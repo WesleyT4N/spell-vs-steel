@@ -213,7 +213,7 @@ export type PanelState = 'clean' | 'burning' | 'cracked';
 
 const PANEL = { face: '#bcbcbc', hi: '#fcfcfc', lo: '#7c7c7c', lip: '#7c7c7c', lipLo: '#000000' };
 
-export function drawPanel(c: Ctx, col: number, row: number, state: PanelState, t: number, owner: 0 | 1, highlight?: string): void {
+export function drawPanel(c: Ctx, col: number, row: number, state: PanelState, _t: number, owner: 0 | 1, highlight?: string): void {
   const x = X0 + col * PW, y = Y0 + row * (FACE + LIP);
   const team = owner === 0 ? LEFT_EDGE : RIGHT_EDGE;
   const fx = x + 2, fy = y + 1, fw = PW - 4, fh = FACE - 2;
@@ -240,15 +240,5 @@ export function drawPanel(c: Ctx, col: number, row: number, state: PanelState, t
     let bx = fx + fw - 8, by = fy + 2;
     for (let i = 0; i < 6; i++) { P(c, '#000000', bx, by); bx -= 1 + Math.floor(cr() * 2); by += 1; }
   }
-  if (state === 'burning') {
-    for (let i = 0; i < 5; i++) {
-      const tx = fx + 2 + i * 6 + (row % 2);
-      const flick = (Math.floor(t / 2) + i + col) % 2;
-      const hgt = 5 + ((Math.floor(t * 1.5) + i * 2 + col) % 4);
-      const base = fy + fh - 1;
-      P(c, '#f83800', tx, base - hgt, 4, hgt); P(c, '#f83800', tx + 1 + flick, base - hgt - 2, 1, 2);
-      P(c, '#fca044', tx + 1, base - Math.round(hgt * 0.75), 2, Math.round(hgt * 0.75));
-      P(c, flick ? '#f8b800' : '#fce0a8', tx + 1, base - Math.round(hgt * 0.45), 2, Math.round(hgt * 0.45));
-    }
-  }
+  // burning panels get their flames from the effects layer (fxView.drawBurn)
 }
