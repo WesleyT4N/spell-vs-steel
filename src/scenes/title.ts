@@ -10,13 +10,15 @@ import { MENU_SONG } from '../engine/music';
 import { SetupScene } from './setup';
 import { DeckBuilderScene } from './deckbuilder';
 import { OptionsScene } from './options';
+import { OnlineScene } from './online';
 import { TutorialScene, tutorialDone } from './tutorial';
 import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
 
-const ITEMS = ['VERSUS CPU', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
+const ITEMS = ['VERSUS CPU', 'ONLINE VERSUS', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
 
-const MENU_Y = 178, MENU_GAP = 20;
+// six rows in dev builds still clear the version line
+const MENU_Y = ITEMS.length > 5 ? 172 : 178, MENU_GAP = ITEMS.length > 5 ? 18 : 20;
 
 export class TitleScene implements Scene {
   sel = 0;
@@ -34,6 +36,7 @@ export class TitleScene implements Scene {
       sfx('select');
       const item = ITEMS[this.sel];
       if (item === 'VERSUS CPU') setScene(new SetupScene());
+      if (item === 'ONLINE VERSUS') setScene(new OnlineScene());
       if (item === 'TUTORIAL') setScene(new TutorialScene());
       if (item === 'DECK BUILDER') setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
       if (item === 'OPTIONS') setScene(new OptionsScene(() => setScene(new TitleScene())));
@@ -55,7 +58,7 @@ export class TitleScene implements Scene {
     drawLogo(c, W / 2, 10, this.t);
     drawMenu(ui, ITEMS, this.sel, UW / 2, MENU_Y, tick, { width: 200, gap: MENU_GAP });
     // first-timers get a nudge toward the tutorial
-    if (!tutorialDone() && tick % 8 < 6) drawText(ui, 'NEW!', UW / 2 + 40, MENU_Y + MENU_GAP + Math.round((MENU_GAP - 17) / 2), '#f8b800');
+    if (!tutorialDone() && tick % 8 < 6) drawText(ui, 'NEW!', UW / 2 + 40, MENU_Y + ITEMS.indexOf('TUTORIAL') * MENU_GAP + Math.round((MENU_GAP - 17) / 2), '#f8b800');
     drawTextCentered(ui, DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2', UW / 2, 288, '#7c7c7c', 1, false);
     if (isMuted()) drawText(ui, 'MUTED', 8, 8, '#7c7c7c');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   M: MUTE`);

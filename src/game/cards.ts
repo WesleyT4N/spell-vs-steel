@@ -3,6 +3,7 @@
 import type { Battle, CastCtx, Fighter, Side } from './battle';
 import type { ClassId } from '../art/sprites';
 import { sfx } from '../engine/audio';
+import { shuffle } from './rng';
 
 export type Element = 'steel' | 'fire' | 'frost' | 'arcane';
 export type Rarity = 'common' | 'uncommon' | 'legendary' | 'mythic';
@@ -487,8 +488,8 @@ const mage: CardDef[] = [
       // ~2 shards/s; each telegraphs 0.5s. Prototype: 40% of shards aim at the enemy's panel.
       for (let i = 0; i < 8; i++) b.later(i * 0.5, () => {
         const cells = allEnemyPanels(b, f.side);
-        const aim = Math.random() < 0.4;
-        const [c, r] = aim ? [foe.col, foe.row] : cells[Math.floor(Math.random() * cells.length)];
+        const aim = b.rand() < 0.4;
+        const [c, r] = aim ? [foe.col, foe.row] : cells[Math.floor(b.rand() * cells.length)];
         b.mark(c, r, 0.5, '#3cbcfc');
         b.later(0.5, () => {
           b.addFx('shard', f.side, c, r, 0.3);
@@ -569,7 +570,7 @@ const mage: CardDef[] = [
     dmg: '50 each', short: '6 comets fall on random enemy panels, leaving them burning.',
     cast: x => {
       const { b, f } = x;
-      const cells = allEnemyPanels(b, f.side).sort(() => Math.random() - 0.5).slice(0, 6);
+      const cells = shuffle(allEnemyPanels(b, f.side), b.rand).slice(0, 6);
       cells.forEach(([c, r], i) => {
         b.later(i * 0.25, () => b.mark(c, r, 0.5, '#f83800'));
         b.later(i * 0.25 + 0.5, () => {

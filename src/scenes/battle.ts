@@ -1,6 +1,6 @@
 // Versus CPU: runs a Battle, the custom screen, pause and results.
 import { setScene, dim, drawMenu, hint, zone, hot, isHot, listMouse, type Scene } from './scene';
-import { Battle, NO_INTENT, type Dir, type Intent } from '../game/battle';
+import { Battle, NO_INTENT, type Dir, type Intent, type Side } from '../game/battle';
 import { drawBattle, drawBattleUi } from '../game/battleView';
 import { Cpu } from '../game/ai';
 import { CARDS, ELEMENT_COLOR, RARITY_COLOR } from '../game/cards';
@@ -40,10 +40,12 @@ export class BattleScene implements Scene {
   holdT = 0;
   lastDir: Dir | null = null;
   ended = false;
+  /** Which side this screen plays: 0 (left) against the CPU, either side online. */
+  me: Side = 0;
 
-  /** Rounds won in the current set: [you, cpu]. */
-  constructor(public m: MatchConfig, public score: [number, number] = [0, 0]) {
-    this.b = new Battle(
+  /** Rounds won in the current set, by side. `battle` lets online play hand in a seeded battle. */
+  constructor(public m: MatchConfig, public score: [number, number] = [0, 0], battle?: Battle) {
+    this.b = battle ?? new Battle(
       { cls: m.p1, deck: playerDeck(m), name: 'YOU', skin: m.p1Skin[m.p1] },
       { cls: m.cpu, deck: toList(starterDeck(m.cpu)), name: 'CPU', skin: m.cpuSkin[m.cpu] },
     );
@@ -52,8 +54,8 @@ export class BattleScene implements Scene {
 
   enter(): void { playMusic('battle', BATTLE_SONG); }
 
-  private playerIntent(dt: number): Intent {
-    const f = this.b.f[0];
+  protected playerIntent(dt: number): Intent {
+    const f = this.b.f[this.me];
     const d = heldDir();
     let move: Dir | null = null;
     if (d) {
@@ -91,26 +93,26 @@ export class BattleScene implements Scene {
       this.ended = true;
       if (b.winner !== null) this.score[b.winner]++;
       stopMusic();
-      if (b.winner === 0) sfx('win');
+      if (b.winner === this.me) sfx('win');
       playMusic('result', RESULT_SONG);
     }
   }
 
-  private openCustom(): void {
+  protected openCustom(): void {
     this.cursor = 0;
     this.lift = [];
     this.picks = [];
     this.timer = TUNING.customTimer;
   }
 
-  private confirmCustom(): void {
+  protected confirmCustom(): void {
     const cpuPicks = this.cpu.pick(this.b, this.b.f[1]);
     this.b.endCustom([this.picks, cpuPicks]);
     this.fightBanner = 0.9;
   }
 
-  private updateCustom(dt: number): void {
-    const offer = this.b.offer[0];
+  protected updateCustom(dt: number): void {
+    const offer = this.b.offer[this.me];
     const rows = offer.length + 1;
     for (let i = 0; i < offer.length; i++) {
       const cur = this.lift[i] ?? 0, to = this.level(i) * LIFT;
@@ -147,7 +149,7 @@ export class BattleScene implements Scene {
 
   /** Pick or unpick the card under the cursor, or start the fight from the FIGHT button. */
   private choose(advance = false): void {
-    const offer = this.b.offer[0];
+    const offer = this.b.offer[this.me];
     if (this.cursor === offer.length) { this.confirmCustom(); return; }
     const at = this.picks.indexOf(this.cursor);
     if (at >= 0) { this.picks.splice(at, 1); sfx('back'); return; }
@@ -157,7 +159,7 @@ export class BattleScene implements Scene {
     if (advance) { this.cursor = Math.min(this.cursor + 1, offer.length); while (this.cursor < offer.length && this.picks.includes(this.cursor)) this.cursor++; }
   }
 
-  private updatePause(dt: number): void {
+  protected updatePause(dt: number): void {
     const items = 4;
     const clicked = listMouse('menu', this.pauseSel, i => { this.pauseSel = i; sfx('move'); });
     if (clicked >= 0) this.pauseSel = clicked;
@@ -174,13 +176,18 @@ export class BattleScene implements Scene {
     }
   }
 
-  private get need(): number { return Math.ceil(this.m.bestOf / 2); }
-  private get setOver(): boolean { return Math.max(...this.score) >= this.need; }
-  private get resultItems(): string[] {
+  /** Hooks the online scene overrides. */
+  protected rivalName = 'CPU';
+  protected pauseItems = ['RESUME', 'OPTIONS', 'RESTART', 'QUIT TO TITLE'];
+  protected rivalDeckText(): string { return `CPU DECK: ${STARTER_NAME[this.m.cpu].toUpperCase()}`; }
+
+  protected get need(): number { return Math.ceil(this.m.bestOf / 2); }
+  protected get setOver(): boolean { return Math.max(...this.score) >= this.need; }
+  protected get resultItems(): string[] {
     return this.setOver ? ['REMATCH', 'CHARACTER SELECT', 'TITLE'] : ['NEXT ROUND', 'TITLE'];
   }
 
-  private updateResult(dt: number): void {
+  protected updateResult(dt: number): void {
     const items = this.resultItems.length;
     const clicked = listMouse('menu', this.resultSel, i => { this.resultSel = i; sfx('move'); });
     if (clicked >= 0) this.resultSel = clicked;
@@ -200,10 +207,10 @@ export class BattleScene implements Scene {
   draw(c: Ctx, tick: number, ui: Ctx): void {
     const b = this.b;
     drawBattle(c, b, tick);
-    if (b.phase !== 'custom') drawBattleUi(ui, b, tick);
+    if (b.phase !== 'custom') drawBattleUi(ui, b, tick, this.me);
     if (this.m.bestOf > 1 && b.phase !== 'over' && b.phase !== 'custom') {
       const round = this.score[0] + this.score[1] + 1;
-      drawTextCentered(ui, `ROUND ${round}   ${this.score[0]}-${this.score[1]}`, UW / 2, 36, '#fcfcfc');
+      drawTextCentered(ui, `ROUND ${round}   ${this.score[this.me]}-${this.score[1 - this.me]}`, UW / 2, 36, '#fcfcfc');
     }
     if (b.phase === 'custom') this.drawCustom(c, tick, ui);
     if (this.fightBanner > 0 && b.phase === 'fight') {
@@ -213,14 +220,14 @@ export class BattleScene implements Scene {
     if (b.phase === 'ko' && b.koT > 0.4) drawTextCentered(ui, 'K.O.', UW / 2, 116, '#f83800', 6);
     if (b.phase === 'over') {
       dim(ui, 0.45);
-      const won = b.winner === 0;
+      const won = b.winner === this.me;
       if (this.m.bestOf === 1) {
         drawTextCentered(ui, won ? 'YOU WIN!' : 'YOU LOSE', UW / 2, 64, won ? '#f8b800' : '#bcbcbc', 5);
       } else {
-        const setWon = this.score[0] >= this.need;
+        const setWon = this.score[this.me] >= this.need;
         const title = this.setOver ? (setWon ? 'SET WON!' : 'SET LOST') : won ? 'ROUND WON' : 'ROUND LOST';
         drawTextCentered(ui, title, UW / 2, 56, won ? '#f8b800' : '#bcbcbc', 4);
-        drawTextCentered(ui, `YOU ${this.score[0]} - ${this.score[1]} CPU`, UW / 2, 104, '#fcfcfc', 2);
+        drawTextCentered(ui, `YOU ${this.score[this.me]} - ${this.score[1 - this.me]} ${this.rivalName}`, UW / 2, 104, '#fcfcfc', 2);
       }
       drawMenu(ui, this.resultItems, this.resultSel, UW / 2, 160, tick, { width: 200, gap: 24 });
       hint(ui, `CLICK OR ${k('attack')}: SELECT`);
@@ -228,14 +235,14 @@ export class BattleScene implements Scene {
     if (this.paused) {
       dim(ui, 0.55);
       drawTextCentered(ui, 'PAUSED', UW / 2, 76, '#fcfcfc', 4);
-      drawMenu(ui, ['RESUME', 'OPTIONS', 'RESTART', 'QUIT TO TITLE'], this.pauseSel, UW / 2, 130, tick, { width: 200, gap: 24 });
+      drawMenu(ui, this.pauseItems, this.pauseSel, UW / 2, 130, tick, { width: 200, gap: 24 });
       hint(ui, `CLICK OR ${k('attack')}: SELECT   ${k('cast')} / RIGHT-CLICK: RESUME`);
     }
   }
 
   private drawCustom(c: Ctx, tick: number, ui: Ctx): void {
-    const b = this.b, f = b.f[0];
-    const offer = b.offer[0];
+    const b = this.b, f = b.f[this.me];
+    const offer = b.offer[this.me];
     dim(c, 0.5);
 
     // header: turn, timer, resource
@@ -255,7 +262,7 @@ export class BattleScene implements Scene {
       drawText(ui, 'START THE FIGHT', 16, 42, '#f8b800', 2);
       drawText(ui, `${this.picks.length} SPELL${this.picks.length === 1 ? '' : 'S'} PICKED`, 16, 64, '#fcfcfc');
       drawText(ui, `CAST THEM IN ORDER WITH ${k('cast')}`, 16, 78, '#bcbcbc');
-      drawText(ui, `CPU DECK: ${STARTER_NAME[this.m.cpu].toUpperCase()}`, 16, 100, '#7c7c7c');
+      drawText(ui, this.rivalDeckText(), 16, 100, '#7c7c7c');
     }
 
     // right: cast order
@@ -295,7 +302,7 @@ export class BattleScene implements Scene {
 
   /** Header resource pips, with what the picked spells would add blinking in. */
   private drawResourcePreview(ui: Ctx, tick: number): void {
-    const b = this.b, f = b.f[0], offer = b.offer[0];
+    const b = this.b, f = b.f[this.me], offer = b.offer[this.me];
     const mage = f.cls === 'mage';
     let gainMax = 0, gainRes = 0, refill = false;
     for (const i of this.picks) {
