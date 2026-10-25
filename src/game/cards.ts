@@ -21,6 +21,8 @@ export interface CardDef {
   lock?: number;
   /** Damage shown on the card. */
   dmg: string;
+  /** Resource the spell gives its caster when cast, previewed on the Draw screen. */
+  gain?: { max?: number; res?: number; refill?: boolean };
   /** One-line rules text (keep under ~90 chars, it has to fit a 240px screen). */
   short: string;
   cast: (x: CastCtx) => void;
@@ -349,7 +351,7 @@ const mage: CardDef[] = [
   },
   {
     id: 'arcane_focus', name: 'Arcane Focus', cls: 'mage', cost: 0, rarity: 'common', element: 'arcane', damaging: false, lock: 0.2,
-    dmg: '-', short: 'Gain +1 Mana this turn. Can go above your max.',
+    dmg: '-', short: 'Gain +1 Mana this turn. Can go above your max.', gain: { res: 1 },
     cast: x => { x.f.res += 1; x.b.text(x.f, '+1 MANA', '#f878f8'); },
   },
   {
@@ -451,7 +453,7 @@ const mage: CardDef[] = [
   },
   {
     id: 'arcane_intellect', name: 'Arcane Intellect', cls: 'mage', cost: 1, rarity: 'uncommon', element: 'arcane', damaging: false, lock: 0.3,
-    dmg: '-', short: 'Permanently +1 max Mana (cap 5).',
+    dmg: '-', short: 'Permanently +1 max Mana (cap 5).', gain: { max: 1, res: 1 },
     cast: x => { if (x.f.resMax < 5) { x.f.resMax += 1; x.f.res += 1; } x.b.text(x.f, '+1 MAX MANA', '#f878f8'); },
   },
   {
@@ -546,7 +548,7 @@ const mage: CardDef[] = [
   },
   {
     id: 'evocation', name: 'Evocation', cls: 'mage', cost: 0, rarity: 'legendary', element: 'arcane', damaging: false, lock: 0.3,
-    dmg: '-', short: 'Refill Mana to max, but you cannot cast for 2s.',
+    dmg: '-', short: 'Refill Mana to max, but you cannot cast for 2s.', gain: { refill: true },
     cast: x => { x.f.res = Math.max(x.f.res, x.f.resMax); x.f.st.evoLock = 2; },
     ai: (_b, f) => f.res <= 1,
   },

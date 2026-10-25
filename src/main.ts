@@ -5,6 +5,7 @@ import { toggleMute } from './engine/audio';
 import { setScene, getScene, commitZones, hotZone } from './scenes/scene';
 import { TitleScene } from './scenes/title';
 import { OnlineScene } from './scenes/online';
+import { DEV_TOOLS } from './flags';
 
 // The screen is the sharp UI resolution. The world draws at 240×160 offscreen and is scaled up 2×
 // underneath, so the fight keeps its chunky pixels while menus and text get twice the room.
@@ -26,7 +27,9 @@ const ui = offscreen(UW, UH);
 
 function fit(): void {
   // half steps of the screen are whole steps of the world, so the fight's pixels stay square
-  const s = Math.max(0.5, Math.floor(Math.min(window.innerWidth / UW, window.innerHeight / UH) * 2) / 2);
+  // dev tools can dock a panel on the right and reserve its width
+  const room = window.innerWidth - Number(document.body.dataset.reserveRight ?? 0);
+  const s = Math.max(0.5, Math.floor(Math.min(room / UW, window.innerHeight / UH) * 2) / 2);
   canvas.style.width = `${UW * s}px`;
   canvas.style.height = `${UH * s}px`;
 }
@@ -42,6 +45,8 @@ window.addEventListener('keydown', () => { engaged = true; });
 // a shared online link (?room=CODE) goes straight to joining that room
 const room = new URLSearchParams(location.search).get('room');
 setScene(room ? new OnlineScene(room) : new TitleScene());
+// dev builds can open a dev tool straight from the URL (#cards, #sandbox, #lab, #dev)
+if (DEV_TOOLS && !room && location.hash.length > 1) void import('./scenes/devMenu').then(m => m.devFromHash(() => setScene(new TitleScene())));
 
 const STEP = 1 / 60;
 let acc = 0;
