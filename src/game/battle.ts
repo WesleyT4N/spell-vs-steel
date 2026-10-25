@@ -25,6 +25,8 @@ export interface Shield { kind: 'guard' | 'ironSkin' | 'barrier' | 'unbreakable'
 export interface Fighter {
   side: Side;
   cls: ClassId;
+  /** Skin id (see art/sprites.ts) and whether the mirror-match alternate palette is on. */
+  skin: string;
   alt: boolean;
   name: string;
   hp: number;
@@ -145,9 +147,10 @@ export class Battle {
   /** Damage dealt by each side, split by source (for tuning). */
   stats = [{ basic: 0, spell: 0, other: 0 }, { basic: 0, spell: 0, other: 0 }];
 
-  constructor(a: { cls: ClassId; deck: string[]; name: string }, bSpec: { cls: ClassId; deck: string[]; name: string }) {
-    const mirror = a.cls === bSpec.cls;
-    this.f = [makeFighter(0, a.cls, false, a.deck, a.name), makeFighter(1, bSpec.cls, mirror, bSpec.deck, bSpec.name)];
+  constructor(a: FighterSpec, bSpec: FighterSpec) {
+    // same class in the same skin: the CPU copy gets the alternate palette
+    const mirror = a.cls === bSpec.cls && (a.skin ?? 'base') === (bSpec.skin ?? 'base');
+    this.f = [makeFighter(0, a, false), makeFighter(1, bSpec, mirror)];
     for (let c = 0; c < COLS; c++) {
       this.panels[c] = [];
       for (let r = 0; r < ROWS; r++) {
@@ -761,12 +764,15 @@ export interface CastCtx {
   spent: number;
 }
 
-function makeFighter(side: Side, cls: ClassId, alt: boolean, deck: string[], name: string): Fighter {
+export interface FighterSpec { cls: ClassId; deck: string[]; name: string; skin?: string }
+
+function makeFighter(side: Side, spec: FighterSpec, alt: boolean): Fighter {
+  const { cls, deck, name } = spec;
   const st = {} as Record<StatusKey, number>;
   for (const k of STATUS_KEYS) st[k] = 0;
   const maxHp = TUNING.hp[cls];
   return {
-    side, cls, alt, name, hp: maxHp, maxHp,
+    side, cls, skin: spec.skin ?? 'base', alt, name, hp: maxHp, maxHp,
     col: side === 0 ? 1 : 4, row: 1, dx: 0, dy: 0,
     lock: 0, moveCd: 0, charging: false, charge: 0,
     res: cls === 'mage' ? TUNING.mage.manaStart : 0,

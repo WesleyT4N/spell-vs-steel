@@ -1,7 +1,7 @@
 // Match setup: both fighters, the player's deck, CPU difficulty.
 import { setScene, hint, type Scene } from './scene';
 import { getArena } from '../game/battleView';
-import { getSprite, drawFighterSprite, teamColor, type ClassId } from '../art/sprites';
+import { getSprite, drawFighterSprite, teamColor, SKINS, type ClassId } from '../art/sprites';
 import { P, W, H, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k } from '../engine/input';
@@ -13,7 +13,7 @@ import { DeckBuilderScene } from './deckbuilder';
 import { TitleScene } from './title';
 
 const CLASSES: ClassId[] = ['warrior', 'mage'];
-const ROWS = ['YOU', 'DECK', 'EDIT DECK', 'CPU', 'CPU LEVEL', 'MATCH', 'FIGHT!'] as const;
+const ROWS = ['YOU', 'SKIN', 'DECK', 'EDIT DECK', 'CPU', 'CPU SKIN', 'CPU LEVEL', 'MATCH', 'FIGHT!'] as const;
 
 export class SetupScene implements Scene {
   m: MatchConfig = loadMatch();
@@ -38,6 +38,8 @@ export class SetupScene implements Scene {
       if (row === 'YOU') { this.m.p1 = cycle(CLASSES, this.m.p1); this.m.p1Deck = 'starter'; sfx('move'); }
       if (row === 'DECK') { this.m.p1Deck = this.m.p1Deck === 'starter' ? 'custom' : 'starter'; sfx('move'); }
       if (row === 'CPU') { this.m.cpu = cycle(CLASSES, this.m.cpu); sfx('move'); }
+      if (row === 'SKIN') { const ids = SKINS[this.m.p1].map(s => s.id); this.m.p1Skin[this.m.p1] = cycle(ids, this.m.p1Skin[this.m.p1]); sfx('move'); }
+      if (row === 'CPU SKIN') { const ids = SKINS[this.m.cpu].map(s => s.id); this.m.cpuSkin[this.m.cpu] = cycle(ids, this.m.cpuSkin[this.m.cpu]); sfx('move'); }
       if (row === 'CPU LEVEL') { this.m.difficulty = this.m.difficulty === 'easy' ? 'normal' : 'easy'; sfx('move'); }
       if (row === 'MATCH') { this.m.bestOf = cycle([1, 3, 5] as const, this.m.bestOf); sfx('move'); }
       saveMatch(this.m);
@@ -69,18 +71,19 @@ export class SetupScene implements Scene {
 
     // portraits
     const bob = Math.floor(tick / 4) % 2;
-    frame(c, 10, 20, 52, 58, '#000000', teamColor(this.m.p1, false));
-    drawFighterSprite(c, getSprite(this.m.p1, false), 36, 70 - bob, false, 'none', 2);
-    drawTextCentered(c, 'YOU', 36, 22, '#fcfcfc', 1, false);
-    const alt = this.m.p1 === this.m.cpu;
-    frame(c, W - 62, 20, 52, 58, '#000000', teamColor(this.m.cpu, alt));
-    drawFighterSprite(c, getSprite(this.m.cpu, alt), W - 36, 70 - (1 - bob), true, 'none', 2);
-    drawTextCentered(c, 'CPU', W - 36, 22, '#fcfcfc', 1, false);
-    drawTextCentered(c, 'VS', W / 2, 44, '#f8b800', 2);
+    const mySkin = this.m.p1Skin[this.m.p1], cpuSkin = this.m.cpuSkin[this.m.cpu];
+    frame(c, 10, 16, 52, 54, '#000000', teamColor(this.m.p1, mySkin, false));
+    drawFighterSprite(c, getSprite(this.m.p1, mySkin, false), 36, 66 - bob, false, 'none', 2);
+    drawTextCentered(c, 'YOU', 36, 18, '#fcfcfc', 1, false);
+    const alt = this.m.p1 === this.m.cpu && mySkin === cpuSkin;
+    frame(c, W - 62, 16, 52, 54, '#000000', teamColor(this.m.cpu, cpuSkin, alt));
+    drawFighterSprite(c, getSprite(this.m.cpu, cpuSkin, alt), W - 36, 66 - (1 - bob), true, 'none', 2);
+    drawTextCentered(c, 'CPU', W - 36, 18, '#fcfcfc', 1, false);
+    drawTextCentered(c, 'VS', W / 2, 38, '#f8b800', 2);
 
     // option rows
-    const x0 = 40, y0 = 82, rh = 9;
-    frame(c, x0 - 14, y0 - 4, W - 2 * x0 + 28, ROWS.length * rh + 5, '#000000', '#fcfcfc');
+    const x0 = 36, y0 = 77, rh = 8;
+    frame(c, x0 - 14, y0 - 4, W - 2 * x0 + 28, ROWS.length * rh + 4, '#000000', '#fcfcfc');
     ROWS.forEach((row, i) => {
       const y = y0 + i * rh;
       const on = i === this.sel;
@@ -91,6 +94,22 @@ export class SetupScene implements Scene {
       if (row === 'DECK') value = this.m.p1Deck === 'starter' ? `STARTER: ${STARTER_NAME[this.m.p1].toUpperCase()}` : `CUSTOM${this.customValid() ? '' : ' (NOT READY)'}`;
       if (row === 'CPU') value = this.m.cpu.toUpperCase() + (alt ? ' (ALT)' : '');
       if (row === 'CPU LEVEL') value = this.m.difficulty.toUpperCase();
+      if (row === 'SKIN' || row === 'CPU SKIN') {
+        // no names: one swatch per skin in its main color, the chosen one framed
+        const cls = row === 'SKIN' ? this.m.p1 : this.m.cpu;
+        const cur = row === 'SKIN' ? mySkin : cpuSkin;
+        drawText(c, row, x0, y, '#bcbcbc');
+        const list = SKINS[cls], sx = W - x0 - list.length * 9 - (on ? 8 : 0);
+        if (on) { drawText(c, '←', sx - 8, y, '#fcfcfc'); drawText(c, '→', sx + list.length * 9 + 2, y, '#fcfcfc'); }
+        list.forEach((sk, n) => {
+          const px = sx + n * 9;
+          if (sk.id === cur) P(c, '#fcfcfc', px - 1, y - 1, 8, 8);
+          P(c, '#000000', px, y, 6, 6);
+          P(c, teamColor(cls, sk.id, false), px + 1, y + 1, 4, 4);
+        });
+        if (on && tick % 8 < 6) drawText(c, '→', x0 - 10, y, '#f8b800');
+        return;
+      }
       if (row === 'MATCH') value = this.m.bestOf === 1 ? 'SINGLE' : `BEST OF ${this.m.bestOf}`;
       if (label) {
         drawText(c, label, x0, y, '#bcbcbc');
@@ -101,7 +120,7 @@ export class SetupScene implements Scene {
       }
       if (on && tick % 8 < 6) drawText(c, '→', x0 - 10, y, '#f8b800');
     });
-    if (this.msgT > 0) { P(c, '#000000', 0, 68, W, 10); drawTextCentered(c, this.msg, W / 2, 69, '#f83800'); }
+    if (this.msgT > 0) { P(c, '#000000', 0, 62, W, 10); drawTextCentered(c, this.msg, W / 2, 63, '#f83800'); }
     hint(c, `${k('left')}/${k('right')} CHANGE  ${k('attack')} OK  ${k('cast')} BACK  ${k('custom')} FIGHT`);
   }
 }

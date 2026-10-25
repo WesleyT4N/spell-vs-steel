@@ -36,7 +36,7 @@ Draw screen: J picks or unpicks a spell (cast order is pick order), K undoes the
 - Spell costs are paid on cast. Warrior Rage (max 5) comes from heavy hits (+1.5) and taking damage (1 pip per 40, max 1 per hit); light attacks build none. Mage Mana starts at 1 max, +1 max per Draw screen (cap 5), and refills each turn.
 - Frozen or stunned targets take +50% damage. No slows.
 - Grimoires: exactly 30 spells, up to 4 copies of a common, 2 of an uncommon, 1 of each Legendary (max 5), exactly 1 Mythic. Custom decks save in the browser.
-- Mirror matches give the CPU an alternate palette.
+- Skins: 6 per class (base + 5), picked on the setup screen for you and the CPU. Same class in the same skin gives the CPU an alternate palette.
 - Matches are a single round, best of 3 (default) or best of 5, picked on the setup screen.
 
 Every number worth tuning is in [`src/game/tuning.ts`](src/game/tuning.ts). Spells live in [`src/game/cards.ts`](src/game/cards.ts), one entry each.

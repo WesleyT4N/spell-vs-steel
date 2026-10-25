@@ -38,8 +38,8 @@ export class TitleScene implements Scene {
     c.fillRect(0, 0, W, H);
     // fighters flanking the logo
     const bob = Math.floor(this.t * 2.5) % 2;
-    drawFighterSprite(c, getSprite('warrior', false), 34, 130 - bob, false, 'none', 2);
-    drawFighterSprite(c, getSprite('mage', false), 206, 130 - (1 - bob), true, 'none', 2);
+    drawFighterSprite(c, getSprite('warrior', 'base', false), 34, 130 - bob, false, 'none', 2);
+    drawFighterSprite(c, getSprite('mage', 'base', false), 206, 130 - (1 - bob), true, 'none', 2);
     P(c, '#000000', 22, 131, 24, 2); P(c, '#000000', 194, 131, 24, 2);
     drawLogo(c, W / 2, 10);
     drawMenu(c, ITEMS, this.sel, W / 2, 92, tick, { width: 104 });
