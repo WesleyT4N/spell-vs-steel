@@ -83,6 +83,8 @@ let capture: ((code: string) => void) | null = null;
 export function captureNextKey(cb: (code: string) => void): void { capture = cb; }
 
 function onKey(e: KeyboardEvent, isDown: boolean): void {
+  // typing into a dev tools field is not game input
+  if (e.target instanceof Element && e.target.closest('input, select, textarea')) return;
   unlockAudio();
   if (capture && isDown) {
     e.preventDefault();

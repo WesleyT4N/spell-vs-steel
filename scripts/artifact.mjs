@@ -1,7 +1,10 @@
 // Turns the single-file Vite build into a page for a claude.ai artifact (which supplies its own <html>/<head>/<body>).
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const html = readFileSync('dist/index.html', 'utf8');
+// usage: node scripts/artifact.mjs [outDir]   (dist by default, dist-prod for the prod build)
+const dir = process.argv[2] ?? 'dist';
+
+const html = readFileSync(`${dir}/index.html`, 'utf8');
 const scripts = [...html.matchAll(/<script[^>]*>[\s\S]*?<\/script>/g)].map(m => m[0]).join('\n');
 const page = `<title>Spell VS Steel</title>
 <style>
@@ -13,5 +16,5 @@ const page = `<title>Spell VS Steel</title>
 <canvas id="game" tabindex="0" aria-label="Spell VS Steel game screen"></canvas>
 ${scripts}
 `;
-writeFileSync('dist/artifact.html', page);
-console.log(`dist/artifact.html ${(page.length / 1024).toFixed(1)} KB`);
+writeFileSync(`${dir}/artifact.html`, page);
+console.log(`${dir}/artifact.html ${(page.length / 1024).toFixed(1)} KB`);
