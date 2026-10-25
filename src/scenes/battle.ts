@@ -16,6 +16,7 @@ import { TUNING } from '../game/tuning';
 import { P, UW, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse } from '../engine/input';
+import { touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
 import { drawCardDetail, drawCardFace, CARD_W, CARD_H, PICKED } from './cardView';
@@ -53,6 +54,14 @@ export class BattleScene implements Scene {
   }
 
   enter(): void { playMusic('battle', BATTLE_SONG); }
+
+  pad(): PadMode {
+    const b = this.b;
+    if (this.paused) return 'back';
+    // the Draw screen and results are all taps (tap a picked card again to undo it)
+    if (b.phase === 'custom' || b.phase === 'over') return 'none';
+    return b.canOpenCustom() ? 'fight-ready' : 'fight';
+  }
 
   protected playerIntent(dt: number): Intent {
     const f = this.b.f[this.me];
@@ -268,7 +277,7 @@ export class BattleScene implements Scene {
     // right: cast order
     frame(ui, 244, 34, 228, 98, '#000000', PICKED);
     drawText(ui, 'CAST ORDER', 252, 42, PICKED);
-    if (!this.picks.length) drawText(ui, 'CLICK CARDS TO QUEUE THEM', 252, 58, '#7c7c7c');
+    if (!this.picks.length) drawText(ui, touchText('CLICK CARDS TO QUEUE THEM'), 252, 58, '#7c7c7c');
     this.picks.slice(0, 5).forEach((i, n) => {
       const cd = CARDS[offer[i]], y = 56 + n * 12;
       drawText(ui, `${n + 1}`, 252, y, PICKED);

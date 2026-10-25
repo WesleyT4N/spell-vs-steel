@@ -17,6 +17,9 @@ const FIXED: Record<string, Action[]> = {
   ArrowUp: ['up'], ArrowDown: ['down'], ArrowLeft: ['left'], ArrowRight: ['right'],
   Enter: ['confirm'], Escape: ['back', 'pause'], Backspace: ['back'],
   KeyM: ['mute'], KeyQ: ['lb'], KeyE: ['rb'],
+  // the on-screen touch pad (src/engine/touch.ts) presses these made-up codes
+  PadUp: ['up'], PadDown: ['down'], PadLeft: ['left'], PadRight: ['right'],
+  PadAttack: ['attack', 'confirm'], PadCast: ['cast', 'back'], PadDraw: ['custom'], PadPause: ['pause'], PadBack: ['back'],
 };
 
 const STORE = 'svs:keys';
@@ -93,11 +96,17 @@ function onKey(e: KeyboardEvent, isDown: boolean): void {
     cb(e.code);
     return;
   }
-  const acts = BINDINGS[e.code];
-  if (!acts) return;
+  if (!BINDINGS[e.code]) return;
   e.preventDefault();
   if (isDown && e.repeat) return;
-  if (isDown) heldCodes.add(e.code); else heldCodes.delete(e.code);
+  press(e.code, isDown);
+}
+
+/** Press or release a key code (a real key, or one of the touch pad's Pad codes). */
+function press(code: string, isDown: boolean): void {
+  const acts = BINDINGS[code];
+  if (!acts) return;
+  if (isDown) heldCodes.add(code); else heldCodes.delete(code);
   for (const a of acts) {
     if (isDown) {
       if (!down.has(a)) pressed.add(a);
@@ -120,6 +129,17 @@ function onKey(e: KeyboardEvent, isDown: boolean): void {
   }
 }
 
+/** Touch pad buttons: press or release one of the Pad codes. */
+export function virtualKey(code: string, isDown: boolean): void {
+  if (isDown === heldCodes.has(code)) return;
+  unlockAudio();
+  press(code, isDown);
+}
+/** Let go of every touch pad button (the pad was hidden or changed layout). */
+export function releaseVirtual(): void {
+  for (const code of [...heldCodes]) if (code.startsWith('Pad')) press(code, false);
+}
+
 // ---------- mouse ----------
 /** Pointer state in canvas pixels, with per-frame click edges. */
 export const mouse = { x: -1, y: -1, moved: false, click: false, rclick: false, wheel: 0, down: false };
@@ -127,6 +147,11 @@ export const mouse = { x: -1, y: -1, moved: false, click: false, rclick: false, 
 /** True while the pointer is inside the rectangle. */
 export const hover = (x: number, y: number, w: number, h: number): boolean =>
   mouse.x >= x && mouse.x < x + w && mouse.y >= y && mouse.y < y + h;
+
+// A finger acts like the mouse: touching hovers (so holding a card reads it), a quick tap clicks,
+// a long hold only reads, and dragging up or down scrolls like the wheel.
+const LONG_PRESS = 0.4, DRAG = 8, WHEEL_STEP = 14;
+let finger: { id: number; x0: number; y0: number; t0: number; wy: number; drag: boolean } | null = null;
 
 function initMouse(canvas: HTMLCanvasElement): void {
   const at = (e: MouseEvent): void => {
@@ -140,6 +165,32 @@ function initMouse(canvas: HTMLCanvasElement): void {
     if (e.button === 0) { mouse.click = true; mouse.down = true; }
     if (e.button === 2) mouse.rclick = true;
   });
+  // fingers and pens; cancelling the pointerdown also stops the browser's emulated mouse events
+  canvas.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' || finger) return; // a second finger on the screen is ignored
+    e.preventDefault();
+    canvas.setPointerCapture(e.pointerId);
+    at(e);
+    finger = { id: e.pointerId, x0: mouse.x, y0: mouse.y, t0: performance.now(), wy: mouse.y, drag: false };
+    mouse.moved = true; mouse.down = true;
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!finger || e.pointerId !== finger.id) return;
+    at(e);
+    mouse.moved = true;
+    if (Math.hypot(mouse.x - finger.x0, mouse.y - finger.y0) > DRAG) finger.drag = true;
+    // finger up scrolls the list down, like the wheel
+    while (mouse.y <= finger.wy - WHEEL_STEP) { mouse.wheel++; finger.wy -= WHEEL_STEP; }
+    while (mouse.y >= finger.wy + WHEEL_STEP) { mouse.wheel--; finger.wy += WHEEL_STEP; }
+  });
+  const lift = (e: PointerEvent, cancel: boolean): void => {
+    if (!finger || e.pointerId !== finger.id) return;
+    if (!cancel && !finger.drag && performance.now() - finger.t0 < LONG_PRESS * 1000) mouse.click = true;
+    mouse.down = false;
+    finger = null;
+  };
+  canvas.addEventListener('pointerup', e => lift(e, false));
+  canvas.addEventListener('pointercancel', e => lift(e, true));
   window.addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
   canvas.addEventListener('mouseleave', () => { mouse.x = mouse.y = -1; });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
@@ -151,7 +202,8 @@ export function initInput(canvas?: HTMLCanvasElement): void {
   window.addEventListener('keydown', e => onKey(e, true));
   window.addEventListener('keyup', e => onKey(e, false));
   window.addEventListener('blur', () => { down.clear(); heldCodes.clear(); dirOrder.length = 0; });
-  window.addEventListener('pointerdown', () => unlockAudio());
+  // iOS only lets sound start from the end of a touch
+  for (const ev of ['pointerdown', 'pointerup', 'touchend']) window.addEventListener(ev, () => unlockAudio());
 }
 
 export const isDown = (a: Action): boolean => down.has(a);

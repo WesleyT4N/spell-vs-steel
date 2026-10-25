@@ -5,6 +5,7 @@ import { getSprite, drawFighterSprite, teamColor, SKINS, skinOf, type ClassId } 
 import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, captureNextKey, k, mouse } from '../engine/input';
+import { touchActive, touchCodeBox, touchText } from '../engine/touch';
 import { sfx } from '../engine/audio';
 import { loadMatch, saveMatch, playerDeck, type MatchConfig } from '../game/match';
 import { loadCustom, validate, STARTER_NAME } from '../game/deck';
@@ -125,7 +126,8 @@ export class OnlineScene implements Scene {
     this.waitT += dt;
     const back = wasPressed('back') || mouse.rclick;
     if (this.mode === 'code') {
-      if (mouse.rclick) { this.mode = 'menu'; captureNextKey(null); sfx('back'); }
+      // typed keys are captured, so a 'back' press here is the touch pad's BACK button
+      if (mouse.rclick || wasPressed('back')) { this.mode = 'menu'; captureNextKey(null); sfx('back'); }
       if (mouse.click && hot('btn') === 0 && this.code.length === CODE_LEN) { captureNextKey(null); this.connect('guest'); }
       return;
     }
@@ -187,7 +189,7 @@ export class OnlineScene implements Scene {
     ];
     lines.forEach((l, i) => drawText(ui, l, 26, 198 + i * 12, '#bcbcbc'));
     drawText(ui, `NETWORK: ${this.kind ? NET_NAME[this.kind] : 'CHECKING...'}`, 26, 266, '#7c7c7c');
-    hint(ui, this.mode === 'code' ? 'TYPE THE CODE   ENTER: JOIN   ESC: BACK'
+    hint(ui, this.mode === 'code' ? (touchActive() ? 'TYPE THE CODE, THEN TAP JOIN' : 'TYPE THE CODE   ENTER: JOIN   ESC: BACK')
       : this.mode === 'menu' ? `CLICK OR ${k('attack')}: SELECT   ${k('left')}/${k('right')}: CHANGE   ${k('cast')} / RIGHT-CLICK: BACK`
         : `${k('cast')} / RIGHT-CLICK: BACK`);
   }
@@ -231,13 +233,19 @@ export class OnlineScene implements Scene {
         frame(ui, bx, 66, 26, 30, '#000000', i === this.code.length && tick % 8 < 5 ? '#f8b800' : '#7c7c7c');
         if (this.code[i]) drawTextCentered(ui, this.code[i], bx + 13, 73, '#f8b800', 2, false);
       }
+      // phones type into a hidden text box over the code boxes
+      touchCodeBox(cx - (CODE_LEN * 30) / 2, 66, CODE_LEN * 30, 30, this.code,
+        v => [...v.toUpperCase()].filter(isCodeChar).join('').slice(0, CODE_LEN),
+        v => { if (v.length > this.code.length) sfx('move'); this.code = v; },
+        () => { if (this.code.length === CODE_LEN) { captureNextKey(null); this.connect('guest'); } });
+      if (touchActive()) drawTextCentered(ui, this.code.length === CODE_LEN ? '' : 'TAP THE BOXES TO TYPE', cx, 102, '#7c7c7c', 1, false);
       if (this.code.length === CODE_LEN) button(ui, 'btn:0', 'JOIN', cx - 40, 112, 80, 20, false, '#f8b800');
       return;
     }
     if (this.mode === 'busy') { drawTextCentered(ui, this.msg, cx, 92, '#f8b800', 1, false); return; }
     if (this.mode === 'error') {
       drawTextCentered(ui, this.msg, cx, 84, '#f83800', 1, false);
-      drawTextCentered(ui, 'CLICK TO GO BACK', cx, 104, '#7c7c7c', 1, false);
+      drawTextCentered(ui, touchText('CLICK TO GO BACK'), cx, 104, '#7c7c7c', 1, false);
       return;
     }
     const net = this.net!;

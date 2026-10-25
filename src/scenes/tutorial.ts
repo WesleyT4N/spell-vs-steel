@@ -17,6 +17,7 @@ import { getSprite, drawFighterSprite, defaultSkin, type ClassId } from '../art/
 import { P, W, H, UW, UH, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, wrap } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
+import { touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG } from '../engine/music';
 
@@ -435,6 +436,12 @@ export class TutorialScene implements Scene {
 
   enter(): void { playMusic('battle', BATTLE_SONG); }
 
+  pad(): PadMode {
+    if (this.choosing || this.paused) return 'back';
+    if (this.done) return 'none';
+    return this.b.phase === 'custom' ? 'none' : this.inner.pad();
+  }
+
   private begin(cls: ClassId): void {
     this.cls = cls;
     this.choosing = false;
@@ -651,8 +658,8 @@ export class TutorialScene implements Scene {
 
   private drawGoal(ui: Ctx, s: Step, tick: number): void {
     const x = UW / 2 - 104, w = 208, y = 36;
-    const lines = wrap(s.goal(this), 32).slice(0, 2);
-    const tip = s.tip ? wrap(s.tip(this), 32).slice(0, 4 - lines.length) : [];
+    const lines = wrap(touchText(s.goal(this)), 32).slice(0, 2);
+    const tip = s.tip ? wrap(touchText(s.tip(this)), 32).slice(0, 4 - lines.length) : [];
     const h = 16 + (lines.length + tip.length) * 9;
     frame(ui, x, y, w, h, '#000000', '#f8b800');
     drawText(ui, this.lessonLabel(), x + 6, y + 4, '#7c7c7c');
@@ -674,7 +681,7 @@ export class TutorialScene implements Scene {
     const pg = this.pages[this.page];
     dim(ui, 0.6);
     const x = 40, w = UW - 80;
-    const paras = pg.body.map(p => wrap(p, Math.floor((w - 28) / 6)));
+    const paras = pg.body.map(p => wrap(touchText(p), Math.floor((w - 28) / 6)));
     const bodyH = paras.reduce((a, l) => a + l.length * 10 + 6, 0);
     const h = 52 + bodyH;
     const y = Math.max(40, Math.round((UH - 14 - h) / 2));
