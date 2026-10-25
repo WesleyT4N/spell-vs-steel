@@ -1,7 +1,7 @@
 // Versus CPU: runs a Battle, the custom screen, pause and results.
 import { setScene, dim, drawMenu, hint, zone, hot, isHot, listMouse, type Scene } from './scene';
 import { Battle, NO_INTENT, type Dir, type Intent } from '../game/battle';
-import { drawBattle } from '../game/battleView';
+import { drawBattle, drawBattleUi } from '../game/battleView';
 import { Cpu } from '../game/ai';
 import { CARDS, ELEMENT_COLOR, RARITY_COLOR } from '../game/cards';
 
@@ -12,8 +12,8 @@ const handArc = (i: number, n: number): number => { const d = i - (n - 1) / 2; r
 import { starterDeck, toList, STARTER_NAME } from '../game/deck';
 import { playerDeck, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
-import { P, W, UW, frame, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
+import { P, UW, frame, type Ctx } from '../engine/gfx';
+import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse } from '../engine/input';
 import { playMusic, stopMusic, sfx } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
@@ -120,18 +120,20 @@ export class BattleScene implements Scene {
     if (prev) { this.cursor = (this.cursor + rows - 1) % rows; sfx('move'); }
     if (next) { this.cursor = (this.cursor + 1) % rows; sfx('move'); }
     if (wasPressed('custom') || (wasPressed('pause') && !wasPressed('confirm'))) { this.confirmCustom(); return; }
-    if (wasPressed('confirm')) { this.choose(); return; }
+    if (wasPressed('confirm')) { this.choose(true); return; }
     if (wasPressed('cast') && this.picks.length) { this.picks.pop(); sfx('back'); }
   }
 
   /** Pick or unpick the card under the cursor, or start the fight from the FIGHT button. */
-  private choose(): void {
+  private choose(advance = false): void {
     const offer = this.b.offer[0];
     if (this.cursor === offer.length) { this.confirmCustom(); return; }
     const at = this.picks.indexOf(this.cursor);
     if (at >= 0) { this.picks.splice(at, 1); sfx('back'); return; }
     this.picks.push(this.cursor);
     sfx('select');
+    // with the keyboard, hop to the next card not yet picked
+    if (advance) { this.cursor = Math.min(this.cursor + 1, offer.length); while (this.cursor < offer.length && this.picks.includes(this.cursor)) this.cursor++; }
   }
 
   private updatePause(dt: number): void {
@@ -177,19 +179,19 @@ export class BattleScene implements Scene {
   draw(c: Ctx, tick: number, ui: Ctx): void {
     const b = this.b;
     drawBattle(c, b, tick);
-    if (this.m.bestOf > 1 && b.phase !== 'over') {
+    if (b.phase !== 'custom') drawBattleUi(ui, b, tick);
+    if (this.m.bestOf > 1 && b.phase !== 'over' && b.phase !== 'custom') {
       const round = this.score[0] + this.score[1] + 1;
-      const t = `ROUND ${round}  ${this.score[0]}-${this.score[1]}`;
-      drawTextOutlined(c, t, W / 2 - textWidth(t) / 2, 22, '#fcfcfc');
+      drawTextCentered(ui, `ROUND ${round}   ${this.score[0]}-${this.score[1]}`, UW / 2, 36, '#fcfcfc');
     }
     if (b.phase === 'custom') this.drawCustom(c, tick, ui);
     if (this.fightBanner > 0 && b.phase === 'fight') {
       const s = this.fightBanner > 0.45 ? 'READY' : 'FIGHT!';
-      drawTextCentered(c, s, W / 2, 62, s === 'FIGHT!' ? '#f8b800' : '#fcfcfc', 3);
+      drawTextCentered(ui, s, UW / 2, 124, s === 'FIGHT!' ? '#f8b800' : '#fcfcfc', 6);
     }
-    if (b.phase === 'ko' && b.koT > 0.4) drawTextCentered(c, 'K.O.', W / 2, 58, '#f83800', 3);
+    if (b.phase === 'ko' && b.koT > 0.4) drawTextCentered(ui, 'K.O.', UW / 2, 116, '#f83800', 6);
     if (b.phase === 'over') {
-      dim(c, 0.45);
+      dim(ui, 0.45);
       const won = b.winner === 0;
       if (this.m.bestOf === 1) {
         drawTextCentered(ui, won ? 'YOU WIN!' : 'YOU LOSE', UW / 2, 64, won ? '#f8b800' : '#bcbcbc', 5);
@@ -203,7 +205,7 @@ export class BattleScene implements Scene {
       hint(ui, `CLICK OR ${k('attack')}: SELECT`);
     }
     if (this.paused) {
-      dim(c, 0.55);
+      dim(ui, 0.55);
       drawTextCentered(ui, 'PAUSED', UW / 2, 76, '#fcfcfc', 4);
       drawMenu(ui, ['RESUME', 'OPTIONS', 'RESTART', 'QUIT TO TITLE'], this.pauseSel, UW / 2, 130, tick, { width: 200, gap: 24 });
       hint(ui, `CLICK OR ${k('attack')}: SELECT   ${k('cast')} / RIGHT-CLICK: RESUME`);

@@ -43,7 +43,7 @@ Every number worth tuning is in [`src/game/tuning.ts`](src/game/tuning.ts). Spel
 
 ## Code map
 
-- `src/main.ts` the loop. The fight draws at 240×160 and is scaled 2× under a sharp 480×320 UI layer that menus, cards and overlays draw on
+- `src/main.ts` the loop. The fight (arena, panels, sprites, effects) draws at 240×160 and is scaled 2× under a sharp 480×320 UI layer for menus, cards, the battle HUD, status tags, damage numbers and cast callouts
 - `src/engine/` canvas helpers, bitmap font, keyboard and mouse input, sound effects and the music sequencer, song data
 - `src/art/` Cartridge NES sprites, the Grand Colosseum arena, the logo
 - `src/game/` battle rules (`battle.ts`), spells, decks, CPU, drawing (`battleView.ts`)
