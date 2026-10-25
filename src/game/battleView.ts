@@ -83,6 +83,14 @@ function drawPanelEffects(c: Ctx, b: Battle, col: number, row: number, tick: num
       P(c, t > 0.7 ? TOX[3] : TOX[2], pc.x - 12 + i * 7, pc.y + 2 - Math.floor(t * 12), 2, 2);
     }
   }
+  if (p.smoke > 0) {
+    // Smokescreen: drifting grey puffs over the panel
+    c.globalAlpha = 0.45; P(c, '#3c3c3c', pc.x - PW / 2 + 2, pc.y - 12, PW - 4, 14); c.globalAlpha = 1;
+    for (let i = 0; i < 5; i++) {
+      const t = (b.time * 0.4 + i / 5 + row * 0.3) % 1;
+      P(c, i % 2 ? '#7c7c7c' : '#bcbcbc', pc.x - 14 + ((i * 7 + Math.floor(t * 8)) % 28), pc.y - 4 - Math.floor(t * 10), 3, 2);
+    }
+  }
   if (p.bless > 0) {
     for (let i = 0; i < 5; i++) {
       const t = (b.time * 0.7 + i / 5 + row * 0.2) % 1;
@@ -276,11 +284,18 @@ function fighterPos(_b: Battle, f: Fighter): { x: number; y: number } {
 
 function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): void {
   const s = getSprite(f.cls, f.skin, f.alt);
-  // Stealth: the owner sees a see-through sprite, the opponent only a faint shimmer
+  // Shadow Clone: the decoy looks like the Rogue
+  if (f.st.decoy > 0 && !f.dead) {
+    const dp = fighterPos(b, { ...f, col: f.decoyCol, row: f.decoyRow, dx: 0, dy: 0 });
+    c.globalAlpha = me === 'all' || me === f.side ? 0.6 : 1; drawFighterSprite(c, s, dp.x, dp.y + 2, f.side === 1, 'none'); c.globalAlpha = 1;
+  }
+  // Stealth: a transparent shimmer with an outline (the owner sees it a little clearer)
   if (f.st.stealth > 0 && !f.dead) {
     const { x, y } = fighterPos(b, f);
-    if (me === 'all' || me === f.side) { c.globalAlpha = 0.4; drawFighterSprite(c, s, x, y + 2, f.side === 1, 'ghost'); c.globalAlpha = 1; }
-    else if (tick % 6 < 2) for (let i = 0; i < 3; i++) P(c, '#7c7c7c', x - 4 + i * 4, y - 8 - ((tick + i * 3) % 10), 1, 2);
+    const mine = me === 'all' || me === f.side;
+    c.globalAlpha = mine ? 0.45 : 0.16 + (tick % 6 < 3 ? 0.08 : 0);
+    drawFighterSprite(c, s, x, y + 2, f.side === 1, 'ghost');
+    c.globalAlpha = 1;
     return;
   }
   const { x, y } = fighterPos(b, f);
@@ -456,7 +471,7 @@ function drawFx(c: Ctx, _b: Battle, e: Fx): void {
       if (p > 0.45 && p < 0.8) for (let i = 0; i < 3; i++) P(c, '#fcfcfc', cx + d * (r + 2 + i * 2), cy - 3 + i * 3, 2, 1);
       break;
     }
-    case 'stab': {
+    case 'dagger': {
       // a quick dagger thrust: the blade shoots out across the panels ahead and snaps back
       const reach = Number(e.data?.reach ?? 2);
       const len = reach * PW * (p < 0.5 ? p * 2 : 1 - (p - 0.5) * 1.2);
@@ -795,6 +810,7 @@ const STATUS_TAGS: Partial<Record<StatusKey, [string, string]>> = {
   nightsEmbrace: ["NIGHT'S EMBRACE", '#9878f8'], pandemic: ['PANDEMIC', '#b8f818'], nest: ['NEST', '#58d854'], deadeye: ['DEADEYE', '#fcfcfc'],
   tripwire: ['TRIPWIRE', '#58d854'], painSup: ['PAIN SUPP', '#f8d878'], guardian: ['GUARDIAN', '#f8d878'], ascension: ['ASCENSION', '#f8d878'],
   avatarLight: ['AVATAR', '#f8d878'], purified: ['PURIFIED', '#f8d878'], mending: ['MENDING', '#58d854'], channel: ['HYMN', '#f8d878'],
+  vanishStun: ['STUN READY', '#f8b800'], backstab: ['BACKSTAB', '#9878f8'], riposte: ['RIPOSTE', '#fcfcfc'], adrenaline: ['ADRENALINE', '#f8d878'], decoy: ['DECOY', '#bcbcbc'],
 };
 const SHIELD_TAG: Record<string, string> = { guard: 'GUARD', ironSkin: 'IRON SKIN', barrier: 'BARRIER', unbreakable: 'UNBREAKABLE', holy: 'SHIELD' };
 
@@ -811,6 +827,7 @@ function drawStatuses(ui: Ctx, b: Battle, f: Fighter, edge: number, y: number, r
   if (f.powerLeft > 0) tags.push([`POWER ×${f.powerLeft}`, '#f878f8']);
   if (f.poison > 0) tags.push([`POISON ×${f.poison} ${Math.max(0, f.poisonT).toFixed(1)}`, '#b8f818']);
   if (f.st.evasion > 0 && f.dodges > 0) tags.push([`DODGE ×${f.dodges}`, '#fcfcfc']);
+  if (f.coldBlood) tags.push(['COLD BLOOD', '#9878f8']);
   const p = b.panels[f.col][f.row];
   if (p.burn > 0) tags.push(['ON FIRE', '#fca044']);
   let cx = edge, cy = y;

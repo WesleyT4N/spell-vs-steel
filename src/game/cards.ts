@@ -23,6 +23,8 @@ export interface CardDef {
   dmg: string;
   /** Resource the spell gives its caster when cast, previewed on the Draw screen. */
   gain?: { max?: number; res?: number; refill?: boolean };
+  /** Only castable while the caster is in Stealth (Ambush); otherwise it waits at the top of the queue. */
+  needsStealth?: boolean;
   /** One-line rules text (keep under ~90 chars, it has to fit a 240px screen). */
   short: string;
   cast: (x: CastCtx) => void;
