@@ -124,7 +124,7 @@ const warrior: CardDef[] = [
   },
   {
     id: 'chain_hook', name: 'Chain Hook', cls: 'warrior', cost: 0, rarity: 'common', element: 'steel', damaging: true, lock: 0.35,
-    dmg: '20', short: 'Chain down your row. On hit: pull them to their front column, gain 1 Rage.',
+    dmg: '20', short: 'Chain down your row. On hit: pull them to their front column, stun 1s, gain 1 Rage.',
     cast: x => {
       x.b.shoot(x.f, {
         speed: 14 * x.dir, kind: 'hook', reflectable: true,
@@ -136,6 +136,7 @@ const warrior: CardDef[] = [
           if (res.blocked && !res.dealt) return;
           const front = b.frontCol(t.side);
           if (t.st.noKnock <= 0 && b.canStand(t, front, t.row)) { t.col = front; }
+          b.stun(t, 1);
           b.gainRage(src, 1, true);
         },
       });
