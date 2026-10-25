@@ -1,5 +1,5 @@
 // CPU opponent. Produces the same Intent a keyboard player would, so the battle can't tell the difference.
-import { NO_INTENT, type Battle, type Dir, type Fighter, type Intent } from './battle';
+import { NO_INTENT, heavyChargeOf, type Battle, type Dir, type Fighter, type Intent } from './battle';
 import { CARDS } from './cards';
 import { TUNING, type Difficulty } from './tuning';
 
@@ -61,15 +61,21 @@ export class Cpu {
 
     // 3. Basic attacks.
     const dist = (foe.col - f.col) * d;
-    const inReach = f.cls === 'warrior' ? aligned && dist >= 1 && dist <= 2 : aligned;
+    const seen = foe.st.stealth <= 0;
+    const inReach = seen && (f.cls === 'warrior' ? aligned && dist >= 1 && dist <= 2 : aligned);
+    // Smite lands a fixed distance ahead, so the Cleric only releases its heavy at that range
+    const heavyReach = inReach && (f.cls !== 'cleric' || dist === TUNING.cleric.smiteRange);
+    const need = heavyChargeOf(f);
     if (this.holding) {
-      if (f.charge >= TUNING.heavyCharge && inReach) this.holding = false; // release fires the heavy
-      else if (f.charge > TUNING.heavyCharge + 1.5) this.holding = false;
+      if (f.charge >= need && heavyReach) this.holding = false; // release fires the heavy
+      else if (f.charge > need + 1.5) this.holding = false;
     } else if (inReach && f.lock <= 0) {
       this.wantTap = true;
       this.holding = Math.random() < (this.difficulty === 'normal' ? 0.35 : 0.15);
       if (Math.random() < 0.5) return;
     }
+    // the Ranger earns Energy by standing still, so it repositions less
+    if (f.cls === 'ranger' && (aligned || !seen) && Math.random() < 0.85) return;
 
     // 4. Positioning.
     const target = this.goal(b, f);
@@ -80,8 +86,15 @@ export class Cpu {
   private goal(b: Battle, f: Fighter): [number, number] {
     const foe = b.foe(f);
     const aim = Math.random() < this.cfg.aim;
-    const row = aim ? foe.row : Math.floor(Math.random() * 3);
+    // a stealthed enemy can't be tracked: hold the current row
+    const row = foe.st.stealth > 0 ? f.row : aim ? foe.row : Math.floor(Math.random() * 3);
     if (f.cls === 'warrior') return [b.frontCol(f.side), row];
+    if (f.cls === 'cleric') {
+      // stand where Smite reaches the enemy, inside our own area
+      const want = foe.col - TUNING.cleric.smiteRange * b.dir(f);
+      const lo = Math.min(b.backCol(f.side), b.frontCol(f.side)), hi = Math.max(b.backCol(f.side), b.frontCol(f.side));
+      return [Math.max(lo, Math.min(hi, want)), row];
+    }
     // Mage: keep distance from a Warrior hugging the border, otherwise hold the middle.
     const threatened = foe.cls === 'warrior' && foe.col === b.frontCol(foe.side);
     const col = threatened ? b.backCol(f.side) : b.frontCol(f.side) - b.dir(f);
@@ -127,8 +140,10 @@ export class Cpu {
       return idx.sort(() => Math.random() - 0.5).slice(0, n);
     }
     const cost = (i: number): number => { const c = CARDS[offer[i]].cost; return c === 'all' ? Math.max(1, f.res) : c; };
-    if (f.cls === 'mage') {
-      let mana = f.res;
+    if (f.cls !== 'warrior') {
+      // Energy and Mana are known up front (the Ranger will earn about 2 more while it stands still)
+      let mana = f.res + (f.cls === 'ranger' ? 2 : 0);
+      for (const i of idx) { const g = CARDS[offer[i]].gain; if (g?.res && offer[i] !== 'arcane_focus') mana += g.res; if (g?.refill) mana = Math.max(mana, 5); }
       const chosen: number[] = [];
       // Focus first (it pays for itself), then the most expensive things we can afford.
       for (const i of idx.filter(i => offer[i] === 'arcane_focus')) { chosen.push(i); mana += 1; }

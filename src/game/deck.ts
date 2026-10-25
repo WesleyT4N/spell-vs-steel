@@ -22,10 +22,28 @@ const STARTERS: Record<ClassId, DeckCounts> = {
     meteor: 1, deep_freeze: 1,
     inferno: 1,
   },
+  rogue: {
+    shiv: 3, evasion: 2, vanish: 2, shadowstep: 4, ambush: 3, deadly_poison: 2, poison_vial: 2, envenom: 3, fan_of_knives: 2, kick: 2,
+    cheap_shot: 1, blade_flurry: 1,
+    eviscerate: 1, preparation: 1,
+    thousand_cuts: 1,
+  },
+  ranger: {
+    steady_focus: 3, hawk_strike: 4, hunters_mark: 2, net: 2, disengage: 2, freezing_trap: 2, explosive_trap: 2, multi_shot: 3, call_wolf: 2, power_shot: 3,
+    flare: 1, volley: 1,
+    kill_shot: 1, explosive_shot: 1,
+    deadeye: 1,
+  },
+  cleric: {
+    prayer: 3, flash_heal: 3, renew: 2, power_word_shield: 2, purify: 1, sanctuary: 2, holy_fire: 4, penance: 3, holy_nova: 2, hammer_of_justice: 3,
+    holy_wall: 1, atonement: 1,
+    wrath_of_heaven: 1, holy_word_serenity: 1,
+    day_of_judgment: 1,
+  },
 };
 
 export const starterDeck = (cls: ClassId): DeckCounts => ({ ...STARTERS[cls] });
-export const STARTER_NAME: Record<ClassId, string> = { warrior: 'Brawler', mage: 'Elementalist' };
+export const STARTER_NAME: Record<ClassId, string> = { warrior: 'Brawler', mage: 'Elementalist', rogue: 'Assassin', ranger: 'Hunter', cleric: 'Priest' };
 
 export const deckSize = (d: DeckCounts): number => Object.values(d).reduce((a, b) => a + b, 0);
 export const countRarity = (d: DeckCounts, r: CardDef['rarity']): number =>

@@ -2,7 +2,8 @@
 // turn off dying and resource costs, slow time down, move fighters around and read every hit.
 // The fight is the real Battle; the controls live in a DOM panel docked on the right.
 import { zone, hot, type Scene } from './scene';
-import { Battle, NO_INTENT, COLS, ROWS, type Dir, type Fighter, type Intent, type Side, type StatusKey } from '../game/battle';
+import { CLASS_INFO } from '../game/classes';
+import { Battle, NO_INTENT, heavyChargeOf, COLS, ROWS, type Dir, type Fighter, type Intent, type Side, type StatusKey } from '../game/battle';
 import { drawBattle, drawBattleUi } from '../game/battleView';
 import { Cpu } from '../game/ai';
 import { CARDS, RARITY_COLOR, cardsFor, type CardDef } from '../game/cards';
@@ -174,7 +175,7 @@ export class SandboxScene implements Scene {
     const pi = b.phase === 'fight' ? this.playerIntent(sdt) : NO_INTENT;
     b.update(sdt, [pi, this.brainIntent(sdt)]);
     this.cheats();
-    for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / TUNING.heavyCharge) : null);
+    for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / heavyChargeOf(f)) : null);
     if (b.phase === 'ko' || b.phase === 'over') { this.koT += dt; if (this.koT > 2.5) this.reset(); }
 
     this.uiT -= dt;
@@ -192,7 +193,7 @@ export class SandboxScene implements Scene {
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
     const b = this.b;
-    drawBattle(c, b, tick);
+    drawBattle(c, b, tick, 'all');
     drawBattleUi(ui, b, tick);
     for (let col = 0; col < COLS; col++) for (let row = 0; row < ROWS; row++) {
       zone(`cell:${col * ROWS + row}`, (X0 + col * PW) * 2, (Y0 + row * (FACE + LIP)) * 2, PW * 2, (FACE + LIP) * 2);
@@ -278,7 +279,8 @@ export class SandboxScene implements Scene {
   private maxRes(): void {
     for (const f of this.b.f) {
       if (f.cls === 'warrior') f.res = TUNING.warrior.rageMax;
-      else { f.resMax = TUNING.mage.manaCap; f.res = f.resMax; }
+      else if (f.cls === 'mage') { f.resMax = TUNING.mage.manaCap; f.res = f.resMax; }
+      else f.res = f.resMax;
     }
   }
 
@@ -318,7 +320,7 @@ export class SandboxScene implements Scene {
       const st = (Object.entries(f.st) as Array<[StatusKey, number]>).filter(([, v]) => v > 0).map(([k, v]) => `${k} ${v.toFixed(1)}`);
       const sh = f.shields.filter(s => s.hp > 0).map(s => `${s.kind} ${Math.ceil(s.hp)}`);
       const mods = [f.shout ? `shout ×${f.shout}` : '', f.rallyLeft ? `rally ×${f.rallyLeft}` : '', f.powerLeft ? `power ×${f.powerLeft}` : '', f.bonusManaNext ? `+${f.bonusManaNext} mana next` : ''].filter(Boolean);
-      const res = f.cls === 'warrior' ? `rage ${f.res.toFixed(1)}/${TUNING.warrior.rageMax}` : `mana ${f.res}/${f.resMax}`;
+      const res = f.cls === 'warrior' ? `rage ${f.res.toFixed(1)}/${TUNING.warrior.rageMax}` : `${CLASS_INFO[f.cls].res.toLowerCase()} ${f.res}/${f.resMax}${f.poison ? `  poison ×${f.poison}` : ''}`;
       return [
         `${f.side ? 'ENEMY' : 'YOU'} ${f.cls}  hp ${Math.ceil(f.hp)}/${f.maxHp}  ${res}`,
         `  at ${f.col},${f.row}  lock ${f.lock.toFixed(2)}  ${f.charging ? `charge ${f.charge.toFixed(2)}` : ''}`,

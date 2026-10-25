@@ -1,7 +1,7 @@
 // Every number worth tweaking after a playtest lives here.
 
 export const TUNING = {
-  hp: { warrior: 870, mage: 720 },
+  hp: { warrior: 870, mage: 720, rogue: 680, ranger: 700, cleric: 700 },
 
   /** Seconds for the shared custom gauge to fill. */
   gaugeSeconds: 10,
@@ -37,6 +37,50 @@ export const TUNING = {
     manaStart: 1,
     manaCap: 5,
   },
+
+  // Draft classes (Rogue, Ranger, Cleric): basics follow the same x0.7 scale as Warrior and Mage.
+  rogue: {
+    lightDamage: 6,
+    heavyDamage: 22,
+    lightLock: 0.35,
+    heavyLock: 0.35,
+    /** Energy tops up to this at every Draw screen; anything above is kept. */
+    energyTopUp: 3,
+    energyCap: 5,
+  },
+
+  ranger: {
+    lightDamage: 6,
+    heavyDamage: 30,
+    lightLock: 0.4,
+    heavyLock: 0.4,
+    /** Aimed Shot takes longer to charge than other heavies. */
+    heavyCharge: 1.4,
+    energyStart: 2,
+    energyCap: 5,
+    /** Standing still this long gives 1 Energy. */
+    stillSeconds: 2,
+  },
+
+  cleric: {
+    lightDamage: 6,
+    heavyDamage: 22,
+    lightLock: 0.4,
+    heavyLock: 0.5,
+    /** Smite lands this many panels ahead and heals the Cleric on a hit. */
+    smiteRange: 3,
+    smiteHeal: 10,
+    manaStart: 3,
+    manaPerDraw: 3,
+    manaCap: 5,
+  },
+
+  /** Each Poison stack deals this per second for poisonSeconds. */
+  poisonDps: 4,
+  poisonSeconds: 6,
+  poisonMaxStacks: 3,
+  /** Blessed panels heal whoever owns them this much per second. */
+  blessHps: 12,
 
   /** Frost Nova hits an enemy within this many columns of the caster. */
   frostNovaRange: 2,
