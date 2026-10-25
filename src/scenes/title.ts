@@ -1,9 +1,9 @@
 import { setScene, drawMenu, hint, listMouse, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawLogo } from '../art/logo';
-import { getSprite, drawFighterSprite, defaultSkin, teamColor, type ClassId } from '../art/sprites';
+import { getSprite, drawFighterSprite, defaultSkin, type ClassId } from '../art/sprites';
 import { P, W, H, UW, type Ctx } from '../engine/gfx';
-import { PLAYABLE, CLASS_INFO } from '../game/classes';
+import { PLAYABLE } from '../game/classes';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k } from '../engine/input';
 import type { PadMode } from '../engine/touch';
@@ -94,7 +94,6 @@ export class TitleScene implements Scene {
       if (k >= 0.35) drawFighterSprite(c, getSprite(cls, defaultSkin(cls), false), x, 130 - (side ? bob : 1 - bob), side === 1, k < 0.6 ? 'flash' : 'none', 2);
       P(c, '#000000', x - 12, 131, 24, 2);
       if (k < 1) poof(c, x, 112, k);
-      drawTextCentered(ui, CLASS_INFO[cls].name, x * 2, 270, teamColor(cls, defaultSkin(cls), false), 1, true);
     }
     drawLogo(c, W / 2, 10, this.t);
     drawMenu(ui, ITEMS, this.sel, UW / 2, MENU_Y, tick, { width: 200, gap: MENU_GAP });
