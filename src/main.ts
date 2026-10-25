@@ -4,7 +4,7 @@ import { initInput, endFrame, wasPressed } from './engine/input';
 import { toggleMute } from './engine/audio';
 import { setScene, getScene, commitZones, hotZone } from './scenes/scene';
 import { TitleScene } from './scenes/title';
-import { devFromHash } from './scenes/devMenu';
+import { DEV_TOOLS } from './flags';
 
 // The screen is the sharp UI resolution. The world draws at 240×160 offscreen and is scaled up 2×
 // underneath, so the fight keeps its chunky pixels while menus and text get twice the room.
@@ -41,7 +41,9 @@ let engaged = false;
 const engage = (): void => { engaged = true; canvas.focus(); };
 window.addEventListener('pointerdown', engage);
 window.addEventListener('keydown', () => { engaged = true; });
-if (!devFromHash(() => setScene(new TitleScene()))) setScene(new TitleScene());
+setScene(new TitleScene());
+// dev builds can open a dev tool straight from the URL (#cards, #sandbox, #lab, #dev)
+if (DEV_TOOLS && location.hash.length > 1) void import('./scenes/devMenu').then(m => m.devFromHash(() => setScene(new TitleScene())));
 
 const STEP = 1 / 60;
 let acc = 0;
