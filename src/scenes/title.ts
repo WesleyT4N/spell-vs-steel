@@ -4,7 +4,7 @@ import { drawLogo } from '../art/logo';
 import { getSprite, drawFighterSprite } from '../art/sprites';
 import { P, W, H, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
-import { wasPressed, navPressed } from '../engine/input';
+import { wasPressed, navPressed, k } from '../engine/input';
 import { playMusic, sfx, isMuted } from '../engine/audio';
 import { MENU_SONG } from '../engine/music';
 import { SetupScene } from './setup';
@@ -45,6 +45,6 @@ export class TitleScene implements Scene {
     drawMenu(c, ITEMS, this.sel, W / 2, 92, tick, { width: 104 });
     drawTextCentered(c, 'PROTOTYPE 0.1', W / 2, 136, '#7c7c7c', 1, false);
     if (isMuted()) drawText(c, 'MUTED', 4, 4, '#7c7c7c');
-    hint(c, 'Z: SELECT   M: MUTE');
+    hint(c, `${k('up')}/${k('down')}: MOVE  ${k('attack')}: SELECT  M: MUTE`);
   }
 }

@@ -18,15 +18,17 @@ npm run sim      # headless CPU-vs-CPU matches; prints win rates, match length, 
 
 | Key | Action |
 | --- | --- |
-| Arrows / WASD | Move |
-| Z (tap) | Light attack |
-| Z (hold, release) | Heavy attack |
-| X | Cast the next spell (hold a direction to aim Blink) |
+| WASD (arrows also work) | Move |
+| J (tap) | Light attack |
+| J (hold, release) | Heavy attack |
+| K | Cast the next spell (hold a direction to aim Blink) |
 | Space | Open the custom screen when the gauge is full |
 | Enter / Esc | Pause |
 | M | Mute |
 
-Custom screen: Z picks or unpicks a spell (cast order is pick order), X undoes the last pick, Space starts the fight. Deck builder: Right or Z adds a copy, Left or X removes one, Q / E switch class, Enter finishes.
+These are the defaults. **Controls** on the title menu rebinds movement, attack, cast, custom screen and pause (saved in the browser); arrows, Esc and M always work.
+
+Custom screen: J picks or unpicks a spell (cast order is pick order), K undoes the last pick, Space starts the fight. Deck builder: D or J adds a copy, A or K removes one, Q / E switch class, Enter finishes.
 
 ## Rules in the prototype
 

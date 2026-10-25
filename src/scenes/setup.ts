@@ -4,7 +4,7 @@ import { getArena } from '../game/battleView';
 import { getSprite, drawFighterSprite, teamColor, type ClassId } from '../art/sprites';
 import { P, W, H, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
-import { wasPressed, navPressed } from '../engine/input';
+import { wasPressed, navPressed, k } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
 import { loadCustom, validate, STARTER_NAME } from '../game/deck';
@@ -100,6 +100,6 @@ export class SetupScene implements Scene {
       if (on && tick % 8 < 6) drawText(c, '→', x0 - 10, y, '#f8b800');
     });
     if (this.msgT > 0) drawTextCentered(c, this.msg, W / 2, 142, '#f83800');
-    hint(c, '←→ CHANGE  Z OK  X BACK  SPACE FIGHT');
+    hint(c, `${k('left')}/${k('right')} CHANGE  ${k('attack')} OK  ${k('cast')} BACK  ${k('custom')} FIGHT`);
   }
 }

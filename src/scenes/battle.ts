@@ -9,7 +9,7 @@ import { playerDeck, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
 import { P, W, H, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, drawTextOutlined } from '../engine/font';
-import { wasPressed, isDown, heldDir, navPressed } from '../engine/input';
+import { wasPressed, isDown, heldDir, navPressed, k } from '../engine/input';
 import { playMusic, stopMusic, sfx } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
 import { drawCardDetail } from './deckbuilder';
@@ -150,13 +150,13 @@ export class BattleScene implements Scene {
       const won = b.winner === 0;
       drawTextCentered(c, won ? 'YOU WIN!' : 'YOU LOSE', W / 2, 36, won ? '#f8b800' : '#bcbcbc', 3);
       drawMenu(c, ['REMATCH', 'CHANGE SETUP', 'TITLE'], this.resultSel, W / 2, 80, tick, { width: 104 });
-      hint(c, 'Z: SELECT');
+      hint(c, `${k('attack')}: SELECT`);
     }
     if (this.paused) {
       dim(c, 0.55);
       drawTextCentered(c, 'PAUSED', W / 2, 40, '#fcfcfc', 2);
       drawMenu(c, ['RESUME', 'RESTART', 'QUIT TO TITLE'], this.pauseSel, W / 2, 70, tick, { width: 104 });
-      hint(c, 'Z: SELECT  X: RESUME');
+      hint(c, `${k('attack')}: SELECT  ${k('cast')}: RESUME`);
     }
   }
 
@@ -214,6 +214,6 @@ export class BattleScene implements Scene {
       drawText(c, 'CPU DECK:', dx + 4, ly + 50, '#7c7c7c');
       drawText(c, STARTER_NAME[this.m.cpu].toUpperCase(), dx + 4, ly + 58, '#7c7c7c');
     }
-    drawTextOutlined(c, 'Z PICK  X UNDO  SPACE FIGHT', 6, H - 9, '#fcfcfc');
+    drawTextOutlined(c, `${k('attack')} PICK  ${k('cast')} UNDO  ${k('custom')} FIGHT`, 6, H - 9, '#fcfcfc');
   }
 }

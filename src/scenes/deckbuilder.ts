@@ -4,7 +4,7 @@ import { getArena } from '../game/battleView';
 import { teamColor, type ClassId } from '../art/sprites';
 import { P, W, H, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, wrap } from '../engine/font';
-import { wasPressed, navPressed } from '../engine/input';
+import { wasPressed, navPressed, k } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { cardsFor, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef } from '../game/cards';
 import { canAdd, countRarity, deckSize, loadCustom, saveCustom, starterDeck, validate, DECK_SIZE, MAX_LEGENDARIES, type DeckCounts } from '../game/deck';
@@ -142,7 +142,7 @@ export class DeckBuilderScene implements Scene {
     else if (errs.length) drawTextCentered(c, errs[0], W / 2, 128, '#f83800');
     else drawTextCentered(c, 'GRIMOIRE READY. SAVED.', W / 2, 128, '#58d854');
     drawTextCentered(c, 'DECKS SAVE IN THIS BROWSER', W / 2, 138, '#7c7c7c', 1, false);
-    hint(c, '→/Z: ADD  ←/X: REMOVE  ENTER: DONE');
+    hint(c, `${k('right')}/${k('attack')}: ADD  ${k('left')}/${k('cast')}: REMOVE  ENTER: DONE`);
   }
 }
 
