@@ -8,12 +8,14 @@ export interface MatchConfig {
   p1Deck: 'starter' | 'custom';
   cpu: ClassId;
   difficulty: Difficulty;
+  /** Rounds in a set: 1 (single match), 3 or 5. */
+  bestOf: 1 | 3 | 5;
 }
 
 const KEY = 'svs:match';
 
 export function loadMatch(): MatchConfig {
-  const def: MatchConfig = { p1: 'warrior', p1Deck: 'starter', cpu: 'mage', difficulty: 'normal' };
+  const def: MatchConfig = { p1: 'warrior', p1Deck: 'starter', cpu: 'mage', difficulty: 'normal', bestOf: 3 };
   try {
     const raw = localStorage.getItem(KEY);
     return raw ? { ...def, ...(JSON.parse(raw) as Partial<MatchConfig>) } : def;

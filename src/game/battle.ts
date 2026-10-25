@@ -326,7 +326,9 @@ export class Battle {
           f.st.frostNova = 0;
           this.damage(foe, TUNING.frostNovaDamage, f, { spell: true, element: 'frost' });
           this.freeze(foe, 1.5);
+          this.addFx('nova', f.side, f.col, f.row, 0.5);
           this.addFx('nova', f.side, foe.col, foe.row, 0.5);
+          this.shake = Math.max(this.shake, 0.2);
         }
       }
       // Glacial Fortress: an enemy standing right in front of the ice is frozen.

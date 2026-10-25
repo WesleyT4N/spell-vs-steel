@@ -13,11 +13,11 @@ import { DeckBuilderScene } from './deckbuilder';
 import { TitleScene } from './title';
 
 const CLASSES: ClassId[] = ['warrior', 'mage'];
-const ROWS = ['YOU', 'DECK', 'EDIT DECK', 'CPU', 'CPU LEVEL', 'FIGHT!'] as const;
+const ROWS = ['YOU', 'DECK', 'EDIT DECK', 'CPU', 'CPU LEVEL', 'MATCH', 'FIGHT!'] as const;
 
 export class SetupScene implements Scene {
   m: MatchConfig = loadMatch();
-  sel = 5;
+  sel: number = ROWS.length - 1;
   msg = '';
   msgT = 0;
 
@@ -39,6 +39,7 @@ export class SetupScene implements Scene {
       if (row === 'DECK') { this.m.p1Deck = this.m.p1Deck === 'starter' ? 'custom' : 'starter'; sfx('move'); }
       if (row === 'CPU') { this.m.cpu = cycle(CLASSES, this.m.cpu); sfx('move'); }
       if (row === 'CPU LEVEL') { this.m.difficulty = this.m.difficulty === 'easy' ? 'normal' : 'easy'; sfx('move'); }
+      if (row === 'MATCH') { this.m.bestOf = cycle([1, 3, 5] as const, this.m.bestOf); sfx('move'); }
       saveMatch(this.m);
     }
     if (wasPressed('back')) { sfx('back'); setScene(new TitleScene()); return; }
@@ -78,18 +79,19 @@ export class SetupScene implements Scene {
     drawTextCentered(c, 'VS', W / 2, 44, '#f8b800', 2);
 
     // option rows
-    const x0 = 40, y0 = 86;
-    frame(c, x0 - 14, y0 - 4, W - 2 * x0 + 28, ROWS.length * 10 + 5, '#000000', '#fcfcfc');
+    const x0 = 40, y0 = 82, rh = 9;
+    frame(c, x0 - 14, y0 - 4, W - 2 * x0 + 28, ROWS.length * rh + 5, '#000000', '#fcfcfc');
     ROWS.forEach((row, i) => {
-      const y = y0 + i * 10;
+      const y = y0 + i * rh;
       const on = i === this.sel;
-      if (on) P(c, '#0000a8', x0 - 12, y - 2, W - 2 * x0 + 24, 10);
+      if (on) P(c, '#0000a8', x0 - 12, y - 1, W - 2 * x0 + 24, rh);
       const label = row === 'FIGHT!' || row === 'EDIT DECK' ? '' : row;
       let value = '';
       if (row === 'YOU') value = this.m.p1.toUpperCase();
       if (row === 'DECK') value = this.m.p1Deck === 'starter' ? `STARTER: ${STARTER_NAME[this.m.p1].toUpperCase()}` : `CUSTOM${this.customValid() ? '' : ' (NOT READY)'}`;
       if (row === 'CPU') value = this.m.cpu.toUpperCase() + (alt ? ' (ALT)' : '');
       if (row === 'CPU LEVEL') value = this.m.difficulty.toUpperCase();
+      if (row === 'MATCH') value = this.m.bestOf === 1 ? 'SINGLE' : `BEST OF ${this.m.bestOf}`;
       if (label) {
         drawText(c, label, x0, y, '#bcbcbc');
         const v = on ? `← ${value} →` : value;
@@ -99,7 +101,7 @@ export class SetupScene implements Scene {
       }
       if (on && tick % 8 < 6) drawText(c, '→', x0 - 10, y, '#f8b800');
     });
-    if (this.msgT > 0) drawTextCentered(c, this.msg, W / 2, 142, '#f83800');
+    if (this.msgT > 0) { P(c, '#000000', 0, 68, W, 10); drawTextCentered(c, this.msg, W / 2, 69, '#f83800'); }
     hint(c, `${k('left')}/${k('right')} CHANGE  ${k('attack')} OK  ${k('cast')} BACK  ${k('custom')} FIGHT`);
   }
 }
