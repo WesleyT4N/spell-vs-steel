@@ -48,6 +48,10 @@ export interface Fighter {
   /** Seconds of action lock (attacks, casts). */
   lock: number;
   moveCd: number;
+  /** Seconds until the next step is allowed (TUNING.moveCooldown). */
+  stepCd: number;
+  /** A step tapped during stepCd, taken as soon as it ends. */
+  moveBuf: Dir | null;
   charging: boolean;
   charge: number;
   /** Rage pips (Warrior) or current Mana (Mage). */
@@ -549,6 +553,7 @@ export class Battle {
     f.shields = f.shields.filter(s => s.t > 0 && s.hp > 0);
     f.lock = Math.max(0, f.lock - dt);
     f.moveCd = Math.max(0, f.moveCd - dt);
+    f.stepCd = Math.max(0, f.stepCd - dt);
     f.flash = Math.max(0, f.flash - dt);
     f.poseT = Math.max(0, f.poseT - dt);
     if (f.poseT === 0) f.pose = 'idle';
@@ -571,11 +576,18 @@ export class Battle {
     if (sp.smoke > 0 && sp.smokeSide === f.side && f.st.revealed <= 0 && f.st.hunted <= 0) f.st.stealth = Math.max(f.st.stealth, 0.1);
 
     const disabled = f.st.frozen > 0 || f.st.stunned > 0 || f.st.iceBlock > 0 || f.st.sleep > 0 || f.st.channel > 0;
-    if (disabled) { f.charging = false; f.charge = 0; return; }
+    if (disabled) { f.charging = false; f.charge = 0; f.moveBuf = null; return; }
     const busy = f.lock > 0 || f.st.flinch > 0;
 
     // any move during a backstab window blinks the Rogue home instead
-    if (intent.move && !busy) { if (f.st.backstab > 0) { this.blinkHome(f); f.moveCd = TUNING.moveRepeat; } else this.tryMove(f, intent.move); }
+    if (intent.move) f.moveBuf = intent.move;
+    if (f.moveBuf && f.stepCd <= 0) {
+      const d = f.moveBuf;
+      f.moveBuf = null;
+      if (!busy) {
+        if (f.st.backstab > 0) { this.blinkHome(f); f.moveCd = TUNING.moveRepeat; f.stepCd = TUNING.moveCooldown; } else this.tryMove(f, d);
+      }
+    }
 
     if (intent.attackPressed && !busy) {
       this.basicAttack(f, 'light');
@@ -626,6 +638,7 @@ export class Battle {
     this.leavePanel(f.col, f.row);
     f.col = nc; f.row = nr;
     f.moveCd = TUNING.moveRepeat;
+    f.stepCd = TUNING.moveCooldown;
     sfx('step', { pan: panOf(nc) });
     return true;
   }
@@ -1293,7 +1306,7 @@ function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => nu
   return {
     side, cls, skin: spec.skin ?? defaultSkin(cls), alt, name, hp: maxHp, maxHp,
     col: side === 0 ? 1 : 4, row: 1, dx: 0, dy: 0,
-    lock: 0, moveCd: 0, charging: false, charge: 0,
+    lock: 0, moveCd: 0, stepCd: 0, moveBuf: null, charging: false, charge: 0,
     res: START_RES[cls],
     resMax: cls === 'mage' ? TUNING.mage.manaStart : cls === 'warrior' ? TUNING.warrior.rageMax : 5,
     bonusManaNext: 0,
