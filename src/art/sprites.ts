@@ -3,10 +3,10 @@
 import type { Ctx } from '../engine/gfx';
 import { HIRES } from './hiresSprites';
 
-/** Draw the 48px hi-res fighters (art/hi-res) instead of the ~18px Cartridge sprites. */
+/** Draw the 24px fighters from the reference sheet (art/hi-res) instead of the ~18px Cartridge sprites. */
 export const USE_HIRES = true;
-/** Sprite pixels per world pixel: hi-res sprites draw at half a world pixel on the 2x world canvas. */
-const RES = USE_HIRES ? 2 : 1;
+/** Sprite pixels per world pixel (1: both sprite sets draw at world resolution). */
+const RES = 1;
 
 export type ClassId = 'warrior' | 'mage' | 'rogue' | 'ranger' | 'cleric';
 
