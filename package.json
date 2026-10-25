@@ -1,0 +1,19 @@
+{
+  "name": "spell-vs-steel",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && node scripts/artifact.mjs",
+    "sim": "tsx scripts/sim.ts",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15",
+    "typescript": "5.9",
+    "vite": "^8.3.5",
+    "vite-plugin-singlefile": "^2.3.4"
+  }
+}
