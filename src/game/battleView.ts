@@ -27,14 +27,20 @@ export function drawBattle(c: Ctx, b: Battle, tick: number): void {
     if (p.hole > 0) { drawHole(c, col, r, p.owner); continue; }
     const state: PanelState = p.burn > 0 ? 'burning' : p.cracked ? 'cracked' : 'clean';
     const mark = b.marks.find(m => m.col === col && m.row === r);
-    const hl = mark && Math.floor(b.time * 10) % 2 ? mark.color : undefined;
+    let hl = mark && Math.floor(b.time * 10) % 2 ? mark.color : undefined;
+    // an armed Frost Nova blinks the enemy panels it covers
+    if (!hl && Math.floor(b.time * 5) % 2 === 0) {
+      for (const f of b.f) {
+        if (f.st.frostNova > 0 && !f.frostNovaUsed && p.owner !== f.side && Math.abs(col - f.col) <= TUNING.frostNovaRange) hl = '#a4e4fc';
+      }
+    }
     drawPanel(c, col, r, state, tick, p.owner, hl);
   }
   // Frost Nova / Glacial zones get a frosty tint on the trigger columns
   for (const f of b.f) {
     if (f.st.frostNova > 0 && !f.frostNovaUsed) {
       for (let col = 0; col < 6; col++) for (let r = 0; r < 3; r++) {
-        const inRange = col !== f.col && Math.abs(col - f.col) <= TUNING.frostNovaRange;
+        const inRange = b.panels[col][r].owner !== f.side && Math.abs(col - f.col) <= TUNING.frostNovaRange;
         if (inRange && (col + r + tick) % 4 === 0) { const pc = panelCenter(col, r); P(c, '#a4e4fc', pc.x - 1, pc.y - 1, 2, 2); }
       }
     }

@@ -37,6 +37,7 @@ Draw screen: J picks or unpicks a spell (cast order is pick order), K undoes the
 - Frozen or stunned targets take +50% damage. No slows.
 - Grimoires: exactly 30 spells, up to 4 copies of a common, 2 of an uncommon, 1 of each Legendary (max 5), exactly 1 Mythic. Custom decks save in the browser.
 - Mirror matches give the CPU an alternate palette.
+- Matches are a single round, best of 3 (default) or best of 5, picked on the setup screen.
 
 Every number worth tuning is in [`src/game/tuning.ts`](src/game/tuning.ts). Spells live in [`src/game/cards.ts`](src/game/cards.ts), one entry each.
 

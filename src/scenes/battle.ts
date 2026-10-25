@@ -8,7 +8,7 @@ import { starterDeck, toList, STARTER_NAME } from '../game/deck';
 import { playerDeck, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
 import { P, W, H, frame, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered, drawTextOutlined } from '../engine/font';
+import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k } from '../engine/input';
 import { playMusic, stopMusic, sfx } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
@@ -30,7 +30,8 @@ export class BattleScene implements Scene {
   lastDir: Dir | null = null;
   ended = false;
 
-  constructor(public m: MatchConfig) {
+  /** Rounds won in the current set: [you, cpu]. */
+  constructor(public m: MatchConfig, public score: [number, number] = [0, 0]) {
     this.b = new Battle(
       { cls: m.p1, deck: playerDeck(m), name: 'YOU' },
       { cls: m.cpu, deck: toList(starterDeck(m.cpu)), name: 'CPU' },
@@ -75,6 +76,7 @@ export class BattleScene implements Scene {
     b.update(dt, [pi, ci]);
     if ((b.phase as string) === 'over' && !this.ended) {
       this.ended = true;
+      if (b.winner !== null) this.score[b.winner]++;
       stopMusic();
       if (b.winner === 0) sfx('win');
       playMusic('result', RESULT_SONG);
@@ -118,27 +120,40 @@ export class BattleScene implements Scene {
     if (wasPressed('confirm') || (wasPressed('pause') && this.pauseSel === 0)) {
       sfx('select');
       if (this.pauseSel === 0) this.paused = false;
-      if (this.pauseSel === 1) setScene(new BattleScene(this.m));
+      if (this.pauseSel === 1) setScene(new BattleScene(this.m, this.score));
       if (this.pauseSel === 2) { stopMusic(); setScene(new TitleScene()); }
     }
   }
 
+  private get need(): number { return Math.ceil(this.m.bestOf / 2); }
+  private get setOver(): boolean { return Math.max(...this.score) >= this.need; }
+  private get resultItems(): string[] {
+    return this.setOver ? ['REMATCH', 'CHANGE SETUP', 'TITLE'] : ['NEXT ROUND', 'TITLE'];
+  }
+
   private updateResult(dt: number): void {
-    const items = 3;
+    const items = this.resultItems.length;
     if (navPressed('up', dt)) { this.resultSel = (this.resultSel + items - 1) % items; sfx('move'); }
     if (navPressed('down', dt)) { this.resultSel = (this.resultSel + 1) % items; sfx('move'); }
     if (wasPressed('confirm') || wasPressed('custom')) {
       sfx('select');
       stopMusic();
-      if (this.resultSel === 0) setScene(new BattleScene(this.m));
-      if (this.resultSel === 1) setScene(new SetupScene());
-      if (this.resultSel === 2) setScene(new TitleScene());
+      const choice = this.resultItems[this.resultSel];
+      if (choice === 'NEXT ROUND') setScene(new BattleScene(this.m, this.score));
+      if (choice === 'REMATCH') setScene(new BattleScene(this.m));
+      if (choice === 'CHANGE SETUP') setScene(new SetupScene());
+      if (choice === 'TITLE') setScene(new TitleScene());
     }
   }
 
   draw(c: Ctx, tick: number): void {
     const b = this.b;
     drawBattle(c, b, tick);
+    if (this.m.bestOf > 1 && b.phase !== 'over') {
+      const round = this.score[0] + this.score[1] + 1;
+      const t = `ROUND ${round}  ${this.score[0]}-${this.score[1]}`;
+      drawTextOutlined(c, t, W / 2 - textWidth(t) / 2, 22, '#fcfcfc');
+    }
     if (b.phase === 'custom') this.drawCustom(c, tick);
     if (this.fightBanner > 0 && b.phase === 'fight') {
       const s = this.fightBanner > 0.45 ? 'READY' : 'FIGHT!';
@@ -148,8 +163,15 @@ export class BattleScene implements Scene {
     if (b.phase === 'over') {
       dim(c, 0.45);
       const won = b.winner === 0;
-      drawTextCentered(c, won ? 'YOU WIN!' : 'YOU LOSE', W / 2, 36, won ? '#f8b800' : '#bcbcbc', 3);
-      drawMenu(c, ['REMATCH', 'CHANGE SETUP', 'TITLE'], this.resultSel, W / 2, 80, tick, { width: 104 });
+      if (this.m.bestOf === 1) {
+        drawTextCentered(c, won ? 'YOU WIN!' : 'YOU LOSE', W / 2, 36, won ? '#f8b800' : '#bcbcbc', 3);
+      } else {
+        const setWon = this.score[0] >= this.need;
+        const title = this.setOver ? (setWon ? 'SET WON!' : 'SET LOST') : won ? 'ROUND WON' : 'ROUND LOST';
+        drawTextCentered(c, title, W / 2, 30, won ? '#f8b800' : '#bcbcbc', 2);
+        drawTextCentered(c, `YOU ${this.score[0]} - ${this.score[1]} CPU`, W / 2, 56, '#fcfcfc', 1, false);
+      }
+      drawMenu(c, this.resultItems, this.resultSel, W / 2, 80, tick, { width: 104 });
       hint(c, `${k('attack')}: SELECT`);
     }
     if (this.paused) {
