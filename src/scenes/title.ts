@@ -48,7 +48,7 @@ export class TitleScene implements Scene {
     drawFighterSprite(c, getSprite('warrior', defaultSkin('warrior'), false), 206, 130 - bob, true, 'none', 2);
     P(c, '#000000', 22, 131, 24, 2); P(c, '#000000', 194, 131, 24, 2);
     drawLogo(c, W / 2, 10, this.t);
-    drawMenu(ui, ITEMS, this.sel, UW / 2, 186, tick, { width: 200, gap: 24 });
+    drawMenu(ui, ITEMS, this.sel, UW / 2, 180, tick, { width: 200, gap: 22 });
     drawTextCentered(ui, 'PROTOTYPE 0.2', UW / 2, 280, '#7c7c7c', 1, false);
     if (isMuted()) drawText(ui, 'MUTED', 8, 8, '#7c7c7c');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   M: MUTE`);

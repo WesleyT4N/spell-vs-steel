@@ -142,7 +142,7 @@ interface NamedRoom {
   onPeers(fn: (c: RoomChange) => void, onError?: (e: { code: string }) => void): () => void;
   leave(): Promise<void>;
 }
-interface Room { join(name: string): Promise<NamedRoom> }
+interface Room extends NamedRoom { join(name: string): Promise<NamedRoom> }
 
 let roomP: Promise<Room | null> | null = null;
 function getRoom(): Promise<Room | null> {
@@ -151,21 +151,27 @@ function getRoom(): Promise<Room | null> {
   return (roomP ??= claude.use('room').then(r => (r as Room | null) ?? null, () => null));
 }
 
+/** Packets ride in our presence as { c: room code, p: packet }; the code filters out other games in a shared room. */
 class RoomTransport extends Base implements Transport {
   readonly kind = 'room';
-  constructor(private r: NamedRoom) {
+  constructor(private r: NamedRoom, private code: string, private named: boolean) {
     super();
     r.onPeers(c => {
-      for (const p of [...c.joined, ...c.updated]) if (!p.sameTab && p.presence.p) this.deliver(p.presence.p);
+      for (const p of [...c.joined, ...c.updated]) if (!p.sameTab && p.presence.c === code && p.presence.p) this.deliver(p.presence.p);
     }, e => this.die(`ROOM ERROR (${e.code})`));
   }
-  send(p: Packet): void { if (!this.closed) this.r.presence({ p }).catch(() => { /* dropped; the next packet repeats it */ }); }
-  close(): void { this.closed = true; this.r.presence({ p: null }).catch(() => {}); this.r.leave().catch(() => {}); }
+  send(p: Packet): void { if (!this.closed) this.r.presence({ c: this.code, p }).catch(() => { /* dropped; the next packet repeats it */ }); }
+  close(): void {
+    this.closed = true;
+    this.r.presence({ c: null, p: null }).catch(() => {});
+    if (this.named) this.r.leave().catch(() => {});
+  }
 }
 
 async function openRoom(code: string): Promise<Transport> {
   const room = await getRoom();
   if (!room) throw new Error('ONLINE ROOMS ARE NOT AVAILABLE HERE');
-  try { return new RoomTransport(await room.join(`svs-${code.toLowerCase()}`)); }
-  catch { throw new Error('CANNOT JOIN THAT ROOM'); }
+  // a named room per code; where named rooms are refused, share the page's main room instead
+  try { return new RoomTransport(await room.join(`svs-${code.toLowerCase()}`), code, true); }
+  catch { return new RoomTransport(room, code, false); }
 }
