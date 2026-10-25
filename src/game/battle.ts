@@ -3,6 +3,8 @@ import { TUNING } from './tuning';
 import { CARDS, type CardDef, type Element } from './cards';
 import { defaultSkin, mirrorSkin, type ClassId } from '../art/sprites';
 import { sfx } from '../engine/audio';
+import { seeded, randomSeed, shuffle } from './rng';
+export { shuffle };
 
 export const COLS = 6, ROWS = 3;
 export type Side = 0 | 1;
@@ -147,11 +149,15 @@ export class Battle {
   /** Damage dealt by each side, split by source (for tuning). */
   stats = [{ basic: 0, spell: 0, other: 0 }, { basic: 0, spell: 0, other: 0 }];
 
-  constructor(a: FighterSpec, bSpec: FighterSpec) {
+  /** Every random roll in the rules comes from here, so two machines given the same seed play the same battle. */
+  rand: ReturnType<typeof seeded>;
+
+  constructor(a: FighterSpec, bSpec: FighterSpec, seed: number = randomSeed()) {
+    this.rand = seeded(seed);
     // same class in the same color: the second fighter takes the next color
     const aSkin = a.skin ?? defaultSkin(a.cls);
     const bSkin = a.cls === bSpec.cls ? mirrorSkin(a.cls, aSkin, bSpec.skin ?? defaultSkin(bSpec.cls)) : bSpec.skin;
-    this.f = [makeFighter(0, { ...a, skin: aSkin }, false), makeFighter(1, { ...bSpec, skin: bSkin }, false)];
+    this.f = [makeFighter(0, { ...a, skin: aSkin }, false, this.rand), makeFighter(1, { ...bSpec, skin: bSkin }, false, this.rand)];
     for (let c = 0; c < COLS; c++) {
       this.panels[c] = [];
       for (let r = 0; r < ROWS; r++) {
@@ -216,7 +222,7 @@ export class Battle {
       while (hand.length < TUNING.handSize) {
         if (!f.deck.length) {
           if (!f.discard.length) break;
-          f.deck = shuffle(f.discard);
+          f.deck = shuffle(f.discard, this.rand);
           f.discard = [];
         }
         hand.push(f.deck.pop()!);
@@ -236,7 +242,7 @@ export class Battle {
       f.queue = chosen.map(i => offer[i]);
       // the rest go back into the grimoire, BN style
       const rest = offer.filter((_, i) => !chosen.includes(i));
-      f.deck = shuffle([...f.deck, ...rest]);
+      f.deck = shuffle([...f.deck, ...rest], this.rand);
       this.offer[f.side] = [];
     }
     this.gauge = 0;
@@ -770,7 +776,7 @@ export interface CastCtx {
 
 export interface FighterSpec { cls: ClassId; deck: string[]; name: string; skin?: string }
 
-function makeFighter(side: Side, spec: FighterSpec, alt: boolean): Fighter {
+function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => number): Fighter {
   const { cls, deck, name } = spec;
   const st = {} as Record<StatusKey, number>;
   for (const k of STATUS_KEYS) st[k] = 0;
@@ -782,17 +788,9 @@ function makeFighter(side: Side, spec: FighterSpec, alt: boolean): Fighter {
     res: cls === 'mage' ? TUNING.mage.manaStart : 0,
     resMax: cls === 'mage' ? TUNING.mage.manaStart : TUNING.warrior.rageMax,
     bonusManaNext: 0,
-    deck: shuffle(deck), discard: [], queue: [], shields: [], st,
+    deck: shuffle(deck, rand), discard: [], queue: [], shields: [], st,
     shout: 0, rallyLeft: 0, powerLeft: 0, frostNovaUsed: false, lastStandAbsorbed: 0, glacialCd: 0,
     flash: 0, pose: 'idle', poseT: 0, dead: false,
   };
 }
 
-export function shuffle<T>(a: T[]): T[] {
-  const o = a.slice();
-  for (let i = o.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [o[i], o[j]] = [o[j], o[i]];
-  }
-  return o;
-}

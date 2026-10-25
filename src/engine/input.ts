@@ -79,8 +79,8 @@ const heldCodes = new Set<string>();
 const dirOrder: Action[] = [];
 let capture: ((code: string) => void) | null = null;
 
-/** The next key press goes to `cb` instead of the game (used by the rebinding screen). */
-export function captureNextKey(cb: (code: string) => void): void { capture = cb; }
+/** The next key press goes to `cb` instead of the game (used by the rebinding screen). null cancels. */
+export function captureNextKey(cb: ((code: string) => void) | null): void { capture = cb; }
 
 function onKey(e: KeyboardEvent, isDown: boolean): void {
   unlockAudio();
