@@ -118,14 +118,6 @@ function drawTrap(c: Ctx, t: Trap, tick: number): void {
   c.globalAlpha = 1;
 }
 
-/** Draw `fn` scaled by `s` around the anchor (ax, ay), so pixel art stays on the same footing. */
-function zoom(c: Ctx, ax: number, ay: number, s: number, fn: () => void): void {
-  c.save();
-  c.translate(ax, ay); c.scale(s, s); c.translate(-ax, -ay);
-  fn();
-  c.restore();
-}
-
 /** Companions: wolves pace in their row by the Ranger's back column, hawks circle overhead, the bear stands on its panel. */
 function drawPet(c: Ctx, b: Battle, p: Pet, tick: number): void {
   const owner = b.f[p.side];
@@ -145,31 +137,63 @@ function drawPet(c: Ctx, b: Battle, p: Pet, tick: number): void {
   drawWolf(c, x, y, d, tick % 8 < 4);
 }
 
-// a small grey wolf facing right: a = outline, b = fur, c = eye; the second rows are the running frame
-const WOLF = ['......a.a..', '.....abab..', 'a...abbbbca', 'babbbbbbbaa', '.abbbbbbba.'];
-const WOLF_LEGS = ['.a.a...a.a.', '..a.a.a.a..'];
-function drawWolf(c: Ctx, x: number, y: number, d: number, step: boolean): void {
-  const rows = [...WOLF, WOLF_LEGS[step ? 1 : 0]];
-  // drawn at 2x so the wolf reads next to the fighters
-  zoom(c, x, y, 2, () => rows.forEach((r, j) => [...r].forEach((ch, i) => {
-    if (ch === '.') return;
-    const px = d > 0 ? x - 5 + i : x + 5 - i;
-    P(c, ch === 'a' ? '#000000' : ch === 'c' ? '#fcfcfc' : j === 3 ? '#bcbcbc' : '#7c7c7c', px, y - 6 + j, 1, 1);
-  })));
+// a grey wolf facing right: b = fur, h = light fur, w = white muzzle and belly, e = eye, n = nose, k = paws
+const WOLF = [
+  '..................k..k..',
+  '..................kbbk..',
+  '.................bbbbbb.',
+  '.................bbebbbbn',
+  'hh..............bbbbbwww',
+  'hhh.hhhhhhhhhhhbbbbbww..',
+  '.hbbbbbbbbbbbbbbbbbbw...',
+  '..bbbbbbbbbbbbbbbbbb....',
+  '..b.bbbbbbbbbbbbbbbb....',
+  '.....wwwwbbbbbbwwwbb....',
+];
+const WOLF_LEGS = [
+  ['.....bb.bb.....bb.bb....', '....bb...bb...bb...bb...', '...bb.....bb.bb.....bb..', '...kk.....kk.kk.....kk..'],
+  ['.....bbbb......bbbb.....', '.....bbbb......bbbb.....', '.....b..b......b..b.....', '.....kk.kk.....kk.kk....'],
+];
+const WOLF_COL: Record<string, string> = { b: '#7c7c7c', h: '#bcbcbc', w: '#fcfcfc', e: '#f8b800', n: '#000000', k: '#3c3c3c' };
+
+/** Pixel rows with a black outline, centered on x with the last row on y; d < 0 mirrors it. */
+function drawPix(c: Ctx, rows: string[], pal: Record<string, string>, x: number, y: number, d: number): void {
+  const w = Math.max(...rows.map(r => r.length)), x0 = x - (w >> 1), y0 = y - rows.length + 1;
+  const px = (i: number): number => (d > 0 ? x0 + i : x0 + w - 1 - i);
+  rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') P(c, '#000000', px(i) - 1, y0 + j - 1, 3, 3); }));
+  rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') P(c, pal[ch], px(i), y0 + j, 1, 1); }));
 }
 
-// a hawk facing right: b = feathers, d = white head, e = beak; two wing frames
-const HAWK_UP = ['b.......b', 'bb.....bb', '.bb.d.bb.', '..bbdde..', '...bbb...', '....b....'];
-const HAWK_DOWN = ['.........', '....d....', '...bdde..', '.bbbbbbb.', 'bb.bbb.bb', 'b...b...b'];
-const HAWK_COL: Record<string, string> = { b: '#ac7c00', d: '#fcfcfc', e: '#f8b800' };
-/** Drawn at 2x with a black outline, centered on (x, y). */
+function drawWolf(c: Ctx, x: number, y: number, d: number, step: boolean): void {
+  drawPix(c, [...WOLF, ...WOLF_LEGS[step ? 1 : 0]], WOLF_COL, x, y, d);
+}
+
+// a hawk facing right: b = feathers, h = light wing edge, w = white head, e = beak, k = tail and talons
+const HAWK_UP = [
+  'b................b..',
+  'bb..............bb..',
+  '.bbh...........hbb..',
+  '..bbhh.......hhbb...',
+  '...bbbbh...hbbbb.ww.',
+  '....bbbbbbbbbbbbwwwe',
+  '.....bbbbbbbbbbbbw.e',
+  '..kkbbbbbbbbbb......',
+  '...k...k.k..........',
+];
+const HAWK_DOWN = [
+  '....................',
+  '................ww..',
+  '...............wwwe.',
+  '..kkbbbbbbbbbbbbbw.e',
+  '...kbbbbbbbbbbbbb...',
+  '....hbbbbbbbbbbbh...',
+  '...hbbb.k.k...bbbh..',
+  '..hbb..........bbh..',
+  '.hb..............bh.',
+];
+const HAWK_COL: Record<string, string> = { b: '#ac7c00', h: '#f8d878', w: '#fcfcfc', e: '#f8b800', k: '#503000' };
 function drawHawk(c: Ctx, x: number, y: number, d: number, up: boolean): void {
-  const rows = up ? HAWK_UP : HAWK_DOWN;
-  const px = (i: number): number => (d > 0 ? x - 4 + i : x + 4 - i);
-  zoom(c, x, y, 2, () => {
-    rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') P(c, '#000000', px(i) - 1, y - 3 + j - 1, 3, 3); }));
-    rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') P(c, HAWK_COL[ch], px(i), y - 3 + j, 1, 1); }));
-  });
+  drawPix(c, up ? HAWK_UP : HAWK_DOWN, HAWK_COL, x, y + 4, d);
 }
 
 function drawHole(c: Ctx, col: number, row: number, owner: 0 | 1): void {
@@ -235,24 +259,36 @@ function drawLightWall(c: Ctx, cx: number, base: number, time: number): number {
 }
 
 /** Spirit Bear: a big pale-blue bear, facing the enemy. */
+// Spirit Bear facing right: b = fur, h = glow highlight, k = dark, e = eye, n = nose
+const BEAR = [
+  '................bb..bb....',
+  '...........hhhh.bbbbbb....',
+  '........hhhbbbbhbbbbbbb...',
+  '......hhbbbbbbbbbbbebbbb..',
+  '....hhbbbbbbbbbbbbbbbbbbbn',
+  '...hbbbbbbbbbbbbbbbbbbbbbk',
+  '..hbbbbbbbbbbbbbbbbbbkkkk.',
+  '..bbbbbbbbbbbbbbbbbbb.....',
+  '..bbbbbbbbbbbbbbbbbbb.....',
+  '..bbbbbbbbbbbbbbbbbbb.....',
+  '..bbbbkbbbbbbbbbbkbbb.....',
+  '..bbbb.bbbb..bbbb.bbbb....',
+  '..bbbb.bbbb..bbbb.bbbb....',
+  '..kkkk.kkkk..kkkk.kkkk....',
+];
+const BEAR_COL: Record<string, string> = { b: '#6888fc', h: '#a4e4fc', k: '#0000a8', e: '#fcfcfc', n: '#000000' };
+
 function drawBear(c: Ctx, w: Wall, cx: number, base: number, time: number): number {
   const d = w.side === 0 ? 1 : -1;
   const bob = Math.floor(time * 2) % 2;
-  const top = base - 24 + bob;
-  const body = '#6888fc', hi = '#a4e4fc', dark = '#0000a8';
-  P(c, '#000000', cx - 13, top + 6, 26, 18 - bob);
-  P(c, body, cx - 12, top + 7, 24, 16 - bob);
-  P(c, hi, cx - 12, top + 7, 24, 3);
-  // head toward the enemy
-  P(c, '#000000', cx + d * 7 - 6, top - 1, 13, 12);
-  P(c, body, cx + d * 7 - 5, top, 11, 10);
-  P(c, hi, cx + d * 7 - 5, top, 11, 2);
-  P(c, '#000000', cx + d * 7 - 5, top - 3, 3, 3); P(c, '#000000', cx + d * 7 + 3, top - 3, 3, 3);
-  P(c, '#fcfcfc', cx + d * 10, top + 3, 2, 2);
-  P(c, dark, cx + d * 11, top + 6, 3, 3);
-  for (const lx of [-11, -6, 3, 8]) P(c, dark, cx + lx, base - 3, 3, 3);
-  glow(c, cx, top + 11, 19, '104,136,252', 0.2 + 0.1 * Math.sin(time * 4));
-  return top - 3;
+  const top = base - BEAR.length - 1 + bob;
+  const px = (i: number): number => (d > 0 ? cx - 13 + i : cx + 12 - i);
+  // the legs stay planted; the body breathes
+  const py = (j: number): number => (j >= 11 ? base - BEAR.length - 1 + j : top + j);
+  BEAR.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') P(c, '#000000', px(i) - 1, py(j) - 1, 3, 3); }));
+  BEAR.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') P(c, BEAR_COL[ch], px(i), py(j), 1, 1); }));
+  glow(c, cx, top + 7, 18, '104,136,252', 0.2 + 0.1 * Math.sin(time * 4));
+  return top - 2;
 }
 
 function drawIceShards(c: Ctx, w: Wall, cx: number, base: number, pct: number, time: number): number {
