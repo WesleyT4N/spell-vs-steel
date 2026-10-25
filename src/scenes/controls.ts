@@ -66,7 +66,7 @@ export class ControlsScene implements Scene {
       const v = on && this.waiting ? (tick % 4 < 3 ? 'PRESS A KEY' : '') : keyName(getKey(row));
       drawText(ui, v, 240, ty, on && this.waiting ? '#f8b800' : '#fcd8a8');
     });
-    drawText(ui, `HOLD ${k('attack')}: HEAVY ATTACK    ${k('cast')} + DIRECTION: AIM BLINK`, PX, 262, '#7c7c7c');
+    drawText(ui, `HOLD ${k('attack')}: HEAVY ATTACK    ${k('cast')} + DIRECTION: AIM SPELL`, PX, 262, '#7c7c7c');
     drawText(ui, 'ARROW KEYS ALSO MOVE    ESC: PAUSE    M: MUTE', PX, 274, '#7c7c7c');
     if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, 288, '#f83800', 1, false);
     hint(ui, this.waiting ? 'PRESS A KEY   ESC: CANCEL' : `CLICK A ROW OR ${k('attack')}: REBIND   ${k('cast')} / RIGHT-CLICK: BACK`);

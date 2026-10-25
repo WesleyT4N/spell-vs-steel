@@ -21,7 +21,7 @@ npm run sim      # headless CPU-vs-CPU matches; prints win rates, match length, 
 | WASD (arrows also work) | Move |
 | J (tap) | Light attack |
 | J (hold, release) | Heavy attack |
-| K | Cast the next spell (hold a direction to aim Blink) |
+| K | Cast the next spell (hold a direction to aim it) |
 | Space | Open the Draw screen when the gauge is full |
 | Enter / Esc | Pause |
 | M | Mute |
