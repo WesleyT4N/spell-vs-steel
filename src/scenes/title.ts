@@ -10,9 +10,10 @@ import { MENU_SONG } from '../engine/music';
 import { SetupScene } from './setup';
 import { DeckBuilderScene } from './deckbuilder';
 import { OptionsScene } from './options';
+import { TutorialScene, tutorialDone } from './tutorial';
 import { loadMatch } from '../game/match';
 
-const ITEMS = ['VERSUS CPU', 'DECK BUILDER', 'OPTIONS'];
+const ITEMS = ['VERSUS CPU', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS'];
 
 export class TitleScene implements Scene {
   sel = 0;
@@ -28,9 +29,11 @@ export class TitleScene implements Scene {
     if (clicked >= 0) this.sel = clicked;
     if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
       sfx('select');
-      if (this.sel === 0) setScene(new SetupScene());
-      if (this.sel === 1) setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
-      if (this.sel === 2) setScene(new OptionsScene(() => setScene(new TitleScene())));
+      const item = ITEMS[this.sel];
+      if (item === 'VERSUS CPU') setScene(new SetupScene());
+      if (item === 'TUTORIAL') setScene(new TutorialScene());
+      if (item === 'DECK BUILDER') setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
+      if (item === 'OPTIONS') setScene(new OptionsScene(() => setScene(new TitleScene())));
     }
   }
 
@@ -45,8 +48,10 @@ export class TitleScene implements Scene {
     drawFighterSprite(c, getSprite('warrior', defaultSkin('warrior'), false), 206, 130 - bob, true, 'none', 2);
     P(c, '#000000', 22, 131, 24, 2); P(c, '#000000', 194, 131, 24, 2);
     drawLogo(c, W / 2, 10, this.t);
-    drawMenu(ui, ITEMS, this.sel, UW / 2, 186, tick, { width: 200, gap: 24 });
-    drawTextCentered(ui, 'PROTOTYPE 0.2', UW / 2, 280, '#7c7c7c', 1, false);
+    drawMenu(ui, ITEMS, this.sel, UW / 2, 182, tick, { width: 200, gap: 24 });
+    // first-timers get a nudge toward the tutorial
+    if (!tutorialDone() && tick % 8 < 6) drawText(ui, 'NEW!', UW / 2 + 40, 182 + 24 + 4, '#f8b800');
+    drawTextCentered(ui, 'PROTOTYPE 0.2', UW / 2, 290, '#7c7c7c', 1, false);
     if (isMuted()) drawText(ui, 'MUTED', 8, 8, '#7c7c7c');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   M: MUTE`);
   }
