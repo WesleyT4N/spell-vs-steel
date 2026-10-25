@@ -1,7 +1,7 @@
 import { setScene, drawMenu, hint, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawLogo } from '../art/logo';
-import { getSprite, drawFighterSprite } from '../art/sprites';
+import { getSprite, drawFighterSprite, defaultSkin } from '../art/sprites';
 import { P, W, H, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k } from '../engine/input';
@@ -38,8 +38,8 @@ export class TitleScene implements Scene {
     c.fillRect(0, 0, W, H);
     // fighters flanking the logo
     const bob = Math.floor(this.t * 2.5) % 2;
-    drawFighterSprite(c, getSprite('warrior', 'base', false), 34, 130 - bob, false, 'none', 2);
-    drawFighterSprite(c, getSprite('mage', 'base', false), 206, 130 - (1 - bob), true, 'none', 2);
+    drawFighterSprite(c, getSprite('warrior', defaultSkin('warrior'), false), 34, 130 - bob, false, 'none', 2);
+    drawFighterSprite(c, getSprite('mage', defaultSkin('mage'), false), 206, 130 - (1 - bob), true, 'none', 2);
     P(c, '#000000', 22, 131, 24, 2); P(c, '#000000', 194, 131, 24, 2);
     drawLogo(c, W / 2, 10);
     drawMenu(c, ITEMS, this.sel, W / 2, 92, tick, { width: 104 });

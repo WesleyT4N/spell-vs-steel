@@ -1,7 +1,7 @@
 // Battle simulation. Pure game state and rules; drawing lives in battleView.ts.
 import { TUNING } from './tuning';
 import { CARDS, type CardDef, type Element } from './cards';
-import type { ClassId } from '../art/sprites';
+import { defaultSkin, mirrorSkin, type ClassId } from '../art/sprites';
 import { sfx } from '../engine/audio';
 
 export const COLS = 6, ROWS = 3;
@@ -148,9 +148,10 @@ export class Battle {
   stats = [{ basic: 0, spell: 0, other: 0 }, { basic: 0, spell: 0, other: 0 }];
 
   constructor(a: FighterSpec, bSpec: FighterSpec) {
-    // same class in the same skin: the CPU copy gets the alternate palette
-    const mirror = a.cls === bSpec.cls && (a.skin ?? 'base') === (bSpec.skin ?? 'base');
-    this.f = [makeFighter(0, a, false), makeFighter(1, bSpec, mirror)];
+    // same class in the same color: the second fighter takes the next color
+    const aSkin = a.skin ?? defaultSkin(a.cls);
+    const bSkin = a.cls === bSpec.cls ? mirrorSkin(a.cls, aSkin, bSpec.skin ?? defaultSkin(bSpec.cls)) : bSpec.skin;
+    this.f = [makeFighter(0, { ...a, skin: aSkin }, false), makeFighter(1, { ...bSpec, skin: bSkin }, false)];
     for (let c = 0; c < COLS; c++) {
       this.panels[c] = [];
       for (let r = 0; r < ROWS; r++) {
@@ -772,7 +773,7 @@ function makeFighter(side: Side, spec: FighterSpec, alt: boolean): Fighter {
   for (const k of STATUS_KEYS) st[k] = 0;
   const maxHp = TUNING.hp[cls];
   return {
-    side, cls, skin: spec.skin ?? 'base', alt, name, hp: maxHp, maxHp,
+    side, cls, skin: spec.skin ?? defaultSkin(cls), alt, name, hp: maxHp, maxHp,
     col: side === 0 ? 1 : 4, row: 1, dx: 0, dy: 0,
     lock: 0, moveCd: 0, charging: false, charge: 0,
     res: cls === 'mage' ? TUNING.mage.manaStart : 0,
