@@ -79,6 +79,8 @@ export class Cpu {
       this.holding = Math.random() < (this.difficulty === 'normal' ? 0.35 : 0.15);
       if (Math.random() < 0.5) return;
     }
+    // a Rogue in a backstab window holds its panel: any move would blink it home
+    if (f.st.backstab > 0) return;
     // the Ranger earns Energy by standing still, so it repositions less
     if (f.cls === 'ranger' && (aligned || !seen) && Math.random() < 0.85) return;
 
@@ -136,6 +138,31 @@ export class Cpu {
     return safe[Math.floor(Math.random() * safe.length)][0];
   }
 
+  /** Rogue: spend the full Energy bar on a chain. Setup first, then a blink, then the finishers that want to be up close.
+   *  Ambush only comes with a Stealth card cast before it. */
+  private pickRogue(offer: string[], energy: number, cost: (i: number) => number): number[] {
+    const STEALTH = ['vanish', 'shadow_clone', 'smokescreen', 'nights_embrace'];
+    const RANK: Record<string, number> = {
+      vanish: 0, shadow_clone: 0, smokescreen: 0, nights_embrace: 0, cold_blood: 0, deadly_poison: 0, adrenaline_rush: 0, shadow_dance: 0,
+      pandemic: 0, death_mark: 0, poison_vial: 0, evasion: 0, riposte: 0, cloak_of_shadows: 0,
+      shadowstep: 1, ambush: 1, blade_flurry: 1, killing_spree: 1,
+    };
+    const chosen: number[] = [];
+    const take = (i: number): void => {
+      if (chosen.includes(i) || cost(i) > energy) return;
+      chosen.push(i);
+      energy -= cost(i);
+      if (offer[i] === 'pickpocket') energy += 1;
+    };
+    const idx = offer.map((_, i) => i);
+    const hide = idx.find(i => STEALTH.includes(offer[i]));
+    const ambush = idx.find(i => offer[i] === 'ambush');
+    if (hide !== undefined && ambush !== undefined && cost(hide) + cost(ambush) <= energy) { take(hide); take(ambush); }
+    for (const i of idx.filter(i => offer[i] !== 'ambush').sort((a, c) => cost(c) - cost(a))) take(i);
+    // finishers (Shiv, Kidney Shot, Envenom, Eviscerate...) go last, after the chain is set up
+    return chosen.sort((a, c) => (RANK[offer[a]] ?? 2) - (RANK[offer[c]] ?? 2));
+  }
+
   /** Choose spells from the offer, in cast order. */
   pick(b: Battle, f: Fighter): number[] {
     const offer = b.offer[f.side];
@@ -145,6 +172,7 @@ export class Cpu {
       return idx.sort(() => Math.random() - 0.5).slice(0, n);
     }
     const cost = (i: number): number => { const c = CARDS[offer[i]].cost; return c === 'all' ? Math.max(1, f.res) : c; };
+    if (f.cls === 'rogue') return this.pickRogue(offer, f.res, cost);
     if (f.cls !== 'warrior') {
       // Energy and Mana are known up front (the Ranger will earn about 2 more while it stands still)
       let mana = f.res + (f.cls === 'ranger' ? 2 : 0);

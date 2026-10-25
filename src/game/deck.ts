@@ -23,10 +23,10 @@ const STARTERS: Record<ClassId, DeckCounts> = {
     inferno: 1,
   },
   rogue: {
-    shiv: 3, evasion: 2, vanish: 2, shadowstep: 4, ambush: 3, deadly_poison: 2, poison_vial: 2, envenom: 3, fan_of_knives: 2, kick: 2,
-    cheap_shot: 1, blade_flurry: 1,
-    eviscerate: 1, preparation: 1,
-    thousand_cuts: 1,
+    vanish: 3, shadowstep: 4, ambush: 3, shiv: 4, evasion: 1, kick: 2, poison_vial: 2, deadly_poison: 2, envenom: 2,
+    cold_blood: 2, riposte: 1, pickpocket: 1,
+    eviscerate: 1, kidney_shot: 1,
+    death_mark: 1,
   },
   ranger: {
     steady_focus: 3, hawk_strike: 4, hunters_mark: 2, net: 2, disengage: 2, freezing_trap: 2, explosive_trap: 2, multi_shot: 3, call_wolf: 2, power_shot: 3,

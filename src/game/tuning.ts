@@ -43,12 +43,17 @@ export const TUNING = {
     /** Light: a dagger stab that hits every panel up to `stabReach` ahead. Heavy: a throwing knife down the row. */
     lightDamage: 7,
     heavyDamage: 22,
-    stabReach: 2,
+    stabReach: 1,
     lightLock: 0.35,
     heavyLock: 0.35,
     /** Energy tops up to this at every Draw screen (5 = a full refill, so every turn can chain cheap skills). */
     energyTopUp: 5,
     energyCap: 5,
+    /** After a backstab the Rogue may keep acting from in front of the enemy this long before blinking home. */
+    backstabWindow: 2,
+    /** Vanish: the next attack spell stuns for this long. */
+    vanishStun: 1.5,
+    riposteDamage: 80,
   },
 
   ranger: {
