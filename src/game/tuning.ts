@@ -6,7 +6,7 @@ export const TUNING = {
   /** Seconds for the shared custom gauge to fill. */
   gaugeSeconds: 10,
   /** Custom screen countdown in seconds. */
-  customTimer: 15,
+  customTimer: 20,
   /** Spells drawn per custom screen. */
   handSize: 5,
 
@@ -24,7 +24,9 @@ export const TUNING = {
     rageMax: 5,
     rageLightHit: 0,
     rageHeavyHit: 1,
-    rageWhenHit: 0.5,
+    /** Taking damage builds Rage in proportion to the damage: 1 pip per this much, capped per hit. */
+    rageDamagePerPip: 40,
+    rageWhenHitMax: 1,
   },
 
   mage: {
@@ -35,6 +37,10 @@ export const TUNING = {
     manaStart: 1,
     manaCap: 5,
   },
+
+  /** Frost Nova hits an enemy within this many columns of the caster. */
+  frostNovaRange: 2,
+  frostNovaDamage: 20,
 
   /** Frozen or stunned targets take this multiplier from all sources. */
   frozenBonus: 1.5,

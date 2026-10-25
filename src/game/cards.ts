@@ -442,10 +442,10 @@ const mage: CardDef[] = [
     ai: (b, f) => sameRow(b, f),
   },
   {
-    id: 'frost_nova', name: 'Frost Nova', cls: 'mage', cost: 2, rarity: 'common', element: 'frost', damaging: false, lock: 0.3,
-    dmg: '-', short: '8s trap: an enemy entering your area or the column next to it is frozen 1.5s.',
-    cast: x => { x.f.st.frostNova = 8; x.f.frostNovaUsed = false; x.b.addFx('novaZone', x.f.side, x.f.col, x.f.row, 0.6); },
-    ai: (b, f) => b.foe(f).cls === 'warrior',
+    id: 'frost_nova', name: 'Frost Nova', cls: 'mage', cost: 2, rarity: 'common', element: 'frost', damaging: true, lock: 0.3,
+    dmg: '20', short: 'Hits an enemy within 2 columns of you for 20 and freezes them 1.5s. If none, lingers 6s until one comes close.',
+    cast: x => { x.f.st.frostNova = 6; x.f.frostNovaUsed = false; x.b.addFx('novaZone', x.f.side, x.f.col, x.f.row, 0.6); },
+    ai: (b, f) => b.foe(f).cls === 'warrior' || Math.abs(b.foe(f).col - f.col) <= 2,
   },
   {
     id: 'arcane_intellect', name: 'Arcane Intellect', cls: 'mage', cost: 1, rarity: 'uncommon', element: 'arcane', damaging: false, lock: 0.3,

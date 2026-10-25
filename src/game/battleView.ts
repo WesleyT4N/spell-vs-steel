@@ -34,8 +34,8 @@ export function drawBattle(c: Ctx, b: Battle, tick: number): void {
   for (const f of b.f) {
     if (f.st.frostNova > 0 && !f.frostNovaUsed) {
       for (let col = 0; col < 6; col++) for (let r = 0; r < 3; r++) {
-        const own = b.panels[col][r].owner === f.side, border = col === b.frontCol(f.side) - b.dir(f);
-        if ((own || border) && (col + r + tick) % 4 === 0) { const pc = panelCenter(col, r); P(c, '#a4e4fc', pc.x - 1, pc.y - 1, 2, 2); }
+        const inRange = col !== f.col && Math.abs(col - f.col) <= TUNING.frostNovaRange;
+        if (inRange && (col + r + tick) % 4 === 0) { const pc = panelCenter(col, r); P(c, '#a4e4fc', pc.x - 1, pc.y - 1, 2, 2); }
       }
     }
   }
