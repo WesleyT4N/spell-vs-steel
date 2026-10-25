@@ -19,14 +19,14 @@ npm run sim      # headless CPU-vs-CPU matches; prints win rates, match length, 
 | Key | Action |
 | --- | --- |
 | WASD (arrows also work) | Move |
-| J | Light attack |
-| L | Heavy attack (winds up for 1s, then swings on its own) |
+| J (tap) | Light attack |
+| J (hold, release) | Heavy attack |
 | K | Cast the next spell (hold a direction to aim it) |
 | Space | Open the Draw screen when the gauge is full |
 | Enter / Esc | Pause |
 | M | Mute |
 
-These are the defaults. **Options** (title menu or pause menu) has master, music and sound effect volume, music and sound effect on/off, and **Key Mapping**, which rebinds movement, light and heavy attack, cast, Draw screen and pause. Settings save in the browser; arrows, Esc and M always work.
+These are the defaults. **Options** (title menu or pause menu) has master, music and sound effect volume, music and sound effect on/off, and **Key Mapping**, which rebinds movement, attack, cast, Draw screen and pause. Settings save in the browser; arrows, Esc and M always work.
 
 **Menus are mouse-first.** Hover highlights, click picks, right-click backs out. Draw screen: the 5 drawn spells are a hand of cards; hover one to read it, click to queue it (cast order is pick order), right-click to undo, click FIGHT! to start. Deck builder: hover a spell to read it, click to add a copy, right-click to remove one, wheel to scroll, click the class tabs to switch. The keyboard still works everywhere (J picks, K undoes, Space fights; in the deck builder D/A add and remove, Q/E switch class). Combat is keyboard only.
 

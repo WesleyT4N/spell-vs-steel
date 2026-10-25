@@ -14,11 +14,11 @@ export interface Intent {
   /** Direction currently held, used to aim Blink. */
   held: Dir | null;
   attackPressed: boolean;
-  heavyPressed: boolean;
+  attackHeld: boolean;
   castPressed: boolean;
 }
 export type Dir = 'up' | 'down' | 'left' | 'right';
-export const NO_INTENT: Intent = { move: null, held: null, attackPressed: false, heavyPressed: false, castPressed: false };
+export const NO_INTENT: Intent = { move: null, held: null, attackPressed: false, attackHeld: false, castPressed: false };
 
 export interface Shield { kind: 'guard' | 'ironSkin' | 'barrier' | 'unbreakable'; hp: number; t: number; hits: number }
 
@@ -371,21 +371,21 @@ export class Battle {
 
     if (intent.move && !busy) this.tryMove(f, intent.move);
 
-    // Heavy has its own button: a press starts the wind-up, which fires on its own once charged.
-    // Light attacks are locked out while winding up; a flinch cancels it.
-    if (f.charging) {
-      const before = f.charge;
-      f.charge += dt;
-      if (before < TUNING.heavyCharge && f.charge >= TUNING.heavyCharge) sfx('charged');
-      if (f.charge >= TUNING.heavyCharge && !busy) {
-        this.basicAttack(f, 'heavy');
+    if (intent.attackPressed && !busy) {
+      this.basicAttack(f, 'light');
+      f.charging = true;
+      f.charge = 0;
+    } else if (f.charging) {
+      if (intent.attackHeld) {
+        const before = f.charge;
+        f.charge += dt;
+        if (before < TUNING.heavyCharge && f.charge >= TUNING.heavyCharge) sfx('charged');
+      } else {
+        if (f.charge >= TUNING.heavyCharge && f.lock <= 0 && f.st.flinch <= 0) this.basicAttack(f, 'heavy');
         f.charging = false;
         f.charge = 0;
       }
-    } else if (intent.heavyPressed && !busy) {
-      f.charging = true;
-      f.charge = 0;
-    } else if (intent.attackPressed && !busy) this.basicAttack(f, 'light');
+    }
 
     if (intent.castPressed && !busy) this.castTop(f, intent.held);
   }
