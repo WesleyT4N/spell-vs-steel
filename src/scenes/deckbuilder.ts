@@ -94,7 +94,7 @@ export class DeckBuilderScene implements Scene {
     c.fillRect(0, 0, W, H);
 
     // header
-    frame(c, 4, 3, W - 8, 19, '#000000', teamColor(this.cls, false));
+    frame(c, 4, 3, W - 8, 19, '#000000', teamColor(this.cls, loadMatch().p1Skin[this.cls], false));
     drawText(c, `Q ← ${this.cls.toUpperCase()} GRIMOIRE → E`, 8, 6, '#fcfcfc');
     const n = deckSize(this.deck), leg = countRarity(this.deck, 'legendary'), myth = countRarity(this.deck, 'mythic');
     drawText(c, `${n}/${DECK_SIZE}`, 8, 14, n === DECK_SIZE ? '#58d854' : '#f8b800');

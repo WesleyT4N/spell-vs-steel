@@ -8,6 +8,9 @@ export interface MatchConfig {
   p1Deck: 'starter' | 'custom';
   cpu: ClassId;
   difficulty: Difficulty;
+  /** Chosen skin per class, for the player and for the CPU. */
+  p1Skin: Record<ClassId, string>;
+  cpuSkin: Record<ClassId, string>;
   /** Rounds in a set: 1 (single match), 3 or 5. */
   bestOf: 1 | 3 | 5;
 }
@@ -15,10 +18,13 @@ export interface MatchConfig {
 const KEY = 'svs:match';
 
 export function loadMatch(): MatchConfig {
-  const def: MatchConfig = { p1: 'warrior', p1Deck: 'starter', cpu: 'mage', difficulty: 'normal', bestOf: 3 };
+  const skins = (): Record<ClassId, string> => ({ warrior: 'base', mage: 'base' });
+  const def: MatchConfig = { p1: 'warrior', p1Deck: 'starter', cpu: 'mage', difficulty: 'normal', bestOf: 3, p1Skin: skins(), cpuSkin: skins() };
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? { ...def, ...(JSON.parse(raw) as Partial<MatchConfig>) } : def;
+    if (!raw) return def;
+    const saved = JSON.parse(raw) as Partial<MatchConfig>;
+    return { ...def, ...saved, p1Skin: { ...skins(), ...saved.p1Skin }, cpuSkin: { ...skins(), ...saved.cpuSkin } };
   } catch { return def; }
 }
 

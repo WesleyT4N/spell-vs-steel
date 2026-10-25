@@ -34,8 +34,8 @@ export class BattleScene implements Scene {
   /** Rounds won in the current set: [you, cpu]. */
   constructor(public m: MatchConfig, public score: [number, number] = [0, 0]) {
     this.b = new Battle(
-      { cls: m.p1, deck: playerDeck(m), name: 'YOU' },
-      { cls: m.cpu, deck: toList(starterDeck(m.cpu)), name: 'CPU' },
+      { cls: m.p1, deck: playerDeck(m), name: 'YOU', skin: m.p1Skin[m.p1] },
+      { cls: m.cpu, deck: toList(starterDeck(m.cpu)), name: 'CPU', skin: m.cpuSkin[m.cpu] },
     );
     this.cpu = new Cpu(m.difficulty);
   }

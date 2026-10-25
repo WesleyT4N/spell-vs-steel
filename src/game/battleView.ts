@@ -92,7 +92,7 @@ function fighterPos(_b: Battle, f: Fighter): { x: number; y: number } {
 }
 
 function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number): void {
-  const s = getSprite(f.cls, f.alt);
+  const s = getSprite(f.cls, f.skin, f.alt);
   const { x, y } = fighterPos(b, f);
   const flip = f.side === 1;
   const lean = f.pose === 'attack' ? 2 : f.pose === 'hurt' ? -2 : 0;
@@ -324,7 +324,7 @@ function drawHud(c: Ctx, b: Battle, tick: number): void {
     const right = f.side === 1;
     const x = right ? W - 62 : 4;
     // HP box (BN style)
-    frame(c, x, 4, 58, 13, '#000000', teamColor(f.cls, f.alt));
+    frame(c, x, 4, 58, 13, '#000000', teamColor(f.cls, f.skin, f.alt));
     const hp = String(Math.max(0, Math.ceil(f.hp)));
     const low = f.hp / f.maxHp < 0.3;
     drawText(c, hp, x + 56 - textWidth(hp, 1) - 2, 7, low && tick % 4 < 2 ? '#f83800' : '#fcfcfc');
