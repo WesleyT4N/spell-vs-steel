@@ -433,7 +433,7 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
 function cellPx(col: number, row: number): { x: number; y: number } { return panelFoot(col, row); }
 
 /** Color ramps for the quick row shots (basic attacks and arrows). */
-const DART: Record<string, string[]> = { knife: STEEL, knifeHeavy: TOX, arrow: ['#503000', '#ac7c00', '#bcbcbc', '#fcfcfc'], aimed: STEEL, holySpark: HOLY };
+const DART: Record<string, string[]> = { knife: STEEL, knifeHeavy: STEEL, arrow: ['#503000', '#ac7c00', '#bcbcbc', '#fcfcfc'], aimed: STEEL, holySpark: HOLY };
 
 function drawFx(c: Ctx, _b: Battle, e: Fx): void {
   const p = e.t / e.dur;
@@ -454,6 +454,17 @@ function drawFx(c: Ctx, _b: Battle, e: Fx): void {
         if (age < 0.6 * (1 - p) + 0.15) P(c, col, px - 1, py - 1, age < 0.12 ? 3 : 2, 2);
       }
       if (p > 0.45 && p < 0.8) for (let i = 0; i < 3; i++) P(c, '#fcfcfc', cx + d * (r + 2 + i * 2), cy - 3 + i * 3, 2, 1);
+      break;
+    }
+    case 'stab': {
+      // a quick dagger thrust: the blade shoots out across the panels ahead and snaps back
+      const reach = Number(e.data?.reach ?? 2);
+      const len = reach * PW * (p < 0.5 ? p * 2 : 1 - (p - 0.5) * 1.2);
+      const x0 = x + d * 6, by = y - 10, tip = x0 + d * len;
+      P(c, '#000000', Math.min(x0, tip), by - 2, Math.abs(tip - x0), 3);
+      P(c, '#bcbcbc', Math.min(x0, tip), by - 1, Math.abs(tip - x0), 1);
+      P(c, '#fcfcfc', tip - (d > 0 ? 3 : 0), by - 2, 3, 3);
+      if (p > 0.35 && p < 0.65) glow(c, tip, by, 6, '252,252,252', 0.6);
       break;
     }
     case 'cleaveHeavy': {
