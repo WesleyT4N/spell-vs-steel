@@ -7,6 +7,7 @@ import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { sfx } from '../engine/audio';
+import { PLAYABLE } from '../game/classes';
 import { ALL_CARDS, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef, type Element, type Rarity } from '../game/cards';
 import { starterDeck, STARTER_NAME } from '../game/deck';
 import { drawCardDetail, drawCardFace, CARD_W, CARD_H } from './cardView';
@@ -28,7 +29,7 @@ export class EncyclopediaScene implements Scene {
   element: Element | null = null;
   sel = 0;
   scroll = 0;
-  private classes: ClassId[] = [...new Set(ALL_CARDS.map(c => c.cls))];
+  private classes: ClassId[] = [...new Set(ALL_CARDS.map(c => c.cls))].filter(c => PLAYABLE.includes(c));
 
   constructor(private back: () => void, private test?: (card: CardDef) => void) {}
 
@@ -37,7 +38,7 @@ export class EncyclopediaScene implements Scene {
   private list(): CardDef[] {
     const order = this.classes;
     return ALL_CARDS
-      .filter(c => (!this.cls || c.cls === this.cls) && (!this.rarity || c.rarity === this.rarity) && (!this.element || c.element === this.element))
+      .filter(c => order.includes(c.cls) && (!this.cls || c.cls === this.cls) && (!this.rarity || c.rarity === this.rarity) && (!this.element || c.element === this.element))
       .sort((a, b) => order.indexOf(a.cls) - order.indexOf(b.cls) || RANK[a.rarity] - RANK[b.rarity] || costNum(a) - costNum(b) || a.name.localeCompare(b.name));
   }
 
@@ -117,7 +118,6 @@ export class EncyclopediaScene implements Scene {
       x += w + 4;
     });
     drawText(ui, `${cards.length} SPELL${cards.length === 1 ? '' : 'S'}`, x + 8, 13, '#7c7c7c');
-    drawTextCentered(ui, 'CARD ENCYCLOPEDIA', 340, 13, '#fcfcfc', 1, false);
     button(ui, 'done', 'DONE', UW - 64, 9, 50, 14, false, '#f8b800');
     x = 14;
     RARITIES.forEach((r, i) => {
@@ -130,6 +130,7 @@ export class EncyclopediaScene implements Scene {
     x += 10;
     this.elements().forEach((el, i) => {
       const label = el.toUpperCase(), w = textWidth(label) + 10, on = this.element === el;
+      if (x + w > UW - 12) return; // with every class shown, the last elements don't fit: pick a class tab to filter them
       zone(`el:${i}`, x, 27, w, 14);
       frame(ui, x, 27, w, 14, on ? ELEMENT_COLOR[el] : '#000000', isHot(`el:${i}`) || on ? '#fcfcfc' : ELEMENT_COLOR[el]);
       drawText(ui, label, x + 5, 31, on ? '#000000' : ELEMENT_COLOR[el]);

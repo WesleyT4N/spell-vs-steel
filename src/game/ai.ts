@@ -1,5 +1,5 @@
 // CPU opponent. Produces the same Intent a keyboard player would, so the battle can't tell the difference.
-import { NO_INTENT, type Battle, type Dir, type Fighter, type Intent } from './battle';
+import { NO_INTENT, heavyChargeOf, type Battle, type Dir, type Fighter, type Intent } from './battle';
 import { CARDS } from './cards';
 import { TUNING, type Difficulty } from './tuning';
 
@@ -61,15 +61,28 @@ export class Cpu {
 
     // 3. Basic attacks.
     const dist = (foe.col - f.col) * d;
-    const inReach = f.cls === 'warrior' ? aligned && dist >= 1 && dist <= 2 : aligned;
+    const seen = foe.st.stealth <= 0;
+    const inReach = seen && (f.cls === 'warrior' ? aligned && dist >= 1 && dist <= 2
+      : f.cls === 'rogue' ? aligned && dist >= 1 && dist <= TUNING.rogue.stabReach : aligned);
+    // Smite lands a fixed distance ahead, so the Cleric only releases its heavy at that range;
+    // the Rogue's Throwing Knife flies down the whole row
+    const heavyReach = f.cls === 'rogue' ? seen && aligned : inReach && (f.cls !== 'cleric' || dist === TUNING.cleric.smiteRange);
+    const need = heavyChargeOf(f);
     if (this.holding) {
-      if (f.charge >= TUNING.heavyCharge && inReach) this.holding = false; // release fires the heavy
-      else if (f.charge > TUNING.heavyCharge + 1.5) this.holding = false;
+      if (f.charge >= need && heavyReach) this.holding = false; // release fires the heavy
+      else if (f.charge > need + 1.5) this.holding = false;
+    } else if (f.cls === 'rogue' && heavyReach && !inReach && f.lock <= 0) {
+      // out of stab range: wind up a Throwing Knife instead
+      if (Math.random() < 0.08) { this.wantTap = true; this.holding = true; }
     } else if (inReach && f.lock <= 0) {
       this.wantTap = true;
       this.holding = Math.random() < (this.difficulty === 'normal' ? 0.35 : 0.15);
       if (Math.random() < 0.5) return;
     }
+    // a Rogue in a backstab window holds its panel: any move would blink it home
+    if (f.st.backstab > 0) return;
+    // the Ranger earns Energy by standing still, so it repositions less
+    if (f.cls === 'ranger' && (aligned || !seen) && Math.random() < 0.85) return;
 
     // 4. Positioning.
     const target = this.goal(b, f);
@@ -80,8 +93,15 @@ export class Cpu {
   private goal(b: Battle, f: Fighter): [number, number] {
     const foe = b.foe(f);
     const aim = Math.random() < this.cfg.aim;
-    const row = aim ? foe.row : Math.floor(Math.random() * 3);
-    if (f.cls === 'warrior') return [b.frontCol(f.side), row];
+    // a stealthed enemy can't be tracked: hold the current row
+    const row = foe.st.stealth > 0 ? f.row : aim ? foe.row : Math.floor(Math.random() * 3);
+    if (f.cls === 'warrior' || f.cls === 'rogue') return [b.frontCol(f.side), row];
+    if (f.cls === 'cleric') {
+      // stand where Smite reaches the enemy, inside our own area
+      const want = foe.col - TUNING.cleric.smiteRange * b.dir(f);
+      const lo = Math.min(b.backCol(f.side), b.frontCol(f.side)), hi = Math.max(b.backCol(f.side), b.frontCol(f.side));
+      return [Math.max(lo, Math.min(hi, want)), row];
+    }
     // Mage: keep distance from a Warrior hugging the border, otherwise hold the middle.
     const threatened = foe.cls === 'warrior' && foe.col === b.frontCol(foe.side);
     const col = threatened ? b.backCol(f.side) : b.frontCol(f.side) - b.dir(f);
@@ -118,6 +138,31 @@ export class Cpu {
     return safe[Math.floor(Math.random() * safe.length)][0];
   }
 
+  /** Rogue: spend the full Energy bar on a chain. Setup first, then a blink, then the finishers that want to be up close.
+   *  Ambush only comes with a Stealth card cast before it. */
+  private pickRogue(offer: string[], energy: number, cost: (i: number) => number): number[] {
+    const STEALTH = ['vanish', 'shadow_clone', 'smokescreen', 'nights_embrace'];
+    const RANK: Record<string, number> = {
+      vanish: 0, shadow_clone: 0, smokescreen: 0, nights_embrace: 0, cold_blood: 0, deadly_poison: 0, adrenaline_rush: 0, shadow_dance: 0,
+      pandemic: 0, death_mark: 0, poison_vial: 0, evasion: 0, riposte: 0, cloak_of_shadows: 0,
+      shadowstep: 1, ambush: 1, blade_flurry: 1, killing_spree: 1,
+    };
+    const chosen: number[] = [];
+    const take = (i: number): void => {
+      if (chosen.includes(i) || cost(i) > energy) return;
+      chosen.push(i);
+      energy -= cost(i);
+      if (offer[i] === 'pickpocket') energy += 1;
+    };
+    const idx = offer.map((_, i) => i);
+    const hide = idx.find(i => STEALTH.includes(offer[i]));
+    const ambush = idx.find(i => offer[i] === 'ambush');
+    if (hide !== undefined && ambush !== undefined && cost(hide) + cost(ambush) <= energy) { take(hide); take(ambush); }
+    for (const i of idx.filter(i => offer[i] !== 'ambush').sort((a, c) => cost(c) - cost(a))) take(i);
+    // finishers (Shiv, Kidney Shot, Envenom, Eviscerate...) go last, after the chain is set up
+    return chosen.sort((a, c) => (RANK[offer[a]] ?? 2) - (RANK[offer[c]] ?? 2));
+  }
+
   /** Choose spells from the offer, in cast order. */
   pick(b: Battle, f: Fighter): number[] {
     const offer = b.offer[f.side];
@@ -127,8 +172,11 @@ export class Cpu {
       return idx.sort(() => Math.random() - 0.5).slice(0, n);
     }
     const cost = (i: number): number => { const c = CARDS[offer[i]].cost; return c === 'all' ? Math.max(1, f.res) : c; };
-    if (f.cls === 'mage') {
-      let mana = f.res;
+    if (f.cls === 'rogue') return this.pickRogue(offer, f.res, cost);
+    if (f.cls !== 'warrior') {
+      // Energy and Mana are known up front (the Ranger will earn about 2 more while it stands still)
+      let mana = f.res + (f.cls === 'ranger' ? 2 : 0);
+      for (const i of idx) { const g = CARDS[offer[i]].gain; if (g?.res && offer[i] !== 'arcane_focus') mana += g.res; if (g?.refill) mana = Math.max(mana, 5); }
       const chosen: number[] = [];
       // Focus first (it pays for itself), then the most expensive things we can afford.
       for (const i of idx.filter(i => offer[i] === 'arcane_focus')) { chosen.push(i); mana += 1; }

@@ -9,10 +9,11 @@ import { sfx } from '../engine/audio';
 import { cardsFor, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef } from '../game/cards';
 import { canAdd, countRarity, deckSize, loadCustom, saveCustom, starterDeck, validate, DECK_SIZE, MAX_LEGENDARIES, type DeckCounts } from '../game/deck';
 import { loadMatch, saveMatch } from '../game/match';
+import { PLAYABLE } from '../game/classes';
 import { drawCardFace, resColor, resName, CARD_W, CARD_H } from './cardView';
 
 const RARITY_ORDER = { common: 0, uncommon: 1, legendary: 2, mythic: 3 };
-const CLASSES: ClassId[] = ['warrior', 'mage'];
+const CLASSES: ClassId[] = PLAYABLE;
 
 // layout (UI pixels)
 const VISIBLE = 16, RH = 14;
@@ -98,7 +99,11 @@ export class DeckBuilderScene implements Scene {
 
     if (navPressed('up', dt)) { this.sel = (this.sel + this.rows - 1) % this.rows; sfx('move'); this.follow(); }
     if (navPressed('down', dt)) { this.sel = (this.sel + 1) % this.rows; sfx('move'); this.follow(); }
-    if (wasPressed('lb') || wasPressed('rb')) { this.switchClass(this.cls === 'warrior' ? 'mage' : 'warrior'); return; }
+    if (wasPressed('lb') || wasPressed('rb')) {
+      const step = wasPressed('lb') ? -1 : 1;
+      this.switchClass(CLASSES[(CLASSES.indexOf(this.cls) + step + CLASSES.length) % CLASSES.length]);
+      return;
+    }
     if (wasPressed('pause')) { this.exit(); return; }
     const card = this.cards[this.sel];
     if (card) {
@@ -126,8 +131,8 @@ export class DeckBuilderScene implements Scene {
 
     // header: class tabs, counts, done
     frame(ui, 8, 6, UW - 16, 38, '#000000', teamColor(this.cls, loadMatch().p1Skin[this.cls], false));
-    CLASSES.forEach((cl, i) => button(ui, `tab:${i}`, cl.toUpperCase(), 14 + i * 78, 11, 74, 14, cl === this.cls, cl === this.cls ? '#f8b800' : '#bcbcbc'));
-    drawText(ui, 'GRIMOIRE', 176, 15, '#fcfcfc');
+    CLASSES.forEach((cl, i) => button(ui, `tab:${i}`, cl.toUpperCase(), 14 + i * 54, 11, 52, 14, cl === this.cls, cl === this.cls ? '#f8b800' : '#bcbcbc'));
+    drawText(ui, 'GRIMOIRE', 300, 11, '#fcfcfc');
     const n = deckSize(this.deck), leg = countRarity(this.deck, 'legendary'), myth = countRarity(this.deck, 'mythic');
     drawText(ui, `SPELLS ${n}/${DECK_SIZE}`, 14, 31, n === DECK_SIZE ? '#58d854' : '#f8b800');
     drawText(ui, `LEGENDARY ${leg}/${MAX_LEGENDARIES}`, 104, 31, leg <= MAX_LEGENDARIES ? RARITY_COLOR.legendary : '#f83800');

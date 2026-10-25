@@ -1,5 +1,6 @@
 // Online Versus lobby: pick your fighter, then create a room (and share its code or link) or join one.
 import { setScene, hint, zone, hot, listMouse, button, showSel, type Scene } from './scene';
+import { PLAYABLE } from '../game/classes';
 import { getArena } from '../game/battleView';
 import { getSprite, drawFighterSprite, teamColor, SKINS, skinOf, type ClassId } from '../art/sprites';
 import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
@@ -15,7 +16,7 @@ import { openTransport, pickTransport, type TransportKind } from '../net/transpo
 import { OnlineBattleScene } from './onlineBattle';
 import { TitleScene } from './title';
 
-const CLASSES: ClassId[] = ['warrior', 'mage'];
+const CLASSES: ClassId[] = PLAYABLE;
 const ROWS = ['YOU', 'SKIN', 'DECK', 'MATCH', 'CREATE ROOM', 'JOIN ROOM'] as const;
 type RowName = (typeof ROWS)[number];
 type Mode = 'menu' | 'code' | 'busy' | 'room' | 'error';

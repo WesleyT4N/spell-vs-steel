@@ -1,7 +1,8 @@
 // Cartridge-style NES fighters, extracted from the round-3 sprite page (art/sprite-styles-round3.html).
+// Rogue, Ranger and Cleric are the Classic set (art/classic-sprites.ts); their skins recolor the tint letters b/c/d.
 import type { Ctx } from '../engine/gfx';
 
-export type ClassId = 'warrior' | 'mage';
+export type ClassId = 'warrior' | 'mage' | 'rogue' | 'ranger' | 'cleric';
 
 interface SpriteDef { pal: string[]; rows: string[]; ax: number }
 
@@ -17,6 +18,21 @@ const DEFS: Record<ClassId, SpriteDef> = {
     pal: ['#000000', '#6888fc', '#0058f8', '#ac7c00', '#00e8d8', '#008888', '#f8b800', '#0000a8', '#fce0a8', '#e45c10', '#fcfcfc', '#bcbcbc', '#fcfcfc'],
     rows: ['...aa........', '..abba...aaa.', '...acca.adeea', '....accaadefa', '....acghaddda', '...achhhaada.', '.aabgggggcda.', 'acccccchhhha.', '.aaaiiiajada.', '....aikkkada.', '...abckklada.', '...accclcada.', '...acccchhia.', '..aggggggaja.', '..accccghada.', '..acchhghada.', '.achhhhddhda.', 'agggggggggda.', '.aaaaaaaaada.', '..........a..'],
     ax: 6,
+  },
+  rogue: {
+    pal: ['#000000', '#9878f8', '#6844fc', '#4428bc', '#fce0a8', '#3c3c3c', '#7c7c7c', '#bcbcbc', '#fcfcfc', '#503000', '#58d854'],
+    rows: ['.....aaa.........', '....abbca........', '...abbccca.......', '...abccccca......', '..abccaaaaca.....', '..abcagggfa......', '..abcagfiffa.....', '..abccacddda.....', '.abcccddddda...a.', '.abccddffffda.aia', 'abccdffffffdaahia', 'abcdafggffaeahaa.', 'abdaffjjjjjaeaa..', '.aa.affgaffaa....', '..ahaffa.affa....', '..aiaffa..affa...', '...aaaa...aaaa...'],
+    ax: 8,
+  },
+  ranger: {
+    pal: ['#000000', '#b8f818', '#00a800', '#005800', '#fce0a8', '#ac7c00', '#503000', '#fcfcfc', '#d82800', '#bcbcbc', '#000000', '#e4a060'],
+    rows: ['........ia..........', '.h....aaaia.aa......', 'ahaa.abbbcda.hfa....', 'ahgaabbcccdda.h.fa..', 'agfabcccccddah..fa..', '.afaaaeeelaa.h..fa..', '.afa.aeekea..h...fa.', '.afa.adeela..h...fa.', '.agaaccdddcaah...fa.', 'aaccbccccdcccccaaea.', 'acbbccccddaaaaaaaea.', 'acbcccgggga..h...fa.', '.adbccfjfda..h..fa..', '.adccdgggga..h..fa..', '..adddcdddca.h.fa...', '...adda.adda.hfa....', '...afga..afga.aa....', '..afggga.afgga......', '..aaaaa..aaaaa......'],
+    ax: 8,
+  },
+  cleric: {
+    pal: ['#000000', '#fcfcfc', '#bcbcbc', '#7c7c7c', '#fce0a8', '#f8b800', '#ac7c00', '#f8d878', '#fcfcfc', '#bcbcbc', '#000000', '#e4a060'],
+    rows: ['....aaaaaa.......', '...ahhhhhfa..aaa.', '....aaaaaa..ajija', '....abbbca..ajjja', '...abbbbcca.ajija', '..acbfeeelfa.aga.', '..acbfeekefa.aga.', '..acbfeeelfa.aga.', '..acbbfeeffa..ga.', '.acbbbbffbbbccea.', 'acbcbbfgfbbcaaga.', 'acdcbbbffbcca.ga.', 'acdcbbfffbcca..a.', '.acdcbbfbbbcca...', '.acdcbbfbbbbcca..', 'acdccbbfbbbccda..', 'affffffffffffgga.', '.aaaaaaaaaaaaaa..'],
+    ax: 8,
   },
 };
 
@@ -45,6 +61,36 @@ export const SKINS: Record<ClassId, Skin[]> = {
     { id: 'black', name: 'Black', set: { b: '#7c7c7c', c: '#3c3c3c', h: '#000000', g: '#d82800' } },
     { id: 'white', name: 'White', set: { b: '#fcfcfc', c: '#fcfcfc', h: '#bcbcbc', g: '#f8b800', k: '#bcbcbc', l: '#7c7c7c' } },
   ],
+  rogue: [
+    { id: 'purple', name: 'Purple', set: {} },
+    { id: 'red', name: 'Red', set: { b: '#f87858', c: '#d82800', d: '#881400' } },
+    { id: 'blue', name: 'Blue', set: { b: '#6888fc', c: '#0058f8', d: '#0000a8' } },
+    { id: 'green', name: 'Green', set: { b: '#58d854', c: '#00a800', d: '#005800' } },
+    { id: 'yellow', name: 'Yellow', set: { b: '#f8d878', c: '#f8b800', d: '#ac7c00' } },
+    { id: 'pink', name: 'Pink', set: { b: '#f8b8f8', c: '#f878f8', d: '#d800cc' } },
+    { id: 'black', name: 'Black', set: { b: '#7c7c7c', c: '#3c3c3c', d: '#1c1c1c' } },
+    { id: 'white', name: 'White', set: { b: '#fcfcfc', c: '#bcbcbc', d: '#7c7c7c' } },
+  ],
+  ranger: [
+    { id: 'green', name: 'Green', set: {} },
+    { id: 'red', name: 'Red', set: { b: '#f87858', c: '#d82800', d: '#881400' } },
+    { id: 'blue', name: 'Blue', set: { b: '#6888fc', c: '#0058f8', d: '#0000a8' } },
+    { id: 'yellow', name: 'Yellow', set: { b: '#f8d878', c: '#f8b800', d: '#ac7c00' } },
+    { id: 'purple', name: 'Purple', set: { b: '#9878f8', c: '#6844fc', d: '#4428bc' } },
+    { id: 'pink', name: 'Pink', set: { b: '#f8b8f8', c: '#f878f8', d: '#d800cc' } },
+    { id: 'black', name: 'Black', set: { b: '#7c7c7c', c: '#3c3c3c', d: '#1c1c1c' } },
+    { id: 'white', name: 'White', set: { b: '#fcfcfc', c: '#bcbcbc', d: '#7c7c7c' } },
+  ],
+  cleric: [
+    { id: 'white', name: 'White', set: {} },
+    { id: 'red', name: 'Red', set: { b: '#f87858', c: '#d82800', d: '#881400' } },
+    { id: 'blue', name: 'Blue', set: { b: '#6888fc', c: '#0058f8', d: '#0000a8' } },
+    { id: 'green', name: 'Green', set: { b: '#58d854', c: '#00a800', d: '#005800' } },
+    { id: 'yellow', name: 'Yellow', set: { b: '#f8d878', c: '#f8b800', d: '#ac7c00' } },
+    { id: 'purple', name: 'Purple', set: { b: '#9878f8', c: '#6844fc', d: '#4428bc' } },
+    { id: 'pink', name: 'Pink', set: { b: '#f8b8f8', c: '#f878f8', d: '#d800cc' } },
+    { id: 'black', name: 'Black', set: { b: '#7c7c7c', c: '#3c3c3c', d: '#1c1c1c' } },
+  ],
 };
 
 export const skinOf = (cls: ClassId, id: string): Skin => SKINS[cls].find(s => s.id === id) ?? SKINS[cls][0];
@@ -71,6 +117,7 @@ function skinned(cls: ClassId, skinId: string, alt: boolean): { pal: string[]; r
 const ALT: Record<ClassId, Record<number, string>> = {
   warrior: { 7: '#00a800', 10: '#005800', 8: '#58d854' },
   mage: { 1: '#f878f8', 2: '#d800cc', 7: '#940084' },
+  rogue: {}, ranger: {}, cleric: {},
 };
 
 export type Tint = 'none' | 'flash' | 'ice' | 'stun' | 'ghost';
@@ -131,6 +178,6 @@ export function drawFighterSprite(c: Ctx, s: Sprite, footX: number, footY: numbe
 
 /** The main team color of a fighter, for HUD accents. */
 export function teamColor(cls: ClassId, skin: string, alt: boolean): string {
-  // the tabard (Warrior h) or robe (Mage c) color
+  // the tabard (Warrior h), robe (Mage c) or the mid tint tone (c) of the Classic set
   return skinned(cls, skin, alt).pal[cls === 'warrior' ? 7 : 2];
 }

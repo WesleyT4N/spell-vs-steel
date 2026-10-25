@@ -4,6 +4,7 @@ import { CARDS, type CardDef, type Element } from './cards';
 import { defaultSkin, mirrorSkin, type ClassId } from '../art/sprites';
 import { sfx } from '../engine/audio';
 import { seeded, randomSeed, shuffle } from './rng';
+import { CLASS_INFO } from './classes';
 export { shuffle };
 
 export const COLS = 6, ROWS = 3;
@@ -22,7 +23,7 @@ export interface Intent {
 export type Dir = 'up' | 'down' | 'left' | 'right';
 export const NO_INTENT: Intent = { move: null, held: null, attackPressed: false, attackHeld: false, castPressed: false };
 
-export interface Shield { kind: 'guard' | 'ironSkin' | 'barrier' | 'unbreakable'; hp: number; t: number; hits: number }
+export interface Shield { kind: 'guard' | 'ironSkin' | 'barrier' | 'unbreakable' | 'holy'; hp: number; t: number; hits: number }
 
 export interface Fighter {
   side: Side;
@@ -62,6 +63,37 @@ export interface Fighter {
   lastStandAbsorbed: number;
   /** Time until Glacial Fortress can freeze this fighter again. */
   glacialCd: number;
+  /** Poison stacks, seconds left on them and the tick accumulator. */
+  poison: number;
+  poisonT: number;
+  poisonAcc: number;
+  /** Evasion: hits left to dodge. */
+  dodges: number;
+  /** Rogue: the panel a backstab blinks home to (-1 while home). */
+  homeCol: number;
+  homeRow: number;
+  /** Rogue: battle time of each recent spell cast (Shiv, Kidney Shot). */
+  castTimes: number[];
+  /** Counts casts, so Deadly Poison applies once per spell. */
+  castSeq: number;
+  dpSeq: number;
+  /** Vanish: seconds of stun the current cast's first hit applies. */
+  castStun: number;
+  /** Cold Blood: the next attack spell deals double. */
+  coldBlood: boolean;
+  /** Shadow Clone: where the decoy stands. */
+  decoyCol: number;
+  decoyRow: number;
+  /** Ranger: seconds stood still on the current panel (for Energy). */
+  stillT: number;
+  lastCol: number;
+  lastRow: number;
+  /** Healing done since the last Draw screen (Atonement). */
+  healedTurn: number;
+  /** Damage this fighter took from the enemy while Death Marked. */
+  deathMarkAcc: number;
+  /** Prayer of Mending: heals left. */
+  mending: number;
   /** Visual: seconds of hit flash. */
   flash: number;
   /** Visual: current pose. */
@@ -72,9 +104,22 @@ export interface Fighter {
 
 export type StatusKey =
   | 'frozen' | 'stunned' | 'flinch' | 'iceBlock' | 'roared' | 'berserk' | 'avatar' | 'ascendance'
-  | 'lastStand' | 'reflect' | 'counterspell' | 'mortal' | 'evoLock' | 'noKnock' | 'frostNova' | 'glacial';
+  | 'lastStand' | 'reflect' | 'counterspell' | 'mortal' | 'evoLock' | 'noKnock' | 'frostNova' | 'glacial'
+  // Rogue, Ranger, Cleric
+  | 'stealth' | 'silenced' | 'rooted' | 'sleep' | 'untargetable' | 'evasion' | 'spellImmune' | 'deadlyPoison'
+  | 'deathMark' | 'hunted' | 'revealed' | 'shadowDance' | 'nightsEmbrace' | 'pandemic' | 'camo' | 'nest' | 'deadeye'
+  | 'tripwire' | 'painSup' | 'guardian' | 'ascension' | 'avatarLight' | 'purified' | 'mending' | 'channel'
+  | 'vanishStun' | 'backstab' | 'riposte' | 'adrenaline' | 'decoy';
 
-const STATUS_KEYS: StatusKey[] = ['frozen', 'stunned', 'flinch', 'iceBlock', 'roared', 'berserk', 'avatar', 'ascendance', 'lastStand', 'reflect', 'counterspell', 'mortal', 'evoLock', 'noKnock', 'frostNova', 'glacial'];
+const STATUS_KEYS: StatusKey[] = ['frozen', 'stunned', 'flinch', 'iceBlock', 'roared', 'berserk', 'avatar', 'ascendance', 'lastStand', 'reflect', 'counterspell', 'mortal', 'evoLock', 'noKnock', 'frostNova', 'glacial',
+  'stealth', 'silenced', 'rooted', 'sleep', 'untargetable', 'evasion', 'spellImmune', 'deadlyPoison', 'deathMark', 'hunted', 'revealed', 'shadowDance', 'nightsEmbrace', 'pandemic', 'camo', 'nest', 'deadeye',
+  'tripwire', 'painSup', 'guardian', 'ascension', 'avatarLight', 'purified', 'mending', 'channel',
+  'vanishStun', 'backstab', 'riposte', 'adrenaline', 'decoy'];
+
+/** Buffs a dispel (Purge) strips. */
+export const BUFF_KEYS: StatusKey[] = ['berserk', 'avatar', 'ascendance', 'lastStand', 'reflect', 'counterspell', 'noKnock', 'frostNova', 'stealth', 'untargetable', 'evasion', 'spellImmune', 'deadlyPoison', 'shadowDance', 'nightsEmbrace', 'camo', 'nest', 'deadeye', 'tripwire', 'painSup', 'guardian', 'ascension', 'avatarLight', 'purified', 'mending', 'vanishStun', 'riposte', 'adrenaline', 'decoy'];
+/** Debuffs a cleanse removes (and Purify blocks). */
+const DEBUFF_KEYS: StatusKey[] = ['frozen', 'stunned', 'silenced', 'rooted', 'sleep', 'roared', 'mortal', 'deathMark', 'hunted', 'revealed'];
 
 export interface Panel {
   owner: Side;
@@ -85,9 +130,23 @@ export interface Panel {
   burnAcc: number;
   cracked: boolean;
   hole: number;
+  /** Toxic panels give 1 Poison stack per second to an enemy standing on them. */
+  toxic: number;
+  toxicSide: Side;
+  toxicAcc: number;
+  /** Blessed panels heal their owner standing on them. */
+  bless: number;
+  blessAcc: number;
+  /** Holy fire (Consecration): like burning, drawn gold. */
+  smite: number;
+  smiteDps: number;
+  smiteAcc: number;
+  /** Smokescreen: the owner's side is stealthed while standing in it. */
+  smoke: number;
+  smokeSide: Side;
 }
 
-export interface Wall { side: Side; col: number; row: number; hp: number; maxHp: number; t: number; kind: 'stone' | 'ice' | 'glacial'; invuln: boolean }
+export interface Wall { side: Side; col: number; row: number; hp: number; maxHp: number; t: number; kind: 'stone' | 'ice' | 'glacial' | 'holy' | 'bear'; invuln: boolean }
 
 export interface Projectile {
   side: Side;
@@ -96,7 +155,10 @@ export interface Projectile {
   x: number;
   /** Panels per second, signed. */
   speed: number;
-  kind: 'fireball' | 'hook' | 'gust' | 'missile' | 'reflected';
+  kind: 'fireball' | 'hook' | 'gust' | 'missile' | 'reflected' | 'knife' | 'arrow' | 'net' | 'wolf' | 'hawk' | 'hammer' | 'sting' | 'vial';
+  /** Piercing shots fly through walls (hitting them) instead of stopping. */
+  pierce?: boolean;
+  hitWalls?: Wall[];
   /** For homing missiles: progress 0..1 and start pixel. */
   homing?: { p: number; dur: number; sx: number; sy: number; target: Side };
   reflectable: boolean;
@@ -105,6 +167,10 @@ export interface Projectile {
 }
 
 export interface Mark { col: number; row: number; t: number; color: string }
+/** A hidden Ranger trap. Only its owner sees it. */
+export interface Trap { side: Side; col: number; row: number; arm: number; t: number; kind: 'freeze' | 'explode' | 'mine' | 'blast' }
+/** A Ranger companion that acts on its own. `row` null follows the Ranger's row. */
+export interface Pet { side: Side; kind: 'wolf' | 'hawk' | 'bear'; row: number | null; col: number; t: number; cd: number; period: number; dmg: number }
 export interface FloatText { x: number; y: number; text: string; color: string; t: number }
 export interface Fx { t: number; dur: number; kind: string; side: Side; col: number; row: number; data?: Record<string, number | string> }
 
@@ -120,6 +186,12 @@ export interface HitOpts {
   stun?: number;
   freeze?: number;
   noFlinch?: boolean;
+  /** Picks the target wherever they are: misses a stealthed or untargetable fighter. */
+  targeted?: boolean;
+  /** Ignores barriers and shields (not Guard). */
+  pierce?: boolean;
+  /** Damage over time ticks (no dodges, no flinch). */
+  dot?: boolean;
 }
 
 export interface HitResult { fighter: boolean; wall: boolean; dealt: number; broke: boolean; blocked: boolean }
@@ -132,6 +204,8 @@ export class Battle {
   walls: Wall[] = [];
   projectiles: Projectile[] = [];
   marks: Mark[] = [];
+  traps: Trap[] = [];
+  pets: Pet[] = [];
   texts: FloatText[] = [];
   fx: Fx[] = [];
   timers: Timer[] = [];
@@ -162,7 +236,7 @@ export class Battle {
       this.panels[c] = [];
       for (let r = 0; r < ROWS; r++) {
         const owner: Side = c < 3 ? 0 : 1;
-        this.panels[c][r] = { owner, baseOwner: owner, ownerT: 0, burn: 0, burnDps: 0, burnAcc: 0, cracked: false, hole: 0 };
+        this.panels[c][r] = { owner, baseOwner: owner, ownerT: 0, burn: 0, burnDps: 0, burnAcc: 0, cracked: false, hole: 0, toxic: 0, toxicSide: 0, toxicAcc: 0, bless: 0, blessAcc: 0, smite: 0, smiteDps: 0, smiteAcc: 0, smoke: 0, smokeSide: 0 };
       }
     }
     this.beginCustom();
@@ -210,6 +284,7 @@ export class Battle {
     this.phase = 'custom';
     this.turn++;
     for (const f of this.f) {
+      this.blinkHome(f);
       // uncast picks from last turn are discarded
       f.discard.push(...f.queue);
       f.queue = [];
@@ -217,7 +292,12 @@ export class Battle {
         if (this.turn > 1) f.resMax = Math.min(TUNING.mage.manaCap, f.resMax + 1);
         f.res = f.resMax + f.bonusManaNext;
         f.bonusManaNext = 0;
+      } else if (f.cls === 'rogue') {
+        f.res = Math.max(f.res, TUNING.rogue.energyTopUp);
+      } else if (f.cls === 'cleric' && this.turn > 1) {
+        f.res = Math.min(TUNING.cleric.manaCap, f.res + TUNING.cleric.manaPerDraw);
       }
+      f.healedTurn = 0;
       const hand: string[] = [];
       while (hand.length < TUNING.handSize) {
         if (!f.deck.length) {
@@ -285,6 +365,8 @@ export class Battle {
     this.updateWalls(dt);
     for (const f of this.f) this.updateFighter(f, intents[f.side], dt);
     this.updateProjectiles(dt);
+    this.updateTraps(dt);
+    this.updatePets(dt);
     this.updateZones();
 
     for (const f of this.f) {
@@ -313,9 +395,40 @@ export class Battle {
         if (p.burnAcc >= TUNING.burnTick) {
           p.burnAcc -= TUNING.burnTick;
           const v = this.fighterAt(c, r);
-          if (v) this.damage(v, Math.round(p.burnDps * TUNING.burnTick), null, { element: 'fire', noFlinch: true });
+          if (v) this.damage(v, Math.round(p.burnDps * TUNING.burnTick), null, { element: 'fire', noFlinch: true, dot: true });
         }
         if (p.burn <= 0) { p.burn = 0; p.burnDps = 0; }
+      }
+      if (p.smite > 0) {
+        p.smite -= dt;
+        p.smiteAcc += dt;
+        if (p.smiteAcc >= TUNING.burnTick) {
+          p.smiteAcc -= TUNING.burnTick;
+          const v = this.fighterAt(c, r);
+          if (v && v.side === p.owner) this.damage(v, Math.round(p.smiteDps * TUNING.burnTick), this.foe(v), { element: 'holy', noFlinch: true, dot: true });
+        }
+        if (p.smite <= 0) { p.smite = 0; p.smiteDps = 0; }
+      }
+      if (p.toxic > 0) {
+        p.toxic -= dt;
+        p.toxicAcc += dt;
+        const v = this.fighterAt(c, r);
+        if (p.toxicAcc >= 1) {
+          p.toxicAcc -= 1;
+          if (v && v.side !== p.toxicSide) this.addPoison(v, 1);
+        }
+        if (p.toxic <= 0) p.toxic = 0;
+      }
+      if (p.smoke > 0) p.smoke = Math.max(0, p.smoke - dt);
+      if (p.bless > 0) {
+        p.bless -= dt;
+        p.blessAcc += dt;
+        if (p.blessAcc >= 1) {
+          p.blessAcc -= 1;
+          const v = this.fighterAt(c, r);
+          if (v && v.side === p.owner) this.heal(v, TUNING.blessHps);
+        }
+        if (p.bless <= 0) p.bless = 0;
       }
     }
   }
@@ -323,6 +436,50 @@ export class Battle {
   private updateWalls(dt: number): void {
     for (const w of this.walls) w.t -= dt;
     this.walls = this.walls.filter(w => w.t > 0 && w.hp > 0);
+  }
+
+  private updateTraps(dt: number): void {
+    for (const t of this.traps) {
+      t.t -= dt;
+      t.arm -= dt;
+      if (t.arm > 0 || t.t <= 0) continue;
+      const v = this.fighterAt(t.col, t.row);
+      if (!v || v.side === t.side) continue;
+      t.t = 0;
+      const src = this.f[t.side];
+      this.addFx('trapPop', t.side, t.col, t.row, 0.5, { kind: t.kind });
+      if (t.kind === 'freeze') { this.damage(v, 20, src, { spell: true, element: 'frost' }); this.freeze(v, 1.5); }
+      else if (t.kind === 'explode') {
+        sfx('explode');
+        const cells: Array<[number, number]> = [[t.col, t.row], [t.col - 1, t.row], [t.col + 1, t.row], [t.col, t.row - 1], [t.col, t.row + 1]];
+        for (const [c, r] of cells) if (this.inGrid(c, r)) this.addFx('explode', t.side, c, r, 0.35);
+        this.strike(src, cells, 90, { spell: true, element: 'fire' });
+      } else if (t.kind === 'mine') { sfx('explode'); this.damage(v, 50, src, { spell: true, element: 'nature', knockback: true }); }
+      else { sfx('explode'); this.addFx('explode', t.side, t.col, t.row, 0.35); this.damage(v, 60, src, { spell: true, element: 'fire' }); }
+    }
+    this.traps = this.traps.filter(t => t.t > 0);
+  }
+
+  private updatePets(dt: number): void {
+    for (const p of this.pets) {
+      p.t -= dt;
+      p.cd -= dt;
+      const owner = this.f[p.side], foe = this.foe(owner);
+      if (owner.dead || foe.dead) continue;
+      if (p.kind === 'bear' && !this.walls.some(w => w.kind === 'bear' && w.side === p.side)) { p.t = 0; continue; }
+      if (p.cd > 0) continue;
+      const row = p.row ?? owner.row;
+      if (p.kind === 'hawk') {
+        p.cd = p.period;
+        this.addFx('hawkDive', p.side, foe.col, foe.row, 0.35);
+        this.damage(foe, p.dmg, owner, { spell: true, element: 'nature', targeted: true, noFlinch: true });
+      } else if (foe.row === row) {
+        p.cd = p.period;
+        this.addFx(p.kind === 'bear' ? 'claw' : 'bite', p.side, foe.col, foe.row, 0.3);
+        this.damage(foe, p.dmg, owner, { spell: true, element: 'nature', noFlinch: p.kind !== 'bear' });
+      }
+    }
+    this.pets = this.pets.filter(p => p.t > 0);
   }
 
   private updateZones(): void {
@@ -370,12 +527,28 @@ export class Battle {
     f.poseT = Math.max(0, f.poseT - dt);
     if (f.poseT === 0) f.pose = 'idle';
     if (f.dead) return;
+    this.updatePoison(f, dt);
+    if (f.cls === 'ranger') {
+      // Energy comes from standing still; any change of panel restarts the count
+      if (f.col !== f.lastCol || f.row !== f.lastRow) f.stillT = 0;
+      else f.stillT += dt * (f.st.nest > 0 ? 2 : 1);
+      const R = TUNING.ranger;
+      while (f.stillT >= R.stillSeconds) {
+        f.stillT -= R.stillSeconds;
+        if (f.res < R.energyCap) { f.res = Math.min(R.energyCap, f.res + 1); sfx('pip'); }
+      }
+    }
+    f.lastCol = f.col; f.lastRow = f.row;
+    // Smokescreen: stealthed while standing in your own smoke, even right after an attack
+    const sp = this.panels[f.col][f.row];
+    if (sp.smoke > 0 && sp.smokeSide === f.side && f.st.revealed <= 0 && f.st.hunted <= 0) f.st.stealth = Math.max(f.st.stealth, 0.1);
 
-    const disabled = f.st.frozen > 0 || f.st.stunned > 0 || f.st.iceBlock > 0;
+    const disabled = f.st.frozen > 0 || f.st.stunned > 0 || f.st.iceBlock > 0 || f.st.sleep > 0 || f.st.channel > 0;
     if (disabled) { f.charging = false; f.charge = 0; return; }
     const busy = f.lock > 0 || f.st.flinch > 0;
 
-    if (intent.move && !busy) this.tryMove(f, intent.move);
+    // any move during a backstab window blinks the Rogue home instead
+    if (intent.move && !busy) { if (f.st.backstab > 0) { this.blinkHome(f); f.moveCd = TUNING.moveRepeat; } else this.tryMove(f, intent.move); }
 
     if (intent.attackPressed && !busy) {
       this.basicAttack(f, 'light');
@@ -385,9 +558,10 @@ export class Battle {
       if (intent.attackHeld) {
         const before = f.charge;
         f.charge += dt;
-        if (before < TUNING.heavyCharge && f.charge >= TUNING.heavyCharge) sfx('charged');
+        const need = heavyChargeOf(f);
+        if (before < need && f.charge >= need) sfx('charged');
       } else {
-        if (f.charge >= TUNING.heavyCharge && f.lock <= 0 && f.st.flinch <= 0) this.basicAttack(f, 'heavy');
+        if (f.charge >= heavyChargeOf(f) && f.lock <= 0 && f.st.flinch <= 0) this.basicAttack(f, 'heavy');
         f.charging = false;
         f.charge = 0;
       }
@@ -406,12 +580,22 @@ export class Battle {
       if (dmg > 0) this.damage(foe, dmg, f, { spell: true, element: 'steel' });
     }
     if (k === 'glacial') this.walls = this.walls.filter(w => !(w.side === f.side && w.kind === 'glacial'));
+    if (k === 'deathMark') {
+      const dmg = Math.round(f.deathMarkAcc * 0.5);
+      f.deathMarkAcc = 0;
+      if (dmg > 0) { this.addFx('stab', f.side, f.col, f.row, 0.4); this.damage(f, dmg, this.foe(f), { spell: true, element: 'shadow' }); }
+    }
+    if (k === 'camo' || k === 'nightsEmbrace') f.st.stealth = 0;
+    if (k === 'mending') f.mending = 0;
+    if (k === 'backstab') this.blinkHome(f);
   }
 
   tryMove(f: Fighter, d: Dir): boolean {
     const [dc, dr] = d === 'up' ? [0, -1] : d === 'down' ? [0, 1] : d === 'left' ? [-1, 0] : [1, 0];
     const nc = f.col + dc, nr = f.row + dr;
+    if (f.st.rooted > 0 || f.st.nest > 0) return false;
     if (!this.canStand(f, nc, nr)) return false;
+    if (f.st.camo > 0) { f.st.camo = 0; f.st.stealth = 0; }
     this.leavePanel(f.col, f.row);
     f.col = nc; f.row = nr;
     f.moveCd = TUNING.moveRepeat;
@@ -457,6 +641,14 @@ export class Battle {
     const before = Math.floor(f.res);
     f.res = Math.min(TUNING.warrior.rageMax, f.res + amt);
     if (Math.floor(f.res) > before && fromCard) sfx('pip');
+  }
+
+  /** Energy, Mana or Rage from a card or effect, up to the class cap. */
+  gainRes(f: Fighter, amt: number): void {
+    if (f.cls === 'warrior') { this.gainRage(f, amt, true); return; }
+    const cap = f.cls === 'mage' ? 99 : f.resMax;
+    f.res = Math.min(cap, f.res + amt);
+    sfx('pip');
   }
 
   costOf(f: Fighter, card: CardDef): number {
@@ -519,20 +711,54 @@ export class Battle {
       sfx(kind === 'light' ? 'slash' : 'slashHeavy');
       swing();
       if (f.st.avatar > 0) this.later(0.12, swing);
-    } else {
+    } else if (f.cls === 'mage') {
       const T = TUNING.mage;
       const dmg = kind === 'light' ? T.lightDamage : T.heavyDamage;
       f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
       sfx(kind === 'light' ? 'bolt' : 'boltHeavy');
-      // hitscan bolt: first enemy wall or fighter down the row
-      let endCol = d > 0 ? COLS - 1 : 0;
-      for (let c = f.col + d; c >= 0 && c < COLS; c += d) {
-        const w = this.wallAt(c, f.row);
-        if (w && w.side !== f.side) { endCol = c; this.hitWall(w, dmg, f, {}); break; }
-        if (foe.col === c && foe.row === f.row && !foe.dead) { endCol = c; this.damage(foe, dmg, f, { basic: kind, element: 'arcane' }); break; }
+      const end = this.rowShot(f, dmg, { basic: kind, element: 'arcane' });
+      this.addFx(kind === 'light' ? 'bolt' : 'boltHeavy', f.side, f.col, f.row, kind === 'light' ? 0.2 : 0.32, { to: end.col });
+    } else if (f.cls === 'rogue') {
+      const T = TUNING.rogue;
+      f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
+      if (kind === 'light') {
+        // Stab: a dagger thrust that reaches the panels ahead
+        sfx('slash');
+        const cells: Array<[number, number]> = [];
+        for (let i = 1; i <= T.stabReach; i++) cells.push([f.col + i * d, f.row]);
+        this.addFx('dagger', f.side, f.col, f.row, 0.18, { reach: T.stabReach });
+        this.strike(f, cells, T.lightDamage, { basic: kind, element: 'steel' });
+      } else {
+        // Throwing Knife: a heavy knife down the row
+        sfx('slashHeavy');
+        const end = this.rowShot(f, T.heavyDamage, { basic: kind, element: 'steel' });
+        this.addFx('knifeHeavy', f.side, f.col, f.row, 0.22, { to: end.col });
       }
-      this.addFx(kind === 'light' ? 'bolt' : 'boltHeavy', f.side, f.col, f.row, kind === 'light' ? 0.2 : 0.32, { to: endCol });
+    } else if (f.cls === 'ranger') {
+      const T = TUNING.ranger;
+      f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
+      sfx(kind === 'light' ? 'bolt' : 'boltHeavy');
+      const dmg = kind === 'light' ? T.lightDamage * (f.st.deadeye > 0 ? 3 : 1) : T.heavyDamage;
+      const pierce = kind === 'heavy' && f.st.deadeye > 0;
+      const end = this.rowShot(f, dmg, { basic: kind, element: 'steel', knockback: kind === 'heavy' }, pierce);
+      this.addFx(kind === 'light' ? 'arrow' : 'aimed', f.side, f.col, f.row, kind === 'light' ? 0.2 : 0.3, { to: end.col });
+    } else {
+      const T = TUNING.cleric;
+      f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
+      if (kind === 'light') {
+        sfx('bolt');
+        const end = this.rowShot(f, T.lightDamage, { basic: kind, element: 'holy' });
+        this.addFx('holySpark', f.side, f.col, f.row, 0.2, { to: end.col });
+      } else {
+        // Smite: a pillar of light a fixed distance ahead
+        sfx('boltHeavy');
+        const c = f.col + T.smiteRange * d;
+        this.addFx('holyPillar', f.side, c, f.row, 0.4);
+        const res = this.strike(f, [[c, f.row]], T.heavyDamage, { basic: kind, element: 'holy' });
+        if (res.fighter && res.dealt > 0) this.heal(f, T.smiteHeal);
+      }
     }
+    this.breakStealth(f);
     void foe;
   }
 
@@ -561,6 +787,131 @@ export class Battle {
     return res;
   }
 
+  /** Hitscan down the attacker's row: the first enemy wall or fighter takes it (all of them when piercing). */
+  rowShot(f: Fighter, dmg: number, opts: HitOpts, pierce = false): { col: number; hit: boolean } {
+    const d = this.dir(f), foe = this.foe(f);
+    let col = d > 0 ? COLS - 1 : 0, hit = false;
+    for (let c = f.col + d; c >= 0 && c < COLS; c += d) {
+      const w = this.wallAt(c, f.row);
+      if (w && w.side !== f.side) { this.hitWall(w, dmg, f, opts); if (!pierce) { col = c; break; } }
+      if (foe.col === c && foe.row === f.row && !foe.dead) {
+        col = c;
+        hit = this.damage(foe, dmg, f, opts).dealt > 0;
+        break;
+      }
+    }
+    return { col, hit };
+  }
+
+  /** Attacking or casting ends Stealth, unless Camouflage or Night's Embrace keep it. Shadow Dance brings it back. */
+  breakStealth(f: Fighter): void {
+    if (f.st.stealth <= 0 || f.st.camo > 0 || f.st.nightsEmbrace > 0) return;
+    f.st.stealth = 0;
+    if (f.st.shadowDance > 0) this.later(1, () => { if (f.st.shadowDance > 0) this.stealth(f, 2); });
+  }
+
+  stealth(f: Fighter, t: number): void {
+    if (f.st.revealed > 0 || f.st.hunted > 0) { this.text(f, 'REVEALED', '#f8b800'); return; }
+    f.st.stealth = Math.max(f.st.stealth, t);
+    this.addFx('smoke', f.side, f.col, f.row, 0.4);
+  }
+
+  /** Can this fighter be picked by a targeted or homing effect? */
+  targetable(f: Fighter): boolean { return f.st.stealth <= 0 && f.st.untargetable <= 0; }
+
+  /** Blinking into the enemy area. Returns false (and the blink fails) when a Tripwire catches it. */
+  blinkIn(f: Fighter): boolean {
+    const foe = this.foe(f);
+    if (foe.st.tripwire <= 0) return true;
+    foe.st.tripwire = 0;
+    f.st.stealth = 0;
+    this.addFx('trapPop', foe.side, foe.col, foe.row, 0.5, { kind: 'mine' });
+    this.damage(f, 40, foe, { spell: true, element: 'nature' });
+    this.stun(f, 1);
+    this.text(f, 'TRIPWIRE', '#f8b800');
+    return false;
+  }
+
+  /** Backstab blink: move to the panel in front of the enemy, in their row. A wall there takes the hit and
+   *  the Rogue lands in front of it. Returns the panel the blink attacks. */
+  blinkFront(f: Fighter): { col: number; row: number } {
+    const foe = this.foe(f), d = this.dir(f);
+    if (f.homeCol < 0) { f.homeCol = f.col; f.homeRow = f.row; }
+    const row = foe.row;
+    let col = Math.max(0, Math.min(COLS - 1, foe.col - d));
+    while (this.inGrid(col - d, row) && (this.wallAt(col, row) || this.panels[col][row].hole > 0 || (this.fighterAt(col, row) && this.fighterAt(col, row) !== f))) col -= d;
+    this.addFx('smoke', f.side, f.col, f.row, 0.3);
+    f.col = col; f.row = row; f.dx = 0; f.dy = 0;
+    this.addFx('smoke', f.side, col, row, 0.3);
+    return { col: col + d, row };
+  }
+
+  /** End a backstab: blink back to the panel the Rogue left from. */
+  blinkHome(f: Fighter): void {
+    f.st.backstab = 0;
+    if (f.homeCol < 0) return;
+    this.addFx('smoke', f.side, f.col, f.row, 0.3);
+    f.col = f.homeCol; f.row = f.homeRow;
+    f.homeCol = -1; f.homeRow = -1;
+    if (!f.dead) this.relocate(f);
+  }
+
+  addPoison(t: Fighter, n: number): void {
+    if (t.dead || t.st.iceBlock > 0 || t.st.purified > 0 || n <= 0) return;
+    const cap = t.st.pandemic > 0 ? 5 : TUNING.poisonMaxStacks;
+    t.poison = Math.min(cap, t.poison + n);
+    t.poisonT = TUNING.poisonSeconds;
+    this.text(t, `POISON ×${t.poison}`, '#b8f818');
+  }
+
+  private updatePoison(f: Fighter, dt: number): void {
+    if (f.poison <= 0) return;
+    const fast = f.st.pandemic > 0 ? 2 : 1;
+    f.poisonT -= dt;
+    f.poisonAcc += dt * fast;
+    if (f.poisonAcc >= 1) {
+      f.poisonAcc -= 1;
+      this.damage(f, TUNING.poisonDps * f.poison, this.foe(f), { element: 'poison', noFlinch: true, dot: true });
+    }
+    if (f.poisonT <= 0) { f.poison = 0; f.poisonAcc = 0; }
+  }
+
+  /** Remove Poison, the fire under you, freeze and other debuffs. Pandemic Poison stays. */
+  cleanse(f: Fighter): void {
+    if (f.st.pandemic <= 0) { f.poison = 0; f.poisonT = 0; }
+    const p = this.panels[f.col][f.row];
+    p.burn = 0; p.burnDps = 0; p.smite = 0;
+    for (const k of DEBUFF_KEYS) f.st[k] = 0;
+    f.deathMarkAcc = 0;
+    this.addFx('healBurst', f.side, f.col, f.row, 0.4);
+  }
+
+  silence(f: Fighter, t: number): void {
+    if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
+    f.st.silenced = Math.max(f.st.silenced, t);
+    this.text(f, 'SILENCED', '#9878f8');
+  }
+
+  root(f: Fighter, t: number): void {
+    if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
+    f.st.rooted = Math.max(f.st.rooted, t);
+    this.text(f, 'ROOTED', '#58d854');
+  }
+
+  /** A stun that any damage breaks (Blind, Wyvern Sting). */
+  sleep(f: Fighter, t: number): void {
+    if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
+    f.st.sleep = Math.max(f.st.sleep, t);
+    f.charging = false;
+    this.text(f, 'ASLEEP', '#9878f8');
+  }
+
+  /** Bless a panel of the owner's area for `t` seconds. */
+  bless(col: number, row: number, t: number): void {
+    const p = this.panel(col, row);
+    if (p && p.hole <= 0) p.bless = Math.max(p.bless, t);
+  }
+
   hitWall(w: Wall, dmg: number, _src: Fighter | null, _opts: HitOpts): void {
     if (w.invuln) { this.addFx('spark', w.side, w.col, w.row, 0.2); return; }
     w.hp -= dmg;
@@ -569,7 +920,7 @@ export class Battle {
   }
 
   freeze(f: Fighter, t: number): void {
-    if (f.dead || f.st.iceBlock > 0) return;
+    if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
     f.st.frozen = Math.max(f.st.frozen, t);
     f.charging = false;
     this.text(f, 'FROZEN', '#3cbcfc');
@@ -577,17 +928,27 @@ export class Battle {
   }
 
   stun(f: Fighter, t: number): void {
-    if (f.dead || f.st.iceBlock > 0) return;
+    if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
     f.st.stunned = Math.max(f.st.stunned, t);
     f.charging = false;
     this.text(f, 'STUN', '#f8b800');
   }
 
   heal(f: Fighter, amt: number): void {
+    if (f.dead) return;
+    if (f.st.avatarLight > 0) amt *= 2;
     if (f.st.mortal > 0) amt = Math.round(amt / 2);
+    amt = Math.round(amt);
     f.hp = Math.min(f.maxHp, f.hp + amt);
+    f.healedTurn += amt;
     this.text(f, '+' + amt, '#58d854');
     sfx('heal');
+    // Avatar of Light: every heal also smites the enemy for the same amount
+    if (f.st.avatarLight > 0) {
+      const foe = this.foe(f);
+      this.addFx('holyPillar', f.side, foe.col, foe.row, 0.35);
+      this.damage(foe, amt, f, { spell: true, element: 'holy', noFlinch: true });
+    }
   }
 
   /** Core damage pipeline: immunity, guard, multipliers, shields, last stand, Rage. */
@@ -595,10 +956,41 @@ export class Battle {
     const out = { dealt: 0, broke: false, blocked: false };
     if (target.dead || base <= 0) return out;
     if (target.st.iceBlock > 0) { this.text(target, 'IMMUNE', '#a4e4fc'); return out; }
+    if (!opts.dot && (target.st.untargetable > 0 || (opts.targeted && target.st.stealth > 0))) { this.text(target, 'MISS', '#bcbcbc'); return out; }
+    if (opts.spell && target.st.spellImmune > 0) { this.text(target, 'IMMUNE', '#9878f8'); return out; }
+    if (!opts.dot && target.st.evasion > 0 && target.dodges > 0) {
+      target.dodges--;
+      if (target.dodges <= 0) target.st.evasion = 0;
+      this.text(target, 'DODGE', '#fcfcfc');
+      return out;
+    }
+    if (!opts.dot && target.st.riposte > 0) {
+      // Riposte: parry the hit and counter the attacker wherever they are
+      target.st.riposte = 0;
+      out.blocked = true;
+      this.text(target, 'PARRY', '#fcfcfc');
+      this.addFx('guard', target.side, target.col, target.row, 0.3);
+      sfx('block');
+      if (src && src !== target) this.later(0.08, () => {
+        this.addFx('stab', target.side, src.col, src.row, 0.25);
+        this.damage(src, TUNING.rogue.riposteDamage, target, { spell: true, element: 'steel' });
+      });
+      return out;
+    }
+    if (!opts.dot && target.st.decoy > 0) {
+      target.st.decoy = 0;
+      this.text(target, 'DECOY', '#bcbcbc');
+      this.addFx('smoke', target.side, target.decoyCol, target.decoyRow, 0.4);
+      return out;
+    }
 
     let amt = base;
     if (src && src.st.roared > 0) amt *= 0.7;
-    if (target.st.frozen > 0 || target.st.stunned > 0) amt *= TUNING.frozenBonus;
+    if (target.st.frozen > 0 || target.st.stunned > 0 || target.st.sleep > 0) amt *= TUNING.frozenBonus;
+    if (src && src.cls === 'ranger' && target.st.hunted > 0) amt *= 1.25;
+    if (target.st.painSup > 0) amt *= 0.5;
+    // any hit wakes a sleeping target (that hit still got the bonus)
+    if (target.st.sleep > 0 && !opts.dot) target.st.sleep = 0;
 
     // Break effects shatter breakable shields first and double the hit.
     if (opts.breaks) {
@@ -625,7 +1017,7 @@ export class Battle {
 
     amt = Math.round(amt);
     for (const s of target.shields) {
-      if (amt <= 0) break;
+      if (amt <= 0 || opts.pierce) break;
       if (s.hp <= 0 || s.kind === 'guard') continue;
       const take = Math.min(s.hp, amt);
       s.hp -= take;
@@ -641,14 +1033,37 @@ export class Battle {
       target.lastStandAbsorbed += amt;
       amt = Math.min(amt, target.hp - 1);
     }
+    if (target.st.ascension > 0) amt = Math.min(amt, target.hp - 1);
+    if (target.st.guardian > 0 && amt >= target.hp) {
+      target.st.guardian = 0;
+      target.hp = Math.max(target.hp, 200);
+      this.text(target, 'GUARDIAN SPIRIT', '#f8d878');
+      this.addFx('healBurst', target.side, target.col, target.row, 0.6);
+      sfx('heal');
+      return out;
+    }
     target.hp = Math.max(0, target.hp - amt);
     out.dealt = amt;
+    if (target.st.deathMark > 0 && src && src.side !== target.side) target.deathMarkAcc += amt;
+    if (target.st.mending > 0 && target.mending > 0 && !opts.dot) {
+      target.mending--;
+      if (target.mending <= 0) target.st.mending = 0;
+      this.later(0.05, () => this.heal(target, 30));
+    }
+    // Deadly Poison: every basic hit, and each spell once per cast
+    if (src && src !== target && !opts.dot && src.st.deadlyPoison > 0 && (opts.basic || (opts.spell && src.dpSeq !== src.castSeq))) {
+      if (!opts.basic) src.dpSeq = src.castSeq;
+      this.addPoison(target, 1);
+    }
+    // Vanish: the first hit of the next attack spell stuns
+    let vanishStun = 0;
+    if (src && src !== target && opts.spell && !opts.dot && src.castStun > 0) { vanishStun = src.castStun; src.castStun = 0; }
     const st = this.stats[1 - target.side];
     if (opts.basic) st.basic += amt; else if (opts.spell) st.spell += amt; else st.other += amt;
     target.flash = 0.12;
     target.pose = 'hurt';
     target.poseT = 0.15;
-    this.texts.push({ x: target.col, y: target.row, text: String(amt), color: opts.element === 'fire' ? '#fca044' : opts.element === 'frost' ? '#a4e4fc' : '#fcfcfc', t: 0 });
+    this.texts.push({ x: target.col, y: target.row, text: String(amt), color: opts.element === 'fire' ? '#fca044' : opts.element === 'frost' ? '#a4e4fc' : opts.element === 'poison' ? '#b8f818' : opts.element === 'holy' ? '#f8d878' : '#fcfcfc', t: 0 });
     if (target.cls === 'warrior') this.gainRage(target, Math.min(TUNING.warrior.rageWhenHitMax, amt / TUNING.warrior.rageDamagePerPip));
     if (amt >= TUNING.flinchThreshold && !opts.noFlinch && target.st.noKnock <= 0 && target.st.avatar <= 0) {
       target.st.flinch = TUNING.flinchTime;
@@ -658,6 +1073,7 @@ export class Battle {
     if (amt >= 80) { this.shake = Math.max(this.shake, 0.25); this.cheer = 1.5; }
     if (opts.basic === 'heavy') this.shake = Math.max(this.shake, 0.18);
     if (opts.stun) this.stun(target, opts.stun);
+    if (vanishStun) this.stun(target, vanishStun);
     if (opts.freeze) this.freeze(target, opts.freeze);
     if (opts.knockback) this.knockback(target, 1);
     sfx(opts.basic === 'heavy' ? 'heavyImpact' : amt >= 60 ? 'hitBig' : 'hit');
@@ -669,8 +1085,10 @@ export class Battle {
     if (!f.queue.length) return;
     const card = CARDS[f.queue[0]];
     if (f.st.evoLock > 0) { this.text(f, 'CAN\'T CAST', '#bcbcbc'); return; }
+    if (f.st.silenced > 0) { this.text(f, 'SILENCED', '#9878f8'); sfx('deny'); f.lock = 0.15; return; }
+    if (card.needsStealth && f.st.stealth <= 0) { this.text(f, 'NEED STEALTH', '#bcbcbc'); sfx('deny'); f.lock = 0.15; return; }
     if (!this.canAfford(f, card)) {
-      this.text(f, f.cls === 'warrior' ? 'NEED RAGE' : 'NEED MANA', '#bcbcbc');
+      this.text(f, `NEED ${CLASS_INFO[f.cls].res}`, '#bcbcbc');
       sfx('deny');
       f.lock = 0.15;
       return;
@@ -683,6 +1101,14 @@ export class Battle {
     if (f.powerLeft > 0 && card.cost !== 'all' && card.cost > 0 && !(f.st.avatar > 0 || f.st.ascendance > 0)) f.powerLeft--;
 
     const foe = this.foe(f);
+    const stealthed = f.st.stealth > 0;
+    const prior = f.castTimes;
+    f.castTimes = [...prior.filter(t => this.time - t < 5), this.time];
+    f.castSeq++;
+    f.castStun = 0;
+    // Adrenaline Rush: every spell refunds 1 Energy
+    if (f.st.adrenaline > 0 && card.id !== 'adrenaline_rush') this.gainRes(f, 1);
+    this.breakStealth(f);
     this.fx = this.fx.filter(e => !(e.kind === 'castName' && e.side === f.side));
     this.addFx('castName', f.side, f.col, f.row, 2.2, { id: card.id });
     f.pose = 'cast';
@@ -703,9 +1129,13 @@ export class Battle {
     if (card.damaging) {
       if (f.shout > 0) { mult *= f.shout; f.shout = 0; }
       if (f.rallyLeft > 0) { mult *= 1.3; f.rallyLeft--; }
+      if (f.coldBlood) { mult *= 2; f.coldBlood = false; }
+      if (f.st.vanishStun > 0) { f.st.vanishStun = 0; f.castStun = TUNING.rogue.vanishStun; }
     }
     sfx(card.element === 'fire' ? 'fire' : card.element === 'frost' ? 'frost' : card.element === 'arcane' ? 'arcane' : 'cast');
-    const ctx: CastCtx = { b: this, f, foe, mult, dir: this.dir(f), held, spent };
+    const now = this.time;
+    const castsWithin = (secs: number): number => prior.filter(t => now - t <= secs).length;
+    const ctx: CastCtx = { b: this, f, foe, mult, dir: this.dir(f), held, spent, stealthed, castsWithin };
     card.cast(ctx);
     if (f.st.ascendance > 0 && card.id !== 'ascendance') this.later(0.45, () => { if (!f.dead) card.cast({ ...ctx }); });
   }
@@ -724,6 +1154,7 @@ export class Battle {
         if (p.homing.p >= 1) {
           p.dead = true;
           const t = this.f[p.homing.target];
+          if (!this.targetable(t)) { this.text(t, 'MISS', '#bcbcbc'); continue; }
           if (t.st.reflect > 0 && p.reflectable && t.side !== p.side) { this.reflect(p, t); continue; }
           p.onHit(this, t.dead ? null : t, null, t.col, p);
         }
@@ -738,7 +1169,10 @@ export class Battle {
         if (c < 0 || c >= COLS) continue;
         if (Math.abs(c - p.x) > 0.5 && Math.abs(c - prev) > 0.5 && !(c > lo && c < hi)) continue;
         const w = this.wallAt(c, p.row);
-        if (w && w.side !== p.side) {
+        if (w && w.side !== p.side && p.pierce) {
+          if (!p.hitWalls) p.hitWalls = [];
+          if (!p.hitWalls.includes(w)) { p.hitWalls.push(w); this.hitWall(w, 60, this.f[p.side], {}); }
+        } else if (w && w.side !== p.side) {
           p.dead = true;
           const owner = this.f[w.side];
           if (w.kind === 'stone' && owner.cls === 'warrior') this.gainRage(owner, 1, true);
@@ -801,9 +1235,22 @@ export interface CastCtx {
   held: Dir | null;
   /** Resource actually spent (Arcane Surge scales on this). */
   spent: number;
+  /** Whether the caster was in Stealth when casting (Ambush). */
+  stealthed: boolean;
+  /** How many other spells this fighter cast in the last `secs` seconds (Shiv, Kidney Shot). */
+  castsWithin: (secs: number) => number;
+}
+
+/** Seconds to arm a fighter's heavy attack. */
+export function heavyChargeOf(f: Fighter): number {
+  if (f.cls !== 'ranger') return TUNING.heavyCharge;
+  return f.st.nest > 0 || f.st.deadeye > 0 ? 0.35 : TUNING.ranger.heavyCharge;
 }
 
 export interface FighterSpec { cls: ClassId; deck: string[]; name: string; skin?: string }
+
+// Rogue Energy tops up at the first Draw screen, so it starts empty here.
+const START_RES: Record<ClassId, number> = { warrior: 0, mage: TUNING.mage.manaStart, rogue: 0, ranger: TUNING.ranger.energyStart, cleric: TUNING.cleric.manaStart };
 
 function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => number): Fighter {
   const { cls, deck, name } = spec;
@@ -814,11 +1261,14 @@ function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => nu
     side, cls, skin: spec.skin ?? defaultSkin(cls), alt, name, hp: maxHp, maxHp,
     col: side === 0 ? 1 : 4, row: 1, dx: 0, dy: 0,
     lock: 0, moveCd: 0, charging: false, charge: 0,
-    res: cls === 'mage' ? TUNING.mage.manaStart : 0,
-    resMax: cls === 'mage' ? TUNING.mage.manaStart : TUNING.warrior.rageMax,
+    res: START_RES[cls],
+    resMax: cls === 'mage' ? TUNING.mage.manaStart : cls === 'warrior' ? TUNING.warrior.rageMax : 5,
     bonusManaNext: 0,
     deck: shuffle(deck, rand), discard: [], queue: [], shields: [], st,
     shout: 0, rallyLeft: 0, powerLeft: 0, frostNovaUsed: false, lastStandAbsorbed: 0, glacialCd: 0,
+    poison: 0, poisonT: 0, poisonAcc: 0, dodges: 0,
+    homeCol: -1, homeRow: -1, castTimes: [], castSeq: 0, dpSeq: 0, castStun: 0, coldBlood: false, decoyCol: 0, decoyRow: 0,
+    stillT: 0, lastCol: -1, lastRow: -1, healedTurn: 0, deathMarkAcc: 0, mending: 0,
     flash: 0, pose: 'idle', poseT: 0, dead: false,
   };
 }

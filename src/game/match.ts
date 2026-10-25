@@ -1,5 +1,6 @@
 // The player's match setup, remembered between visits.
 import { defaultSkin, type ClassId } from '../art/sprites';
+import { CLASS_IDS } from './classes';
 import type { Difficulty } from './tuning';
 import { loadCustom, starterDeck, toList, validate } from './deck';
 
@@ -18,7 +19,7 @@ export interface MatchConfig {
 const KEY = 'svs:match';
 
 export function loadMatch(): MatchConfig {
-  const skins = (): Record<ClassId, string> => ({ warrior: defaultSkin('warrior'), mage: defaultSkin('mage') });
+  const skins = (): Record<ClassId, string> => Object.fromEntries(CLASS_IDS.map(c => [c, defaultSkin(c)])) as Record<ClassId, string>;
   const def: MatchConfig = { p1: 'warrior', p1Deck: 'starter', cpu: 'mage', difficulty: 'normal', bestOf: 3, p1Skin: skins(), cpuSkin: skins() };
   try {
     const raw = localStorage.getItem(KEY);
