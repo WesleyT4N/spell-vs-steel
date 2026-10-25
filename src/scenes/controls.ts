@@ -7,7 +7,7 @@ import { sfx } from '../engine/audio';
 
 const LABELS: Record<Bindable, string> = {
   up: 'MOVE UP', down: 'MOVE DOWN', left: 'MOVE LEFT', right: 'MOVE RIGHT',
-  attack: 'ATTACK / OK', cast: 'CAST / BACK', custom: 'CUSTOM SCREEN', pause: 'PAUSE',
+  attack: 'ATTACK / OK', cast: 'CAST / BACK', custom: 'DRAW SCREEN', pause: 'PAUSE',
 };
 const ROWS = [...BINDABLE, 'reset', 'back'] as const;
 

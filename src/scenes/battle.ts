@@ -168,7 +168,7 @@ export class BattleScene implements Scene {
     const lx = 4, ly = 24, lw = 118;
     frame(c, lx, ly, lw, 126, '#000000', '#3cbcfc');
     P(c, '#0000a8', lx + 1, ly + 1, lw - 2, 10);
-    drawText(c, `CUSTOM  TURN ${b.turn}`, lx + 4, ly + 3, '#fcfcfc');
+    drawText(c, `DRAW  TURN ${b.turn}`, lx + 4, ly + 3, '#fcfcfc');
     const secs = Math.ceil(this.timer);
     drawText(c, String(secs).padStart(2, '0'), lx + lw - 16, ly + 3, secs <= 5 && tick % 4 < 2 ? '#f83800' : '#f8b800');
     offer.forEach((id, i) => {
