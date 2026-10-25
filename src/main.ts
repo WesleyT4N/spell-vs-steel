@@ -2,7 +2,7 @@ import { W, H, UW, UH, P } from './engine/gfx';
 import { drawTextCentered } from './engine/font';
 import { initInput, endFrame, wasPressed } from './engine/input';
 import { toggleMute } from './engine/audio';
-import { setScene, getScene, commitZones, hotZone } from './scenes/scene';
+import { setScene, getScene, commitZones, hotZone, noteTouch } from './scenes/scene';
 import { TitleScene } from './scenes/title';
 import { OnlineScene } from './scenes/online';
 import { DEV_TOOLS } from './flags';
@@ -76,6 +76,7 @@ function frame(now: number): void {
   while (acc >= STEP) {
     acc -= STEP;
     if (wasPressed('mute')) toggleMute();
+    noteTouch();
     getScene()?.update(STEP);
     endFrame();
     tickAcc += STEP;
