@@ -118,6 +118,14 @@ function drawTrap(c: Ctx, t: Trap, tick: number): void {
   c.globalAlpha = 1;
 }
 
+/** Draw `fn` scaled by `s` around the anchor (ax, ay), so pixel art stays on the same footing. */
+function zoom(c: Ctx, ax: number, ay: number, s: number, fn: () => void): void {
+  c.save();
+  c.translate(ax, ay); c.scale(s, s); c.translate(-ax, -ay);
+  fn();
+  c.restore();
+}
+
 /** Companions: wolves pace in their row by the Ranger's back column, hawks circle overhead, the bear stands on its panel. */
 function drawPet(c: Ctx, b: Battle, p: Pet, tick: number): void {
   const owner = b.f[p.side];
@@ -125,15 +133,15 @@ function drawPet(c: Ctx, b: Battle, p: Pet, tick: number): void {
   if (p.kind === 'hawk') {
     const ang = b.time * 3;
     const o = fighterPos(b, owner);
-    const x = o.x + Math.cos(ang) * 10, y = o.y - 30 + Math.sin(ang) * 3;
+    const x = Math.round(o.x + Math.cos(ang) * 12), y = Math.round(o.y - 38 + Math.sin(ang) * 3);
     const flap = tick % 4 < 2 ? 0 : 2;
-    P(c, '#000000', x - 4, y - 1 - flap, 9, 3); P(c, '#ac7c00', x - 3, y - flap, 7, 1); P(c, '#fcfcfc', x + d * 2, y - 1, 2, 2);
+    drawHawk(c, x, y, d, flap > 0);
     return;
   }
   if (p.kind === 'bear') return; // drawn as its wall
   const row = p.row ?? owner.row;
   const f = panelFoot(p.row === null ? owner.col : p.col, row);
-  const x = Math.round(f.x - d * (p.row === null ? 10 : 2) + Math.sin(b.time * 4 + row) * 2), y = Math.round(f.y);
+  const x = Math.round(f.x - d * (p.row === null ? 16 : 2) + Math.sin(b.time * 4 + row) * 2), y = Math.round(f.y);
   drawWolf(c, x, y, d, tick % 8 < 4);
 }
 
@@ -142,11 +150,26 @@ const WOLF = ['......a.a..', '.....abab..', 'a...abbbbca', 'babbbbbbbaa', '.abbb
 const WOLF_LEGS = ['.a.a...a.a.', '..a.a.a.a..'];
 function drawWolf(c: Ctx, x: number, y: number, d: number, step: boolean): void {
   const rows = [...WOLF, WOLF_LEGS[step ? 1 : 0]];
-  rows.forEach((r, j) => [...r].forEach((ch, i) => {
+  // drawn at 2x so the wolf reads next to the fighters
+  zoom(c, x, y, 2, () => rows.forEach((r, j) => [...r].forEach((ch, i) => {
     if (ch === '.') return;
     const px = d > 0 ? x - 5 + i : x + 5 - i;
     P(c, ch === 'a' ? '#000000' : ch === 'c' ? '#fcfcfc' : j === 3 ? '#bcbcbc' : '#7c7c7c', px, y - 6 + j, 1, 1);
-  }));
+  })));
+}
+
+// a hawk facing right: b = feathers, d = white head, e = beak; two wing frames
+const HAWK_UP = ['b.......b', 'bb.....bb', '.bb.d.bb.', '..bbdde..', '...bbb...', '....b....'];
+const HAWK_DOWN = ['.........', '....d....', '...bdde..', '.bbbbbbb.', 'bb.bbb.bb', 'b...b...b'];
+const HAWK_COL: Record<string, string> = { b: '#ac7c00', d: '#fcfcfc', e: '#f8b800' };
+/** Drawn at 2x with a black outline, centered on (x, y). */
+function drawHawk(c: Ctx, x: number, y: number, d: number, up: boolean): void {
+  const rows = up ? HAWK_UP : HAWK_DOWN;
+  const px = (i: number): number => (d > 0 ? x - 4 + i : x + 4 - i);
+  zoom(c, x, y, 2, () => {
+    rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') P(c, '#000000', px(i) - 1, y - 3 + j - 1, 3, 3); }));
+    rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') P(c, HAWK_COL[ch], px(i), y - 3 + j, 1, 1); }));
+  });
 }
 
 function drawHole(c: Ctx, col: number, row: number, owner: 0 | 1): void {
@@ -215,21 +238,21 @@ function drawLightWall(c: Ctx, cx: number, base: number, time: number): number {
 function drawBear(c: Ctx, w: Wall, cx: number, base: number, time: number): number {
   const d = w.side === 0 ? 1 : -1;
   const bob = Math.floor(time * 2) % 2;
-  const top = base - 17 + bob;
+  const top = base - 24 + bob;
   const body = '#6888fc', hi = '#a4e4fc', dark = '#0000a8';
-  P(c, '#000000', cx - 9, top + 4, 18, 13 - bob);
-  P(c, body, cx - 8, top + 5, 16, 11 - bob);
-  P(c, hi, cx - 8, top + 5, 16, 2);
+  P(c, '#000000', cx - 13, top + 6, 26, 18 - bob);
+  P(c, body, cx - 12, top + 7, 24, 16 - bob);
+  P(c, hi, cx - 12, top + 7, 24, 3);
   // head toward the enemy
-  P(c, '#000000', cx + d * 5 - 4, top - 1, 9, 9);
-  P(c, body, cx + d * 5 - 3, top, 7, 7);
-  P(c, hi, cx + d * 5 - 3, top, 7, 1);
-  P(c, '#000000', cx + d * 5 - 3, top - 2, 2, 2); P(c, '#000000', cx + d * 5 + 2, top - 2, 2, 2);
-  P(c, '#fcfcfc', cx + d * 7, top + 2, 1, 1);
-  P(c, dark, cx + d * 8, top + 4, 2, 2);
-  for (const lx of [-7, -3, 2, 6]) P(c, dark, cx + lx, base - 2, 2, 2);
-  glow(c, cx, top + 8, 14, '104,136,252', 0.2 + 0.1 * Math.sin(time * 4));
-  return top - 2;
+  P(c, '#000000', cx + d * 7 - 6, top - 1, 13, 12);
+  P(c, body, cx + d * 7 - 5, top, 11, 10);
+  P(c, hi, cx + d * 7 - 5, top, 11, 2);
+  P(c, '#000000', cx + d * 7 - 5, top - 3, 3, 3); P(c, '#000000', cx + d * 7 + 3, top - 3, 3, 3);
+  P(c, '#fcfcfc', cx + d * 10, top + 3, 2, 2);
+  P(c, dark, cx + d * 11, top + 6, 3, 3);
+  for (const lx of [-11, -6, 3, 8]) P(c, dark, cx + lx, base - 3, 3, 3);
+  glow(c, cx, top + 11, 19, '104,136,252', 0.2 + 0.1 * Math.sin(time * 4));
+  return top - 3;
 }
 
 function drawIceShards(c: Ctx, w: Wall, cx: number, base: number, pct: number, time: number): number {
@@ -401,8 +424,8 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
     const x = s.x + (e.x - s.x) * q, y = s.y - 10 + (e.y - 10 - (s.y - 10)) * q - Math.sin(q * Math.PI) * 18;
     if (p.kind === 'hawk') {
       const dd = e.x - s.x > 0 ? 1 : -1, flap = Math.floor(q * 12) % 2 ? 2 : 0;
-      P(c, '#000000', x - 5, y - 2 - flap, 11, 4); P(c, '#ac7c00', x - 4, y - 1 - flap, 9, 2);
-      P(c, '#000000', x - 2, y - 1, 6, 4); P(c, '#503000', x - 1, y, 4, 2); P(c, '#fcfcfc', x + dd * 3, y - 1, 2, 2); P(c, '#f8b800', x + dd * 5, y, 1, 1);
+      const hx = Math.round(x), hy = Math.round(y);
+      drawHawk(c, hx, hy, dd, flap > 0);
       return;
     }
     if (p.kind === 'arrow') {
