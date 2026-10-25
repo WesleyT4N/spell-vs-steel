@@ -621,10 +621,11 @@ export class Battle {
       target.charge = 0;
     }
     if (amt >= 80) { this.shake = Math.max(this.shake, 0.25); this.cheer = 1.5; }
+    if (opts.basic === 'heavy') this.shake = Math.max(this.shake, 0.18);
     if (opts.stun) this.stun(target, opts.stun);
     if (opts.freeze) this.freeze(target, opts.freeze);
     if (opts.knockback) this.knockback(target, 1);
-    sfx(amt >= 60 ? 'hitBig' : 'hit');
+    sfx(opts.basic === 'heavy' ? 'heavyImpact' : amt >= 60 ? 'hitBig' : 'hit');
     return out;
   }
 

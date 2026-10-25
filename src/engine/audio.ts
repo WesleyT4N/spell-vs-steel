@@ -96,6 +96,13 @@ const SFX: Record<string, Blip[]> = {
   bolt: [{ w: 'square', f0: 1400, f1: 500, d: 0.06, v: 0.18 }],
   boltHeavy: [{ w: 'sawtooth', f0: 900, f1: 150, d: 0.2, v: 0.25 }, { w: 'noise', f0: 0, f1: 0, d: 0.1, v: 0.2, hp: 3000 }],
   hit: [{ w: 'noise', f0: 0, f1: 0, d: 0.05, v: 0.3, hp: 1200 }, { w: 'square', f0: 180, f1: 90, d: 0.05, v: 0.2 }],
+  // heavy basic landing: a low boom, a crunch and a ringing smack layered together
+  heavyImpact: [
+    { w: 'sine', f0: 150, f1: 38, d: 0.32, v: 0.6 },
+    { w: 'noise', f0: 0, f1: 0, d: 0.22, v: 0.55, hp: 250 },
+    { w: 'square', f0: 220, f1: 55, d: 0.16, v: 0.3 },
+    { w: 'noise', f0: 0, f1: 0, d: 0.06, v: 0.35, hp: 4000 },
+  ],
   hitBig: [{ w: 'noise', f0: 0, f1: 0, d: 0.18, v: 0.45, hp: 400 }, { w: 'square', f0: 140, f1: 40, d: 0.15, v: 0.3 }],
   block: [{ w: 'square', f0: 1800, f1: 1800, d: 0.03, v: 0.18 }, { w: 'square', f0: 2400, f1: 2400, d: 0.05, v: 0.15, delay: 0.03 }],
   break: [{ w: 'noise', f0: 0, f1: 0, d: 0.25, v: 0.4, hp: 1500 }, { w: 'square', f0: 2000, f1: 400, d: 0.2, v: 0.2 }],
@@ -308,4 +315,50 @@ export function stopMusic(): void {
   if (current) window.clearInterval(current.timer);
   current = null;
   currentName = '';
+}
+
+// ---------- charge hum ----------
+// A held tone that rises while a heavy attack charges and warbles once it's ready. Call every frame
+// with the charge progress; it fades out on its own a moment after the calls stop.
+interface Hum { osc: OscillatorNode; gain: GainNode; lfo: OscillatorNode; lfoGain: GainNode; timer: number }
+const hums = new Map<number, Hum>();
+
+export function chargeHum(id: number, progress: number | null): void {
+  const c = ctx;
+  const h = hums.get(id);
+  if (progress === null || !c || c.state !== 'running' || muted || !settings.sfxOn || settings.sfx === 0) {
+    if (h) stopHum(id);
+    return;
+  }
+  const t = c.currentTime;
+  if (!h) {
+    const osc = c.createOscillator(), gain = c.createGain(), lfo = c.createOscillator(), lfoGain = c.createGain();
+    osc.type = 'square';
+    lfo.frequency.value = 16;
+    lfoGain.gain.value = 0;
+    lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.07, t + 0.05);
+    osc.connect(gain); gain.connect(sfxBus);
+    osc.start(t); lfo.start(t);
+    hums.set(id, { osc, gain, lfo, lfoGain, timer: 0 });
+  }
+  const hum = hums.get(id)!;
+  const full = progress >= 1;
+  hum.osc.frequency.setTargetAtTime(full ? 620 : 160 + 380 * progress, t, 0.03);
+  hum.lfoGain.gain.setTargetAtTime(full ? 60 : 6, t, 0.03);
+  window.clearTimeout(hum.timer);
+  hum.timer = window.setTimeout(() => stopHum(id), 150);
+}
+
+function stopHum(id: number): void {
+  const h = hums.get(id);
+  if (!h || !ctx) return;
+  hums.delete(id);
+  window.clearTimeout(h.timer);
+  const t = ctx.currentTime;
+  h.gain.gain.cancelScheduledValues(t);
+  h.gain.gain.setValueAtTime(h.gain.gain.value, t);
+  h.gain.gain.linearRampToValueAtTime(0, t + 0.05);
+  h.osc.stop(t + 0.06); h.lfo.stop(t + 0.06);
 }

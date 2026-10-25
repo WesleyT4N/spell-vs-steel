@@ -16,7 +16,7 @@ import { TUNING } from '../game/tuning';
 import { P, UW, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse } from '../engine/input';
-import { playMusic, stopMusic, sfx } from '../engine/audio';
+import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
 import { drawCardDetail, drawCardFace, CARD_W, CARD_H, PICKED } from './cardView';
 import { SetupScene } from './setup';
@@ -85,6 +85,8 @@ export class BattleScene implements Scene {
     const pi = b.phase === 'fight' ? this.playerIntent(dt) : NO_INTENT;
     const ci = this.cpu.intent(b, b.f[1], dt);
     b.update(dt, [pi, ci]);
+    // charging heavies hum (rising pitch, then a warble when ready); a quick tap stays silent
+    for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / TUNING.heavyCharge) : null);
     if ((b.phase as string) === 'over' && !this.ended) {
       this.ended = true;
       if (b.winner !== null) this.score[b.winner]++;
