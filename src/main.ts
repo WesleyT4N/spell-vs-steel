@@ -6,6 +6,9 @@ import { setScene, getScene, commitZones, hotZone, noteTouch } from './scenes/sc
 import { TitleScene } from './scenes/title';
 import { OnlineScene } from './scenes/online';
 import { DEV_TOOLS } from './flags';
+import { USE_HIRES } from './art/sprites';
+
+const WORLD_RES = USE_HIRES ? 2 : 1;
 import { touchActive, onTouchChange, layout as layoutPad, padSide, syncPad, touchText, viewport } from './engine/touch';
 
 // The screen is the sharp UI resolution. The world draws at 240×160 offscreen and is scaled up 2×
@@ -23,7 +26,9 @@ const offscreen = (w: number, h: number): CanvasRenderingContext2D => {
   x.imageSmoothingEnabled = false;
   return x;
 };
-const world = offscreen(W, H);
+// with hi-res fighters the world canvas is 2x: world art still draws in 240×160 units (scaled), sprites use the extra pixels
+const world = offscreen(W * WORLD_RES, H * WORLD_RES);
+world.scale(WORLD_RES, WORLD_RES);
 const ui = offscreen(UW, UH);
 
 function fit(): void {
