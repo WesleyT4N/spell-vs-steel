@@ -123,7 +123,7 @@ const warrior: CardDef[] = [
     ai: (b, f) => ahead(b, f, 2),
   },
   {
-    id: 'chain_hook', name: 'Chain Hook', cls: 'warrior', cost: 0, rarity: 'common', element: 'steel', damaging: true, lock: 0.35,
+    id: 'chain_hook', name: 'Chain Hook', cls: 'warrior', cost: 1, rarity: 'common', element: 'steel', damaging: true, lock: 0.35,
     dmg: '20', short: 'Chain down your row. On hit: pull them to their front column, stun 1s, gain 1 Rage.',
     cast: x => {
       x.b.shoot(x.f, {
