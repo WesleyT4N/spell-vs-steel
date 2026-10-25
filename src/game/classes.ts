@@ -17,8 +17,8 @@ export interface ClassInfo {
 }
 
 export const CLASS_IDS: ClassId[] = ['warrior', 'mage', 'rogue', 'ranger', 'cleric'];
-/** Classes shown in menus, the deck builder and the dev tools. Ranger and Cleric stay hidden until their kits are finalized. */
-export const PLAYABLE: ClassId[] = ['warrior', 'mage', 'rogue'];
+/** Classes shown in menus, the deck builder and the dev tools. The Cleric stays hidden until its kit is finalized. */
+export const PLAYABLE: ClassId[] = ['warrior', 'mage', 'rogue', 'ranger'];
 
 export const CLASS_INFO: Record<ClassId, ClassInfo> = {
   warrior: { name: 'WARRIOR', res: 'RAGE', resColor: '#f87858', gem: '#d82800', pipBase: '#503000', pip: '#d82800', refill: 'PAY ON CAST' },

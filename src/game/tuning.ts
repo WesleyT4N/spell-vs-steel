@@ -1,7 +1,7 @@
 // Every number worth tweaking after a playtest lives here.
 
 export const TUNING = {
-  hp: { warrior: 870, mage: 720, rogue: 650, ranger: 700, cleric: 700 },
+  hp: { warrior: 870, mage: 720, rogue: 650, ranger: 740, cleric: 700 },
 
   /** Seconds for the shared custom gauge to fill. */
   gaugeSeconds: 10,
@@ -58,15 +58,19 @@ export const TUNING = {
   },
 
   ranger: {
-    lightDamage: 6,
-    heavyDamage: 30,
+    /** Light: a travel-time Arrow (panels per second). Heavy: an instant Aimed Shot on the normal charge. */
+    // heavy 20 / 740 HP: sims put the Ranger at ~39% vs Warrior, ~63% vs Mage, ~60% vs Rogue (2026-10-25)
+    lightDamage: 8,
+    heavyDamage: 20,
+    arrowSpeed: 14,
     lightLock: 0.4,
     heavyLock: 0.4,
-    /** Aimed Shot takes longer to charge than other heavies. */
-    heavyCharge: 1.4,
+    /** Steady Focus: damage multiplier while rooted. */
+    focusBonus: 1.25,
+    tripwireStun: 2,
     energyStart: 2,
     energyCap: 5,
-    /** Standing still this long gives 1 Energy. */
+    /** Standing still this long gives 1 Energy (plus 1 per Draw screen). */
     stillSeconds: 2,
   },
 

@@ -63,7 +63,9 @@ export class Cpu {
     const dist = (foe.col - f.col) * d;
     const seen = foe.st.stealth <= 0;
     const inReach = seen && (f.cls === 'warrior' ? aligned && dist >= 1 && dist <= 2
-      : f.cls === 'rogue' ? aligned && dist >= 1 && dist <= TUNING.rogue.stabReach : aligned);
+      : f.cls === 'rogue' ? aligned && dist >= 1 && dist <= TUNING.rogue.stabReach
+      // Hunter's Mark: the Ranger's shots home in from any row
+      : aligned || (f.cls === 'ranger' && foe.st.hunted > 0));
     // Smite lands a fixed distance ahead, so the Cleric only releases its heavy at that range;
     // the Rogue's Throwing Knife flies down the whole row
     const heavyReach = f.cls === 'rogue' ? seen && aligned : inReach && (f.cls !== 'cleric' || dist === TUNING.cleric.smiteRange);
@@ -182,8 +184,9 @@ export class Cpu {
       for (const i of idx.filter(i => offer[i] === 'arcane_focus')) { chosen.push(i); mana += 1; }
       const rest = idx.filter(i => !chosen.includes(i)).sort((a, c) => cost(c) - cost(a));
       for (const i of rest) if (cost(i) <= mana) { chosen.push(i); mana -= cost(i); }
-      // cast cheap control first, big damage last
-      return chosen.sort((a, c) => (offer[a] === 'arcane_focus' ? -10 : cost(a)) - (offer[c] === 'arcane_focus' ? -10 : cost(c)));
+      // cast cheap control first, big damage last; the Ranger's core combo is Steady Focus, Hunter's Mark, Rapid Fire
+      const FIRST: Record<string, number> = { arcane_focus: -10, steady_focus: -9, hunters_mark: -8, rapid_fire: -7 };
+      return chosen.sort((a, c) => (FIRST[offer[a]] ?? cost(a)) - (FIRST[offer[c]] ?? cost(c)));
     }
     // Warrior: builders first, then spenders we can expect to afford this turn.
     let budget = f.res + 3;
