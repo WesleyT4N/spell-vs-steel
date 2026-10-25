@@ -60,19 +60,26 @@ export const PICKED = '#3cbcfc';
 export const CARD_W = 76;
 export const CARD_H = 104;
 
-/** A card face as it sits in the hand. `order` is its cast position when picked, else -1. */
-export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: { order?: number; lit?: boolean; faded?: boolean } = {}): void {
+/**
+ * A card face as it sits in the hand. `order` is its cast position when picked, else -1.
+ * `short` marks affordability: 0 = payable (gold gem ring), above 0 = that much resource missing
+ * (grey gem, dimmed, NEED tag), unset = not shown. `builds` is for resources earned mid-fight (Rage):
+ * a short card stays bright and gets a soft +N tag instead, since it will be castable later.
+ */
+export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: { order?: number; lit?: boolean; faded?: boolean; short?: number; builds?: boolean } = {}): void {
   const w = CARD_W, h = CARD_H, order = opts.order ?? -1;
   const edge = order >= 0 ? PICKED : opts.lit ? '#fcfcfc' : RARITY_COLOR[card.rarity];
   P(c, '#000000', x + 3, y + 3, w, h); // drop shadow
   frame(c, x, y, w, h, '#181818', edge);
   if (opts.lit || order >= 0) { P(c, edge, x + 1, y + 1, w - 2, 1); P(c, edge, x + 1, y + h - 2, w - 2, 1); }
   // cost gem
-  const gem = card.cls === 'warrior' ? '#d82800' : '#0058f8';
+  const short = opts.short ?? -1, hard = short > 0 && !opts.builds;
+  const gem = hard ? '#3c3c3c' : card.cls === 'warrior' ? '#d82800' : '#0058f8';
+  P(c, short === 0 ? '#f8b800' : '#000000', x + 2, y + 2, 18, 18);
   P(c, '#000000', x + 3, y + 3, 16, 16);
   P(c, gem, x + 4, y + 4, 14, 14);
   P(c, mix(gem, '#fcfcfc', 0.4), x + 5, y + 5, 4, 2);
-  drawTextCentered(c, costText(card), x + 11, y + 8, '#fcfcfc', 1, false);
+  drawTextCentered(c, costText(card), x + 11, y + 8, hard ? '#f87858' : '#fcfcfc', 1, false);
   // rarity pip
   P(c, '#000000', x + w - 14, y + 5, 10, 10);
   P(c, RARITY_COLOR[card.rarity], x + w - 13, y + 6, 8, 8);
@@ -90,7 +97,12 @@ export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: 
   if (!d) drawTextCentered(c, 'EFFECT', x + w / 2, y + 86, '#bcbcbc', 1, false);
   else if (textWidth(d, 2) <= w - 8) drawTextCentered(c, d, x + w / 2, y + 83, '#f8b800', 2, false);
   else drawTextCentered(c, d.slice(0, 12), x + w / 2, y + 86, '#f8b800', 1, false);
-  if (opts.faded) { c.fillStyle = 'rgba(0,0,0,0.45)'; c.fillRect(x, y, w, h); }
+  if (opts.faded || hard) { c.fillStyle = `rgba(0,0,0,${opts.faded || !opts.lit ? 0.45 : 0.2})`; c.fillRect(x, y, w, h); }
+  if (short > 0) {
+    const tag = hard ? `NEED ${short}` : `+${short} ${resName(card)}`, tw = textWidth(tag) + 6;
+    P(c, '#000000', x + (w - tw) / 2, y + 66, tw, 11);
+    drawTextCentered(c, tag, x + w / 2, y + 68, hard ? '#f83800' : resColor(card), 1, false);
+  }
   if (order >= 0) {
     P(c, '#000000', x + w - 19, y - 7, 22, 20);
     P(c, PICKED, x + w - 18, y - 6, 20, 18);
