@@ -3,21 +3,36 @@ import type { Ctx } from '../engine/gfx';
 import { P, UW, UH, frame } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { mouse } from '../engine/input';
+import { touchActive, touchText, type PadMode } from '../engine/touch';
 
 export interface Scene {
   update(dt: number): void;
   /** `c` is the 240×160 world; `ui` is the 480×320 sharp layer drawn on top of it. */
   draw(c: Ctx, tick: number, ui: Ctx): void;
   enter?(): void;
+  /** Which touch controls this screen shows on phones (a BACK button when left out). */
+  pad?(): PadMode;
 }
 
 let current: Scene | null = null;
 export function setScene(s: Scene): void {
   current = s;
+  fresh = true;
   zones = []; nextZones = [];
   s.enter?.();
 }
 export const getScene = (): Scene | null => current;
+
+// ---------- nothing preselected on phones ----------
+// With keys a highlighted row is the cursor, so a menu opens with one. By touch it reads as a choice
+// already made, so phones show no selection until a finger lands on one.
+let fresh = true;
+/** False until the first touch on this menu when playing by touch; always true otherwise. */
+export const showSel = (): boolean => !touchActive() || !fresh;
+/** A new menu opened inside the same screen (pause, results, Draw): hide the selection again on phones. */
+export function resetSel(): void { fresh = true; }
+/** Called by the main loop before each update: a finger landing on something selectable shows the selection. */
+export function noteTouch(): void { if (mouse.touched && hotZone()) fresh = false; }
 
 // ---------- mouse zones ----------
 // Scenes register clickable rectangles (UI coordinates) while drawing; the next update reads them.
@@ -66,7 +81,7 @@ export function drawMenu(c: Ctx, items: string[], sel: number, cx: number, y: nu
   frame(c, x, y - 6, w, items.length * gap + 6, '#000000', '#fcfcfc');
   items.forEach((t, i) => {
     const yy = y + i * gap;
-    const on = i === sel;
+    const on = i === sel && showSel();
     const dis = opts.disabled?.[i];
     zone(`menu:${i}`, x + 2, yy - 4, w - 4, gap - 1);
     if (on) P(c, '#0000a8', x + 2, yy - 4, w - 4, gap - 2);
@@ -78,7 +93,7 @@ export function drawMenu(c: Ctx, items: string[], sel: number, cx: number, y: nu
 /** Footer line of control hints on the UI layer. */
 export function hint(c: Ctx, s: string): void {
   P(c, '#000000', 0, UH - 14, UW, 14);
-  drawTextCentered(c, s, UW / 2, UH - 11, '#bcbcbc', 1, false);
+  drawTextCentered(c, touchText(s), UW / 2, UH - 11, '#bcbcbc', 1, false);
 }
 
 /** A small clickable button; returns nothing, registers the zone `id`. */
