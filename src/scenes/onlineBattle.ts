@@ -2,7 +2,7 @@
 import { setScene, dim, hint } from './scene';
 import { BattleScene } from './battle';
 import { TitleScene } from './title';
-import { Battle, type Side } from '../game/battle';
+import { Battle, heavyChargeOf, type Side } from '../game/battle';
 import { loadMatch } from '../game/match';
 import { battleHash } from '../net/hash';
 import { NO_INPUT, type NetInput } from '../net/protocol';
@@ -13,7 +13,6 @@ import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { RESULT_SONG } from '../engine/music';
 import { listMouse } from './scene';
-import { TUNING } from '../game/tuning';
 
 const STEP = 1 / 60;
 
@@ -101,7 +100,7 @@ export class OnlineBattleScene extends BattleScene {
       if (this.frame % 30 === 0) net.recordHash(this.frame, battleHash(b));
       if ((b.phase as string) !== 'fight' && (b.phase as string) !== 'ko') break;
     }
-    for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / TUNING.heavyCharge) : null);
+    for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / heavyChargeOf(f)) : null);
     if ((b.phase as string) === 'over' && !this.ended) {
       this.ended = true;
       if (b.winner !== null) this.score[b.winner]++;

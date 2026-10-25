@@ -117,7 +117,6 @@ export class EncyclopediaScene implements Scene {
       x += w + 4;
     });
     drawText(ui, `${cards.length} SPELL${cards.length === 1 ? '' : 'S'}`, x + 8, 13, '#7c7c7c');
-    drawTextCentered(ui, 'CARD ENCYCLOPEDIA', 340, 13, '#fcfcfc', 1, false);
     button(ui, 'done', 'DONE', UW - 64, 9, 50, 14, false, '#f8b800');
     x = 14;
     RARITIES.forEach((r, i) => {
@@ -130,6 +129,7 @@ export class EncyclopediaScene implements Scene {
     x += 10;
     this.elements().forEach((el, i) => {
       const label = el.toUpperCase(), w = textWidth(label) + 10, on = this.element === el;
+      if (x + w > UW - 12) return; // with every class shown, the last elements don't fit: pick a class tab to filter them
       zone(`el:${i}`, x, 27, w, 14);
       frame(ui, x, 27, w, 14, on ? ELEMENT_COLOR[el] : '#000000', isHot(`el:${i}`) || on ? '#fcfcfc' : ELEMENT_COLOR[el]);
       drawText(ui, label, x + 5, 31, on ? '#000000' : ELEMENT_COLOR[el]);

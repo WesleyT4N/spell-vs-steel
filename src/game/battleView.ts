@@ -7,16 +7,25 @@ import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '.
 import { drawCardIcon } from '../scenes/cardView';
 import { CARDS, ELEMENT_COLOR } from './cards';
 import { TUNING } from './tuning';
-import type { Battle, Fighter, Fx, Projectile, Side, StatusKey, Wall } from './battle';
+import { heavyChargeOf } from './battle';
+import type { Battle, Fighter, Fx, Pet, Projectile, Side, StatusKey, Trap, Wall } from './battle';
+import { CLASS_INFO } from './classes';
 
 const FIRE = ['#f83800', '#fca044', '#f8b800', '#fce0a8'];
 const ICE = ['#0058f8', '#3cbcfc', '#a4e4fc', '#fcfcfc'];
 const ARC = ['#940084', '#d800cc', '#f878f8', '#fcfcfc'];
+const HOLY = ['#ac7c00', '#f8b800', '#f8d878', '#fcfcfc'];
+const TOX = ['#005800', '#58d854', '#b8f818', '#fcfcfc'];
+const SHADOW = ['#4428bc', '#6844fc', '#9878f8', '#fcfcfc'];
+const STEEL = ['#3c3c3c', '#7c7c7c', '#bcbcbc', '#fcfcfc'];
+
+/** Whose hidden things (traps, a stealthed fighter) are visible: one side's, or everything in the dev sandbox. */
+export type Viewer = Side | 'all';
 
 let arena: Colosseum | null = null;
 export const getArena = (): Colosseum => (arena ??= new Colosseum());
 
-export function drawBattle(c: Ctx, b: Battle, tick: number): void {
+export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): void {
   const a = getArena();
   c.save();
   if (b.shake > 0) c.translate(Math.round((Math.random() - 0.5) * 4 * Math.min(1, b.shake * 4)), Math.round((Math.random() - 0.5) * 3 * Math.min(1, b.shake * 4)));
@@ -47,14 +56,89 @@ export function drawBattle(c: Ctx, b: Battle, tick: number): void {
     }
   }
 
+  // toxic, blessed and holy-fire panels
+  for (let col = 0; col < 6; col++) for (let r = 0; r < 3; r++) drawPanelEffects(c, b, col, r, tick);
+  for (const t of b.traps) if (me === 'all' || t.side === me) drawTrap(c, t, tick);
+
   // entities, back row first
   for (let r = 0; r < 3; r++) {
     for (const w of b.walls) if (w.row === r) drawWall(c, w, b.time);
-    for (const f of b.f) if (f.row === r) drawFighter(c, b, f, tick);
+    for (const f of b.f) if (f.row === r) drawFighter(c, b, f, tick, me);
   }
+  for (const p of b.pets) drawPet(c, b, p, tick);
   for (const pr of b.projectiles) drawProjectile(c, b, pr);
   for (const e of b.fx) drawFx(c, b, e);
   c.restore();
+}
+
+function drawPanelEffects(c: Ctx, b: Battle, col: number, row: number, tick: number): void {
+  const p = b.panels[col][row];
+  if (p.hole > 0) return;
+  const pc = panelCenter(col, row);
+  if (p.toxic > 0) {
+    // bubbles rising out of a green haze
+    c.globalAlpha = 0.35; P(c, TOX[1], pc.x - PW / 2 + 3, pc.y - 4, PW - 6, 8); c.globalAlpha = 1;
+    for (let i = 0; i < 4; i++) {
+      const t = (b.time * 0.9 + i / 4 + col * 0.13) % 1;
+      P(c, t > 0.7 ? TOX[3] : TOX[2], pc.x - 12 + i * 7, pc.y + 2 - Math.floor(t * 12), 2, 2);
+    }
+  }
+  if (p.bless > 0) {
+    for (let i = 0; i < 5; i++) {
+      const t = (b.time * 0.7 + i / 5 + row * 0.2) % 1;
+      if ((i + tick) % 3) P(c, t < 0.5 ? HOLY[3] : HOLY[2], pc.x - 13 + i * 6, pc.y + 3 - Math.floor(t * 10), 1, 2);
+    }
+    P(c, HOLY[2], pc.x - PW / 2 + 3, pc.y + 4, PW - 6, 1);
+  }
+  if (p.smite > 0) {
+    for (let i = 0; i < 6; i++) {
+      const h = 3 + ((i * 5 + tick) % 6);
+      P(c, HOLY[(i + tick) % 3 + 1], pc.x - 14 + i * 5, pc.y + 4 - h, 3, h);
+    }
+  }
+}
+
+/** A hidden trap, drawn only for its owner: a faint snare outline that brightens once armed. */
+function drawTrap(c: Ctx, t: Trap, tick: number): void {
+  const pc = panelCenter(t.col, t.row);
+  const col = t.kind === 'freeze' ? '#3cbcfc' : t.kind === 'mine' ? '#58d854' : '#f87800';
+  const armed = t.arm <= 0;
+  c.globalAlpha = armed ? 0.85 : 0.4;
+  P(c, '#000000', pc.x - 6, pc.y - 2, 12, 5);
+  P(c, col, pc.x - 5, pc.y - 1, 10, 3);
+  for (let i = 0; i < 4; i++) P(c, armed && (tick + i) % 4 === 0 ? '#fcfcfc' : '#bcbcbc', pc.x - 7 + i * 4, pc.y - 3 + (i % 2) * 6, 2, 1);
+  c.globalAlpha = 1;
+}
+
+/** Companions: wolves pace in their row by the Ranger's back column, hawks circle overhead, the bear stands on its panel. */
+function drawPet(c: Ctx, b: Battle, p: Pet, tick: number): void {
+  const owner = b.f[p.side];
+  const d = p.side === 0 ? 1 : -1;
+  if (p.kind === 'hawk') {
+    const ang = b.time * 3;
+    const o = fighterPos(b, owner);
+    const x = o.x + Math.cos(ang) * 10, y = o.y - 30 + Math.sin(ang) * 3;
+    const flap = tick % 4 < 2 ? 0 : 2;
+    P(c, '#000000', x - 4, y - 1 - flap, 9, 3); P(c, '#ac7c00', x - 3, y - flap, 7, 1); P(c, '#fcfcfc', x + d * 2, y - 1, 2, 2);
+    return;
+  }
+  if (p.kind === 'bear') return; // drawn as its wall
+  const row = p.row ?? owner.row;
+  const f = panelFoot(p.row === null ? owner.col : p.col, row);
+  const x = Math.round(f.x - d * (p.row === null ? 10 : 2) + Math.sin(b.time * 4 + row) * 2), y = Math.round(f.y);
+  drawWolf(c, x, y, d, tick % 8 < 4);
+}
+
+// a small grey wolf facing right: a = outline, b = fur, c = eye; the second rows are the running frame
+const WOLF = ['......a.a..', '.....abab..', 'a...abbbbca', 'babbbbbbbaa', '.abbbbbbba.'];
+const WOLF_LEGS = ['.a.a...a.a.', '..a.a.a.a..'];
+function drawWolf(c: Ctx, x: number, y: number, d: number, step: boolean): void {
+  const rows = [...WOLF, WOLF_LEGS[step ? 1 : 0]];
+  rows.forEach((r, j) => [...r].forEach((ch, i) => {
+    if (ch === '.') return;
+    const px = d > 0 ? x - 5 + i : x + 5 - i;
+    P(c, ch === 'a' ? '#000000' : ch === 'c' ? '#fcfcfc' : j === 3 ? '#bcbcbc' : '#7c7c7c', px, y - 6 + j, 1, 1);
+  }));
 }
 
 function drawHole(c: Ctx, col: number, row: number, owner: 0 | 1): void {
@@ -71,6 +155,8 @@ function drawWall(c: Ctx, w: Wall, time: number): void {
   let top: number;
   if (w.kind === 'stone') top = drawTowerShield(c, w, cx, base, pct);
   else if (w.kind === 'ice') top = drawIceShards(c, w, cx, base, pct, time);
+  else if (w.kind === 'holy') top = drawLightWall(c, cx, base, time);
+  else if (w.kind === 'bear') top = drawBear(c, w, cx, base, time);
   else top = drawGlacialPillar(c, w, cx, base, time);
   if (!w.invuln) {
     P(c, '#000000', cx - 9, top - 5, 18, 3);
@@ -102,6 +188,42 @@ function drawTowerShield(c: Ctx, w: Wall, cx: number, base: number, pct: number)
 const mixDark = (col: string): string => (col === '#d82800' ? '#881400' : '#0000a8');
 
 /** Ice Wall: a cluster of jagged frost crystals with a shimmer that sweeps up them. Cracks as it weakens. */
+/** Holy Wall: a shimmering pane of gold light. */
+function drawLightWall(c: Ctx, cx: number, base: number, time: number): number {
+  const top = base - 26;
+  c.globalAlpha = 0.55;
+  P(c, HOLY[1], cx - 5, top, 10, 26);
+  c.globalAlpha = 1;
+  P(c, HOLY[2], cx - 4, top + 1, 2, 24);
+  P(c, HOLY[3], cx - 1, top + 2, 1, 22);
+  for (let i = 0; i < 4; i++) {
+    const t = (time * 1.2 + i / 4) % 1;
+    P(c, HOLY[3], cx - 4 + ((i * 3) % 8), base - Math.floor(t * 26), 1, 1);
+  }
+  return top;
+}
+
+/** Spirit Bear: a big pale-blue bear, facing the enemy. */
+function drawBear(c: Ctx, w: Wall, cx: number, base: number, time: number): number {
+  const d = w.side === 0 ? 1 : -1;
+  const bob = Math.floor(time * 2) % 2;
+  const top = base - 17 + bob;
+  const body = '#6888fc', hi = '#a4e4fc', dark = '#0000a8';
+  P(c, '#000000', cx - 9, top + 4, 18, 13 - bob);
+  P(c, body, cx - 8, top + 5, 16, 11 - bob);
+  P(c, hi, cx - 8, top + 5, 16, 2);
+  // head toward the enemy
+  P(c, '#000000', cx + d * 5 - 4, top - 1, 9, 9);
+  P(c, body, cx + d * 5 - 3, top, 7, 7);
+  P(c, hi, cx + d * 5 - 3, top, 7, 1);
+  P(c, '#000000', cx + d * 5 - 3, top - 2, 2, 2); P(c, '#000000', cx + d * 5 + 2, top - 2, 2, 2);
+  P(c, '#fcfcfc', cx + d * 7, top + 2, 1, 1);
+  P(c, dark, cx + d * 8, top + 4, 2, 2);
+  for (const lx of [-7, -3, 2, 6]) P(c, dark, cx + lx, base - 2, 2, 2);
+  glow(c, cx, top + 8, 14, '104,136,252', 0.2 + 0.1 * Math.sin(time * 4));
+  return top - 2;
+}
+
 function drawIceShards(c: Ctx, w: Wall, cx: number, base: number, pct: number, time: number): number {
   const shards: Array<[number, number, number]> = [[-6, 4, 11], [0, 5, 17], [6, 4, 13]]; // x offset, half width, height
   const sweep = (time * 1.6 + w.col * 0.3) % 1.6;
@@ -152,8 +274,15 @@ function fighterPos(_b: Battle, f: Fighter): { x: number; y: number } {
   return { x: p.x + f.dx, y: p.y + f.dy };
 }
 
-function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number): void {
+function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): void {
   const s = getSprite(f.cls, f.skin, f.alt);
+  // Stealth: the owner sees a see-through sprite, the opponent only a faint shimmer
+  if (f.st.stealth > 0 && !f.dead) {
+    const { x, y } = fighterPos(b, f);
+    if (me === 'all' || me === f.side) { c.globalAlpha = 0.4; drawFighterSprite(c, s, x, y + 2, f.side === 1, 'ghost'); c.globalAlpha = 1; }
+    else if (tick % 6 < 2) for (let i = 0; i < 3; i++) P(c, '#7c7c7c', x - 4 + i * 4, y - 8 - ((tick + i * 3) % 10), 1, 2);
+    return;
+  }
   const { x, y } = fighterPos(b, f);
   const flip = f.side === 1;
   // heavy: a short wind-back, then a deep lunge into the swing
@@ -166,7 +295,7 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number): void {
     return;
   }
   // charge aura: sparks spiral in toward the fighter, then a bright ring pulses once the heavy is ready
-  const charge = f.charging && f.charge > 0.15 ? Math.min(1, f.charge / TUNING.heavyCharge) : 0;
+  const charge = f.charging && f.charge > 0.15 ? Math.min(1, f.charge / heavyChargeOf(f)) : 0;
   const ready = charge >= 1;
   if (charge > 0) {
     const cy = y - 9;
@@ -192,7 +321,7 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number): void {
   let tint: Tint = 'none';
   if (f.flash > 0 || (ready && tick % 4 === 0)) tint = 'flash';
   else if (f.st.frozen > 0) tint = 'ice';
-  else if (f.st.stunned > 0 && tick % 2) tint = 'stun';
+  else if ((f.st.stunned > 0 || f.st.sleep > 0) && tick % 2) tint = 'stun';
   const bob = f.pose === 'idle' && Math.floor(b.time * 2.5) % 2 ? 1 : 0;
   const castLift = f.pose === 'cast' ? 1 : 0;
   drawFighterSprite(c, s, fx, y + 2 - bob - castLift, flip, tint);
@@ -215,7 +344,7 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number): void {
       const gx = fx + b.dir(f) * 9;
       P(c, '#000000', gx - 3, y - 15, 7, 11); P(c, '#fcfcfc', gx - 2, y - 14, 5, 9); P(c, '#bcbcbc', gx - 1, y - 12, 3, 5);
     } else {
-      const col = sh.kind === 'barrier' ? '#f878f8' : sh.kind === 'unbreakable' ? '#f8b800' : '#bcbcbc';
+      const col = sh.kind === 'barrier' ? '#f878f8' : sh.kind === 'unbreakable' ? '#f8b800' : sh.kind === 'holy' ? '#f8d878' : '#bcbcbc';
       const rx = 11, ry = 13;
       for (let i = 0; i < 28; i++) {
         if ((i + tick) % 3 === 0) continue;
@@ -228,6 +357,14 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number): void {
   if (f.st.counterspell > 0) drawText(c, '×', fx - 2, y - s.h - 12, tick % 2 ? '#f878f8' : '#d800cc');
   if (f.st.frostNova > 0 && !f.frostNovaUsed && tick % 4 < 2) P(c, '#a4e4fc', fx - 1, y - s.h - 6, 3, 3);
   if (f.st.roared > 0) drawText(c, '↓', fx + 6, y - s.h - 4, '#bcbcbc');
+  if (f.poison > 0) for (let i = 0; i < f.poison; i++) { const t = (b.time * 1.5 + i / f.poison) % 1; P(c, t > 0.7 ? TOX[3] : TOX[2], fx - 5 + i * 4, y - 6 - Math.floor(t * 16), 2, 2); }
+  if (f.st.silenced > 0) { P(c, '#000000', fx - 10, y - s.h - 5, 7, 4); P(c, '#9878f8', fx - 9, y - s.h - 4, 5, 2); }
+  if (f.st.sleep > 0) drawText(c, 'Z', fx + 5 + (tick % 8 < 4 ? 0 : 1), y - s.h - 6 - (tick % 8), '#fcfcfc');
+  if (f.st.rooted > 0 || f.st.nest > 0) { P(c, '#503000', fx - 6, y - 1, 12, 2); P(c, '#58d854', fx - 5, y - 3, 2, 2); P(c, '#58d854', fx + 3, y - 3, 2, 2); }
+  if (f.st.channel > 0 || f.st.avatarLight > 0 || f.st.ascension > 0) for (let i = 0; i < 4; i++) P(c, HOLY[2 + (i % 2)], fx - 8 + ((tick * 3 + i * 5) % 16), y - 4 - ((tick * 2 + i * 7) % 20), 1, 2);
+  if (f.st.untargetable > 0 && tick % 2) { c.globalAlpha = 0.5; drawFighterSprite(c, s, fx, y + 2, flip, 'ghost'); c.globalAlpha = 1; }
+  if (f.st.deathMark > 0 && tick % 8 < 5) drawText(c, '×', fx - 2, y - s.h - 16, '#9878f8');
+  if (f.st.hunted > 0 && tick % 8 < 5) { P(c, '#f83800', fx - 1, y - s.h - 14, 3, 1); P(c, '#f83800', fx, y - s.h - 15, 1, 3); }
 
   // queued spells as stacked chips above the head (BN style)
   const n = Math.min(5, f.queue.length);
@@ -247,6 +384,12 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
     const s = panelFoot(p.homing.sx, p.homing.sy), e = fighterPos(b, t);
     const q = p.homing.p;
     const x = s.x + (e.x - s.x) * q, y = s.y - 10 + (e.y - 10 - (s.y - 10)) * q - Math.sin(q * Math.PI) * 18;
+    if (p.kind === 'hawk') {
+      const dd = e.x - s.x > 0 ? 1 : -1, flap = Math.floor(q * 12) % 2 ? 2 : 0;
+      P(c, '#000000', x - 5, y - 2 - flap, 11, 4); P(c, '#ac7c00', x - 4, y - 1 - flap, 9, 2);
+      P(c, '#000000', x - 2, y - 1, 6, 4); P(c, '#503000', x - 1, y, 4, 2); P(c, '#fcfcfc', x + dd * 3, y - 1, 2, 2); P(c, '#f8b800', x + dd * 5, y, 1, 1);
+      return;
+    }
     P(c, '#000000', x - 2, y - 2, 5, 5);
     P(c, ARC[2], x - 1, y - 1, 3, 3);
     P(c, ARC[3], x, y, 1, 1);
@@ -264,6 +407,22 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
     const ox = panelFoot(owner.col, owner.row).x;
     for (let xx = ox; dir > 0 ? xx < x : xx > x; xx += dir * 3) P(c, '#7c7c7c', xx, y + ((xx >> 1) % 2), 2, 1);
     P(c, '#000000', x - 3, y - 3, 7, 7); P(c, '#bcbcbc', x - 2, y - 2, 5, 5); P(c, '#fcfcfc', x - 1 + dir, y - 1, 2, 2);
+  } else if (p.kind === 'arrow' || p.kind === 'sting') {
+    P(c, '#000000', x - dir * 8, y - 1, 12, 3);
+    P(c, '#ac7c00', x - dir * 7, y, 10, 1);
+    P(c, p.kind === 'sting' ? TOX[2] : '#fcfcfc', x + dir * 2, y - 1, 2, 3);
+    P(c, '#fcfcfc', x - dir * 8, y - 1, 2, 1); P(c, '#fcfcfc', x - dir * 8, y + 1, 2, 1);
+  } else if (p.kind === 'net') {
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if ((i + j) % 2 === 0) P(c, '#bcbcbc', x - 4 + i * 2, y - 5 + j * 3, 1, 1);
+    P(c, '#7c7c7c', x - 5, y - 6, 1, 11); P(c, '#7c7c7c', x + 4, y - 6, 1, 11);
+  } else if (p.kind === 'wolf') {
+    drawWolf(c, Math.round(x), Math.round(y + 9), dir, Math.floor(b.time * 12) % 2 === 0);
+  } else if (p.kind === 'hammer') {
+    const spin = Math.floor(b.time * 16) % 4;
+    blob(c, '#000000', x, y, 5);
+    P(c, HOLY[1], x - 3, y - 3, 7, 7); P(c, HOLY[3], x - 2, y - 2, 2, 2);
+    P(c, '#503000', x + (spin % 2 ? 0 : spin === 0 ? 4 : -5), y + (spin % 2 ? (spin === 1 ? 4 : -5) : 0), 2, 2);
+    glow(c, x, y, 10, '248,216,120', 0.35);
   } else if (p.kind === 'gust') {
     for (let i = 0; i < 3; i++) { P(c, '#fcfcfc', x - dir * i * 4, y - 4 + i * 3, 6, 1); P(c, '#f878f8', x - dir * i * 4 - dir * 2, y - 3 + i * 3, 3, 1); }
   } else {
@@ -272,6 +431,9 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
 }
 
 function cellPx(col: number, row: number): { x: number; y: number } { return panelFoot(col, row); }
+
+/** Color ramps for the quick row shots (basic attacks and arrows). */
+const DART: Record<string, string[]> = { knife: STEEL, knifeHeavy: TOX, arrow: ['#503000', '#ac7c00', '#bcbcbc', '#fcfcfc'], aimed: STEEL, holySpark: HOLY };
 
 function drawFx(c: Ctx, _b: Battle, e: Fx): void {
   const p = e.t / e.dur;
@@ -324,11 +486,20 @@ function drawFx(c: Ctx, _b: Battle, e: Fx): void {
       }
       break;
     }
-    case 'bolt': case 'boltHeavy': {
+    case 'bolt': case 'boltHeavy': case 'knife': case 'knifeHeavy': case 'arrow': case 'aimed': case 'holySpark': {
       const heavy = e.kind === 'boltHeavy';
       const to = Number(e.data?.to ?? e.col);
       const x0 = x + d * 8, x1 = cellPx(to, e.row).x, by = y - 10;
-      const ramp = heavy ? ARC : ['#0058f8', '#3cbcfc', '#a4e4fc', '#fcfcfc'];
+      const ramp = heavy ? ARC : DART[e.kind] ?? ['#0058f8', '#3cbcfc', '#a4e4fc', '#fcfcfc'];
+      if (e.kind === 'aimed') {
+        // a heavy arrow: a long white streak with a shock ring where it lands
+        const q = Math.min(1, p * 2.5), head = x0 + (x1 - x0) * q;
+        P(c, '#000000', Math.min(x0, head), by - 2, Math.abs(head - x0), 4);
+        P(c, ramp[2], Math.min(x0, head), by - 1, Math.abs(head - x0), 2);
+        P(c, ramp[3], Math.min(x0, head), by - 1, Math.abs(head - x0), 1);
+        if (q >= 1) { const rr = 3 + p * 10; for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; P(c, ramp[3], x1 + Math.cos(a) * rr, by + Math.sin(a) * rr * 0.7, 2, 1); } }
+        break;
+      }
       // staff-tip flash
       if (p < 0.4) { glow(c, x0, by, heavy ? 12 : 7, heavy ? '248,120,248' : '60,188,252', 0.7 * (1 - p / 0.4)); blob(c, ramp[3], x0, by, heavy ? 3 : 2); }
       if (!heavy) {
@@ -441,6 +612,89 @@ function drawFx(c: Ctx, _b: Battle, e: Fx): void {
       }
       break;
     }
+    case 'holyPillar': {
+      const w = Math.round(10 * (1 - p * 0.6));
+      for (let yy = 0; yy < 60; yy += 2) P(c, HOLY[1 + ((yy >> 2) + Math.floor(p * 10)) % 3], x - w / 2, y - yy - 4, w, 2);
+      P(c, HOLY[3], x - 1, y - 60, 2, 56);
+      glow(c, x, y - 6, 16, '248,216,120', 0.6 * (1 - p));
+      break;
+    }
+    case 'holyNova': {
+      const r = 4 + p * 30;
+      for (let i = 0; i < 20; i++) { const ang = (i / 20) * Math.PI * 2; P(c, HOLY[1 + (i % 3)], x + Math.cos(ang) * r, y - 8 + Math.sin(ang) * r * 0.55, 2, 2); }
+      glow(c, x, y - 8, 18, '248,216,120', 0.5 * (1 - p));
+      break;
+    }
+    case 'healBurst': {
+      for (let i = 0; i < 6; i++) {
+        const px = x - 10 + ((i * 7) % 20), py = y - 4 - p * 22 - ((i * 5) % 8);
+        P(c, '#58d854', px - 1, py, 3, 1); P(c, '#58d854', px, py - 1, 1, 3);
+      }
+      break;
+    }
+    case 'stab': {
+      // a quick shadow slash: two crossing dark streaks over the panel
+      const k = Math.min(1, p * 3), cx = x, cy = y - 10;
+      for (let i = 0; i < 7; i++) {
+        if (i / 6 > k) break;
+        P(c, SHADOW[2 + (i % 2)], cx - 9 + i * 3, cy - 8 + i * 3, 2, 2);
+        P(c, SHADOW[1], cx + 9 - i * 3, cy - 8 + i * 3, 2, 1);
+      }
+      break;
+    }
+    case 'smoke': {
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2, r = 3 + p * 10;
+        P(c, i % 2 ? '#7c7c7c' : '#3c3c3c', x + Math.cos(a) * r, y - 8 + Math.sin(a) * r * 0.6 - p * 4, 3, 2);
+      }
+      break;
+    }
+    case 'toxicPuff': {
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2 + p, r = 2 + p * 11;
+        P(c, TOX[1 + (i % 3)], x + Math.cos(a) * r, y - 6 + Math.sin(a) * r * 0.6 - p * 6, 2, 2);
+      }
+      break;
+    }
+    case 'lob': {
+      // a vial arcing to its target panel
+      const to = Number(e.data?.to ?? e.col), x1 = cellPx(to, e.row).x;
+      const vx = x + (x1 - x) * p, vy = y - 12 - Math.sin(p * Math.PI) * 26;
+      P(c, '#000000', vx - 2, vy - 3, 5, 6); P(c, String(e.data?.color ?? TOX[2]), vx - 1, vy - 1, 3, 3); P(c, '#fcfcfc', vx - 1, vy - 3, 3, 1);
+      break;
+    }
+    case 'trapPop': {
+      const col = e.data?.kind === 'freeze' ? ICE : e.data?.kind === 'mine' ? TOX : FIRE;
+      for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; P(c, col[1 + (i % 3)], x + Math.cos(a) * p * 14, y - 4 + Math.sin(a) * p * 6 - p * 6, 2, 2); }
+      P(c, '#bcbcbc', x - 6, y - 1, 12, 1);
+      break;
+    }
+    case 'hawkDive': case 'bite': case 'claw': {
+      // three slash marks raking across the target
+      const n = e.kind === 'claw' ? 4 : 3, k = Math.min(1, p * 3);
+      for (let i = 0; i < n; i++) for (let j = 0; j < 6; j++) if (j / 5 <= k) P(c, j > 3 ? '#fcfcfc' : '#bcbcbc', x - 6 + i * 4 + j, y - 16 + j * 2, 1, 2);
+      break;
+    }
+    case 'flare': {
+      if (p < 0.5) glow(c, x, y - 6, 14, '248,184,0', 0.5 * (1 - p * 2));
+      P(c, '#fce0a8', x - 1, y - 4 - p * 10, 2, 2);
+      break;
+    }
+    case 'arrowRain': {
+      const yy = y - 30 * (1 - Math.min(1, p * 2));
+      for (let i = 0; i < 3; i++) { P(c, '#ac7c00', x - 6 + i * 5, yy - 10 - i * 2, 1, 7); P(c, '#fcfcfc', x - 6 + i * 5, yy - 3 - i * 2, 1, 2); }
+      break;
+    }
+    case 'laser': {
+      // Kill Shot lock-on: a red line from the bow to the enemy, blinking faster as it fires
+      const t = _b.f[1 - e.side], tp = fighterPos(_b, t);
+      if (Math.floor(e.t * (8 + p * 20)) % 2 === 0) {
+        const steps = 24;
+        for (let i = 0; i <= steps; i++) P(c, '#f83800', x + (tp.x - x) * (i / steps), y - 12 + (tp.y - 12 - (y - 12)) * (i / steps), 1, 1);
+        P(c, '#f83800', tp.x - 4, tp.y - 12, 9, 1); P(c, '#f83800', tp.x, tp.y - 16, 1, 9);
+      }
+      break;
+    }
     case 'castName': break; // drawn on the UI layer by drawCastCallout
   }
 }
@@ -474,7 +728,7 @@ function drawFighterHud(ui: Ctx, b: Battle, f: Fighter, tick: number): void {
   // HP box with a bar
   frame(ui, x, 6, w, 30, '#000000', teamColor(f.cls, f.skin, f.alt));
   drawText(ui, f.name, x + 6, 10, '#fcfcfc');
-  drawText(ui, f.cls === 'warrior' ? 'WARRIOR' : 'MAGE', x + 6, 20, '#7c7c7c');
+  drawText(ui, CLASS_INFO[f.cls].name, x + 6, 20, '#7c7c7c');
   const hp = String(Math.max(0, Math.ceil(f.hp)));
   const low = f.hp / f.maxHp < 0.3;
   drawText(ui, hp, x + w - 6 - textWidth(hp, 2), 9, low && tick % 4 < 2 ? '#f83800' : '#fcfcfc', 2);
@@ -499,6 +753,13 @@ function drawResource(ui: Ctx, f: Fighter, x: number, y: number, tick: number): 
       if (v >= 1) pip(i, '#503000', f.st.avatar > 0 ? '#f8b800' : '#d82800', '#f87858');
       else { pip(i, '#503000', null, ''); if (v >= 0.5) P(ui, '#881400', x + 36 + i * 11, y + 4, 8, 5); }
     }
+  } else if (f.cls !== 'mage') {
+    // Energy (Rogue, Ranger) and Cleric Mana: five pips, no max to grow
+    const info = CLASS_INFO[f.cls];
+    drawTextOutlined(ui, info.res === 'ENERGY' ? 'NRG' : 'MANA', x, y + 1, info.resColor);
+    for (let i = 0; i < 5; i++) pip(i, info.pipBase, i < f.res ? info.pip : null, '#fcfcfc');
+    // the Ranger's stand-still timer fills the next pip
+    if (f.cls === 'ranger' && f.res < 5) P(ui, info.pip, x + 36 + Math.floor(f.res) * 11, y + 8, Math.round(8 * f.stillT / TUNING.ranger.stillSeconds), 1);
   } else {
     drawTextOutlined(ui, 'MANA', x, y + 1, '#a4e4fc');
     const max = Math.max(5, Math.ceil(f.res));
@@ -517,8 +778,14 @@ const STATUS_TAGS: Partial<Record<StatusKey, [string, string]>> = {
   ascendance: ['ASCENDANCE', '#f878f8'], lastStand: ['LAST STAND', '#f87858'], reflect: ['REFLECT', '#fcfcfc'],
   counterspell: ['COUNTER', '#f878f8'], mortal: ['MORTAL WOUND', '#f83800'], evoLock: ['EVO LOCK', '#7c7c7c'],
   frostNova: ['NOVA ARMED', '#3cbcfc'], glacial: ['GLACIAL', '#3cbcfc'],
+  stealth: ['STEALTH', '#9878f8'], silenced: ['SILENCED', '#9878f8'], rooted: ['ROOTED', '#58d854'], sleep: ['ASLEEP', '#9878f8'],
+  untargetable: ['UNTARGETABLE', '#bcbcbc'], evasion: ['EVASION', '#fcfcfc'], spellImmune: ['CLOAK', '#9878f8'], deadlyPoison: ['DEADLY POISON', '#b8f818'],
+  deathMark: ['DEATH MARK', '#9878f8'], hunted: ['HUNTED', '#f83800'], revealed: ['REVEALED', '#f8b800'], shadowDance: ['SHADOW DANCE', '#9878f8'],
+  nightsEmbrace: ["NIGHT'S EMBRACE", '#9878f8'], pandemic: ['PANDEMIC', '#b8f818'], nest: ['NEST', '#58d854'], deadeye: ['DEADEYE', '#fcfcfc'],
+  tripwire: ['TRIPWIRE', '#58d854'], painSup: ['PAIN SUPP', '#f8d878'], guardian: ['GUARDIAN', '#f8d878'], ascension: ['ASCENSION', '#f8d878'],
+  avatarLight: ['AVATAR', '#f8d878'], purified: ['PURIFIED', '#f8d878'], mending: ['MENDING', '#58d854'], channel: ['HYMN', '#f8d878'],
 };
-const SHIELD_TAG: Record<string, string> = { guard: 'GUARD', ironSkin: 'IRON SKIN', barrier: 'BARRIER', unbreakable: 'UNBREAKABLE' };
+const SHIELD_TAG: Record<string, string> = { guard: 'GUARD', ironSkin: 'IRON SKIN', barrier: 'BARRIER', unbreakable: 'UNBREAKABLE', holy: 'SHIELD' };
 
 function drawStatuses(ui: Ctx, b: Battle, f: Fighter, edge: number, y: number, right: boolean): void {
   const tags: Array<[string, string]> = [];
@@ -531,6 +798,8 @@ function drawStatuses(ui: Ctx, b: Battle, f: Fighter, edge: number, y: number, r
   if (f.shout > 0) tags.push(['SHOUT', '#f8b800']);
   if (f.rallyLeft > 0) tags.push([`RALLY ×${f.rallyLeft}`, '#f8b800']);
   if (f.powerLeft > 0) tags.push([`POWER ×${f.powerLeft}`, '#f878f8']);
+  if (f.poison > 0) tags.push([`POISON ×${f.poison} ${Math.max(0, f.poisonT).toFixed(1)}`, '#b8f818']);
+  if (f.st.evasion > 0 && f.dodges > 0) tags.push([`DODGE ×${f.dodges}`, '#fcfcfc']);
   const p = b.panels[f.col][f.row];
   if (p.burn > 0) tags.push(['ON FIRE', '#fca044']);
   let cx = edge, cy = y;
@@ -557,9 +826,9 @@ function drawCastCallout(ui: Ctx, e: Fx): void {
   drawCardIcon(ui, card, x + 6, y + 6, 32);
   const tx = x + 44;
   drawText(ui, card.name.toUpperCase(), tx, y + 6, '#fcfcfc');
-  const res = card.cls === 'warrior' ? 'RAGE' : 'MANA';
-  const meta = `${card.cost === 'all' ? 'ALL' : card.cost} ${res}${card.dmg !== '-' ? `  DMG ${card.dmg.toUpperCase()}` : ''}`;
-  drawText(ui, meta, tx, y + 17, card.cls === 'warrior' ? '#f87858' : '#a4e4fc');
+  const info = CLASS_INFO[card.cls];
+  const meta = `${card.cost === 'all' ? 'ALL' : card.cost} ${info.res}${card.dmg !== '-' ? `  DMG ${card.dmg.toUpperCase()}` : ''}`;
+  drawText(ui, meta, tx, y + 17, info.resColor);
   wrap(card.short.toUpperCase(), Math.floor((w - 50) / 6)).slice(0, 3).forEach((l, i) => drawText(ui, l, tx, y + 29 + i * 9, '#bcbcbc'));
   if (e.data?.countered) {
     ui.fillStyle = 'rgba(0,0,0,0.55)'; ui.fillRect(x, y, w, h);
@@ -579,13 +848,13 @@ function drawNextSpell(ui: Ctx, b: Battle, f: Fighter): void {
   P(ui, ok ? ELEMENT_COLOR[card.element] : '#3c3c3c', 12, UH - 18, 8, 8);
   drawText(ui, s, 24, UH - 18, ok ? '#fcfcfc' : '#7c7c7c');
   if (more) drawText(ui, `+${more}`, 24 + textWidth(s) + 12, UH - 18, '#7c7c7c');
-  if (!ok) drawText(ui, `NEED ${card.cls === 'warrior' ? 'RAGE' : 'MANA'}`, tw + 44, UH - 18, '#f83800');
+  if (!ok) drawText(ui, f.st.silenced > 0 ? 'SILENCED' : `NEED ${CLASS_INFO[card.cls].res}`, tw + 44, UH - 18, '#f83800');
 }
 
 /** A charge meter under a fighter's feet while a heavy winds up; flashes READY when full. */
 function drawChargeBar(ui: Ctx, b: Battle, f: Fighter, tick: number): void {
   if (f.dead || !f.charging || f.charge <= 0.15) return;
-  const p = Math.min(1, f.charge / TUNING.heavyCharge);
+  const p = Math.min(1, f.charge / heavyChargeOf(f));
   const { x, y } = fighterPos(b, f);
   const bx = x * UI - 16, by = (y + 4) * UI;
   frame(ui, bx, by, 32, 6, '#000000', '#000000');
