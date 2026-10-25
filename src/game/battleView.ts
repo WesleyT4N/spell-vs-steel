@@ -66,20 +66,85 @@ function drawHole(c: Ctx, col: number, row: number, owner: 0 | 1): void {
 
 function drawWall(c: Ctx, w: Wall, time: number): void {
   const f = panelFoot(w.col, w.row);
-  const x = Math.round(f.x - 9), base = Math.round(f.y + 1);
-  const h = w.kind === 'glacial' ? 22 : 15;
-  const ramp = w.kind === 'stone' ? ['#000000', '#7c7c7c', '#bcbcbc', '#fcfcfc'] : ICE;
-  P(c, '#000000', x - 1, base - h - 1, 20, h + 2);
-  P(c, ramp[1], x, base - h, 18, h);
-  P(c, ramp[2], x + 1, base - h + 1, 12, h - 3);
-  P(c, ramp[3], x + 1, base - h + 1, 4, 2);
-  if (w.kind === 'stone') { P(c, '#7c7c7c', x, base - h + 6, 18, 1); P(c, '#7c7c7c', x + 8, base - h, 1, 6); P(c, '#7c7c7c', x + 4, base - h + 6, 1, h - 6); }
-  else if (Math.floor(time * 3 + w.col) % 4 === 0) P(c, '#fcfcfc', x + 12, base - h + 4, 1, 3);
+  const cx = Math.round(f.x), base = Math.round(f.y + 1);
+  const pct = Math.max(0, w.hp / w.maxHp);
+  let top: number;
+  if (w.kind === 'stone') top = drawTowerShield(c, w, cx, base, pct);
+  else if (w.kind === 'ice') top = drawIceShards(c, w, cx, base, pct, time);
+  else top = drawGlacialPillar(c, w, cx, base, time);
   if (!w.invuln) {
-    const pct = Math.max(0, w.hp / w.maxHp);
-    P(c, '#000000', x, base - h - 4, 18, 3);
-    P(c, pct > 0.5 ? '#58d854' : pct > 0.25 ? '#f8b800' : '#f83800', x + 1, base - h - 3, Math.ceil(16 * pct), 1);
+    P(c, '#000000', cx - 9, top - 5, 18, 3);
+    P(c, pct > 0.5 ? '#58d854' : pct > 0.25 ? '#f8b800' : '#f83800', cx - 8, top - 4, Math.ceil(16 * pct), 1);
   }
+}
+
+/** Shield Wall: a planted steel tower shield with rivets and a stripe in the owner's color. Dents as it takes damage. */
+function drawTowerShield(c: Ctx, w: Wall, cx: number, base: number, pct: number): number {
+  const h = 18, top = base - h, x = cx - 8;
+  const stripe = w.side === 0 ? '#d82800' : '#0058f8';
+  P(c, '#000000', x - 1, top - 1, 18, h + 1);
+  P(c, '#000000', x, base, 16, 1);
+  for (let r = 0; r < h; r++) {
+    const inset = r > h - 5 ? (r - (h - 5)) : 0;   // tapered foot
+    P(c, '#7c7c7c', x + inset, top + r, 16 - inset * 2, 1);
+    P(c, '#bcbcbc', x + 1 + inset, top + r, 12 - inset * 2, 1);
+  }
+  P(c, '#fcfcfc', x + 1, top, 14, 1);
+  P(c, '#fcfcfc', x + 1, top + 1, 1, h - 6);
+  P(c, stripe, x + 6, top + 1, 4, h - 4);
+  P(c, mixDark(stripe), x + 9, top + 1, 1, h - 4);
+  for (const [rx, ry] of [[2, 2], [13, 2], [2, 11], [13, 11]]) { P(c, '#3c3c3c', x + rx, top + ry, 1, 1); P(c, '#fcfcfc', x + rx, top + ry - 1, 1, 1); }
+  // dents and cracks appear as it loses HP
+  if (pct < 0.7) { P(c, '#3c3c3c', x + 3, top + 6, 2, 1); P(c, '#3c3c3c', x + 4, top + 7, 1, 2); }
+  if (pct < 0.4) { P(c, '#000000', x + 11, top + 4, 1, 3); P(c, '#000000', x + 12, top + 7, 1, 3); P(c, '#000000', x + 10, top + 10, 1, 2); }
+  return top;
+}
+const mixDark = (col: string): string => (col === '#d82800' ? '#881400' : '#0000a8');
+
+/** Ice Wall: a cluster of jagged frost crystals with a shimmer that sweeps up them. Cracks as it weakens. */
+function drawIceShards(c: Ctx, w: Wall, cx: number, base: number, pct: number, time: number): number {
+  const shards: Array<[number, number, number]> = [[-6, 4, 11], [0, 5, 17], [6, 4, 13]]; // x offset, half width, height
+  const sweep = (time * 1.6 + w.col * 0.3) % 1.6;
+  for (const [ox, hw, h] of shards) {
+    for (let r = 0; r < h; r++) {
+      const half = Math.max(0, Math.round(hw * Math.min(1, (r + 1) / (h * 0.45))));
+      const y = base - h + r;
+      P(c, '#000000', cx + ox - half - 1, y, half * 2 + 2, 1);
+      if (half <= 0) continue;
+      P(c, '#3cbcfc', cx + ox - half, y, half * 2, 1);
+      P(c, '#a4e4fc', cx + ox - half, y, Math.max(1, half - 1), 1);
+      if (Math.abs(r / h - (1 - sweep)) < 0.08) P(c, '#fcfcfc', cx + ox - half, y, half * 2, 1);
+    }
+    P(c, '#fcfcfc', cx + ox, base - h, 1, 2);
+  }
+  P(c, '#0078f8', cx - 10, base, 20, 1);
+  if (pct < 0.6) { P(c, '#fcfcfc', cx - 1, base - 12, 1, 4); P(c, '#fcfcfc', cx, base - 8, 1, 3); P(c, '#fcfcfc', cx + 1, base - 5, 1, 2); }
+  if (pct < 0.3) { P(c, '#fcfcfc', cx - 7, base - 8, 1, 3); P(c, '#fcfcfc', cx + 6, base - 9, 1, 4); }
+  return base - 17;
+}
+
+/** Glacial Fortress: a tall deep-blue pillar capped with snow, a rune pulsing in its core and frost mist at its foot. */
+function drawGlacialPillar(c: Ctx, w: Wall, cx: number, base: number, time: number): number {
+  const h = 26, top = base - h, x = cx - 9;
+  P(c, '#000000', x - 1, top - 1, 20, h + 2);
+  P(c, '#0058f8', x, top, 18, h);
+  P(c, '#0078f8', x + 2, top, 12, h);
+  P(c, '#3cbcfc', x + 3, top + 2, 4, h - 4);
+  P(c, '#a4e4fc', x + 4, top + 3, 1, h - 8);
+  // snow cap with drips
+  P(c, '#fcfcfc', x - 1, top - 2, 20, 3);
+  for (const [dx, dl] of [[2, 3], [7, 2], [13, 4], [16, 2]]) P(c, '#fcfcfc', x + dx, top + 1, 1, dl);
+  // pulsing rune
+  const pulse = 0.5 + 0.5 * Math.sin(time * 4 + w.row);
+  const rune = pulse > 0.5 ? '#fcfcfc' : '#a4e4fc';
+  P(c, rune, cx - 1, top + 9, 2, 8); P(c, rune, cx - 3, top + 11, 6, 1); P(c, rune, cx - 3, top + 14, 6, 1);
+  glow(c, cx, top + 13, 8, '164,228,252', 0.25 + 0.25 * pulse);
+  // frost mist drifting at the base
+  for (let i = 0; i < 6; i++) {
+    const t = (time * 0.8 + i / 6 + w.row * 0.17) % 1;
+    P(c, t < 0.6 ? '#fcfcfc' : '#a4e4fc', x - 3 + ((i * 5 + Math.floor(t * 8)) % 24), base - Math.floor(t * 4), 2, 1);
+  }
+  return top;
 }
 
 function fighterPos(_b: Battle, f: Fighter): { x: number; y: number } {
@@ -91,7 +156,8 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number): void {
   const s = getSprite(f.cls, f.skin, f.alt);
   const { x, y } = fighterPos(b, f);
   const flip = f.side === 1;
-  const lean = f.pose === 'attack' ? 2 : f.pose === 'hurt' ? -2 : 0;
+  // heavy: a short wind-back, then a deep lunge into the swing
+  const lean = f.pose === 'attack' ? 2 : f.pose === 'heavy' ? (f.poseT > 0.26 ? -2 : 4) : f.pose === 'hurt' ? -2 : 0;
   const fx = x + lean * b.dir(f);
   // shadow
   P(c, '#000000', x - 5, y, 10, 1); P(c, '#000000', x - 4, y + 1, 8, 1);
@@ -212,26 +278,86 @@ function drawFx(c: Ctx, _b: Battle, e: Fx): void {
   const { x, y } = cellPx(e.col, e.row);
   const d = e.side === 0 ? 1 : -1;
   switch (e.kind) {
-    case 'cleave': case 'cleaveHeavy': {
-      const heavy = e.kind === 'cleaveHeavy';
-      const len = heavy ? 2 : 1.6;
-      const r = 10 + p * 6;
-      for (let i = 0; i < 14; i++) {
-        const ang = -1.2 + (i / 13) * 2.4 * Math.min(1, p * 2);
-        const px = x + d * (PW * (len - 1) * 0.5 + Math.cos(ang) * r), py = y - 9 + Math.sin(ang) * r * 0.8;
-        P(c, i > 10 ? '#fcfcfc' : heavy ? '#f8b800' : '#bcbcbc', px, py, heavy ? 2 : 1, 2);
+    case 'cleave': {
+      // light: a quick crescent swipe across the panel ahead, bright edge leading a fading trail
+      const cx = x + d * 4, cy = y - 10, r = 12;
+      const sweep = Math.min(1, p * 1.8);
+      for (let i = 0; i < 18; i++) {
+        const k = i / 17;
+        if (k > sweep) break;
+        const ang = -1.3 + k * 2.4;
+        const age = sweep - k;                       // 0 at the leading edge
+        const px = cx + d * Math.cos(ang) * r, py = cy + Math.sin(ang) * r * 0.85;
+        const col = age < 0.12 ? '#fcfcfc' : age < 0.35 ? '#bcbcbc' : '#7c7c7c';
+        if (age < 0.6 * (1 - p) + 0.15) P(c, col, px - 1, py - 1, age < 0.12 ? 3 : 2, 2);
+      }
+      if (p > 0.45 && p < 0.8) for (let i = 0; i < 3; i++) P(c, '#fcfcfc', cx + d * (r + 2 + i * 2), cy - 3 + i * 3, 2, 1);
+      break;
+    }
+    case 'cleaveHeavy': {
+      // heavy: a big overhead chop that lands on both panels ahead with a gold flash, dust and a crack
+      const cx = x + d * (PW * 0.5), cy = y - 12, r = 18;
+      const swing = Math.min(1, p * 2.2);
+      if (p < 0.6) {
+        for (let i = 0; i < 24; i++) {
+          const k = i / 23;
+          if (k > swing) break;
+          const ang = -2.2 + k * 2.9;                  // from over the shoulder down to the floor
+          const age = swing - k;
+          const px = cx + d * Math.cos(ang) * r * 0.9, py = cy + Math.sin(ang) * r;
+          const col = age < 0.1 ? '#fcfcfc' : age < 0.3 ? '#f8b800' : '#fca044';
+          if (age < 0.45) P(c, col, px - 1, py - 1, age < 0.1 ? 4 : 3, 3);
+        }
+      }
+      if (p >= 0.4) {
+        const q = (p - 0.4) / 0.6;
+        for (const col of [e.col, e.col + d]) {
+          const pc = cellPx(col, e.row);
+          if (q < 0.35) glow(c, pc.x, pc.y - 4, 14, '248,184,0', 0.6 * (1 - q / 0.35));
+          for (let i = 0; i < 5; i++) {                // dust puffs drift outward
+            const dx = (i - 2) * (4 + q * 8), dy = -2 - q * 6 * (1 - Math.abs(i - 2) / 3);
+            P(c, q < 0.5 ? '#fce0a8' : '#bcbcbc', pc.x + dx - 1, pc.y + dy, 3, 2);
+          }
+          P(c, '#000000', pc.x - 6, pc.y - 1, 12, 1);  // crack in the panel
+          P(c, '#000000', pc.x - 2, pc.y, 4, 1);
+        }
       }
       break;
     }
     case 'bolt': case 'boltHeavy': {
+      const heavy = e.kind === 'boltHeavy';
       const to = Number(e.data?.to ?? e.col);
-      const x1 = cellPx(to, e.row).x;
-      const h = e.kind === 'boltHeavy' ? 3 : 1;
-      const col = e.kind === 'boltHeavy' ? ARC : ['#0058f8', '#3cbcfc', '#a4e4fc', '#fcfcfc'];
-      const xa = Math.min(x + d * 8, x1), xb = Math.max(x + d * 8, x1);
-      P(c, col[1], xa, y - 10 - h, xb - xa, h * 2 + 1);
-      P(c, col[3], xa, y - 10, xb - xa, 1);
-      blob(c, col[2], x1, y - 10, 2 + h);
+      const x0 = x + d * 8, x1 = cellPx(to, e.row).x, by = y - 10;
+      const ramp = heavy ? ARC : ['#0058f8', '#3cbcfc', '#a4e4fc', '#fcfcfc'];
+      // staff-tip flash
+      if (p < 0.4) { glow(c, x0, by, heavy ? 12 : 7, heavy ? '248,120,248' : '60,188,252', 0.7 * (1 - p / 0.4)); blob(c, ramp[3], x0, by, heavy ? 3 : 2); }
+      if (!heavy) {
+        // a dart: bright head racing down the row with a sparkling tail
+        const head = x0 + (x1 - x0) * Math.min(1, p * 2.2);
+        const tail = x0 + (x1 - x0) * Math.max(0, p * 2.2 - 0.5);
+        const xa = Math.min(head, tail), xb = Math.max(head, tail);
+        P(c, ramp[1], xa, by - 1, xb - xa, 3);
+        P(c, ramp[3], xa, by, xb - xa, 1);
+        for (let i = 0; i < 4; i++) P(c, ramp[2], tail + (head - tail) * (i / 4), by + ((i * 7 + Math.floor(p * 20)) % 5) - 2, 1, 1);
+        blob(c, ramp[3], head, by, 2);
+        if (p * 2.2 >= 1) for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; P(c, ramp[2], x1 + Math.cos(a) * (3 + p * 6), by + Math.sin(a) * (3 + p * 6), 1, 1); }
+      } else {
+        // a thick, wobbling arcane beam with a burst where it lands
+        const w = p < 0.7 ? 1 : 1 - (p - 0.7) / 0.3;
+        const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
+        for (let xx = xa; xx < xb; xx += 2) {
+          const wob = Math.round(Math.sin(xx * 0.5 + p * 30) * 1.5);
+          const hh = Math.max(1, Math.round(4 * w));
+          P(c, ramp[1], xx, by - hh + wob, 2, hh * 2 + 1);
+          P(c, ramp[2], xx, by - Math.ceil(hh / 2) + wob, 2, Math.ceil(hh / 2) * 2 + 1);
+        }
+        P(c, ramp[3], xa, by, xb - xa, 1);
+        glow(c, x1, by, 14, '248,120,248', 0.5 * w);
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2 + p * 4, rr = 4 + p * 12;
+          P(c, i % 2 ? ramp[3] : ramp[2], x1 + Math.cos(a) * rr, by + Math.sin(a) * rr * 0.8, 2, 2);
+        }
+      }
       break;
     }
     case 'thrust': {
