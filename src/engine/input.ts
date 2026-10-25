@@ -1,15 +1,15 @@
 // Keyboard input with per-frame "pressed" edges and rebindable keys (saved in the browser).
 import { unlockAudio } from './audio';
 
-export type Action = 'up' | 'down' | 'left' | 'right' | 'attack' | 'cast' | 'custom' | 'confirm' | 'back' | 'pause' | 'mute' | 'lb' | 'rb';
+export type Action = 'up' | 'down' | 'left' | 'right' | 'attack' | 'heavy' | 'cast' | 'custom' | 'confirm' | 'back' | 'pause' | 'mute' | 'lb' | 'rb';
 
 /** Actions the player can rebind, in the order the controls screen lists them. */
-export const BINDABLE = ['up', 'down', 'left', 'right', 'attack', 'cast', 'custom', 'pause'] as const;
+export const BINDABLE = ['up', 'down', 'left', 'right', 'attack', 'heavy', 'cast', 'custom', 'pause'] as const;
 export type Bindable = (typeof BINDABLE)[number];
 
 export const DEFAULT_KEYS: Record<Bindable, string> = {
   up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD',
-  attack: 'KeyJ', cast: 'KeyK', custom: 'Space', pause: 'Enter',
+  attack: 'KeyJ', heavy: 'KeyL', cast: 'KeyK', custom: 'Space', pause: 'Enter',
 };
 
 // Keys that always work regardless of bindings. Menus confirm with the attack key and go back with the cast key.

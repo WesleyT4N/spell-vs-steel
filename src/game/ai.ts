@@ -6,7 +6,7 @@ import { TUNING, type Difficulty } from './tuning';
 export class Cpu {
   private think = 0;
   private waitedOnTop = 0;
-  private holding = false;
+  private wantHeavy = false;
   private pendingMove: Dir | null = null;
   private wantCast = false;
   private wantTap = false;
@@ -17,7 +17,7 @@ export class Cpu {
   }
 
   intent(b: Battle, f: Fighter, dt: number): Intent {
-    if (b.phase !== 'fight' || f.dead) { this.holding = false; return NO_INTENT; }
+    if (b.phase !== 'fight' || f.dead) { this.wantHeavy = false; return NO_INTENT; }
     this.think -= dt;
     this.waitedOnTop += dt;
     if (this.think <= 0) {
@@ -26,11 +26,12 @@ export class Cpu {
     }
     const out: Intent = {
       move: this.pendingMove, held: this.pendingMove,
-      attackPressed: this.wantTap, attackHeld: this.holding,
+      attackPressed: this.wantTap, heavyPressed: this.wantHeavy,
       castPressed: this.wantCast,
     };
     this.pendingMove = null;
     this.wantTap = false;
+    this.wantHeavy = false;
     this.wantCast = false;
     return out;
   }
@@ -62,12 +63,9 @@ export class Cpu {
     // 3. Basic attacks.
     const dist = (foe.col - f.col) * d;
     const inReach = f.cls === 'warrior' ? aligned && dist >= 1 && dist <= 2 : aligned;
-    if (this.holding) {
-      if (f.charge >= TUNING.heavyCharge && inReach) this.holding = false; // release fires the heavy
-      else if (f.charge > TUNING.heavyCharge + 1.5) this.holding = false;
-    } else if (inReach && f.lock <= 0) {
-      this.wantTap = true;
-      this.holding = Math.random() < (this.difficulty === 'normal' ? 0.35 : 0.15);
+    if (!f.charging && inReach && f.lock <= 0) {
+      if (Math.random() < (this.difficulty === 'normal' ? 0.35 : 0.15)) this.wantHeavy = true;
+      else this.wantTap = true;
       if (Math.random() < 0.5) return;
     }
 

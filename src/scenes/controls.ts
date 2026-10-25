@@ -7,10 +7,10 @@ import { sfx } from '../engine/audio';
 
 const LABELS: Record<Bindable, string> = {
   up: 'MOVE UP', down: 'MOVE DOWN', left: 'MOVE LEFT', right: 'MOVE RIGHT',
-  attack: 'ATTACK / OK', cast: 'CAST / BACK', custom: 'DRAW SCREEN', pause: 'PAUSE',
+  attack: 'LIGHT ATTACK / OK', heavy: 'HEAVY ATTACK', cast: 'CAST / BACK', custom: 'OPEN DRAW SCREEN', pause: 'PAUSE',
 };
 const ROWS = [...BINDABLE, 'reset', 'back'] as const;
-const PX = 64, PW = UW - 128, Y0 = 48, RH = 20;
+const PX = 64, PW = UW - 128, Y0 = 48, RH = 18;
 const rowY = (i: number): number => Y0 + i * RH + (i >= BINDABLE.length ? 8 : 0);
 
 /** Rebinding screen: pick an action, press the new key. */
@@ -66,7 +66,7 @@ export class ControlsScene implements Scene {
       const v = on && this.waiting ? (tick % 4 < 3 ? 'PRESS A KEY' : '') : keyName(getKey(row));
       drawText(ui, v, 240, ty, on && this.waiting ? '#f8b800' : '#fcd8a8');
     });
-    drawText(ui, `HOLD ${k('attack')}: HEAVY ATTACK    ${k('cast')} + DIRECTION: AIM SPELL`, PX, 262, '#7c7c7c');
+    drawText(ui, `${k('heavy')}: HEAVY ATTACK (WINDS UP 1S)    ${k('cast')} + DIRECTION: AIM SPELL`, PX, 262, '#7c7c7c');
     drawText(ui, 'ARROW KEYS ALSO MOVE    ESC: PAUSE    M: MUTE', PX, 274, '#7c7c7c');
     if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, 288, '#f83800', 1, false);
     hint(ui, this.waiting ? 'PRESS A KEY   ESC: CANCEL' : `CLICK A ROW OR ${k('attack')}: REBIND   ${k('cast')} / RIGHT-CLICK: BACK`);
