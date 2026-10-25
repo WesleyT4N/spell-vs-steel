@@ -10,7 +10,6 @@ import { ahead, allEnemyPanels, cellsAhead } from './cardUtil';
 function backstab(x: CastCtx, hit: (col: number, row: number) => void, window = true): void {
   const { b, f, foe } = x;
   if (!b.targetable(foe)) { b.text(foe, 'MISS', '#bcbcbc'); return; }
-  if (!b.blinkIn(f)) return;
   const at = b.blinkFront(f);
   if (window) f.st.backstab = TUNING.rogue.backstabWindow;
   hit(at.col, at.row);
@@ -194,7 +193,6 @@ export const rogue: CardDef[] = [
     cast: x => {
       const { b, f, foe } = x;
       if (!b.targetable(foe)) { b.text(foe, 'MISS', '#bcbcbc'); return; }
-      if (!b.blinkIn(f)) return;
       f.st.backstab = 0;
       f.st.untargetable = 2.1;
       for (let i = 0; i < 5; i++) b.later(0.1 + i * 0.45, () => { const at = b.blinkFront(f); slash(x, [[at.col, at.row]], 35); });

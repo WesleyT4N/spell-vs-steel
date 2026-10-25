@@ -1,21 +1,26 @@
-// Ranger draft kit (class-drafts page, 2026-10-25). Arrows, hidden traps and companions; Energy comes from standing still.
+// Ranger kit (design doc, 2026-10-25). Arrows, hidden traps and companions; Energy comes from standing still.
 import type { Battle, CastCtx, Fighter, Trap } from './battle';
 import type { CardDef } from './cards';
 import { sfx } from '../engine/audio';
 import { shuffle } from './rng';
 import { allEnemyPanels, sameRow } from './cardUtil';
 
-/** Hide a trap on a panel. It arms after 1s and only its owner can see it. */
-function trap(b: Battle, f: Fighter, col: number, row: number, kind: Trap['kind'], t = 12): void {
+/** Hide a trap on a panel until the next Draw screen. It arms after `arm` seconds and only its owner can see it. */
+function trap(b: Battle, f: Fighter, col: number, row: number, kind: Trap['kind'], arm = 1, group?: number): void {
   if (!b.inGrid(col, row)) return;
   b.traps = b.traps.filter(x => !(x.col === col && x.row === row));
-  b.traps.push({ side: f.side, col, row, arm: 1, t, kind });
+  b.traps.push({ side: f.side, col, row, arm, kind, group });
 }
 
+const randomEnemyPanel = (b: Battle, f: Fighter): [number, number] => {
+  const cells = allEnemyPanels(b, f.side);
+  return cells[Math.floor(b.rand() * cells.length)];
+};
+
 /** An arrow-type projectile down the caster's row. */
-function arrow(x: CastCtx, kind: 'arrow' | 'net' | 'wolf' | 'sting', speed: number, onFoe: (b: Battle, t: Fighter) => void, wallDmg = 20): void {
+function arrow(x: CastCtx, kind: 'arrow' | 'net' | 'wolf' | 'sting', speed: number, onFoe: (b: Battle, t: Fighter) => void, wallDmg = 20, row = x.f.row): void {
   x.b.shoot(x.f, {
-    speed: speed * x.dir, kind, reflectable: true,
+    row, speed: speed * x.dir, kind, reflectable: true,
     onHit: (b, t, w) => {
       if (w) { b.hitWall(w, wallDmg, x.f, {}); return; }
       if (t) onFoe(b, t);
@@ -24,12 +29,16 @@ function arrow(x: CastCtx, kind: 'arrow' | 'net' | 'wolf' | 'sting', speed: numb
 }
 
 const enemyNear = (b: Battle, f: Fighter, n: number): boolean => Math.abs(b.foe(f).col - f.col) <= n;
+let wireGroup = 0;
 
 export const ranger: CardDef[] = [
   {
     id: 'steady_focus', name: 'Steady Focus', cls: 'ranger', cost: 0, rarity: 'common', element: 'nature', damaging: false, lock: 0.2,
-    dmg: '-', short: 'Root yourself for 1.5s. +2 Energy.', gain: { res: 2 },
-    cast: x => { x.f.st.rooted = 1.5; x.b.gainRes(x.f, 2); x.b.text(x.f, '+2 ENERGY', '#f8d878'); },
+    dmg: '-', short: 'Root yourself for 4s. While rooted your damage is +25%. +2 Energy.', gain: { res: 2 },
+    cast: x => {
+      x.f.st.rooted = Math.max(x.f.st.rooted, 4); x.f.st.focus = 4;
+      x.b.gainRes(x.f, 2); x.b.text(x.f, '+2 ENERGY', '#f8d878');
+    },
   },
   {
     id: 'hawk_strike', name: 'Hawk Strike', cls: 'ranger', cost: 1, rarity: 'common', element: 'nature', damaging: true, lock: 0.3,
@@ -44,8 +53,8 @@ export const ranger: CardDef[] = [
     },
   },
   {
-    id: 'hunters_mark', name: "Hunter's Mark", cls: 'ranger', cost: 1, rarity: 'common', element: 'nature', damaging: false, lock: 0.2,
-    dmg: '-', short: 'For 6s the enemy takes +25% damage from you and cannot enter Stealth.',
+    id: 'hunters_mark', name: "Hunter's Mark", cls: 'ranger', cost: 2, rarity: 'common', element: 'nature', damaging: false, lock: 0.2,
+    dmg: '-', short: 'For 6s your Arrow and Aimed Shot home in on the enemy. They cannot enter Stealth.',
     cast: x => {
       // a mark finds a stealthed target: it is how the Ranger hunts Rogues
       x.foe.st.hunted = 6; x.foe.st.stealth = 0;
@@ -71,27 +80,18 @@ export const ranger: CardDef[] = [
   },
   {
     id: 'freezing_trap', name: 'Freezing Trap', cls: 'ranger', cost: 1, rarity: 'common', element: 'frost', damaging: true, lock: 0.25,
-    dmg: '20', short: "Hidden trap on the enemy's panel. Arms in 1s, freezes for 1.5s.",
-    cast: x => trap(x.b, x.f, x.foe.col, x.foe.row, 'freeze'),
+    dmg: '20', short: 'Hidden trap on a random enemy panel until the next Draw. Freezes for 1.5s.',
+    cast: x => { const [c, r] = randomEnemyPanel(x.b, x.f); trap(x.b, x.f, c, r, 'freeze'); },
   },
   {
     id: 'explosive_trap', name: 'Explosive Trap', cls: 'ranger', cost: 2, rarity: 'common', element: 'fire', damaging: true, lock: 0.25,
-    dmg: '90', short: "Hidden trap on the enemy's panel. Blasts it and the 4 panels around it.",
-    cast: x => trap(x.b, x.f, x.foe.col, x.foe.row, 'explode'),
+    dmg: '90', short: 'Hidden trap on a random enemy panel until the next Draw. Blasts it and the 4 around it.',
+    cast: x => { const [c, r] = randomEnemyPanel(x.b, x.f); trap(x.b, x.f, c, r, 'explode'); },
   },
   {
     id: 'multi_shot', name: 'Multi-Shot', cls: 'ranger', cost: 2, rarity: 'common', element: 'steel', damaging: true, lock: 0.35,
     dmg: '50', short: 'Three arrows, one down each row.',
-    cast: x => {
-      const { b, f } = x;
-      const row = f.row;
-      for (let r = 0; r < 3; r++) {
-        f.row = r;
-        const end = b.rowShot(f, 50 * x.mult, { spell: true, element: 'steel' });
-        b.addFx('arrow', f.side, f.col, r, 0.25, { to: end.col });
-      }
-      f.row = row;
-    },
+    cast: x => { for (let r = 0; r < 3; r++) arrow(x, 'arrow', 14, (b, t) => b.damage(t, 50 * x.mult, x.f, { spell: true, element: 'steel' }), 50, r); },
   },
   {
     id: 'call_wolf', name: 'Call Wolf', cls: 'ranger', cost: 2, rarity: 'common', element: 'nature', damaging: true, lock: 0.3,
@@ -116,26 +116,24 @@ export const ranger: CardDef[] = [
     ai: (b, f) => sameRow(b, f),
   },
   {
-    id: 'tripwire', name: 'Tripwire', cls: 'ranger', cost: 1, rarity: 'uncommon', element: 'nature', damaging: true, lock: 0.2,
-    dmg: '40', short: 'For 10s, the first enemy that blinks or dashes into your area is revealed and stunned 1s.',
-    cast: x => { x.f.st.tripwire = 10; },
-    ai: (b, f) => b.foe(f).cls === 'rogue' || b.foe(f).cls === 'warrior',
-  },
-  {
-    id: 'flare', name: 'Flare', cls: 'ranger', cost: 1, rarity: 'uncommon', element: 'fire', damaging: true, lock: 0.25,
-    dmg: '30', short: 'Lights up the enemy area for 6s: breaks Stealth and stops it.',
+    id: 'tripwire', name: 'Tripwire', cls: 'ranger', cost: 3, rarity: 'uncommon', element: 'nature', damaging: true, lock: 0.25,
+    dmg: '40', short: 'Hidden wire on a random enemy column until the next Draw. Reveals and stuns 2s.',
     cast: x => {
-      const { b, f, foe } = x;
-      for (const [c, r] of allEnemyPanels(b, f.side)) b.addFx('flare', f.side, c, r, 0.5);
-      foe.st.stealth = 0; foe.st.revealed = 6;
-      b.damage(foe, 30 * x.mult, f, { spell: true, element: 'fire' });
+      const cols = [...new Set(allEnemyPanels(x.b, x.f.side).map(([c]) => c))];
+      const c = cols[Math.floor(x.b.rand() * cols.length)];
+      const g = ++wireGroup;
+      for (let r = 0; r < 3; r++) trap(x.b, x.f, c, r, 'wire', 1, g);
     },
-    ai: (b, f) => b.foe(f).st.stealth > 0 || b.foe(f).cls === 'rogue',
   },
   {
-    id: 'camouflage', name: 'Camouflage', cls: 'ranger', cost: 2, rarity: 'uncommon', element: 'nature', damaging: false, lock: 0.2,
-    dmg: '-', short: 'Stealth for up to 6s while you stand still. Attacking is fine; moving ends it.',
-    cast: x => { x.b.stealth(x.f, 6); if (x.f.st.stealth > 0) x.f.st.camo = 6; },
+    id: 'rapid_fire', name: 'Rapid Fire', cls: 'ranger', cost: 2, rarity: 'uncommon', element: 'steel', damaging: false, lock: 0.2,
+    dmg: 'Arrow x2', short: 'For 4s your light Arrow fires twice as fast.',
+    cast: x => { x.f.st.rapidFire = 4; x.b.text(x.f, 'RAPID FIRE', '#fcfcfc'); },
+  },
+  {
+    id: 'light_footed', name: 'Light Footed', cls: 'ranger', cost: 1, rarity: 'uncommon', element: 'nature', damaging: false, lock: 0.2,
+    dmg: '-', short: "For 6s moving doesn't reset your stand-still Energy count.",
+    cast: x => { x.f.st.lightFoot = 6; x.b.text(x.f, 'LIGHT FOOTED', '#58d854'); },
   },
   {
     id: 'volley', name: 'Volley', cls: 'ranger', cost: 3, rarity: 'uncommon', element: 'steel', damaging: true, lock: 0.35,
@@ -155,7 +153,7 @@ export const ranger: CardDef[] = [
   },
   {
     id: 'spirit_bear', name: 'Spirit Bear', cls: 'ranger', cost: 3, rarity: 'uncommon', element: 'nature', damaging: true, lock: 0.3,
-    dmg: '40/swipe', short: 'A bear (120 HP) stands in front of you for 6s, blocks shots, swipes the enemy in its row.',
+    dmg: '40/swipe', short: 'A bear (120 HP) stands in front of you for 6s and blocks shots. Swipes an enemy right in front of it.',
     cast: x => {
       const { b, f } = x;
       const c = f.col + x.dir, r = f.row;
@@ -211,9 +209,15 @@ export const ranger: CardDef[] = [
     ai: (b, f) => sameRow(b, f),
   },
   {
-    id: 'snipers_nest', name: "Sniper's Nest", cls: 'ranger', cost: 3, rarity: 'legendary', element: 'steel', damaging: false, lock: 0.2,
-    dmg: '-', short: 'For 8s you cannot move, gain 1 Energy per second, and Aimed Shot charges instantly.',
-    cast: x => { x.f.st.nest = 8; x.b.addFx('shout', x.f.side, x.f.col, x.f.row, 0.5); },
+    id: 'kill_command', name: 'Kill Command', cls: 'ranger', cost: 3, rarity: 'legendary', element: 'nature', damaging: true, lock: 0.3,
+    dmg: '2x pet hit', short: 'Every companion you have out attacks right away for double damage, wherever the enemy is.',
+    cast: x => {
+      const mine = x.b.pets.filter(p => p.side === x.f.side);
+      if (!mine.length) { x.b.text(x.f, 'NO PETS', '#bcbcbc'); return; }
+      mine.forEach((p, i) => x.b.later(i * 0.12, () => x.b.petAttack(p, 2 * x.mult)));
+      x.b.addFx('shout', x.f.side, x.f.col, x.f.row, 0.5);
+    },
+    ai: (b, f) => b.pets.some(p => p.side === f.side),
   },
   {
     id: 'wyvern_sting', name: 'Wyvern Sting', cls: 'ranger', cost: 2, rarity: 'legendary', element: 'poison', damaging: false, lock: 0.3,
@@ -223,7 +227,7 @@ export const ranger: CardDef[] = [
   },
   {
     id: 'minefield', name: 'Minefield', cls: 'ranger', cost: 3, rarity: 'legendary', element: 'nature', damaging: true, lock: 0.3,
-    dmg: '50 each', short: '4 hidden traps on random enemy panels for 12s. Each knocks back.',
+    dmg: '50 each', short: '4 hidden traps on random enemy panels until the next Draw. Each knocks back.',
     cast: x => {
       const { b, f, foe } = x;
       const cells = shuffle(allEnemyPanels(b, f.side).filter(([c, r]) => !(c === foe.col && r === foe.row)), b.rand).slice(0, 4);
@@ -252,16 +256,15 @@ export const ranger: CardDef[] = [
   // Mythics
   {
     id: 'deadeye', name: 'Deadeye', cls: 'ranger', cost: 5, rarity: 'mythic', element: 'steel', damaging: false, lock: 0.3,
-    dmg: '-', short: 'For 8s Aimed Shot charges instantly and pierces, and light arrows deal triple damage.',
+    dmg: '-', short: 'Rooted for 8s: +1 Energy per second, Aimed Shot charges instantly and pierces, Arrows deal triple damage.',
     cast: x => { x.f.st.deadeye = 8; x.b.cheer = 2; x.b.addFx('transform', x.f.side, x.f.col, x.f.row, 0.8); },
   },
   {
     id: 'hunters_domain', name: "Hunter's Domain", cls: 'ranger', cost: 5, rarity: 'mythic', element: 'nature', damaging: true, lock: 0.4,
-    dmg: '60/freeze', short: 'Hidden traps on every enemy panel but theirs for 10s: freezing traps and 60 blasts.',
+    dmg: '60/freeze', short: 'A hidden trap on every enemy panel until the next Draw. The one under them goes off now.',
     cast: x => {
       const { b, f, foe } = x;
-      allEnemyPanels(b, f.side).filter(([c, r]) => !(c === foe.col && r === foe.row))
-        .forEach(([c, r], i) => trap(b, f, c, r, i % 2 ? 'freeze' : 'blast', 10));
+      allEnemyPanels(b, f.side).forEach(([c, r], i) => trap(b, f, c, r, i % 2 ? 'freeze' : 'blast', c === foe.col && r === foe.row ? 0 : 1));
       b.cheer = 2;
     },
   },

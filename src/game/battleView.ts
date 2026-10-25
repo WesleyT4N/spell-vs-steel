@@ -109,7 +109,7 @@ function drawPanelEffects(c: Ctx, b: Battle, col: number, row: number, tick: num
 /** A hidden trap, drawn only for its owner: a faint snare outline that brightens once armed. */
 function drawTrap(c: Ctx, t: Trap, tick: number): void {
   const pc = panelCenter(t.col, t.row);
-  const col = t.kind === 'freeze' ? '#3cbcfc' : t.kind === 'mine' ? '#58d854' : '#f87800';
+  const col = t.kind === 'freeze' ? '#3cbcfc' : t.kind === 'mine' || t.kind === 'wire' ? '#58d854' : '#f87800';
   const armed = t.arm <= 0;
   c.globalAlpha = armed ? 0.85 : 0.4;
   P(c, '#000000', pc.x - 6, pc.y - 2, 12, 5);
@@ -125,28 +125,75 @@ function drawPet(c: Ctx, b: Battle, p: Pet, tick: number): void {
   if (p.kind === 'hawk') {
     const ang = b.time * 3;
     const o = fighterPos(b, owner);
-    const x = o.x + Math.cos(ang) * 10, y = o.y - 30 + Math.sin(ang) * 3;
+    const x = Math.round(o.x + Math.cos(ang) * 12), y = Math.round(o.y - 38 + Math.sin(ang) * 3);
     const flap = tick % 4 < 2 ? 0 : 2;
-    P(c, '#000000', x - 4, y - 1 - flap, 9, 3); P(c, '#ac7c00', x - 3, y - flap, 7, 1); P(c, '#fcfcfc', x + d * 2, y - 1, 2, 2);
+    drawHawk(c, x, y, d, flap > 0);
     return;
   }
   if (p.kind === 'bear') return; // drawn as its wall
   const row = p.row ?? owner.row;
   const f = panelFoot(p.row === null ? owner.col : p.col, row);
-  const x = Math.round(f.x - d * (p.row === null ? 10 : 2) + Math.sin(b.time * 4 + row) * 2), y = Math.round(f.y);
+  const x = Math.round(f.x - d * (p.row === null ? 16 : 2) + Math.sin(b.time * 4 + row) * 2), y = Math.round(f.y);
   drawWolf(c, x, y, d, tick % 8 < 4);
 }
 
-// a small grey wolf facing right: a = outline, b = fur, c = eye; the second rows are the running frame
-const WOLF = ['......a.a..', '.....abab..', 'a...abbbbca', 'babbbbbbbaa', '.abbbbbbba.'];
-const WOLF_LEGS = ['.a.a...a.a.', '..a.a.a.a..'];
+// a grey wolf facing right: b = fur, h = light fur, w = white muzzle and belly, e = eye, n = nose, k = paws
+const WOLF = [
+  '..................k..k..',
+  '..................kbbk..',
+  '.................bbbbbb.',
+  '.................bbebbbbn',
+  'hh..............bbbbbwww',
+  'hhh.hhhhhhhhhhhbbbbbww..',
+  '.hbbbbbbbbbbbbbbbbbbw...',
+  '..bbbbbbbbbbbbbbbbbb....',
+  '..b.bbbbbbbbbbbbbbbb....',
+  '.....wwwwbbbbbbwwwbb....',
+];
+const WOLF_LEGS = [
+  ['.....bb.bb.....bb.bb....', '....bb...bb...bb...bb...', '...bb.....bb.bb.....bb..', '...kk.....kk.kk.....kk..'],
+  ['.....bbbb......bbbb.....', '.....bbbb......bbbb.....', '.....b..b......b..b.....', '.....kk.kk.....kk.kk....'],
+];
+const WOLF_COL: Record<string, string> = { b: '#7c7c7c', h: '#bcbcbc', w: '#fcfcfc', e: '#f8b800', n: '#000000', k: '#3c3c3c' };
+
+/** Pixel rows with a black outline, centered on x with the last row on y; d < 0 mirrors it. */
+function drawPix(c: Ctx, rows: string[], pal: Record<string, string>, x: number, y: number, d: number): void {
+  const w = Math.max(...rows.map(r => r.length)), x0 = x - (w >> 1), y0 = y - rows.length + 1;
+  const px = (i: number): number => (d > 0 ? x0 + i : x0 + w - 1 - i);
+  rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') P(c, '#000000', px(i) - 1, y0 + j - 1, 3, 3); }));
+  rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') P(c, pal[ch], px(i), y0 + j, 1, 1); }));
+}
+
 function drawWolf(c: Ctx, x: number, y: number, d: number, step: boolean): void {
-  const rows = [...WOLF, WOLF_LEGS[step ? 1 : 0]];
-  rows.forEach((r, j) => [...r].forEach((ch, i) => {
-    if (ch === '.') return;
-    const px = d > 0 ? x - 5 + i : x + 5 - i;
-    P(c, ch === 'a' ? '#000000' : ch === 'c' ? '#fcfcfc' : j === 3 ? '#bcbcbc' : '#7c7c7c', px, y - 6 + j, 1, 1);
-  }));
+  drawPix(c, [...WOLF, ...WOLF_LEGS[step ? 1 : 0]], WOLF_COL, x, y, d);
+}
+
+// a hawk facing right: b = feathers, h = light wing edge, w = white head, e = beak, k = tail and talons
+const HAWK_UP = [
+  'b................b..',
+  'bb..............bb..',
+  '.bbh...........hbb..',
+  '..bbhh.......hhbb...',
+  '...bbbbh...hbbbb.ww.',
+  '....bbbbbbbbbbbbwwwe',
+  '.....bbbbbbbbbbbbw.e',
+  '..kkbbbbbbbbbb......',
+  '...k...k.k..........',
+];
+const HAWK_DOWN = [
+  '....................',
+  '................ww..',
+  '...............wwwe.',
+  '..kkbbbbbbbbbbbbbw.e',
+  '...kbbbbbbbbbbbbb...',
+  '....hbbbbbbbbbbbh...',
+  '...hbbb.k.k...bbbh..',
+  '..hbb..........bbh..',
+  '.hb..............bh.',
+];
+const HAWK_COL: Record<string, string> = { b: '#ac7c00', h: '#f8d878', w: '#fcfcfc', e: '#f8b800', k: '#503000' };
+function drawHawk(c: Ctx, x: number, y: number, d: number, up: boolean): void {
+  drawPix(c, up ? HAWK_UP : HAWK_DOWN, HAWK_COL, x, y + 4, d);
 }
 
 function drawHole(c: Ctx, col: number, row: number, owner: 0 | 1): void {
@@ -212,23 +259,35 @@ function drawLightWall(c: Ctx, cx: number, base: number, time: number): number {
 }
 
 /** Spirit Bear: a big pale-blue bear, facing the enemy. */
+// Spirit Bear facing right: b = fur, h = glow highlight, k = dark, e = eye, n = nose
+const BEAR = [
+  '................bb..bb....',
+  '...........hhhh.bbbbbb....',
+  '........hhhbbbbhbbbbbbb...',
+  '......hhbbbbbbbbbbbebbbb..',
+  '....hhbbbbbbbbbbbbbbbbbbbn',
+  '...hbbbbbbbbbbbbbbbbbbbbbk',
+  '..hbbbbbbbbbbbbbbbbbbkkkk.',
+  '..bbbbbbbbbbbbbbbbbbb.....',
+  '..bbbbbbbbbbbbbbbbbbb.....',
+  '..bbbbbbbbbbbbbbbbbbb.....',
+  '..bbbbkbbbbbbbbbbkbbb.....',
+  '..bbbb.bbbb..bbbb.bbbb....',
+  '..bbbb.bbbb..bbbb.bbbb....',
+  '..kkkk.kkkk..kkkk.kkkk....',
+];
+const BEAR_COL: Record<string, string> = { b: '#6888fc', h: '#a4e4fc', k: '#0000a8', e: '#fcfcfc', n: '#000000' };
+
 function drawBear(c: Ctx, w: Wall, cx: number, base: number, time: number): number {
   const d = w.side === 0 ? 1 : -1;
   const bob = Math.floor(time * 2) % 2;
-  const top = base - 17 + bob;
-  const body = '#6888fc', hi = '#a4e4fc', dark = '#0000a8';
-  P(c, '#000000', cx - 9, top + 4, 18, 13 - bob);
-  P(c, body, cx - 8, top + 5, 16, 11 - bob);
-  P(c, hi, cx - 8, top + 5, 16, 2);
-  // head toward the enemy
-  P(c, '#000000', cx + d * 5 - 4, top - 1, 9, 9);
-  P(c, body, cx + d * 5 - 3, top, 7, 7);
-  P(c, hi, cx + d * 5 - 3, top, 7, 1);
-  P(c, '#000000', cx + d * 5 - 3, top - 2, 2, 2); P(c, '#000000', cx + d * 5 + 2, top - 2, 2, 2);
-  P(c, '#fcfcfc', cx + d * 7, top + 2, 1, 1);
-  P(c, dark, cx + d * 8, top + 4, 2, 2);
-  for (const lx of [-7, -3, 2, 6]) P(c, dark, cx + lx, base - 2, 2, 2);
-  glow(c, cx, top + 8, 14, '104,136,252', 0.2 + 0.1 * Math.sin(time * 4));
+  const top = base - BEAR.length - 1 + bob;
+  const px = (i: number): number => (d > 0 ? cx - 13 + i : cx + 12 - i);
+  // the legs stay planted; the body breathes
+  const py = (j: number): number => (j >= 11 ? base - BEAR.length - 1 + j : top + j);
+  BEAR.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') P(c, '#000000', px(i) - 1, py(j) - 1, 3, 3); }));
+  BEAR.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') P(c, BEAR_COL[ch], px(i), py(j), 1, 1); }));
+  glow(c, cx, top + 7, 18, '104,136,252', 0.2 + 0.1 * Math.sin(time * 4));
   return top - 2;
 }
 
@@ -375,7 +434,7 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
   if (f.poison > 0) for (let i = 0; i < f.poison; i++) { const t = (b.time * 1.5 + i / f.poison) % 1; P(c, t > 0.7 ? TOX[3] : TOX[2], fx - 5 + i * 4, y - 6 - Math.floor(t * 16), 2, 2); }
   if (f.st.silenced > 0) { P(c, '#000000', fx - 10, y - s.h - 5, 7, 4); P(c, '#9878f8', fx - 9, y - s.h - 4, 5, 2); }
   if (f.st.sleep > 0) drawText(c, 'Z', fx + 5 + (tick % 8 < 4 ? 0 : 1), y - s.h - 6 - (tick % 8), '#fcfcfc');
-  if (f.st.rooted > 0 || f.st.nest > 0) { P(c, '#503000', fx - 6, y - 1, 12, 2); P(c, '#58d854', fx - 5, y - 3, 2, 2); P(c, '#58d854', fx + 3, y - 3, 2, 2); }
+  if (f.st.rooted > 0 || f.st.deadeye > 0) { P(c, '#503000', fx - 6, y - 1, 12, 2); P(c, '#58d854', fx - 5, y - 3, 2, 2); P(c, '#58d854', fx + 3, y - 3, 2, 2); }
   if (f.st.channel > 0 || f.st.avatarLight > 0 || f.st.ascension > 0) for (let i = 0; i < 4; i++) P(c, HOLY[2 + (i % 2)], fx - 8 + ((tick * 3 + i * 5) % 16), y - 4 - ((tick * 2 + i * 7) % 20), 1, 2);
   if (f.st.untargetable > 0 && tick % 2) { c.globalAlpha = 0.5; drawFighterSprite(c, s, fx, y + 2, flip, 'ghost'); c.globalAlpha = 1; }
   if (f.st.deathMark > 0 && tick % 8 < 5) drawText(c, '×', fx - 2, y - s.h - 16, '#9878f8');
@@ -401,8 +460,14 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
     const x = s.x + (e.x - s.x) * q, y = s.y - 10 + (e.y - 10 - (s.y - 10)) * q - Math.sin(q * Math.PI) * 18;
     if (p.kind === 'hawk') {
       const dd = e.x - s.x > 0 ? 1 : -1, flap = Math.floor(q * 12) % 2 ? 2 : 0;
-      P(c, '#000000', x - 5, y - 2 - flap, 11, 4); P(c, '#ac7c00', x - 4, y - 1 - flap, 9, 2);
-      P(c, '#000000', x - 2, y - 1, 6, 4); P(c, '#503000', x - 1, y, 4, 2); P(c, '#fcfcfc', x + dd * 3, y - 1, 2, 2); P(c, '#f8b800', x + dd * 5, y, 1, 1);
+      const hx = Math.round(x), hy = Math.round(y);
+      drawHawk(c, hx, hy, dd, flap > 0);
+      return;
+    }
+    if (p.kind === 'arrow') {
+      // a homing Arrow (Hunter's Mark)
+      const dd = e.x - s.x > 0 ? 1 : -1;
+      P(c, '#000000', x - dd * 6, y - 1, 9, 3); P(c, '#ac7c00', x - dd * 5, y, 7, 1); P(c, '#fcfcfc', x + dd * 2, y - 1, 2, 3);
       return;
     }
     P(c, '#000000', x - 2, y - 2, 5, 5);
@@ -807,7 +872,7 @@ const STATUS_TAGS: Partial<Record<StatusKey, [string, string]>> = {
   stealth: ['STEALTH', '#9878f8'], silenced: ['SILENCED', '#9878f8'], rooted: ['ROOTED', '#58d854'], sleep: ['ASLEEP', '#9878f8'],
   untargetable: ['UNTARGETABLE', '#bcbcbc'], evasion: ['EVASION', '#fcfcfc'], spellImmune: ['CLOAK', '#9878f8'], deadlyPoison: ['DEADLY POISON', '#b8f818'],
   deathMark: ['DEATH MARK', '#9878f8'], hunted: ['HUNTED', '#f83800'], revealed: ['REVEALED', '#f8b800'], shadowDance: ['SHADOW DANCE', '#9878f8'],
-  nightsEmbrace: ["NIGHT'S EMBRACE", '#9878f8'], pandemic: ['PANDEMIC', '#b8f818'], nest: ['NEST', '#58d854'], deadeye: ['DEADEYE', '#fcfcfc'],
+  nightsEmbrace: ["NIGHT'S EMBRACE", '#9878f8'], pandemic: ['PANDEMIC', '#b8f818'], focus: ['FOCUS', '#58d854'], lightFoot: ['LIGHT FOOTED', '#58d854'], rapidFire: ['RAPID FIRE', '#fcfcfc'], deadeye: ['DEADEYE', '#fcfcfc'],
   tripwire: ['TRIPWIRE', '#58d854'], painSup: ['PAIN SUPP', '#f8d878'], guardian: ['GUARDIAN', '#f8d878'], ascension: ['ASCENSION', '#f8d878'],
   avatarLight: ['AVATAR', '#f8d878'], purified: ['PURIFIED', '#f8d878'], mending: ['MENDING', '#58d854'], channel: ['HYMN', '#f8d878'],
   vanishStun: ['STUN READY', '#f8b800'], backstab: ['BACKSTAB', '#9878f8'], riposte: ['RIPOSTE', '#fcfcfc'], adrenaline: ['ADRENALINE', '#f8d878'], decoy: ['DECOY', '#bcbcbc'],
