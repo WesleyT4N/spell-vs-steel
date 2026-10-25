@@ -1,5 +1,5 @@
 // CPU opponent. Produces the same Intent a keyboard player would, so the battle can't tell the difference.
-import { NO_INTENT, heavyChargeOf, type Battle, type Dir, type Fighter, type Intent } from './battle';
+import { NO_INTENT, heavyChargeOf, type Battle, type BlessKind, type Dir, type Fighter, type Intent } from './battle';
 import { CARDS } from './cards';
 import { TUNING, type Difficulty } from './tuning';
 
@@ -66,9 +66,9 @@ export class Cpu {
       : f.cls === 'rogue' ? aligned && dist >= 1 && dist <= TUNING.rogue.stabReach
       // Hunter's Mark: the Ranger's shots home in from any row
       : aligned || (f.cls === 'ranger' && foe.st.hunted > 0));
-    // Smite lands a fixed distance ahead, so the Cleric only releases its heavy at that range;
+    // Smite lands a fixed distance ahead, so the Priest only releases its heavy at that range;
     // the Rogue's Throwing Knife flies down the whole row
-    const heavyReach = f.cls === 'rogue' ? seen && aligned : inReach && (f.cls !== 'cleric' || dist === TUNING.cleric.smiteRange);
+    const heavyReach = f.cls === 'rogue' ? seen && aligned : inReach && (f.cls !== 'priest' || dist === TUNING.priest.smiteRange);
     const need = heavyChargeOf(f);
     if (this.holding) {
       if (f.charge >= need && heavyReach) this.holding = false; // release fires the heavy
@@ -85,6 +85,8 @@ export class Cpu {
     if (f.st.backstab > 0) return;
     // the Ranger earns Energy by standing still, so it repositions less
     if (f.cls === 'ranger' && (aligned || !seen) && Math.random() < 0.85) return;
+    // the Priest's blessings only work while it stands on them
+    if (f.cls === 'priest' && b.blessUnder(f) && Math.random() < 0.9) return;
 
     // 4. Positioning.
     const target = this.goal(b, f);
@@ -98,9 +100,12 @@ export class Cpu {
     // a stealthed enemy can't be tracked: hold the current row
     const row = foe.st.stealth > 0 ? f.row : aim ? foe.row : Math.floor(Math.random() * 3);
     if (f.cls === 'warrior' || f.cls === 'rogue') return [b.frontCol(f.side), row];
-    if (f.cls === 'cleric') {
-      // stand where Smite reaches the enemy, inside our own area
-      const want = foe.col - TUNING.cleric.smiteRange * b.dir(f);
+    if (f.cls === 'priest') {
+      // go stand on the most useful blessing we have
+      const spot = this.bestBlessing(b, f);
+      if (spot) return spot;
+      // otherwise stand where Smite reaches the enemy, inside our own area
+      const want = foe.col - TUNING.priest.smiteRange * b.dir(f);
       const lo = Math.min(b.backCol(f.side), b.frontCol(f.side)), hi = Math.max(b.backCol(f.side), b.frontCol(f.side));
       return [Math.max(lo, Math.min(hi, want)), row];
     }
@@ -108,6 +113,32 @@ export class Cpu {
     const threatened = foe.cls === 'warrior' && foe.col === b.frontCol(foe.side);
     const col = threatened ? b.backCol(f.side) : b.frontCol(f.side) - b.dir(f);
     return [col, row];
+  }
+
+  /** Priest: the blessed panel worth standing on now (healing when hurt, the shield until the pool is full...). */
+  private bestBlessing(b: Battle, f: Fighter): [number, number] | null {
+    const shield = f.shields.find(s => s.kind === 'holy')?.hp ?? 0;
+    const worth: Record<BlessKind, number> = {
+      all: 5,
+      heal: f.maxHp - f.hp >= 30 ? 3 : 0.5,
+      shield: shield < TUNING.priest.shieldCap ? 2.5 : 0.5,
+      power: 2,
+      mana: f.res < TUNING.priest.manaCap ? 2 : 0.2,
+    };
+    let best: [number, number] | null = null, bestV = 0;
+    for (let c = 0; c < 6; c++) for (let r = 0; r < 3; r++) {
+      const p = b.panels[c][r];
+      if (p.bless <= 0 || p.owner !== f.side || !b.canStand(f, c, r) && !(f.col === c && f.row === r)) continue;
+      const v = worth[p.blessKind] - (Math.abs(c - f.col) + Math.abs(r - f.row)) * 0.2;
+      if (v > bestV) { bestV = v; best = [c, r]; }
+    }
+    return best;
+  }
+
+  /** Would stepping here put us on a panel the enemy cursed? */
+  private cursed(b: Battle, f: Fighter, col: number, row: number): boolean {
+    const p = b.panel(col, row);
+    return !!p && p.curse > 0 && p.curseSide !== f.side;
   }
 
   private stepToward(b: Battle, f: Fighter, col: number, row: number): Dir | null {
@@ -118,13 +149,14 @@ export class Cpu {
     if (col > f.col) opts.push('right');
     for (const o of opts) {
       const [dc, dr] = o === 'up' ? [0, -1] : o === 'down' ? [0, 1] : o === 'left' ? [-1, 0] : [1, 0];
-      if (b.canStand(f, f.col + dc, f.row + dr)) return o;
+      if (b.canStand(f, f.col + dc, f.row + dr) && !this.cursed(b, f, f.col + dc, f.row + dr)) return o;
     }
     return null;
   }
 
   private inDanger(b: Battle, f: Fighter): boolean {
     if (b.marks.some(m => m.col === f.col && m.row === f.row)) return true;
+    if (b.onCurse(f)) return true;
     return b.projectiles.some(p => p.side !== f.side && !p.homing && p.row === f.row && Math.abs(p.x - f.col) < 3 && Math.sign(f.col - p.x) === Math.sign(p.speed));
   }
 
@@ -132,7 +164,7 @@ export class Cpu {
     const dirs: Array<[Dir, number, number]> = [['up', 0, -1], ['down', 0, 1], ['left', -1, 0], ['right', 1, 0]];
     const safe = dirs.filter(([, dc, dr]) => {
       const c = f.col + dc, r = f.row + dr;
-      if (!b.canStand(f, c, r)) return false;
+      if (!b.canStand(f, c, r) || this.cursed(b, f, c, r)) return false;
       if (b.marks.some(m => m.col === c && m.row === r)) return false;
       return dr !== 0 || !b.projectiles.some(p => p.side !== f.side && p.row === r);
     });
@@ -185,7 +217,12 @@ export class Cpu {
       const rest = idx.filter(i => !chosen.includes(i)).sort((a, c) => cost(c) - cost(a));
       for (const i of rest) if (cost(i) <= mana) { chosen.push(i); mana -= cost(i); }
       // cast cheap control first, big damage last; the Ranger's core combo is Steady Focus, Hunter's Mark, Rapid Fire
-      const FIRST: Record<string, number> = { arcane_focus: -10, steady_focus: -9, hunters_mark: -8, rapid_fire: -7 };
+      // the Priest lays its fields first, then curses and DoTs, then damage
+      const FIRST: Record<string, number> = {
+        arcane_focus: -10, steady_focus: -9, hunters_mark: -8, rapid_fire: -7,
+        power_infusion: -10, holy_sanctum: -9, aegis_field: -8, sacred_ground: -8, sanctuary: -7, wellspring: -7, hallowed_ground: -6,
+        shadowform: -5, void_rift: -5, mind_sear: -5, desecrate: -5, shadow_word_pain: -4, devouring_plague: -4,
+      };
       return chosen.sort((a, c) => (FIRST[offer[a]] ?? cost(a)) - (FIRST[offer[c]] ?? cost(c)));
     }
     // Warrior: builders first, then spenders we can expect to afford this turn.

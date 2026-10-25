@@ -1,4 +1,4 @@
-// Every Warrior and Mage spell from the design doc (Rogue, Ranger and Cleric drafts live in cardsRogue/Ranger/Cleric.ts). Numbers follow the doc; prototype-only
+// Every Warrior and Mage spell from the design doc (Rogue, Ranger and Priest drafts live in cardsRogue/Ranger/Priest.ts). Numbers follow the doc; prototype-only
 // interpretations are called out in the `short` text or a comment.
 import type { Battle, CastCtx, Fighter } from './battle';
 import type { ClassId } from '../art/sprites';
@@ -37,7 +37,7 @@ export const MAX_COPIES: Record<Rarity, number> = { common: 4, uncommon: 2, lege
 import { sameRow, ahead, cellsAhead, allEnemyPanels, lowHp, lunge } from './cardUtil';
 import { rogue } from './cardsRogue';
 import { ranger } from './cardsRanger';
-import { cleric } from './cardsCleric';
+import { priest } from './cardsPriest';
 
 // ---------- Warrior ----------
 const warrior: CardDef[] = [
@@ -600,7 +600,7 @@ const mage: CardDef[] = [
   },
 ];
 
-export const ALL_CARDS: CardDef[] = [...warrior, ...mage, ...rogue, ...ranger, ...cleric];
+export const ALL_CARDS: CardDef[] = [...warrior, ...mage, ...rogue, ...ranger, ...priest];
 export const CARDS: Record<string, CardDef> = Object.fromEntries(ALL_CARDS.map(c => [c.id, c]));
 export const cardsFor = (cls: ClassId): CardDef[] => ALL_CARDS.filter(c => c.cls === cls);
 

@@ -1,7 +1,7 @@
 // Every number worth tweaking after a playtest lives here.
 
 export const TUNING = {
-  hp: { warrior: 870, mage: 720, rogue: 650, ranger: 740, cleric: 700 },
+  hp: { warrior: 870, mage: 720, rogue: 650, ranger: 740, priest: 700 },
 
   /** Seconds for the shared custom gauge to fill. */
   gaugeSeconds: 10,
@@ -38,7 +38,7 @@ export const TUNING = {
     manaCap: 5,
   },
 
-  // Draft classes (Rogue, Ranger, Cleric): basics follow the same x0.7 scale as Warrior and Mage.
+  // Draft classes (Rogue, Ranger, Priest): basics follow the same x0.7 scale as Warrior and Mage.
   rogue: {
     /** Light: a dagger stab that hits every panel up to `stabReach` ahead. Heavy: a throwing knife down the row. */
     // light 12 / 650 HP: sims put the Rogue near 60% vs Mage and 40% vs Warrior (2026-10-25)
@@ -74,24 +74,34 @@ export const TUNING = {
     stillSeconds: 2,
   },
 
-  cleric: {
+  priest: {
     lightDamage: 6,
-    heavyDamage: 22,
+    // Smite at 28 flinches like the Mage heavy; sims at 700 HP (1000 matches each): ~66% vs Warrior, ~53% vs Mage, ~45% vs Rogue, ~42% vs Ranger (2026-10-25)
+    heavyDamage: 28,
     lightLock: 0.4,
     heavyLock: 0.5,
-    /** Smite lands this many panels ahead and heals the Cleric on a hit. */
+    /** Smite lands this many panels ahead and heals the Priest on a hit. */
     smiteRange: 3,
     smiteHeal: 10,
     manaStart: 3,
     manaPerDraw: 3,
     manaCap: 5,
+    /** Cursed panels: damage per second to an enemy standing on one. Cursed or Hexed fighters deal this multiplier. */
+    curseDps: 10,
+    weakened: 0.75,
+    /** Blessed panels (all last until the next Draw screen): Hallowed Ground damage, Aegis Field shield, Wellspring Mana. */
+    hallowedBonus: 1.35,
+    blessShieldPerSec: 15,
+    /** Every holy shield (Power Word: Shield, Aegis Field, Holy Sanctum) shares one pool up to this. */
+    shieldCap: 100,
+    blessManaSeconds: 2,
   },
 
   /** Each Poison stack deals this per second for poisonSeconds. */
   poisonDps: 4,
   poisonSeconds: 6,
   poisonMaxStacks: 3,
-  /** Blessed panels heal whoever owns them this much per second. */
+  /** Healing blessed panels (Sanctuary, Sacred Ground) heal their owner this much per second. */
   blessHps: 12,
 
   /** Frost Nova hits an enemy within this many columns of the caster. */
