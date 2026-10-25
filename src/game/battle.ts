@@ -666,10 +666,19 @@ export class Battle {
     } else if (f.cls === 'rogue') {
       const T = TUNING.rogue;
       f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
-      sfx(kind === 'light' ? 'bolt' : 'slash');
-      const end = this.rowShot(f, kind === 'light' ? T.lightDamage : T.heavyDamage, { basic: kind, element: kind === 'light' ? 'steel' : 'poison' });
-      if (end.hit && kind === 'heavy') this.addPoison(foe, 1);
-      this.addFx(kind === 'light' ? 'knife' : 'knifeHeavy', f.side, f.col, f.row, 0.2, { to: end.col });
+      if (kind === 'light') {
+        // Stab: a dagger thrust that reaches the panels ahead
+        sfx('slash');
+        const cells: Array<[number, number]> = [];
+        for (let i = 1; i <= T.stabReach; i++) cells.push([f.col + i * d, f.row]);
+        this.addFx('stab', f.side, f.col, f.row, 0.18, { reach: T.stabReach });
+        this.strike(f, cells, T.lightDamage, { basic: kind, element: 'steel' });
+      } else {
+        // Throwing Knife: a heavy knife down the row
+        sfx('slashHeavy');
+        const end = this.rowShot(f, T.heavyDamage, { basic: kind, element: 'steel' });
+        this.addFx('knifeHeavy', f.side, f.col, f.row, 0.22, { to: end.col });
+      }
     } else if (f.cls === 'ranger') {
       const T = TUNING.ranger;
       f.lock = kind === 'light' ? T.lightLock : T.heavyLock;

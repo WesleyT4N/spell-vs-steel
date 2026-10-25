@@ -62,13 +62,18 @@ export class Cpu {
     // 3. Basic attacks.
     const dist = (foe.col - f.col) * d;
     const seen = foe.st.stealth <= 0;
-    const inReach = seen && (f.cls === 'warrior' ? aligned && dist >= 1 && dist <= 2 : aligned);
-    // Smite lands a fixed distance ahead, so the Cleric only releases its heavy at that range
-    const heavyReach = inReach && (f.cls !== 'cleric' || dist === TUNING.cleric.smiteRange);
+    const inReach = seen && (f.cls === 'warrior' ? aligned && dist >= 1 && dist <= 2
+      : f.cls === 'rogue' ? aligned && dist >= 1 && dist <= TUNING.rogue.stabReach : aligned);
+    // Smite lands a fixed distance ahead, so the Cleric only releases its heavy at that range;
+    // the Rogue's Throwing Knife flies down the whole row
+    const heavyReach = f.cls === 'rogue' ? seen && aligned : inReach && (f.cls !== 'cleric' || dist === TUNING.cleric.smiteRange);
     const need = heavyChargeOf(f);
     if (this.holding) {
       if (f.charge >= need && heavyReach) this.holding = false; // release fires the heavy
       else if (f.charge > need + 1.5) this.holding = false;
+    } else if (f.cls === 'rogue' && heavyReach && !inReach && f.lock <= 0) {
+      // out of stab range: wind up a Throwing Knife instead
+      if (Math.random() < 0.08) { this.wantTap = true; this.holding = true; }
     } else if (inReach && f.lock <= 0) {
       this.wantTap = true;
       this.holding = Math.random() < (this.difficulty === 'normal' ? 0.35 : 0.15);
@@ -88,7 +93,7 @@ export class Cpu {
     const aim = Math.random() < this.cfg.aim;
     // a stealthed enemy can't be tracked: hold the current row
     const row = foe.st.stealth > 0 ? f.row : aim ? foe.row : Math.floor(Math.random() * 3);
-    if (f.cls === 'warrior') return [b.frontCol(f.side), row];
+    if (f.cls === 'warrior' || f.cls === 'rogue') return [b.frontCol(f.side), row];
     if (f.cls === 'cleric') {
       // stand where Smite reaches the enemy, inside our own area
       const want = foe.col - TUNING.cleric.smiteRange * b.dir(f);

@@ -40,12 +40,14 @@ export const TUNING = {
 
   // Draft classes (Rogue, Ranger, Cleric): basics follow the same x0.7 scale as Warrior and Mage.
   rogue: {
-    lightDamage: 6,
+    /** Light: a dagger stab that hits every panel up to `stabReach` ahead. Heavy: a throwing knife down the row. */
+    lightDamage: 7,
     heavyDamage: 22,
+    stabReach: 2,
     lightLock: 0.35,
     heavyLock: 0.35,
-    /** Energy tops up to this at every Draw screen; anything above is kept. */
-    energyTopUp: 3,
+    /** Energy tops up to this at every Draw screen (5 = a full refill, so every turn can chain cheap skills). */
+    energyTopUp: 5,
     energyCap: 5,
   },
 
