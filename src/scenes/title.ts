@@ -11,9 +11,9 @@ import { SetupScene } from './setup';
 import { DeckBuilderScene } from './deckbuilder';
 import { OptionsScene } from './options';
 import { loadMatch } from '../game/match';
-import { DevMenuScene } from './devMenu';
+import { DEV_TOOLS } from '../flags';
 
-const ITEMS = ['VERSUS CPU', 'DECK BUILDER', 'OPTIONS', 'DEV TOOLS'];
+const ITEMS = ['VERSUS CPU', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
 
 export class TitleScene implements Scene {
   sel = 0;
@@ -32,7 +32,8 @@ export class TitleScene implements Scene {
       if (this.sel === 0) setScene(new SetupScene());
       if (this.sel === 1) setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
       if (this.sel === 2) setScene(new OptionsScene(() => setScene(new TitleScene())));
-      if (this.sel === 3) setScene(new DevMenuScene(() => setScene(new TitleScene())));
+      // loaded on demand, so the prod build (DEV_TOOLS off) carries none of the dev tools code
+      if (this.sel === 3 && DEV_TOOLS) void import('./devMenu').then(m => setScene(new m.DevMenuScene(() => setScene(new TitleScene()))));
     }
   }
 
@@ -48,7 +49,7 @@ export class TitleScene implements Scene {
     P(c, '#000000', 22, 131, 24, 2); P(c, '#000000', 194, 131, 24, 2);
     drawLogo(c, W / 2, 10, this.t);
     drawMenu(ui, ITEMS, this.sel, UW / 2, 182, tick, { width: 200, gap: 22 });
-    drawTextCentered(ui, 'PROTOTYPE 0.2', UW / 2, 284, '#7c7c7c', 1, false);
+    drawTextCentered(ui, DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2', UW / 2, 284, '#7c7c7c', 1, false);
     if (isMuted()) drawText(ui, 'MUTED', 8, 8, '#7c7c7c');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   M: MUTE`);
   }

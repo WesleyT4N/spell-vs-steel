@@ -13,11 +13,14 @@ import { cardPower } from '../dev/instrument';
 import { applyOverrides, defaultTuning, getTuning, isModified, onTuningChange, overrides, resetAll, setPower, setTuning, tuningPaths } from '../dev/tuningEdit';
 import { h, btn, choice, setBadge } from '../dev/dom';
 
-onTuningChange(() => {
+// the corner badge, hooked up the first time the lab opens
+let badgeHooked = false;
+const hookBadge = (): void => { if (!badgeHooked) { badgeHooked = true; onTuningChange(showBadge); } };
+const showBadge = (): void => {
   const o = overrides();
   const n = Object.keys(o.tuning).length + Object.keys(o.cardPower).length;
   setBadge(n ? `DEV TUNING ON: ${n} change${n === 1 ? '' : 's'} (reload the page to undo)` : null);
-});
+};
 
 interface Task { specs: [SideSpec, SideSpec]; n: number; stats: SeriesStats }
 type DeckChoice = 'starter' | 'custom';
@@ -53,6 +56,7 @@ export class LabScene implements Scene {
   constructor(private back: () => void) {}
 
   enter(): void {
+    hookBadge();
     this.mount();
     window.addEventListener('keydown', this.onKey);
   }

@@ -9,15 +9,16 @@ This is the **Warrior vs Mage prototype**: title screen, Versus CPU, match setup
 ```sh
 npm install
 npm run dev      # local dev server
-npm run build    # type-check, then build dist/index.html (one self-contained file)
-                 # and dist/artifact.html (the same game, shaped for a claude.ai artifact)
+npm run build    # DEV build: type-check, then dist/index.html (one self-contained file)
+                 # and dist/artifact.html (the same game, shaped for a claude.ai artifact). Dev tools on.
+npm run build:prod  # player-facing build in dist-prod/: dev tools off and their code left out
 npm run sim      # headless CPU-vs-CPU matches; prints win rates, match length, damage sources
 npm run sim -- 100 --cards   # same, with per-card casts, damage and win rate when cast
 ```
 
 ## Dev tools
 
-**Title > DEV TOOLS** (or open the page with `#cards`, `#sandbox` or `#lab`):
+In dev builds (`npm run dev`, `npm run build`): **Title > DEV TOOLS**, or open the page with `#cards`, `#sandbox` or `#lab`. The `DEV_TOOLS` flag (`src/flags.ts`, set per build in `vite.config.ts`) hides the menu item and routes in `npm run build:prod`, and since the tools load through a dynamic import, none of their code ships in that build. Gate any future dev-only feature on the same flag.
 
 - **Card encyclopedia**: every spell of every class as card faces, filtered by class, rarity and element. Hover to read, J (or the button) tests the card in the sandbox. Classes come from `cards.ts`, so new classes show up on their own.
 - **Sandbox** (debug mode): a real fight with a panel docked on the right. Cast any spell for either side on demand or queue it for K, pick the enemy (still dummy, walker, turret, CPU easy/normal), turn on can't-die and free spells, slow time to 0.1×, pause and step frames (P, .), freeze or stun either side, set enemy HP, move fighters by clicking panels, and read live state plus a hit log that names the spell behind every hit.
