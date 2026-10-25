@@ -5,9 +5,11 @@ import { sfx } from '../engine/audio';
 import { shuffle } from './rng';
 import { allEnemyPanels, sameRow } from './cardUtil';
 
-/** Hide a trap on a panel until the next Draw screen. It arms after `arm` seconds and only its owner can see it. */
+/** Hide a trap on a panel until the next Draw screen. It arms after `arm` seconds and only its owner can see it.
+ *  Blessed panels refuse traps. */
 function trap(b: Battle, f: Fighter, col: number, row: number, kind: Trap['kind'], arm = 1, group?: number): void {
-  if (!b.inGrid(col, row)) return;
+  // holy ground (an enemy Priest's blessed panel) won't hold a trap
+  if (!b.inGrid(col, row) || (b.panels[col][row].bless > 0 && b.panels[col][row].owner !== f.side)) return;
   b.traps = b.traps.filter(x => !(x.col === col && x.row === row));
   b.traps.push({ side: f.side, col, row, arm, kind, group });
 }
