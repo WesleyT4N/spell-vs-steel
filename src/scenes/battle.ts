@@ -14,7 +14,7 @@ import { playerDeck, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
 import { P, UW, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
-import { wasPressed, heldDir, navPressed, k, mouse } from '../engine/input';
+import { wasPressed, isDown, heldDir, navPressed, k, mouse } from '../engine/input';
 import { playMusic, stopMusic, sfx } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
 import { drawCardDetail, drawCardFace, CARD_W, CARD_H, PICKED } from './cardView';
@@ -59,7 +59,7 @@ export class BattleScene implements Scene {
       }
     } else this.holdT = 0;
     this.lastDir = d;
-    return { move, held: d, attackPressed: wasPressed('attack'), heavyPressed: wasPressed('heavy'), castPressed: wasPressed('cast') };
+    return { move, held: d, attackPressed: wasPressed('attack'), attackHeld: isDown('attack'), castPressed: wasPressed('cast') };
   }
 
   update(dt: number): void {
