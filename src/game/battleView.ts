@@ -7,7 +7,7 @@ import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '.
 import { drawCardIcon } from '../scenes/cardView';
 import { CARDS, ELEMENT_COLOR } from './cards';
 import { TUNING } from './tuning';
-import type { Battle, Fighter, Fx, Projectile, StatusKey, Wall } from './battle';
+import type { Battle, Fighter, Fx, Projectile, Side, StatusKey, Wall } from './battle';
 
 const FIRE = ['#f83800', '#fca044', '#f8b800', '#fce0a8'];
 const ICE = ['#0058f8', '#3cbcfc', '#a4e4fc', '#fcfcfc'];
@@ -323,7 +323,7 @@ function drawFx(c: Ctx, _b: Battle, e: Fx): void {
 const UI = 2; // world-to-UI scale
 
 /** Everything drawn over the fight at UI resolution: HP, resources, the Draw gauge, statuses, damage numbers, cast callouts. */
-export function drawBattleUi(ui: Ctx, b: Battle, tick: number): void {
+export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0): void {
   for (const t of b.texts) {
     const pc = panelFoot(t.x, t.y);
     const big = /^\d+$/.test(t.text);
@@ -339,7 +339,7 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number): void {
   if (!full) P(ui, '#a4e4fc', gx + 1, 9, Math.round((gw - 2) * b.gauge), 2);
   drawTextCentered(ui, full ? `${k('custom')}: DRAW` : 'DRAW', UW / 2, 24, full ? '#f8b800' : '#bcbcbc');
   for (const e of b.fx) if (e.kind === 'castName') drawCastCallout(ui, e);
-  drawNextSpell(ui, b, b.f[0]);
+  drawNextSpell(ui, b, b.f[me]);
 }
 
 function drawFighterHud(ui: Ctx, b: Battle, f: Fighter, tick: number): void {

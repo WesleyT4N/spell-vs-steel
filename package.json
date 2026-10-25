@@ -8,12 +8,18 @@
     "build": "tsc --noEmit && vite build && node scripts/artifact.mjs",
     "sim": "tsx scripts/sim.ts",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "netcheck": "tsx scripts/netcheck.ts",
+    "peerserver": "peerjs --port 9000 --host 127.0.0.1"
   },
   "devDependencies": {
+    "peer": "^1.0.2",
     "tsx": "^4.23.15",
     "typescript": "5.9",
     "vite": "^8.3.5",
     "vite-plugin-singlefile": "^2.3.4"
+  },
+  "dependencies": {
+    "peerjs": "^1.5.5"
   }
 }

@@ -10,9 +10,10 @@ import { MENU_SONG } from '../engine/music';
 import { SetupScene } from './setup';
 import { DeckBuilderScene } from './deckbuilder';
 import { OptionsScene } from './options';
+import { OnlineScene } from './online';
 import { loadMatch } from '../game/match';
 
-const ITEMS = ['VERSUS CPU', 'DECK BUILDER', 'OPTIONS'];
+const ITEMS = ['VERSUS CPU', 'ONLINE VERSUS', 'DECK BUILDER', 'OPTIONS'];
 
 export class TitleScene implements Scene {
   sel = 0;
@@ -28,9 +29,11 @@ export class TitleScene implements Scene {
     if (clicked >= 0) this.sel = clicked;
     if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
       sfx('select');
-      if (this.sel === 0) setScene(new SetupScene());
-      if (this.sel === 1) setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
-      if (this.sel === 2) setScene(new OptionsScene(() => setScene(new TitleScene())));
+      const item = ITEMS[this.sel];
+      if (item === 'VERSUS CPU') setScene(new SetupScene());
+      if (item === 'ONLINE VERSUS') setScene(new OnlineScene());
+      if (item === 'DECK BUILDER') setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
+      if (item === 'OPTIONS') setScene(new OptionsScene(() => setScene(new TitleScene())));
     }
   }
 
