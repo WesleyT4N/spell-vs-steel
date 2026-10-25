@@ -1,8 +1,8 @@
-import { setScene, hint, type Scene } from './scene';
+import { setScene, hint, zone, hot, listMouse, type Scene } from './scene';
 import { getArena } from '../game/battleView';
-import { P, W, H, frame, type Ctx } from '../engine/gfx';
+import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
-import { wasPressed, navPressed, k } from '../engine/input';
+import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx, getAudioSettings, setAudioSettings, isMuted, toggleMute } from '../engine/audio';
 import { ControlsScene } from './controls';
 
@@ -17,6 +17,11 @@ const ROWS: Array<[Row, string]> = [
   ['keys', 'KEY MAPPING'],
   ['back', 'BACK'],
 ];
+const isVol = (r: Row): r is 'master' | 'music' | 'sfx' => r === 'master' || r === 'music' || r === 'sfx';
+
+// layout (UI pixels)
+const PX = 64, PW = UW - 128, Y0 = 62, RH = 24, BAR_X = 236, BLOCK = 14;
+const rowY = (i: number): number => Y0 + i * RH + (i >= 6 ? 10 : 0);
 
 /** Audio settings and a door to the key mapping screen. Settings save in the browser. */
 export class OptionsScene implements Scene {
@@ -26,46 +31,78 @@ export class OptionsScene implements Scene {
   update(dt: number): void {
     if (navPressed('up', dt)) { this.sel = (this.sel + ROWS.length - 1) % ROWS.length; sfx('move'); }
     if (navPressed('down', dt)) { this.sel = (this.sel + 1) % ROWS.length; sfx('move'); }
-    if (wasPressed('back')) { sfx('back'); this.back(); return; }
-    const row = ROWS[this.sel][0];
+    if (wasPressed('back') || mouse.rclick) { sfx('back'); this.back(); return; }
     const s = getAudioSettings();
+
+    // mouse: a volume block sets that level, the arrows step it, a row click acts like OK
+    const block = hot('block');
+    if (block >= 0 && (mouse.click || (mouse.down && mouse.moved))) {
+      const row = ROWS[Math.floor(block / 100)][0];
+      const v = (block % 100) + 1;
+      // clicking the only lit block turns that volume off
+      if (isVol(row)) {
+        const to = mouse.click && s[row] === 1 && v === 1 ? 0 : v;
+        if (s[row] !== to) { setAudioSettings({ [row]: to }); sfx('move'); }
+      }
+      return;
+    }
+    const step = hot('step');
+    if (step >= 0 && mouse.click) {
+      const row = ROWS[step >> 1][0];
+      if (isVol(row)) { setAudioSettings({ [row]: Math.max(0, Math.min(10, s[row] + (step & 1 ? 1 : -1))) }); sfx('move'); }
+      return;
+    }
+    const clicked = listMouse('row', this.sel, i => { this.sel = i; sfx('move'); });
+    if (clicked >= 0) this.sel = clicked;
+
+    const row = ROWS[this.sel][0];
     const l = navPressed('left', dt), r = navPressed('right', dt);
-    if ((l || r) && (row === 'master' || row === 'music' || row === 'sfx')) {
-      const v = Math.max(0, Math.min(10, s[row] + (r ? 1 : -1)));
+    const wheel = mouse.wheel && hot('row') === this.sel ? -mouse.wheel : 0;
+    if ((l || r || wheel) && isVol(row)) {
+      const v = Math.max(0, Math.min(10, s[row] + (r ? 1 : l ? -1 : wheel)));
       setAudioSettings({ [row]: v });
       sfx('move');
     }
-    const toggle = wasPressed('confirm') || l || r;
+    const ok = wasPressed('confirm') || clicked >= 0;
+    const toggle = ok || l || r;
     if (toggle && (row === 'musicOn' || row === 'sfxOn')) { setAudioSettings({ [row]: !s[row] }); sfx('select'); }
     if (toggle && row === 'mute') { toggleMute(); sfx('select'); }
-    if (wasPressed('confirm') && row === 'keys') { sfx('select'); setScene(new ControlsScene(() => setScene(this))); }
-    if (wasPressed('confirm') && row === 'back') { sfx('back'); this.back(); }
+    if (ok && row === 'keys') { sfx('select'); setScene(new ControlsScene(() => setScene(this))); }
+    if (ok && row === 'back') { sfx('back'); this.back(); }
   }
 
-  draw(c: Ctx, tick: number): void {
+  draw(c: Ctx, tick: number, ui: Ctx): void {
     getArena().draw(c, tick, 0);
     c.fillStyle = 'rgba(0,0,24,0.6)';
     c.fillRect(0, 0, W, H);
-    frame(c, 12, 8, W - 24, 132, '#000000', '#fcfcfc');
-    drawTextCentered(c, 'OPTIONS', W / 2, 14, '#f8b800', 1, false);
+    frame(ui, PX - 16, 18, PW + 32, 262, '#000000', '#fcfcfc');
+    drawTextCentered(ui, 'OPTIONS', UW / 2, 30, '#f8b800', 2, false);
     const s = getAudioSettings();
     ROWS.forEach(([row, label], i) => {
-      const y = 30 + i * 13 + (i >= 6 ? 4 : 0);
+      const y = rowY(i);
       const on = i === this.sel;
-      if (on) P(c, '#0000a8', 16, y - 3, W - 32, 12);
-      if (on && tick % 8 < 6) drawText(c, '→', 20, y, '#f8b800');
-      drawText(c, label, 30, y, on ? '#fcfcfc' : '#bcbcbc');
-      if (row === 'master' || row === 'music' || row === 'sfx') {
+      zone(`row:${i}`, PX - 12, y, PW + 24, RH - 2);
+      if (on) P(ui, '#0000a8', PX - 12, y, PW + 24, RH - 2);
+      const ty = y + 8;
+      if (on && tick % 8 < 6) drawText(ui, '→', PX - 4, ty, '#f8b800');
+      drawText(ui, label, PX + 10, ty, on ? '#fcfcfc' : '#bcbcbc');
+      if (isVol(row)) {
         const v = s[row];
         const live = row === 'master' || (row === 'music' ? s.musicOn : s.sfxOn);
-        for (let n = 0; n < 10; n++) P(c, n < v ? (live ? '#f8b800' : '#7c7c7c') : '#3c3c3c', 132 + n * 6, y, 4, 7);
-        drawText(c, String(v), 196, y, live ? '#fcfcfc' : '#7c7c7c');
+        drawText(ui, '←', BAR_X - 14, ty, on ? '#fcfcfc' : '#7c7c7c');
+        zone(`step:${i * 2}`, BAR_X - 18, y, 14, RH - 2);
+        for (let n = 0; n < 10; n++) {
+          zone(`block:${i * 100 + n}`, BAR_X + n * BLOCK, y + 2, BLOCK, RH - 6);
+          P(ui, n < v ? (live ? '#f8b800' : '#7c7c7c') : '#3c3c3c', BAR_X + n * BLOCK + 1, y + 5, BLOCK - 4, 12);
+        }
+        drawText(ui, '→', BAR_X + 10 * BLOCK + 2, ty, on ? '#fcfcfc' : '#7c7c7c');
+        zone(`step:${i * 2 + 1}`, BAR_X + 10 * BLOCK, y, 14, RH - 2);
+        drawText(ui, String(v), BAR_X + 10 * BLOCK + 20, ty, live ? '#fcfcfc' : '#7c7c7c');
       }
-      if (row === 'musicOn' || row === 'sfxOn') drawText(c, s[row] ? 'ON' : 'OFF', 132, y, s[row] ? '#fcfcfc' : '#f83800');
-      if (row === 'mute') drawText(c, isMuted() ? 'ON' : 'OFF', 132, y, isMuted() ? '#f83800' : '#fcfcfc');
+      if (row === 'musicOn' || row === 'sfxOn') drawText(ui, s[row] ? 'ON' : 'OFF', BAR_X, ty, s[row] ? '#58d854' : '#f83800');
+      if (row === 'mute') drawText(ui, isMuted() ? 'ON' : 'OFF', BAR_X, ty, isMuted() ? '#f83800' : '#fcfcfc');
+      if (row === 'keys') drawText(ui, '→', BAR_X, ty, '#7c7c7c');
     });
-    const row = ROWS[this.sel][0];
-    const adjustable = row === 'master' || row === 'music' || row === 'sfx';
-    hint(c, adjustable ? `${k('left')}/${k('right')}: ADJUST  ${k('cast')}: BACK` : `${k('attack')}: SELECT  ${k('cast')}: BACK`);
+    hint(ui, `CLICK OR DRAG THE BARS   ${k('left')}/${k('right')}: ADJUST   ${k('cast')} / RIGHT-CLICK: BACK`);
   }
 }

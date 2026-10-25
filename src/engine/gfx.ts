@@ -2,6 +2,9 @@
 
 export const W = 240;
 export const H = 160;
+/** The sharp UI layer: twice the world resolution, drawn over the scaled-up world. */
+export const UW = W * 2;
+export const UH = H * 2;
 
 export const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 

@@ -118,7 +118,34 @@ function onKey(e: KeyboardEvent, isDown: boolean): void {
   }
 }
 
-export function initInput(): void {
+// ---------- mouse ----------
+/** Pointer state in canvas pixels, with per-frame click edges. */
+export const mouse = { x: -1, y: -1, moved: false, click: false, rclick: false, wheel: 0, down: false };
+
+/** True while the pointer is inside the rectangle. */
+export const hover = (x: number, y: number, w: number, h: number): boolean =>
+  mouse.x >= x && mouse.x < x + w && mouse.y >= y && mouse.y < y + h;
+
+function initMouse(canvas: HTMLCanvasElement): void {
+  const at = (e: MouseEvent): void => {
+    const r = canvas.getBoundingClientRect();
+    mouse.x = Math.floor((e.clientX - r.left) * canvas.width / r.width);
+    mouse.y = Math.floor((e.clientY - r.top) * canvas.height / r.height);
+  };
+  canvas.addEventListener('mousemove', e => { at(e); mouse.moved = true; });
+  canvas.addEventListener('mousedown', e => {
+    at(e);
+    if (e.button === 0) { mouse.click = true; mouse.down = true; }
+    if (e.button === 2) mouse.rclick = true;
+  });
+  window.addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
+  canvas.addEventListener('mouseleave', () => { mouse.x = mouse.y = -1; });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('wheel', e => { e.preventDefault(); mouse.wheel += Math.sign(e.deltaY); }, { passive: false });
+}
+
+export function initInput(canvas?: HTMLCanvasElement): void {
+  if (canvas) initMouse(canvas);
   window.addEventListener('keydown', e => onKey(e, true));
   window.addEventListener('keyup', e => onKey(e, false));
   window.addEventListener('blur', () => { down.clear(); heldCodes.clear(); dirOrder.length = 0; });
@@ -134,7 +161,10 @@ export function heldDir(): 'up' | 'down' | 'left' | 'right' | null {
   return null;
 }
 /** Call once at the end of every frame. */
-export function endFrame(): void { pressed.clear(); released.clear(); }
+export function endFrame(): void {
+  pressed.clear(); released.clear();
+  mouse.click = mouse.rclick = mouse.moved = false; mouse.wheel = 0;
+}
 
 /** Menu navigation with key repeat. Returns a direction on press and then every `rate` seconds while held. */
 const repeatT: Partial<Record<Action, number>> = {};

@@ -1,8 +1,8 @@
-import { hint, type Scene } from './scene';
+import { hint, zone, listMouse, type Scene } from './scene';
 import { getArena } from '../game/battleView';
-import { W, H, frame, type Ctx } from '../engine/gfx';
+import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
-import { wasPressed, navPressed, BINDABLE, getKey, setKey, resetKeys, keyName, k, captureNextKey, RESERVED, type Bindable } from '../engine/input';
+import { wasPressed, navPressed, BINDABLE, getKey, setKey, resetKeys, keyName, k, captureNextKey, RESERVED, mouse, type Bindable } from '../engine/input';
 import { sfx } from '../engine/audio';
 
 const LABELS: Record<Bindable, string> = {
@@ -10,6 +10,8 @@ const LABELS: Record<Bindable, string> = {
   attack: 'ATTACK / OK', cast: 'CAST / BACK', custom: 'DRAW SCREEN', pause: 'PAUSE',
 };
 const ROWS = [...BINDABLE, 'reset', 'back'] as const;
+const PX = 64, PW = UW - 128, Y0 = 48, RH = 20;
+const rowY = (i: number): number => Y0 + i * RH + (i >= BINDABLE.length ? 8 : 0);
 
 /** Rebinding screen: pick an action, press the new key. */
 export class ControlsScene implements Scene {
@@ -24,8 +26,10 @@ export class ControlsScene implements Scene {
     if (this.waiting) return;
     if (navPressed('up', dt)) { this.sel = (this.sel + ROWS.length - 1) % ROWS.length; sfx('move'); }
     if (navPressed('down', dt)) { this.sel = (this.sel + 1) % ROWS.length; sfx('move'); }
-    if (wasPressed('back')) { sfx('back'); this.back(); return; }
-    if (!wasPressed('confirm')) return;
+    if (wasPressed('back') || mouse.rclick) { sfx('back'); this.back(); return; }
+    const clicked = listMouse('row', this.sel, i => { this.sel = i; sfx('move'); });
+    if (clicked >= 0) this.sel = clicked;
+    if (!wasPressed('confirm') && clicked < 0) return;
     const row = ROWS[this.sel];
     if (row === 'back') { sfx('back'); this.back(); return; }
     if (row === 'reset') { resetKeys(); sfx('select'); this.flash('DEFAULTS RESTORED'); return; }
@@ -42,27 +46,29 @@ export class ControlsScene implements Scene {
 
   private flash(s: string): void { this.msg = s; this.msgT = 2; }
 
-  draw(c: Ctx, tick: number): void {
+  draw(c: Ctx, tick: number, ui: Ctx): void {
     getArena().draw(c, tick, 0);
     c.fillStyle = 'rgba(0,0,24,0.6)';
     c.fillRect(0, 0, W, H);
-    frame(c, 12, 6, W - 24, 142, '#000000', '#fcfcfc');
-    drawTextCentered(c, 'CONTROLS', W / 2, 11, '#f8b800', 1, false);
+    frame(ui, PX - 16, 14, PW + 32, 286, '#000000', '#fcfcfc');
+    drawTextCentered(ui, 'KEY MAPPING', UW / 2, 26, '#f8b800', 2, false);
     ROWS.forEach((row, i) => {
-      const y = 23 + i * 9;
+      const y = rowY(i), ty = y + 6;
       const on = i === this.sel;
-      if (on && tick % 2 === 0) drawText(c, '→', 20, y, '#f8b800');
+      zone(`row:${i}`, PX - 12, y, PW + 24, RH - 2);
+      if (on) P(ui, '#0000a8', PX - 12, y, PW + 24, RH - 2);
+      if (on && tick % 8 < 6) drawText(ui, '→', PX - 4, ty, '#f8b800');
       if (row === 'reset' || row === 'back') {
-        drawText(c, row === 'reset' ? 'RESET DEFAULTS' : 'BACK', 28, y, on ? '#fcfcfc' : '#bcbcbc');
+        drawText(ui, row === 'reset' ? 'RESET DEFAULTS' : 'BACK', PX + 10, ty, on ? '#fcfcfc' : '#bcbcbc');
         return;
       }
-      drawText(c, LABELS[row], 28, y, on ? '#fcfcfc' : '#bcbcbc');
-      const v = on && this.waiting ? (tick % 2 ? 'PRESS A KEY' : '') : keyName(getKey(row));
-      drawText(c, v, 130, y, on && this.waiting ? '#f8b800' : '#fcd8a8');
+      drawText(ui, LABELS[row], PX + 10, ty, on ? '#fcfcfc' : '#bcbcbc');
+      const v = on && this.waiting ? (tick % 4 < 3 ? 'PRESS A KEY' : '') : keyName(getKey(row));
+      drawText(ui, v, 240, ty, on && this.waiting ? '#f8b800' : '#fcd8a8');
     });
-    drawText(c, `HOLD ${k('attack')}: HEAVY   ${k('cast')}+DIR: AIM BLINK`, 20, 117, '#7c7c7c');
-    drawText(c, 'ARROWS MOVE  ESC PAUSE  M MUTE', 20, 126, '#7c7c7c');
-    if (this.msgT > 0) drawTextCentered(c, this.msg, W / 2, 137, '#f83800', 1, false);
-    hint(c, this.waiting ? 'PRESS A KEY  ESC: CANCEL' : `${k('attack')}: REBIND  ${k('cast')}: BACK`);
+    drawText(ui, `HOLD ${k('attack')}: HEAVY ATTACK    ${k('cast')} + DIRECTION: AIM BLINK`, PX, 262, '#7c7c7c');
+    drawText(ui, 'ARROW KEYS ALSO MOVE    ESC: PAUSE    M: MUTE', PX, 274, '#7c7c7c');
+    if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, 288, '#f83800', 1, false);
+    hint(ui, this.waiting ? 'PRESS A KEY   ESC: CANCEL' : `CLICK A ROW OR ${k('attack')}: REBIND   ${k('cast')} / RIGHT-CLICK: BACK`);
   }
 }
