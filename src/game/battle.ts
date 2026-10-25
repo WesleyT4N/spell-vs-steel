@@ -107,17 +107,17 @@ export type StatusKey =
   | 'lastStand' | 'reflect' | 'counterspell' | 'mortal' | 'evoLock' | 'noKnock' | 'frostNova' | 'glacial'
   // Rogue, Ranger, Cleric
   | 'stealth' | 'silenced' | 'rooted' | 'sleep' | 'untargetable' | 'evasion' | 'spellImmune' | 'deadlyPoison'
-  | 'deathMark' | 'hunted' | 'revealed' | 'shadowDance' | 'nightsEmbrace' | 'pandemic' | 'camo' | 'nest' | 'deadeye'
+  | 'deathMark' | 'hunted' | 'revealed' | 'shadowDance' | 'nightsEmbrace' | 'pandemic' | 'lightFoot' | 'focus' | 'rapidFire' | 'deadeye'
   | 'tripwire' | 'painSup' | 'guardian' | 'ascension' | 'avatarLight' | 'purified' | 'mending' | 'channel'
   | 'vanishStun' | 'backstab' | 'riposte' | 'adrenaline' | 'decoy';
 
 const STATUS_KEYS: StatusKey[] = ['frozen', 'stunned', 'flinch', 'iceBlock', 'roared', 'berserk', 'avatar', 'ascendance', 'lastStand', 'reflect', 'counterspell', 'mortal', 'evoLock', 'noKnock', 'frostNova', 'glacial',
-  'stealth', 'silenced', 'rooted', 'sleep', 'untargetable', 'evasion', 'spellImmune', 'deadlyPoison', 'deathMark', 'hunted', 'revealed', 'shadowDance', 'nightsEmbrace', 'pandemic', 'camo', 'nest', 'deadeye',
+  'stealth', 'silenced', 'rooted', 'sleep', 'untargetable', 'evasion', 'spellImmune', 'deadlyPoison', 'deathMark', 'hunted', 'revealed', 'shadowDance', 'nightsEmbrace', 'pandemic', 'lightFoot', 'focus', 'rapidFire', 'deadeye',
   'tripwire', 'painSup', 'guardian', 'ascension', 'avatarLight', 'purified', 'mending', 'channel',
   'vanishStun', 'backstab', 'riposte', 'adrenaline', 'decoy'];
 
 /** Buffs a dispel (Purge) strips. */
-export const BUFF_KEYS: StatusKey[] = ['berserk', 'avatar', 'ascendance', 'lastStand', 'reflect', 'counterspell', 'noKnock', 'frostNova', 'stealth', 'untargetable', 'evasion', 'spellImmune', 'deadlyPoison', 'shadowDance', 'nightsEmbrace', 'camo', 'nest', 'deadeye', 'tripwire', 'painSup', 'guardian', 'ascension', 'avatarLight', 'purified', 'mending', 'vanishStun', 'riposte', 'adrenaline', 'decoy'];
+export const BUFF_KEYS: StatusKey[] = ['berserk', 'avatar', 'ascendance', 'lastStand', 'reflect', 'counterspell', 'noKnock', 'frostNova', 'stealth', 'untargetable', 'evasion', 'spellImmune', 'deadlyPoison', 'shadowDance', 'nightsEmbrace', 'lightFoot', 'focus', 'rapidFire', 'deadeye', 'tripwire', 'painSup', 'guardian', 'ascension', 'avatarLight', 'purified', 'mending', 'vanishStun', 'riposte', 'adrenaline', 'decoy'];
 /** Debuffs a cleanse removes (and Purify blocks). */
 const DEBUFF_KEYS: StatusKey[] = ['frozen', 'stunned', 'silenced', 'rooted', 'sleep', 'roared', 'mortal', 'deathMark', 'hunted', 'revealed'];
 
@@ -168,7 +168,8 @@ export interface Projectile {
 
 export interface Mark { col: number; row: number; t: number; color: string }
 /** A hidden Ranger trap. Only its owner sees it. */
-export interface Trap { side: Side; col: number; row: number; arm: number; t: number; kind: 'freeze' | 'explode' | 'mine' | 'blast' }
+/** Traps last until the next Draw screen. A Tripwire is one trap per panel of a column, sharing a `group`. */
+export interface Trap { side: Side; col: number; row: number; arm: number; kind: 'freeze' | 'explode' | 'mine' | 'blast' | 'wire'; group?: number; fired?: boolean }
 /** A Ranger companion that acts on its own. `row` null follows the Ranger's row. */
 export interface Pet { side: Side; kind: 'wolf' | 'hawk' | 'bear'; row: number | null; col: number; t: number; cd: number; period: number; dmg: number }
 export interface FloatText { x: number; y: number; text: string; color: string; t: number }
@@ -283,6 +284,8 @@ export class Battle {
   beginCustom(): void {
     this.phase = 'custom';
     this.turn++;
+    // traps last until the next Draw screen
+    this.traps = [];
     for (const f of this.f) {
       this.blinkHome(f);
       // uncast picks from last turn are discarded
@@ -294,6 +297,8 @@ export class Battle {
         f.bonusManaNext = 0;
       } else if (f.cls === 'rogue') {
         f.res = Math.max(f.res, TUNING.rogue.energyTopUp);
+      } else if (f.cls === 'ranger' && this.turn > 1) {
+        f.res = Math.min(TUNING.ranger.energyCap, f.res + 1);
       } else if (f.cls === 'cleric' && this.turn > 1) {
         f.res = Math.min(TUNING.cleric.manaCap, f.res + TUNING.cleric.manaPerDraw);
       }
@@ -440,13 +445,22 @@ export class Battle {
 
   private updateTraps(dt: number): void {
     for (const t of this.traps) {
-      t.t -= dt;
       t.arm -= dt;
-      if (t.arm > 0 || t.t <= 0) continue;
+      if (t.arm > 0 || t.fired) continue;
       const v = this.fighterAt(t.col, t.row);
       if (!v || v.side === t.side) continue;
-      t.t = 0;
+      t.fired = true;
       const src = this.f[t.side];
+      if (t.kind === 'wire') {
+        // the whole wire goes with it
+        for (const o of this.traps) if (o.group === t.group) o.fired = true;
+        v.st.stealth = 0;
+        this.addFx('trapPop', t.side, t.col, t.row, 0.5, { kind: 'mine' });
+        this.damage(v, 40, src, { spell: true, element: 'nature' });
+        this.stun(v, TUNING.ranger.tripwireStun);
+        this.text(v, 'TRIPWIRE', '#f8b800');
+        continue;
+      }
       this.addFx('trapPop', t.side, t.col, t.row, 0.5, { kind: t.kind });
       if (t.kind === 'freeze') { this.damage(v, 20, src, { spell: true, element: 'frost' }); this.freeze(v, 1.5); }
       else if (t.kind === 'explode') {
@@ -457,7 +471,7 @@ export class Battle {
       } else if (t.kind === 'mine') { sfx('explode'); this.damage(v, 50, src, { spell: true, element: 'nature', knockback: true }); }
       else { sfx('explode'); this.addFx('explode', t.side, t.col, t.row, 0.35); this.damage(v, 60, src, { spell: true, element: 'fire' }); }
     }
-    this.traps = this.traps.filter(t => t.t > 0);
+    this.traps = this.traps.filter(t => !t.fired);
   }
 
   private updatePets(dt: number): void {
@@ -469,17 +483,23 @@ export class Battle {
       if (p.kind === 'bear' && !this.walls.some(w => w.kind === 'bear' && w.side === p.side)) { p.t = 0; continue; }
       if (p.cd > 0) continue;
       const row = p.row ?? owner.row;
-      if (p.kind === 'hawk') {
-        p.cd = p.period;
-        this.addFx('hawkDive', p.side, foe.col, foe.row, 0.35);
-        this.damage(foe, p.dmg, owner, { spell: true, element: 'nature', targeted: true, noFlinch: true });
-      } else if (foe.row === row) {
-        p.cd = p.period;
-        this.addFx(p.kind === 'bear' ? 'claw' : 'bite', p.side, foe.col, foe.row, 0.3);
-        this.damage(foe, p.dmg, owner, { spell: true, element: 'nature', noFlinch: p.kind !== 'bear' });
-      }
+      // the bear only swipes the panel right in front of it
+      const inReach = p.kind === 'hawk' || (p.kind === 'bear' ? foe.row === p.row && foe.col === p.col + this.dir(owner) : foe.row === row);
+      if (inReach) { p.cd = p.period; this.petAttack(p, 1); }
     }
     this.pets = this.pets.filter(p => p.t > 0);
+  }
+
+  /** A companion's attack on the enemy. Kill Command forces one from anywhere at double damage. */
+  petAttack(p: Pet, mult: number): void {
+    const owner = this.f[p.side], foe = this.foe(owner);
+    if (p.kind === 'hawk') {
+      this.addFx('hawkDive', p.side, foe.col, foe.row, 0.35);
+      this.damage(foe, p.dmg * mult, owner, { spell: true, element: 'nature', targeted: true, noFlinch: true });
+    } else {
+      this.addFx(p.kind === 'bear' ? 'claw' : 'bite', p.side, foe.col, foe.row, 0.3);
+      this.damage(foe, p.dmg * mult, owner, { spell: true, element: 'nature', noFlinch: p.kind !== 'bear' });
+    }
   }
 
   private updateZones(): void {
@@ -530,8 +550,9 @@ export class Battle {
     this.updatePoison(f, dt);
     if (f.cls === 'ranger') {
       // Energy comes from standing still; any change of panel restarts the count
-      if (f.col !== f.lastCol || f.row !== f.lastRow) f.stillT = 0;
-      else f.stillT += dt * (f.st.nest > 0 ? 2 : 1);
+      // (Light Footed keeps the count through moves; Deadeye doubles the rate)
+      if ((f.col !== f.lastCol || f.row !== f.lastRow) && f.st.lightFoot <= 0) f.stillT = 0;
+      else f.stillT += dt * (f.st.deadeye > 0 ? 2 : 1);
       const R = TUNING.ranger;
       while (f.stillT >= R.stillSeconds) {
         f.stillT -= R.stillSeconds;
@@ -585,7 +606,7 @@ export class Battle {
       f.deathMarkAcc = 0;
       if (dmg > 0) { this.addFx('stab', f.side, f.col, f.row, 0.4); this.damage(f, dmg, this.foe(f), { spell: true, element: 'shadow' }); }
     }
-    if (k === 'camo' || k === 'nightsEmbrace') f.st.stealth = 0;
+    if (k === 'nightsEmbrace') f.st.stealth = 0;
     if (k === 'mending') f.mending = 0;
     if (k === 'backstab') this.blinkHome(f);
   }
@@ -593,9 +614,8 @@ export class Battle {
   tryMove(f: Fighter, d: Dir): boolean {
     const [dc, dr] = d === 'up' ? [0, -1] : d === 'down' ? [0, 1] : d === 'left' ? [-1, 0] : [1, 0];
     const nc = f.col + dc, nr = f.row + dr;
-    if (f.st.rooted > 0 || f.st.nest > 0) return false;
+    if (f.st.rooted > 0 || f.st.deadeye > 0) return false;
     if (!this.canStand(f, nc, nr)) return false;
-    if (f.st.camo > 0) { f.st.camo = 0; f.st.stealth = 0; }
     this.leavePanel(f.col, f.row);
     f.col = nc; f.row = nr;
     f.moveCd = TUNING.moveRepeat;
@@ -736,12 +756,38 @@ export class Battle {
       }
     } else if (f.cls === 'ranger') {
       const T = TUNING.ranger;
-      f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
-      sfx(kind === 'light' ? 'bolt' : 'boltHeavy');
-      const dmg = kind === 'light' ? T.lightDamage * (f.st.deadeye > 0 ? 3 : 1) : T.heavyDamage;
-      const pierce = kind === 'heavy' && f.st.deadeye > 0;
-      const end = this.rowShot(f, dmg, { basic: kind, element: 'steel', knockback: kind === 'heavy' }, pierce);
-      this.addFx(kind === 'light' ? 'arrow' : 'aimed', f.side, f.col, f.row, kind === 'light' ? 0.2 : 0.3, { to: end.col });
+      // Hunter's Mark: both attacks home in on the enemy wherever they are
+      const homing = foe.st.hunted > 0 && this.targetable(foe);
+      if (kind === 'light') {
+        // Arrow: a visible, dodgeable shot with travel time
+        f.lock = f.st.rapidFire > 0 ? T.lightLock / 2 : T.lightLock;
+        sfx('bolt');
+        const dmg = T.lightDamage * (f.st.deadeye > 0 ? 3 : 1);
+        const opts: HitOpts = { basic: kind, element: 'steel' };
+        if (homing) {
+          this.projectiles.push({
+            side: f.side, row: f.row, x: f.col, speed: 0, kind: 'arrow', reflectable: true,
+            homing: { p: 0, dur: Math.max(0.15, Math.abs(foe.col - f.col) / T.arrowSpeed), sx: f.col, sy: f.row, target: foe.side },
+            onHit: (b, t) => { if (t) b.damage(t, dmg, f, opts); },
+          });
+        } else {
+          this.shoot(f, {
+            speed: T.arrowSpeed * d, kind: 'arrow', reflectable: true,
+            onHit: (b, t, w) => { if (w) b.hitWall(w, dmg, f, opts); else if (t) b.damage(t, dmg, f, opts); },
+          });
+        }
+      } else {
+        // Aimed Shot: instant, pierces during Deadeye
+        f.lock = T.heavyLock;
+        sfx('boltHeavy');
+        if (homing) {
+          this.addFx('aimed', f.side, f.col, f.row, 0.3, { to: foe.col, toRow: foe.row });
+          this.damage(foe, T.heavyDamage, f, { basic: kind, element: 'steel', targeted: true });
+        } else {
+          const end = this.rowShot(f, T.heavyDamage, { basic: kind, element: 'steel' }, f.st.deadeye > 0);
+          this.addFx('aimed', f.side, f.col, f.row, 0.3, { to: end.col });
+        }
+      }
     } else {
       const T = TUNING.cleric;
       f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
@@ -803,9 +849,9 @@ export class Battle {
     return { col, hit };
   }
 
-  /** Attacking or casting ends Stealth, unless Camouflage or Night's Embrace keep it. Shadow Dance brings it back. */
+  /** Attacking or casting ends Stealth, unless Night's Embrace keeps it. Shadow Dance brings it back. */
   breakStealth(f: Fighter): void {
-    if (f.st.stealth <= 0 || f.st.camo > 0 || f.st.nightsEmbrace > 0) return;
+    if (f.st.stealth <= 0 || f.st.nightsEmbrace > 0) return;
     f.st.stealth = 0;
     if (f.st.shadowDance > 0) this.later(1, () => { if (f.st.shadowDance > 0) this.stealth(f, 2); });
   }
@@ -818,19 +864,6 @@ export class Battle {
 
   /** Can this fighter be picked by a targeted or homing effect? */
   targetable(f: Fighter): boolean { return f.st.stealth <= 0 && f.st.untargetable <= 0; }
-
-  /** Blinking into the enemy area. Returns false (and the blink fails) when a Tripwire catches it. */
-  blinkIn(f: Fighter): boolean {
-    const foe = this.foe(f);
-    if (foe.st.tripwire <= 0) return true;
-    foe.st.tripwire = 0;
-    f.st.stealth = 0;
-    this.addFx('trapPop', foe.side, foe.col, foe.row, 0.5, { kind: 'mine' });
-    this.damage(f, 40, foe, { spell: true, element: 'nature' });
-    this.stun(f, 1);
-    this.text(f, 'TRIPWIRE', '#f8b800');
-    return false;
-  }
 
   /** Backstab blink: move to the panel in front of the enemy, in their row. A wall there takes the hit and
    *  the Rogue lands in front of it. Returns the panel the blink attacks. */
@@ -987,7 +1020,8 @@ export class Battle {
     let amt = base;
     if (src && src.st.roared > 0) amt *= 0.7;
     if (target.st.frozen > 0 || target.st.stunned > 0 || target.st.sleep > 0) amt *= TUNING.frozenBonus;
-    if (src && src.cls === 'ranger' && target.st.hunted > 0) amt *= 1.25;
+    // Steady Focus: the rooted Ranger hits harder
+    if (src && src.st.focus > 0) amt *= TUNING.ranger.focusBonus;
     if (target.st.painSup > 0) amt *= 0.5;
     // any hit wakes a sleeping target (that hit still got the bonus)
     if (target.st.sleep > 0 && !opts.dot) target.st.sleep = 0;
@@ -1243,8 +1277,7 @@ export interface CastCtx {
 
 /** Seconds to arm a fighter's heavy attack. */
 export function heavyChargeOf(f: Fighter): number {
-  if (f.cls !== 'ranger') return TUNING.heavyCharge;
-  return f.st.nest > 0 || f.st.deadeye > 0 ? 0.35 : TUNING.ranger.heavyCharge;
+  return f.st.deadeye > 0 ? 0.35 : TUNING.heavyCharge;
 }
 
 export interface FighterSpec { cls: ClassId; deck: string[]; name: string; skin?: string }
