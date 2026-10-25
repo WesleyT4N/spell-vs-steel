@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/artifact.mjs",
+    "build:prod": "tsc --noEmit && vite build --mode prod && node scripts/artifact.mjs dist-prod",
     "sim": "tsx scripts/sim.ts",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",

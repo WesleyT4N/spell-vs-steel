@@ -120,9 +120,16 @@ const SFX: Record<string, Blip[]> = {
   win: [523, 659, 784, 1047].map((f, i) => ({ w: 'square' as Wave, f0: f, f1: f, d: 0.12, v: 0.25, delay: i * 0.12 })),
 };
 
+/** Silence sound effects while `fn` runs (headless sims in the dev tools). */
+let quiet = 0;
+export function withoutSfx<T>(fn: () => T): T {
+  quiet++;
+  try { return fn(); } finally { quiet--; }
+}
+
 export function sfx(name: string): void {
   const c = ctx;
-  if (!c || c.state !== 'running' || muted || !settings.sfxOn || settings.sfx === 0) return;
+  if (!c || c.state !== 'running' || quiet || muted || !settings.sfxOn || settings.sfx === 0) return;
   const list = SFX[name];
   if (!list) return;
   const t0 = c.currentTime;

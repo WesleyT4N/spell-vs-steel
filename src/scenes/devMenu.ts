@@ -1,0 +1,68 @@
+// Dev tools menu: card encyclopedia, debug sandbox and balance lab.
+import { setScene, drawMenu, hint, listMouse, type Scene } from './scene';
+import { getArena } from '../game/battleView';
+import { W, H, UW, type Ctx } from '../engine/gfx';
+import { drawTextCentered } from '../engine/font';
+import { wasPressed, navPressed, k } from '../engine/input';
+import { sfx } from '../engine/audio';
+import { EncyclopediaScene } from './encyclopedia';
+import { SandboxScene } from './sandbox';
+import { LabScene } from './lab';
+
+const ITEMS = ['CARD ENCYCLOPEDIA', 'SANDBOX', 'BALANCE LAB', 'BACK'];
+const ABOUT = [
+  'EVERY SPELL OF EVERY CLASS, WITH FILTERS',
+  'DEBUG MODE: CAST ANY SPELL, DUMMIES, SLOW-MO, HIT LOG',
+  'CPU VS CPU SIMS, PER-CARD STATS, LIVE TUNING',
+  '',
+];
+
+export const openEncyclopedia = (back: () => void): void => {
+  const enc: EncyclopediaScene = new EncyclopediaScene(back, card => setScene(new SandboxScene(() => setScene(enc), { you: card.cls, queue: [card.id] })));
+  setScene(enc);
+};
+
+export class DevMenuScene implements Scene {
+  sel = 0;
+
+  constructor(private back: () => void) {}
+
+  private open(i: number): void {
+    const here = (): void => setScene(new DevMenuScene(this.back));
+    if (i === 0) openEncyclopedia(here);
+    if (i === 1) setScene(new SandboxScene(here));
+    if (i === 2) setScene(new LabScene(here));
+    if (i === 3) { sfx('back'); this.back(); }
+  }
+
+  update(dt: number): void {
+    if (navPressed('up', dt)) { this.sel = (this.sel + ITEMS.length - 1) % ITEMS.length; sfx('move'); }
+    if (navPressed('down', dt)) { this.sel = (this.sel + 1) % ITEMS.length; sfx('move'); }
+    const clicked = listMouse('menu', this.sel, i => { this.sel = i; sfx('move'); });
+    if (clicked >= 0) this.sel = clicked;
+    if (wasPressed('confirm') || clicked >= 0) { sfx('select'); this.open(this.sel); return; }
+    if (wasPressed('back')) { sfx('back'); this.back(); }
+  }
+
+  draw(c: Ctx, tick: number, ui: Ctx): void {
+    getArena().draw(c, tick, 0);
+    c.fillStyle = 'rgba(0,0,24,0.7)';
+    c.fillRect(0, 0, W, H);
+    drawTextCentered(ui, 'DEV TOOLS', UW / 2, 48, '#f8b800', 3);
+    drawMenu(ui, ITEMS, this.sel, UW / 2, 112, tick, { width: 240, gap: 24 });
+    drawTextCentered(ui, ABOUT[this.sel], UW / 2, 232, '#bcbcbc');
+    hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   ${k('cast')}: BACK`);
+  }
+}
+
+/** Open a dev tool straight from the URL hash (#cards, #sandbox, #lab), for local work. */
+export function devFromHash(home: () => void): boolean {
+  const tag = location.hash.slice(1);
+  const menu = (): void => setScene(new DevMenuScene(home));
+  if (tag === 'cards') openEncyclopedia(menu);
+  else if (tag === 'sandbox') setScene(new SandboxScene(menu));
+  else if (tag === 'lab') setScene(new LabScene(menu));
+  else if (tag === 'dev') menu();
+  else return false;
+  return true;
+}

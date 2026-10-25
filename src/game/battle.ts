@@ -65,7 +65,7 @@ export interface Fighter {
   /** Visual: seconds of hit flash. */
   flash: number;
   /** Visual: current pose. */
-  pose: 'idle' | 'attack' | 'cast' | 'hurt';
+  pose: 'idle' | 'attack' | 'heavy' | 'cast' | 'hurt';
   poseT: number;
   dead: boolean;
 }
@@ -474,15 +474,15 @@ export class Battle {
   basicAttack(f: Fighter, kind: 'light' | 'heavy'): void {
     const foe = this.foe(f);
     const d = this.dir(f);
-    f.pose = 'attack';
-    f.poseT = 0.2;
+    f.pose = kind === 'light' ? 'attack' : 'heavy';
+    f.poseT = kind === 'light' ? 0.2 : 0.32;
     if (f.cls === 'warrior') {
       const T = TUNING.warrior;
       const dmg = kind === 'light' ? T.lightDamage : T.heavyDamage;
       f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
       const cells: Array<[number, number]> = [[f.col + d, f.row], [f.col + 2 * d, f.row]];
       const swing = (): void => {
-        this.addFx(kind === 'light' ? 'cleave' : 'cleaveHeavy', f.side, f.col + d, f.row, 0.18);
+        this.addFx(kind === 'light' ? 'cleave' : 'cleaveHeavy', f.side, f.col + d, f.row, kind === 'light' ? 0.18 : 0.34);
         const res = this.strike(f, cells, dmg, { basic: kind, element: 'steel' });
         if (res.fighter && kind === 'heavy') this.gainRage(f, T.rageHeavyHit * (f.st.berserk > 0 ? 2 : 1));
         if (res.fighter && kind === 'light' && T.rageLightHit) this.gainRage(f, T.rageLightHit * (f.st.berserk > 0 ? 2 : 1));
@@ -502,7 +502,7 @@ export class Battle {
         if (w && w.side !== f.side) { endCol = c; this.hitWall(w, dmg, f, {}); break; }
         if (foe.col === c && foe.row === f.row && !foe.dead) { endCol = c; this.damage(foe, dmg, f, { basic: kind, element: 'arcane' }); break; }
       }
-      this.addFx(kind === 'light' ? 'bolt' : 'boltHeavy', f.side, f.col, f.row, 0.15, { to: endCol });
+      this.addFx(kind === 'light' ? 'bolt' : 'boltHeavy', f.side, f.col, f.row, kind === 'light' ? 0.2 : 0.32, { to: endCol });
     }
     void foe;
   }
