@@ -18,7 +18,7 @@ import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse } from '../engine/input';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
-import { drawCardDetail, drawCardFace, CARD_W, CARD_H, PICKED } from './cardView';
+import { drawCardDetail, drawCardFace, resName, CARD_W, CARD_H, PICKED } from './cardView';
 import { SetupScene } from './setup';
 import { TitleScene } from './title';
 import { OptionsScene } from './options';
@@ -253,12 +253,17 @@ export class BattleScene implements Scene {
     drawTextCentered(ui, String(secs).padStart(2, '0'), UW / 2, 6, secs <= 5 && tick % 4 < 2 ? '#f83800' : '#f8b800', 2);
     const total = this.picks.reduce((a, i) => { const cc = CARDS[offer[i]].cost; return a + (cc === 'all' ? 1 : cc); }, 0);
     this.drawResourcePreview(ui, tick);
+    const short = this.shortfalls();
 
     // left: the card being read
     const card = offer[this.cursor] ? CARDS[offer[this.cursor]] : null;
     frame(ui, 8, 34, 228, 130, '#000000', card ? ELEMENT_COLOR[card.element] : '#7c7c7c');
-    if (card) drawCardDetail(ui, card, 16, 42, 212);
-    else {
+    if (card) {
+      drawCardDetail(ui, card, 16, 42, 212);
+      const need = short[this.cursor];
+      // Rage builds in the fight, so a Warrior can still queue it; other resources only refill next Draw
+      if (need > 0) drawText(ui, `NEED ${need} MORE ${resName(card)}${f.cls === 'warrior' ? ' (BUILDS IN FIGHT)' : ''}`, 16, 152, '#f83800');
+    } else {
       drawText(ui, 'START THE FIGHT', 16, 42, '#f8b800', 2);
       drawText(ui, `${this.picks.length} SPELL${this.picks.length === 1 ? '' : 'S'} PICKED`, 16, 64, '#fcfcfc');
       drawText(ui, `CAST THEM IN ORDER WITH ${k('cast')}`, 16, 78, '#bcbcbc');
@@ -274,9 +279,9 @@ export class BattleScene implements Scene {
       drawText(ui, `${n + 1}`, 252, y, PICKED);
       P(ui, ELEMENT_COLOR[cd.element], 264, y, 3, 7);
       drawText(ui, cd.name.toUpperCase(), 272, y, RARITY_COLOR[cd.rarity]);
-      drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, '#fcfcfc');
+      drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, short[i] > 0 ? '#f83800' : '#fcfcfc');
     });
-    const over = f.cls === 'mage' && total > f.res;
+    const over = this.picks.some(i => short[i] > 0);
     drawText(ui, `TOTAL COST ${total}`, 252, 120, over ? '#f83800' : '#bcbcbc');
     drawText(ui, f.cls === 'warrior' ? 'PAY ON CAST' : 'REFILLS', 464 - (f.cls === 'warrior' ? 11 : 7) * 6, 120, '#7c7c7c');
 
@@ -294,10 +299,25 @@ export class BattleScene implements Scene {
       // the hit box covers every raise level, so a rising card never slips out from under the pointer
       zone(`card:${i}`, x, HAND_Y - 2 * LIFT, CARD_W, CARD_H + 2 * LIFT);
       const y = HAND_Y - Math.round(this.lift[i] ?? 0);
-      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1 || (lvl === 2 && this.cursor === i) });
+      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1 || (lvl === 2 && this.cursor === i), short: short[i] });
       if (!this.mouseMode && this.cursor === i && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, '#f8b800', 1, false);
     });
     hint(ui, `CLICK: PICK  RIGHT-CLICK: UNDO   KEYS: ${k('left')}/${k('right')} + ${k('attack')}  ${k('cast')} UNDO  ${k('custom')} FIGHT`);
+  }
+
+  /**
+   * How much resource each hand card is missing right now (0 = payable). Picked cards are checked at
+   * their place in the cast order; the rest as if queued next, after what the picks spend and gain.
+   */
+  private shortfalls(): number[] {
+    const b = this.b, f = b.f[this.me], offer = b.offer[this.me];
+    const picked = this.picks.map(i => CARDS[offer[i]]);
+    const plan = b.planCosts(f, picked);
+    return offer.map((id, i) => {
+      const at = this.picks.indexOf(i);
+      const left = at >= 0 ? plan.left[at] : b.planCosts(f, [...picked, CARDS[id]]).left[picked.length];
+      return Math.max(0, -left);
+    });
   }
 
   /** Header resource pips, with what the picked spells would add blinking in. */
