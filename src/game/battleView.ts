@@ -1,4 +1,5 @@
 // Draws a Battle: arena, panels, fighters, spell effects and the HUD.
+import { k } from '../engine/input';
 import { Colosseum, drawPanel, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, type Tint } from '../art/sprites';
 import { P, W, blob, frame, mix, type Ctx } from '../engine/gfx';
@@ -330,7 +331,7 @@ function drawHud(c: Ctx, b: Battle, tick: number): void {
   frame(c, gx, 4, gw, 7, '#000000', '#fcfcfc');
   const full = b.gauge >= 1;
   P(c, full ? (tick % 4 < 2 ? '#f8b800' : '#fcfcfc') : '#3cbcfc', gx + 1, 5, Math.round((gw - 2) * b.gauge), 5);
-  drawTextCentered(c, full ? 'SPACE: CUSTOM' : 'CUSTOM', 120, 13, full ? '#f8b800' : '#bcbcbc');
+  drawTextCentered(c, full ? `${k('custom')}: CUSTOM` : 'CUSTOM', 120, 13, full ? '#f8b800' : '#bcbcbc');
 }
 
 function drawResource(c: Ctx, f: Fighter, x: number, y: number, tick: number): void {
