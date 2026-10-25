@@ -43,6 +43,7 @@ body.svs-portrait { align-items: flex-start; }
 .svs-pill { border-radius: 14px; border: 3px solid #7c7c7c; background: #000; display: flex; align-items: center; justify-content: center; font-size: 12px; letter-spacing: 1px; }
 .svs-pill.ready { border-color: #f8b800; color: #f8b800; }
 .svs-pill.on { background: #0000a8; }
+.svs-pill.big { font-size: 18px; letter-spacing: 2px; border-radius: 22px; }
 .svs-code { opacity: 0.01; font-size: 16px; border: 0; padding: 0; color: transparent; background: transparent; caret-color: transparent; }
 `;
 
@@ -139,6 +140,7 @@ const pill = (code: string, label: string): HTMLDivElement => {
   return e;
 };
 const draw = pill('PadDraw', 'DRAW');
+draw.classList.add('big');
 const pause = pill('PadPause', 'PAUSE');
 const back = pill('PadBack', '◀ BACK');
 
@@ -212,7 +214,7 @@ export function layout(canvas = canvasEl): void {
     ax = vw - 14 - size / 2;
     place(pause, vw / 2 - 36, r.bottom + 14, 72, 28, r);
     place(back, 12, r.bottom + 10, 92, 32, r);
-    place(draw, ax - size * 0.4, cy - size / 2 - 40, size * 0.8, 30, r);
+    place(draw, ax - size * 0.5, cy - size / 2 - 60, size, 46, r);
   } else {
     // landscape: thumbs on either side of the screen
     size = Math.min(160, vh * 0.38);
@@ -223,8 +225,8 @@ export function layout(canvas = canvasEl): void {
     place(pause, vw - 82, 8, 74, 28, r);
     place(back, 8, 8, 92, 32, r);
     // DRAW over the buttons, kept off the screen when the side has room
-    const w = Math.max(size * 0.6, Math.min(size * 0.8, side - 16));
-    place(draw, ax - w / 2, cy - size / 2 - 40, w, 30, r);
+    const w = Math.max(size * 0.8, Math.min(size, side - 12));
+    place(draw, ax - w / 2, cy - size / 2 - 54, w, 42, r);
   }
   place(dpad, dx - size / 2, cy - size / 2, size, size, r);
   const arm = size / 3;
@@ -237,7 +239,10 @@ export function layout(canvas = canvasEl): void {
   const d = size * 0.48;
   place(attack.e, ax + size / 2 - d, cy - size / 2, d, d, r);
   place(cast.e, ax - size / 2, cy + size / 2 - d, d, d, r);
-  for (const b of [attack, cast]) b.key.style.fontSize = `${Math.round(d * 0.32)}px`;
+  for (const b of [attack, cast]) {
+    b.key.style.fontSize = `${Math.round(d * 0.32)}px`;
+    (b.e.lastElementChild as HTMLElement).style.fontSize = `${Math.min(10, Math.round(d * 0.11))}px`;
+  }
   if (codeRect) {
     const sx = r.width / UW, sy = r.height / UH;
     const [x, y, w, h] = codeRect;
