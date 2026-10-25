@@ -33,7 +33,7 @@ Custom screen: J picks or unpicks a spell (cast order is pick order), K undoes t
 ## Rules in the prototype
 
 - One shared custom gauge fills in 10s; only the player can open the custom screen, and both sides draft when it opens. 5 spells drawn each time, 20s timer. Picked-but-uncast spells are discarded at the next custom screen.
-- Spell costs are paid on cast. Warrior Rage (max 5) comes from heavy hits (+1) and taking hits (+1/2); light attacks build none. Mage Mana starts at 1 max, +1 max per custom screen (cap 5), and refills each turn.
+- Spell costs are paid on cast. Warrior Rage (max 5) comes from heavy hits (+1.5) and taking damage (1 pip per 40, max 1 per hit); light attacks build none. Mage Mana starts at 1 max, +1 max per custom screen (cap 5), and refills each turn.
 - Frozen or stunned targets take +50% damage. No slows.
 - Grimoires: exactly 30 spells, up to 4 copies of a common, 2 of an uncommon, 1 of each Legendary (max 5), exactly 1 Mythic. Custom decks save in the browser.
 - Mirror matches give the CPU an alternate palette.
