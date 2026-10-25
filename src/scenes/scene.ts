@@ -3,12 +3,15 @@ import type { Ctx } from '../engine/gfx';
 import { P, UW, UH, frame } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { mouse } from '../engine/input';
+import { touchText, type PadMode } from '../engine/touch';
 
 export interface Scene {
   update(dt: number): void;
   /** `c` is the 240×160 world; `ui` is the 480×320 sharp layer drawn on top of it. */
   draw(c: Ctx, tick: number, ui: Ctx): void;
   enter?(): void;
+  /** Which touch controls this screen shows on phones (a BACK button when left out). */
+  pad?(): PadMode;
 }
 
 let current: Scene | null = null;
@@ -78,7 +81,7 @@ export function drawMenu(c: Ctx, items: string[], sel: number, cx: number, y: nu
 /** Footer line of control hints on the UI layer. */
 export function hint(c: Ctx, s: string): void {
   P(c, '#000000', 0, UH - 14, UW, 14);
-  drawTextCentered(c, s, UW / 2, UH - 11, '#bcbcbc', 1, false);
+  drawTextCentered(c, touchText(s), UW / 2, UH - 11, '#bcbcbc', 1, false);
 }
 
 /** A small clickable button; returns nothing, registers the zone `id`. */

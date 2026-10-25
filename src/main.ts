@@ -6,6 +6,7 @@ import { setScene, getScene, commitZones, hotZone } from './scenes/scene';
 import { TitleScene } from './scenes/title';
 import { OnlineScene } from './scenes/online';
 import { DEV_TOOLS } from './flags';
+import { touchActive, onTouchChange, layout as layoutPad, padSide, syncPad, touchText, viewport } from './engine/touch';
 
 // The screen is the sharp UI resolution. The world draws at 240×160 offscreen and is scaled up 2×
 // underneath, so the fight keeps its chunky pixels while menus and text get twice the room.
@@ -26,14 +27,29 @@ const world = offscreen(W, H);
 const ui = offscreen(UW, UH);
 
 function fit(): void {
-  // half steps of the screen are whole steps of the world, so the fight's pixels stay square
-  // dev tools can dock a panel on the right and reserve its width
-  const room = window.innerWidth - Number(document.body.dataset.reserveRight ?? 0);
-  const s = Math.max(0.5, Math.floor(Math.min(room / UW, window.innerHeight / UH) * 2) / 2);
+  const [vw, vh] = touchActive() ? viewport() : [window.innerWidth, window.innerHeight];
+  let s: number;
+  const portrait = touchActive() && vh > vw;
+  if (touchActive()) {
+    // phones: fill the screen at any scale, leaving room for the touch pad
+    // (underneath in portrait, a little on each side in landscape)
+    s = portrait
+      ? Math.min(vw / UW, (vh * 0.62) / UH)
+      : Math.max(Math.min(vw / UW, vh / UH) * 0.8, Math.min(vh / UH, (vw - 2 * padSide(vh)) / UW));
+  } else {
+    // half steps of the screen are whole steps of the world, so the fight's pixels stay square
+    // dev tools can dock a panel on the right and reserve its width
+    const room = vw - Number(document.body.dataset.reserveRight ?? 0);
+    s = Math.max(0.5, Math.floor(Math.min(room / UW, vh / UH) * 2) / 2);
+  }
+  document.body.classList.toggle('svs-portrait', portrait);
   canvas.style.width = `${UW * s}px`;
   canvas.style.height = `${UH * s}px`;
+  layoutPad(canvas);
 }
 window.addEventListener('resize', fit);
+window.visualViewport?.addEventListener('resize', fit);
+onTouchChange(fit);
 fit();
 
 initInput(canvas);
@@ -69,12 +85,13 @@ function frame(now: number): void {
   getScene()?.draw(world, tick, ui);
   if (!engaged) {
     P(ui, '#000000', 0, 128, UW, 30);
-    drawTextCentered(ui, 'CLICK HERE TO START', UW / 2, 133, tick % 8 < 6 ? '#f8b800' : '#fcfcfc', 1, false);
-    drawTextCentered(ui, 'MOUSE FOR MENUS, KEYBOARD TO FIGHT  (M TO MUTE)', UW / 2, 145, '#bcbcbc', 1, false);
+    drawTextCentered(ui, touchText('CLICK HERE TO START'), UW / 2, 133, tick % 8 < 6 ? '#f8b800' : '#fcfcfc', 1, false);
+    drawTextCentered(ui, touchActive() ? 'TAP MENUS, USE THE PAD TO FIGHT' : 'MOUSE FOR MENUS, KEYBOARD TO FIGHT  (M TO MUTE)', UW / 2, 145, '#bcbcbc', 1, false);
   }
   c.drawImage(world.canvas, 0, 0, UW, UH);
   c.drawImage(ui.canvas, 0, 0);
   commitZones();
+  syncPad(getScene()?.pad?.() ?? 'back');
   canvas.style.cursor = hotZone() ? 'pointer' : 'default';
   requestAnimationFrame(frame);
 }

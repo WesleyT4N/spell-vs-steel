@@ -13,6 +13,7 @@ import { X0, Y0, PW, FACE, LIP, panelCenter } from '../art/arena';
 import { UW, UH, P, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, isDown, heldDir, mouse, getKey, BINDABLE } from '../engine/input';
+import type { PadMode } from '../engine/touch';
 import { playMusic, stopMusic, chargeHum } from '../engine/audio';
 import { BATTLE_SONG } from '../engine/music';
 import { instrument, sourceName, type Hit, type Probe } from '../dev/instrument';
@@ -159,6 +160,8 @@ export class SandboxScene implements Scene {
     }
     return NO_INTENT;
   }
+
+  pad(): PadMode { return 'fight'; }
 
   update(dt: number): void {
     if (this.leaving) { this.exit(); return; }
