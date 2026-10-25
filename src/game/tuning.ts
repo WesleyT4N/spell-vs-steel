@@ -12,6 +12,8 @@ export const TUNING = {
 
   /** Seconds between steps when a direction is held. */
   moveRepeat: 0.16,
+  /** Minimum seconds between any two steps, taps included, so nobody can jitter back and forth. A tap during it is buffered. */
+  moveCooldown: 0.1,
 
   /** Holding the attack button this long arms the heavy attack. */
   heavyCharge: 1.0,
