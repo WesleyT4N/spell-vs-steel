@@ -1,5 +1,5 @@
 // Versus CPU: runs a Battle, the custom screen, pause and results.
-import { setScene, dim, drawMenu, hint, zone, hot, isHot, listMouse, type Scene } from './scene';
+import { setScene, dim, drawMenu, hint, zone, hot, isHot, listMouse, showSel, resetSel, type Scene } from './scene';
 import { Battle, NO_INTENT, type Dir, type Intent, type Side } from '../game/battle';
 import { drawBattle, drawBattleUi } from '../game/battleView';
 import { Cpu } from '../game/ai';
@@ -86,7 +86,7 @@ export class BattleScene implements Scene {
     if (b.phase === 'over') { this.updateResult(dt); b.update(dt, [NO_INTENT, NO_INTENT]); return; }
 
     if (this.paused) { this.updatePause(dt); return; }
-    if (b.phase === 'fight' && wasPressed('pause')) { this.paused = true; this.pauseSel = 0; sfx('select'); return; }
+    if (b.phase === 'fight' && wasPressed('pause')) { this.paused = true; this.pauseSel = 0; resetSel(); sfx('select'); return; }
 
     if (b.phase === 'fight' && wasPressed('custom') && b.canOpenCustom()) {
       b.beginCustom();
@@ -100,6 +100,7 @@ export class BattleScene implements Scene {
     for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / TUNING.heavyCharge) : null);
     if ((b.phase as string) === 'over' && !this.ended) {
       this.ended = true;
+      resetSel();
       if (b.winner !== null) this.score[b.winner]++;
       stopMusic();
       if (b.winner === this.me) sfx('win');
@@ -109,6 +110,7 @@ export class BattleScene implements Scene {
 
   protected openCustom(): void {
     this.cursor = 0;
+    resetSel();
     this.lift = [];
     this.picks = [];
     this.timer = TUNING.customTimer;
@@ -152,7 +154,7 @@ export class BattleScene implements Scene {
   /** Raise level of hand card `i`: 0 resting, 1 hovered, 2 picked. */
   private level(i: number): number {
     if (this.picks.includes(i)) return 2;
-    const hovered = this.mouseMode ? hot('card') === i : this.cursor === i;
+    const hovered = this.mouseMode ? hot('card') === i : this.cursor === i && showSel();
     return hovered ? 1 : 0;
   }
 
@@ -264,10 +266,15 @@ export class BattleScene implements Scene {
     this.drawResourcePreview(ui, tick);
 
     // left: the card being read
-    const card = offer[this.cursor] ? CARDS[offer[this.cursor]] : null;
+    const card = showSel() && offer[this.cursor] ? CARDS[offer[this.cursor]] : null;
     frame(ui, 8, 34, 228, 130, '#000000', card ? ELEMENT_COLOR[card.element] : '#7c7c7c');
     if (card) drawCardDetail(ui, card, 16, 42, 212);
-    else {
+    else if (!showSel()) {
+      drawText(ui, 'YOUR HAND', 16, 42, '#f8b800', 2);
+      drawText(ui, 'TOUCH AND HOLD A CARD TO READ IT', 16, 64, '#fcfcfc');
+      drawText(ui, 'TAP CARDS TO PICK THEM, IN CAST ORDER', 16, 78, '#bcbcbc');
+      drawText(ui, this.rivalDeckText(), 16, 100, '#7c7c7c');
+    } else {
       drawText(ui, 'START THE FIGHT', 16, 42, '#f8b800', 2);
       drawText(ui, `${this.picks.length} SPELL${this.picks.length === 1 ? '' : 'S'} PICKED`, 16, 64, '#fcfcfc');
       drawText(ui, `CAST THEM IN ORDER WITH ${k('cast')}`, 16, 78, '#bcbcbc');
@@ -290,7 +297,7 @@ export class BattleScene implements Scene {
     drawText(ui, f.cls === 'warrior' ? 'PAY ON CAST' : 'REFILLS', 464 - (f.cls === 'warrior' ? 11 : 7) * 6, 120, '#7c7c7c');
 
     // fight button
-    const onOk = this.cursor === offer.length;
+    const onOk = this.cursor === offer.length && showSel();
     // sits above the highest a raised card can reach (HAND_Y - 2 * LIFT)
     zone('fight', 300, 138, 116, 24);
     frame(ui, 300, 138, 116, 24, onOk ? '#f8b800' : '#000000', '#fcfcfc');
@@ -303,8 +310,8 @@ export class BattleScene implements Scene {
       // the hit box covers every raise level, so a rising card never slips out from under the pointer
       zone(`card:${i}`, x, HAND_Y - 2 * LIFT, CARD_W, CARD_H + 2 * LIFT);
       const y = HAND_Y - Math.round(this.lift[i] ?? 0);
-      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1 || (lvl === 2 && this.cursor === i) });
-      if (!this.mouseMode && this.cursor === i && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, '#f8b800', 1, false);
+      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1 || (lvl === 2 && this.cursor === i && showSel()) });
+      if (!this.mouseMode && this.cursor === i && showSel() && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, '#f8b800', 1, false);
     });
     hint(ui, `CLICK: PICK  RIGHT-CLICK: UNDO   KEYS: ${k('left')}/${k('right')} + ${k('attack')}  ${k('cast')} UNDO  ${k('custom')} FIGHT`);
   }

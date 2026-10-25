@@ -3,7 +3,7 @@ import type { Ctx } from '../engine/gfx';
 import { P, UW, UH, frame } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { mouse } from '../engine/input';
-import { touchText, type PadMode } from '../engine/touch';
+import { touchActive, touchText, type PadMode } from '../engine/touch';
 
 export interface Scene {
   update(dt: number): void;
@@ -17,10 +17,22 @@ export interface Scene {
 let current: Scene | null = null;
 export function setScene(s: Scene): void {
   current = s;
+  fresh = true;
   zones = []; nextZones = [];
   s.enter?.();
 }
 export const getScene = (): Scene | null => current;
+
+// ---------- nothing preselected on phones ----------
+// With keys a highlighted row is the cursor, so a menu opens with one. By touch it reads as a choice
+// already made, so phones show no selection until a finger lands on one.
+let fresh = true;
+/** False until the first touch on this menu when playing by touch; always true otherwise. */
+export const showSel = (): boolean => !touchActive() || !fresh;
+/** A new menu opened inside the same screen (pause, results, Draw): hide the selection again on phones. */
+export function resetSel(): void { fresh = true; }
+/** Called by the main loop before each update: a finger landing on something selectable shows the selection. */
+export function noteTouch(): void { if (mouse.touched && hotZone()) fresh = false; }
 
 // ---------- mouse zones ----------
 // Scenes register clickable rectangles (UI coordinates) while drawing; the next update reads them.
@@ -69,7 +81,7 @@ export function drawMenu(c: Ctx, items: string[], sel: number, cx: number, y: nu
   frame(c, x, y - 6, w, items.length * gap + 6, '#000000', '#fcfcfc');
   items.forEach((t, i) => {
     const yy = y + i * gap;
-    const on = i === sel;
+    const on = i === sel && showSel();
     const dis = opts.disabled?.[i];
     zone(`menu:${i}`, x + 2, yy - 4, w - 4, gap - 1);
     if (on) P(c, '#0000a8', x + 2, yy - 4, w - 4, gap - 2);

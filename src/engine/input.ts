@@ -142,7 +142,7 @@ export function releaseVirtual(): void {
 
 // ---------- mouse ----------
 /** Pointer state in canvas pixels, with per-frame click edges. */
-export const mouse = { x: -1, y: -1, moved: false, click: false, rclick: false, wheel: 0, down: false };
+export const mouse = { x: -1, y: -1, moved: false, click: false, rclick: false, wheel: 0, down: false, touched: false };
 
 /** True while the pointer is inside the rectangle. */
 export const hover = (x: number, y: number, w: number, h: number): boolean =>
@@ -172,7 +172,7 @@ function initMouse(canvas: HTMLCanvasElement): void {
     canvas.setPointerCapture(e.pointerId);
     at(e);
     finger = { id: e.pointerId, x0: mouse.x, y0: mouse.y, t0: performance.now(), wy: mouse.y, drag: false };
-    mouse.moved = true; mouse.down = true;
+    mouse.moved = true; mouse.down = true; mouse.touched = true;
   });
   canvas.addEventListener('pointermove', e => {
     if (!finger || e.pointerId !== finger.id) return;
@@ -217,7 +217,7 @@ export function heldDir(): 'up' | 'down' | 'left' | 'right' | null {
 /** Call once at the end of every frame. */
 export function endFrame(): void {
   pressed.clear(); released.clear();
-  mouse.click = mouse.rclick = mouse.moved = false; mouse.wheel = 0;
+  mouse.click = mouse.rclick = mouse.moved = mouse.touched = false; mouse.wheel = 0;
 }
 
 /** Menu navigation with key repeat. Returns a direction on press and then every `rate` seconds while held. */

@@ -1,5 +1,5 @@
 // Online Versus lobby: pick your fighter, then create a room (and share its code or link) or join one.
-import { setScene, hint, zone, hot, listMouse, button, type Scene } from './scene';
+import { setScene, hint, zone, hot, listMouse, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { getSprite, drawFighterSprite, teamColor, SKINS, skinOf, type ClassId } from '../art/sprites';
 import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
@@ -198,7 +198,7 @@ export class OnlineScene implements Scene {
     frame(ui, RX - 8, Y0 - 8, RW + 16, ROWS.length * RH + 12, '#000000', '#fcfcfc');
     ROWS.forEach((row, i) => {
       const y = Y0 + i * RH, ty = y + 5;
-      const on = i === this.sel;
+      const on = i === this.sel && showSel();
       zone(`row:${i}`, RX - 6, y - 1, RW + 12, RH - 1);
       if (on) P(ui, '#0000a8', RX - 6, y - 1, RW + 12, RH - 2);
       if (on && tick % 8 < 6) drawText(ui, '→', RX, ty, '#f8b800');
