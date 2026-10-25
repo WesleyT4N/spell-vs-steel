@@ -109,7 +109,7 @@ function drawPanelEffects(c: Ctx, b: Battle, col: number, row: number, tick: num
 /** A hidden trap, drawn only for its owner: a faint snare outline that brightens once armed. */
 function drawTrap(c: Ctx, t: Trap, tick: number): void {
   const pc = panelCenter(t.col, t.row);
-  const col = t.kind === 'freeze' ? '#3cbcfc' : t.kind === 'mine' ? '#58d854' : '#f87800';
+  const col = t.kind === 'freeze' ? '#3cbcfc' : t.kind === 'mine' || t.kind === 'wire' ? '#58d854' : '#f87800';
   const armed = t.arm <= 0;
   c.globalAlpha = armed ? 0.85 : 0.4;
   P(c, '#000000', pc.x - 6, pc.y - 2, 12, 5);
@@ -375,7 +375,7 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
   if (f.poison > 0) for (let i = 0; i < f.poison; i++) { const t = (b.time * 1.5 + i / f.poison) % 1; P(c, t > 0.7 ? TOX[3] : TOX[2], fx - 5 + i * 4, y - 6 - Math.floor(t * 16), 2, 2); }
   if (f.st.silenced > 0) { P(c, '#000000', fx - 10, y - s.h - 5, 7, 4); P(c, '#9878f8', fx - 9, y - s.h - 4, 5, 2); }
   if (f.st.sleep > 0) drawText(c, 'Z', fx + 5 + (tick % 8 < 4 ? 0 : 1), y - s.h - 6 - (tick % 8), '#fcfcfc');
-  if (f.st.rooted > 0 || f.st.nest > 0) { P(c, '#503000', fx - 6, y - 1, 12, 2); P(c, '#58d854', fx - 5, y - 3, 2, 2); P(c, '#58d854', fx + 3, y - 3, 2, 2); }
+  if (f.st.rooted > 0 || f.st.deadeye > 0) { P(c, '#503000', fx - 6, y - 1, 12, 2); P(c, '#58d854', fx - 5, y - 3, 2, 2); P(c, '#58d854', fx + 3, y - 3, 2, 2); }
   if (f.st.channel > 0 || f.st.avatarLight > 0 || f.st.ascension > 0) for (let i = 0; i < 4; i++) P(c, HOLY[2 + (i % 2)], fx - 8 + ((tick * 3 + i * 5) % 16), y - 4 - ((tick * 2 + i * 7) % 20), 1, 2);
   if (f.st.untargetable > 0 && tick % 2) { c.globalAlpha = 0.5; drawFighterSprite(c, s, fx, y + 2, flip, 'ghost'); c.globalAlpha = 1; }
   if (f.st.deathMark > 0 && tick % 8 < 5) drawText(c, '×', fx - 2, y - s.h - 16, '#9878f8');
@@ -403,6 +403,12 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
       const dd = e.x - s.x > 0 ? 1 : -1, flap = Math.floor(q * 12) % 2 ? 2 : 0;
       P(c, '#000000', x - 5, y - 2 - flap, 11, 4); P(c, '#ac7c00', x - 4, y - 1 - flap, 9, 2);
       P(c, '#000000', x - 2, y - 1, 6, 4); P(c, '#503000', x - 1, y, 4, 2); P(c, '#fcfcfc', x + dd * 3, y - 1, 2, 2); P(c, '#f8b800', x + dd * 5, y, 1, 1);
+      return;
+    }
+    if (p.kind === 'arrow') {
+      // a homing Arrow (Hunter's Mark)
+      const dd = e.x - s.x > 0 ? 1 : -1;
+      P(c, '#000000', x - dd * 6, y - 1, 9, 3); P(c, '#ac7c00', x - dd * 5, y, 7, 1); P(c, '#fcfcfc', x + dd * 2, y - 1, 2, 3);
       return;
     }
     P(c, '#000000', x - 2, y - 2, 5, 5);
@@ -807,7 +813,7 @@ const STATUS_TAGS: Partial<Record<StatusKey, [string, string]>> = {
   stealth: ['STEALTH', '#9878f8'], silenced: ['SILENCED', '#9878f8'], rooted: ['ROOTED', '#58d854'], sleep: ['ASLEEP', '#9878f8'],
   untargetable: ['UNTARGETABLE', '#bcbcbc'], evasion: ['EVASION', '#fcfcfc'], spellImmune: ['CLOAK', '#9878f8'], deadlyPoison: ['DEADLY POISON', '#b8f818'],
   deathMark: ['DEATH MARK', '#9878f8'], hunted: ['HUNTED', '#f83800'], revealed: ['REVEALED', '#f8b800'], shadowDance: ['SHADOW DANCE', '#9878f8'],
-  nightsEmbrace: ["NIGHT'S EMBRACE", '#9878f8'], pandemic: ['PANDEMIC', '#b8f818'], nest: ['NEST', '#58d854'], deadeye: ['DEADEYE', '#fcfcfc'],
+  nightsEmbrace: ["NIGHT'S EMBRACE", '#9878f8'], pandemic: ['PANDEMIC', '#b8f818'], focus: ['FOCUS', '#58d854'], lightFoot: ['LIGHT FOOTED', '#58d854'], rapidFire: ['RAPID FIRE', '#fcfcfc'], deadeye: ['DEADEYE', '#fcfcfc'],
   tripwire: ['TRIPWIRE', '#58d854'], painSup: ['PAIN SUPP', '#f8d878'], guardian: ['GUARDIAN', '#f8d878'], ascension: ['ASCENSION', '#f8d878'],
   avatarLight: ['AVATAR', '#f8d878'], purified: ['PURIFIED', '#f8d878'], mending: ['MENDING', '#58d854'], channel: ['HYMN', '#f8d878'],
   vanishStun: ['STUN READY', '#f8b800'], backstab: ['BACKSTAB', '#9878f8'], riposte: ['RIPOSTE', '#fcfcfc'], adrenaline: ['ADRENALINE', '#f8d878'], decoy: ['DECOY', '#bcbcbc'],

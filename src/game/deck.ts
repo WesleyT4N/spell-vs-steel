@@ -30,7 +30,7 @@ const STARTERS: Record<ClassId, DeckCounts> = {
   },
   ranger: {
     steady_focus: 3, hawk_strike: 4, hunters_mark: 2, net: 2, disengage: 2, freezing_trap: 2, explosive_trap: 2, multi_shot: 3, call_wolf: 2, power_shot: 3,
-    flare: 1, volley: 1,
+    rapid_fire: 1, volley: 1,
     kill_shot: 1, explosive_shot: 1,
     deadeye: 1,
   },
