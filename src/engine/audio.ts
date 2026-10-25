@@ -53,6 +53,7 @@ type Wave = OscillatorType | 'noise';
 interface Blip { w: Wave; f0: number; f1: number; d: number; v: number; delay?: number; hp?: number }
 
 const SFX: Record<string, Blip[]> = {
+  step: [{ w: 'triangle', f0: 220, f1: 160, d: 0.035, v: 0.18 }],
   move: [{ w: 'square', f0: 660, f1: 660, d: 0.04, v: 0.2 }],
   select: [{ w: 'square', f0: 880, f1: 1320, d: 0.07, v: 0.25 }],
   back: [{ w: 'square', f0: 660, f1: 330, d: 0.08, v: 0.25 }],

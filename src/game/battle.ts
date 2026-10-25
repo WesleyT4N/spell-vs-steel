@@ -319,13 +319,12 @@ export class Battle {
     for (const f of this.f) {
       const foe = this.foe(f);
       if (foe.dead) continue;
-      // Frost Nova: an enemy in your area or the column bordering it is frozen once.
+      // Frost Nova: the first time an enemy is within range of the caster, they are hit and frozen.
       if (f.st.frostNova > 0 && !f.frostNovaUsed) {
-        const inArea = this.panels[foe.col][foe.row].owner === f.side;
-        const border = this.frontCol(f.side) - this.dir(f);
-        if (inArea || foe.col === border) {
+        if (Math.abs(foe.col - f.col) <= TUNING.frostNovaRange) {
           f.frostNovaUsed = true;
           f.st.frostNova = 0;
+          this.damage(foe, TUNING.frostNovaDamage, f, { spell: true, element: 'frost' });
           this.freeze(foe, 1.5);
           this.addFx('nova', f.side, foe.col, foe.row, 0.5);
         }
@@ -404,6 +403,7 @@ export class Battle {
     this.leavePanel(f.col, f.row);
     f.col = nc; f.row = nr;
     f.moveCd = TUNING.moveRepeat;
+    sfx('step');
     return true;
   }
 
@@ -608,7 +608,7 @@ export class Battle {
     target.pose = 'hurt';
     target.poseT = 0.15;
     this.texts.push({ x: target.col, y: target.row, text: String(amt), color: opts.element === 'fire' ? '#fca044' : opts.element === 'frost' ? '#a4e4fc' : '#fcfcfc', t: 0 });
-    if (target.cls === 'warrior') this.gainRage(target, TUNING.warrior.rageWhenHit);
+    if (target.cls === 'warrior') this.gainRage(target, Math.min(TUNING.warrior.rageWhenHitMax, amt / TUNING.warrior.rageDamagePerPip));
     if (amt >= TUNING.flinchThreshold && !opts.noFlinch && target.st.noKnock <= 0 && target.st.avatar <= 0) {
       target.st.flinch = TUNING.flinchTime;
       target.charging = false;
