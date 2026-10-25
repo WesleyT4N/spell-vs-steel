@@ -18,7 +18,7 @@ import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse } from '../engine/input';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
-import { drawCardDetail, drawCardFace, resName, CARD_W, CARD_H, PICKED } from './cardView';
+import { drawCardDetail, drawCardFace, resName, resColor, CARD_W, CARD_H, PICKED } from './cardView';
 import { SetupScene } from './setup';
 import { TitleScene } from './title';
 import { OptionsScene } from './options';
@@ -254,6 +254,8 @@ export class BattleScene implements Scene {
     const total = this.picks.reduce((a, i) => { const cc = CARDS[offer[i]].cost; return a + (cc === 'all' ? 1 : cc); }, 0);
     this.drawResourcePreview(ui, tick);
     const short = this.shortfalls();
+    // Rage is earned in the fight and paid on cast, so a short Warrior card is "later", not "can't"
+    const builds = f.cls === 'warrior';
 
     // left: the card being read
     const card = offer[this.cursor] ? CARDS[offer[this.cursor]] : null;
@@ -261,8 +263,10 @@ export class BattleScene implements Scene {
     if (card) {
       drawCardDetail(ui, card, 16, 42, 212);
       const need = short[this.cursor];
-      // Rage builds in the fight, so a Warrior can still queue it; other resources only refill next Draw
-      if (need > 0) drawText(ui, `NEED ${need} MORE ${resName(card)}${f.cls === 'warrior' ? ' (BUILDS IN FIGHT)' : ''}`, 16, 152, '#f83800');
+      if (need > 0) {
+        if (builds) drawText(ui, `BUILD ${need} MORE ${resName(card)} IN THE FIGHT`, 16, 152, resColor(card));
+        else drawText(ui, `NEED ${need} MORE ${resName(card)}`, 16, 152, '#f83800');
+      }
     } else {
       drawText(ui, 'START THE FIGHT', 16, 42, '#f8b800', 2);
       drawText(ui, `${this.picks.length} SPELL${this.picks.length === 1 ? '' : 'S'} PICKED`, 16, 64, '#fcfcfc');
@@ -279,9 +283,9 @@ export class BattleScene implements Scene {
       drawText(ui, `${n + 1}`, 252, y, PICKED);
       P(ui, ELEMENT_COLOR[cd.element], 264, y, 3, 7);
       drawText(ui, cd.name.toUpperCase(), 272, y, RARITY_COLOR[cd.rarity]);
-      drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, short[i] > 0 ? '#f83800' : '#fcfcfc');
+      drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, short[i] > 0 ? (builds ? resColor(cd) : '#f83800') : '#fcfcfc');
     });
-    const over = this.picks.some(i => short[i] > 0);
+    const over = !builds && this.picks.some(i => short[i] > 0);
     drawText(ui, `TOTAL COST ${total}`, 252, 120, over ? '#f83800' : '#bcbcbc');
     drawText(ui, f.cls === 'warrior' ? 'PAY ON CAST' : 'REFILLS', 464 - (f.cls === 'warrior' ? 11 : 7) * 6, 120, '#7c7c7c');
 
@@ -299,7 +303,7 @@ export class BattleScene implements Scene {
       // the hit box covers every raise level, so a rising card never slips out from under the pointer
       zone(`card:${i}`, x, HAND_Y - 2 * LIFT, CARD_W, CARD_H + 2 * LIFT);
       const y = HAND_Y - Math.round(this.lift[i] ?? 0);
-      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1 || (lvl === 2 && this.cursor === i), short: short[i] });
+      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1 || (lvl === 2 && this.cursor === i), short: short[i], builds });
       if (!this.mouseMode && this.cursor === i && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, '#f8b800', 1, false);
     });
     hint(ui, `CLICK: PICK  RIGHT-CLICK: UNDO   KEYS: ${k('left')}/${k('right')} + ${k('attack')}  ${k('cast')} UNDO  ${k('custom')} FIGHT`);
