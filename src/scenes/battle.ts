@@ -8,7 +8,8 @@ import { CARDS, ELEMENT_COLOR, RARITY_COLOR } from '../game/cards';
 // Draw screen layout (UI pixels): the hand fans along the bottom, details and cast order above it.
 const HAND_Y = 194, HAND_GAP = 84;
 const handX = (i: number, n: number): number => Math.round(UW / 2 - (HAND_GAP * (n - 1) + CARD_W) / 2 + i * HAND_GAP);
-const handArc = (i: number, n: number): number => { const d = i - (n - 1) / 2; return Math.round(d * d * 2); };
+/** Pixels per raise level: hovered cards rise one level, picked cards two. */
+const LIFT = 12;
 import { starterDeck, toList, STARTER_NAME } from '../game/deck';
 import { playerDeck, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
@@ -26,6 +27,10 @@ export class BattleScene implements Scene {
   b: Battle;
   cpu: Cpu;
   cursor = 0;
+  /** True after the mouse moves, false after a key press: decides whether hover or the key cursor raises a card. */
+  mouseMode = false;
+  /** Current raise of each card in the hand, eased toward its level. */
+  lift: number[] = [];
   picks: number[] = [];
   timer: number = TUNING.customTimer;
   paused = false;
@@ -91,6 +96,7 @@ export class BattleScene implements Scene {
 
   private openCustom(): void {
     this.cursor = 0;
+    this.lift = [];
     this.picks = [];
     this.timer = TUNING.customTimer;
   }
@@ -104,10 +110,15 @@ export class BattleScene implements Scene {
   private updateCustom(dt: number): void {
     const offer = this.b.offer[0];
     const rows = offer.length + 1;
+    for (let i = 0; i < offer.length; i++) {
+      const cur = this.lift[i] ?? 0, to = this.level(i) * LIFT;
+      this.lift[i] = Math.abs(to - cur) < 0.5 ? to : cur + (to - cur) * Math.min(1, dt * 18);
+    }
     this.timer -= dt;
     if (this.timer <= 0) { this.confirmCustom(); return; }
     // mouse: hover a card to read it, click to pick or unpick, right-click to undo
     const over = isHot('fight') ? offer.length : hot('card');
+    if (mouse.moved) this.mouseMode = true;
     if (over >= 0 && mouse.moved && over !== this.cursor) { this.cursor = over; sfx('move'); }
     if (mouse.click && over >= 0) { this.cursor = over; this.choose(); return; }
     if (mouse.rclick) {
@@ -117,11 +128,19 @@ export class BattleScene implements Scene {
       return;
     }
     const prev = navPressed('up', dt) || navPressed('left', dt), next = navPressed('down', dt) || navPressed('right', dt);
+    if (prev || next || wasPressed('confirm')) this.mouseMode = false;
     if (prev) { this.cursor = (this.cursor + rows - 1) % rows; sfx('move'); }
     if (next) { this.cursor = (this.cursor + 1) % rows; sfx('move'); }
     if (wasPressed('custom') || (wasPressed('pause') && !wasPressed('confirm'))) { this.confirmCustom(); return; }
     if (wasPressed('confirm')) { this.choose(true); return; }
     if (wasPressed('cast') && this.picks.length) { this.picks.pop(); sfx('back'); }
+  }
+
+  /** Raise level of hand card `i`: 0 resting, 1 hovered, 2 picked. */
+  private level(i: number): number {
+    if (this.picks.includes(i)) return 2;
+    const hovered = this.mouseMode ? hot('card') === i : this.cursor === i;
+    return hovered ? 1 : 0;
   }
 
   /** Pick or unpick the card under the cursor, or start the fight from the FIGHT button. */
@@ -261,12 +280,13 @@ export class BattleScene implements Scene {
 
     // the hand
     offer.forEach((id, i) => {
-      const x = handX(i, offer.length), base = HAND_Y + handArc(i, offer.length);
-      const order = this.picks.indexOf(i), on = this.cursor === i;
-      zone(`card:${i}`, x, base - 22, CARD_W, CARD_H + 22);
-      const y = base - (order >= 0 ? 14 : 0) - (on ? 8 : 0);
-      drawCardFace(ui, CARDS[id], x, y, { order, lit: on });
-      if (on && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, '#f8b800', 1, false);
+      const x = handX(i, offer.length);
+      const order = this.picks.indexOf(i), lvl = this.level(i);
+      // the hit box covers every raise level, so a rising card never slips out from under the pointer
+      zone(`card:${i}`, x, HAND_Y - 2 * LIFT, CARD_W, CARD_H + 2 * LIFT);
+      const y = HAND_Y - Math.round(this.lift[i] ?? 0);
+      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1 || (lvl === 2 && this.cursor === i) });
+      if (!this.mouseMode && this.cursor === i && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, '#f8b800', 1, false);
     });
     hint(ui, `CLICK: PICK  RIGHT-CLICK: UNDO   KEYS: ${k('left')}/${k('right')} + ${k('attack')}  ${k('cast')} UNDO  ${k('custom')} FIGHT`);
   }
