@@ -1,18 +1,23 @@
 // Versus CPU: runs a Battle, the custom screen, pause and results.
-import { setScene, dim, drawMenu, hint, type Scene } from './scene';
+import { setScene, dim, drawMenu, hint, zone, hot, isHot, listMouse, type Scene } from './scene';
 import { Battle, NO_INTENT, type Dir, type Intent } from '../game/battle';
 import { drawBattle } from '../game/battleView';
 import { Cpu } from '../game/ai';
 import { CARDS, ELEMENT_COLOR, RARITY_COLOR } from '../game/cards';
+
+// Draw screen layout (UI pixels): the hand fans along the bottom, details and cast order above it.
+const HAND_Y = 194, HAND_GAP = 84;
+const handX = (i: number, n: number): number => Math.round(UW / 2 - (HAND_GAP * (n - 1) + CARD_W) / 2 + i * HAND_GAP);
+const handArc = (i: number, n: number): number => { const d = i - (n - 1) / 2; return Math.round(d * d * 2); };
 import { starterDeck, toList, STARTER_NAME } from '../game/deck';
 import { playerDeck, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
-import { P, W, H, frame, type Ctx } from '../engine/gfx';
+import { P, W, UW, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
-import { wasPressed, isDown, heldDir, navPressed, k } from '../engine/input';
+import { wasPressed, isDown, heldDir, navPressed, k, mouse } from '../engine/input';
 import { playMusic, stopMusic, sfx } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
-import { drawCardDetail } from './deckbuilder';
+import { drawCardDetail, drawCardFace, CARD_W, CARD_H, PICKED } from './cardView';
 import { SetupScene } from './setup';
 import { TitleScene } from './title';
 import { OptionsScene } from './options';
@@ -101,24 +106,43 @@ export class BattleScene implements Scene {
     const rows = offer.length + 1;
     this.timer -= dt;
     if (this.timer <= 0) { this.confirmCustom(); return; }
-    if (navPressed('up', dt)) { this.cursor = (this.cursor + rows - 1) % rows; sfx('move'); }
-    if (navPressed('down', dt)) { this.cursor = (this.cursor + 1) % rows; sfx('move'); }
-    if (wasPressed('custom') || (wasPressed('pause') && !wasPressed('confirm'))) { this.confirmCustom(); return; }
-    if (wasPressed('confirm')) {
-      if (this.cursor === offer.length) { this.confirmCustom(); return; }
-      const at = this.picks.indexOf(this.cursor);
-      if (at >= 0) { this.picks.splice(at, 1); sfx('back'); }
-      else { this.picks.push(this.cursor); sfx('select'); this.cursor = Math.min(this.cursor + 1, rows - 1); while (this.cursor < offer.length && this.picks.includes(this.cursor)) this.cursor++; }
+    // mouse: hover a card to read it, click to pick or unpick, right-click to undo
+    const over = isHot('fight') ? offer.length : hot('card');
+    if (over >= 0 && mouse.moved && over !== this.cursor) { this.cursor = over; sfx('move'); }
+    if (mouse.click && over >= 0) { this.cursor = over; this.choose(); return; }
+    if (mouse.rclick) {
+      const at = this.picks.indexOf(hot('card'));
+      if (at >= 0) this.picks.splice(at, 1); else this.picks.pop();
+      sfx('back');
+      return;
     }
+    const prev = navPressed('up', dt) || navPressed('left', dt), next = navPressed('down', dt) || navPressed('right', dt);
+    if (prev) { this.cursor = (this.cursor + rows - 1) % rows; sfx('move'); }
+    if (next) { this.cursor = (this.cursor + 1) % rows; sfx('move'); }
+    if (wasPressed('custom') || (wasPressed('pause') && !wasPressed('confirm'))) { this.confirmCustom(); return; }
+    if (wasPressed('confirm')) { this.choose(); return; }
     if (wasPressed('cast') && this.picks.length) { this.picks.pop(); sfx('back'); }
+  }
+
+  /** Pick or unpick the card under the cursor, or start the fight from the FIGHT button. */
+  private choose(): void {
+    const offer = this.b.offer[0];
+    if (this.cursor === offer.length) { this.confirmCustom(); return; }
+    const at = this.picks.indexOf(this.cursor);
+    if (at >= 0) { this.picks.splice(at, 1); sfx('back'); return; }
+    this.picks.push(this.cursor);
+    sfx('select');
   }
 
   private updatePause(dt: number): void {
     const items = 4;
+    const clicked = listMouse('menu', this.pauseSel, i => { this.pauseSel = i; sfx('move'); });
+    if (clicked >= 0) this.pauseSel = clicked;
+    if (mouse.rclick) { this.paused = false; return; }
     if (navPressed('up', dt)) { this.pauseSel = (this.pauseSel + items - 1) % items; sfx('move'); }
     if (navPressed('down', dt)) { this.pauseSel = (this.pauseSel + 1) % items; sfx('move'); }
     if (wasPressed('back') && !wasPressed('pause')) { this.paused = false; return; }
-    if (wasPressed('confirm') || (wasPressed('pause') && this.pauseSel === 0)) {
+    if (wasPressed('confirm') || clicked >= 0 || (wasPressed('pause') && this.pauseSel === 0)) {
       sfx('select');
       if (this.pauseSel === 0) this.paused = false;
       if (this.pauseSel === 1) setScene(new OptionsScene(() => setScene(this)));
@@ -135,9 +159,11 @@ export class BattleScene implements Scene {
 
   private updateResult(dt: number): void {
     const items = this.resultItems.length;
+    const clicked = listMouse('menu', this.resultSel, i => { this.resultSel = i; sfx('move'); });
+    if (clicked >= 0) this.resultSel = clicked;
     if (navPressed('up', dt)) { this.resultSel = (this.resultSel + items - 1) % items; sfx('move'); }
     if (navPressed('down', dt)) { this.resultSel = (this.resultSel + 1) % items; sfx('move'); }
-    if (wasPressed('confirm') || wasPressed('custom')) {
+    if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
       sfx('select');
       stopMusic();
       const choice = this.resultItems[this.resultSel];
@@ -148,7 +174,7 @@ export class BattleScene implements Scene {
     }
   }
 
-  draw(c: Ctx, tick: number): void {
+  draw(c: Ctx, tick: number, ui: Ctx): void {
     const b = this.b;
     drawBattle(c, b, tick);
     if (this.m.bestOf > 1 && b.phase !== 'over') {
@@ -156,7 +182,7 @@ export class BattleScene implements Scene {
       const t = `ROUND ${round}  ${this.score[0]}-${this.score[1]}`;
       drawTextOutlined(c, t, W / 2 - textWidth(t) / 2, 22, '#fcfcfc');
     }
-    if (b.phase === 'custom') this.drawCustom(c, tick);
+    if (b.phase === 'custom') this.drawCustom(c, tick, ui);
     if (this.fightBanner > 0 && b.phase === 'fight') {
       const s = this.fightBanner > 0.45 ? 'READY' : 'FIGHT!';
       drawTextCentered(c, s, W / 2, 62, s === 'FIGHT!' ? '#f8b800' : '#fcfcfc', 3);
@@ -166,78 +192,80 @@ export class BattleScene implements Scene {
       dim(c, 0.45);
       const won = b.winner === 0;
       if (this.m.bestOf === 1) {
-        drawTextCentered(c, won ? 'YOU WIN!' : 'YOU LOSE', W / 2, 36, won ? '#f8b800' : '#bcbcbc', 3);
+        drawTextCentered(ui, won ? 'YOU WIN!' : 'YOU LOSE', UW / 2, 64, won ? '#f8b800' : '#bcbcbc', 5);
       } else {
         const setWon = this.score[0] >= this.need;
         const title = this.setOver ? (setWon ? 'SET WON!' : 'SET LOST') : won ? 'ROUND WON' : 'ROUND LOST';
-        drawTextCentered(c, title, W / 2, 30, won ? '#f8b800' : '#bcbcbc', 2);
-        drawTextCentered(c, `YOU ${this.score[0]} - ${this.score[1]} CPU`, W / 2, 56, '#fcfcfc', 1, false);
+        drawTextCentered(ui, title, UW / 2, 56, won ? '#f8b800' : '#bcbcbc', 4);
+        drawTextCentered(ui, `YOU ${this.score[0]} - ${this.score[1]} CPU`, UW / 2, 104, '#fcfcfc', 2);
       }
-      drawMenu(c, this.resultItems, this.resultSel, W / 2, 80, tick, { width: 104 });
-      hint(c, `${k('attack')}: SELECT`);
+      drawMenu(ui, this.resultItems, this.resultSel, UW / 2, 160, tick, { width: 200, gap: 24 });
+      hint(ui, `CLICK OR ${k('attack')}: SELECT`);
     }
     if (this.paused) {
       dim(c, 0.55);
-      drawTextCentered(c, 'PAUSED', W / 2, 40, '#fcfcfc', 2);
-      drawMenu(c, ['RESUME', 'OPTIONS', 'RESTART', 'QUIT TO TITLE'], this.pauseSel, W / 2, 66, tick, { width: 104 });
-      hint(c, `${k('attack')}: SELECT  ${k('cast')}: RESUME`);
+      drawTextCentered(ui, 'PAUSED', UW / 2, 76, '#fcfcfc', 4);
+      drawMenu(ui, ['RESUME', 'OPTIONS', 'RESTART', 'QUIT TO TITLE'], this.pauseSel, UW / 2, 130, tick, { width: 200, gap: 24 });
+      hint(ui, `CLICK OR ${k('attack')}: SELECT   ${k('cast')} / RIGHT-CLICK: RESUME`);
     }
   }
 
-  private drawCustom(c: Ctx, tick: number): void {
+  private drawCustom(c: Ctx, tick: number, ui: Ctx): void {
     const b = this.b, f = b.f[0];
     const offer = b.offer[0];
-    dim(c, 0.35);
-    // left: hand
-    const lx = 4, ly = 24, lw = 118;
-    frame(c, lx, ly, lw, 126, '#000000', '#3cbcfc');
-    P(c, '#0000a8', lx + 1, ly + 1, lw - 2, 10);
-    drawText(c, `DRAW  TURN ${b.turn}`, lx + 4, ly + 3, '#fcfcfc');
+    dim(c, 0.5);
+
+    // header: turn, timer, resource
+    P(ui, '#000000', 0, 0, UW, 28);
+    P(ui, '#0000a8', 0, 0, UW, 26);
+    drawText(ui, `DRAW   TURN ${b.turn}`, 10, 10, '#fcfcfc');
     const secs = Math.ceil(this.timer);
-    drawText(c, String(secs).padStart(2, '0'), lx + lw - 16, ly + 3, secs <= 5 && tick % 4 < 2 ? '#f83800' : '#f8b800');
-    offer.forEach((id, i) => {
-      const card = CARDS[id];
-      const y = ly + 15 + i * 15;
-      const on = this.cursor === i;
-      const order = this.picks.indexOf(i);
-      if (on) P(c, '#0000a8', lx + 2, y - 2, lw - 4, 14);
-      P(c, '#000000', lx + 4, y - 1, 11, 11);
-      P(c, ELEMENT_COLOR[card.element], lx + 5, y, 9, 9);
-      drawText(c, card.cost === 'all' ? 'A' : String(card.cost), lx + 7, y + 1, '#000000');
-      drawText(c, card.name.toUpperCase().slice(0, 14), lx + 19, y + 1, order >= 0 ? '#7c7c7c' : RARITY_COLOR[card.rarity]);
-      if (order >= 0) { P(c, '#f8b800', lx + lw - 13, y - 1, 9, 11); drawText(c, String(order + 1), lx + lw - 11, y + 1, '#000000'); }
-      if (on && tick % 8 < 6) drawText(c, '→', lx + 1, y + 1, '#f8b800');
-    });
-    const okY = ly + 15 + offer.length * 15 + 2;
-    const onOk = this.cursor === offer.length;
-    frame(c, lx + 30, okY, 58, 12, onOk ? '#f8b800' : '#000000', '#fcfcfc');
-    drawTextCentered(c, 'FIGHT!', lx + 59, okY + 3, onOk ? '#000000' : '#f8b800', 1, false);
-
-    // resource and picked total
-    const ry = ly + 108;
+    drawTextCentered(ui, String(secs).padStart(2, '0'), UW / 2, 6, secs <= 5 && tick % 4 < 2 ? '#f83800' : '#f8b800', 2);
     const total = this.picks.reduce((a, i) => { const cc = CARDS[offer[i]].cost; return a + (cc === 'all' ? 1 : cc); }, 0);
-    if (f.cls === 'warrior') {
-      drawText(c, `RAGE ${f.res.toFixed(1).replace('.0', '')}/5`, lx + 4, ry, '#f87858');
-      drawText(c, `COST ${total}`, lx + 70, ry, '#bcbcbc');
-    } else {
-      drawText(c, `MANA ${f.res}/${f.resMax}`, lx + 4, ry, '#a4e4fc');
-      drawText(c, `COST ${total}`, lx + 70, ry, total > f.res ? '#f83800' : '#bcbcbc');
-    }
-    drawText(c, f.cls === 'warrior' ? 'PAY RAGE ON CAST' : 'REFILLS EACH TURN', lx + 4, ry + 9, '#7c7c7c');
+    const res = f.cls === 'warrior' ? `RAGE ${f.res.toFixed(1).replace('.0', '')}/5` : `MANA ${f.res}/${f.resMax}`;
+    drawText(ui, res, UW - 10 - res.length * 6, 10, f.cls === 'warrior' ? '#f87858' : '#a4e4fc');
 
-    // right: detail
-    const dx = 126, dw = W - dx - 4;
+    // left: the card being read
     const card = offer[this.cursor] ? CARDS[offer[this.cursor]] : null;
-    frame(c, dx, ly, dw, 126, '#000000', card ? ELEMENT_COLOR[card.element] : '#7c7c7c');
-    if (card) drawCardDetail(c, card, dx + 4, ly + 4, Math.floor((dw - 8) / 6));
+    frame(ui, 8, 34, 228, 146, '#000000', card ? ELEMENT_COLOR[card.element] : '#7c7c7c');
+    if (card) drawCardDetail(ui, card, 16, 42, 212);
     else {
-      drawText(c, 'START THE FIGHT', dx + 4, ly + 4, '#fcfcfc');
-      drawText(c, `${this.picks.length} SPELL${this.picks.length === 1 ? '' : 'S'} PICKED`, dx + 4, ly + 16, '#bcbcbc');
-      drawText(c, 'CAST IN ORDER', dx + 4, ly + 26, '#bcbcbc');
-      drawText(c, 'WITH X', dx + 4, ly + 34, '#bcbcbc');
-      drawText(c, 'CPU DECK:', dx + 4, ly + 50, '#7c7c7c');
-      drawText(c, STARTER_NAME[this.m.cpu].toUpperCase(), dx + 4, ly + 58, '#7c7c7c');
+      drawText(ui, 'START THE FIGHT', 16, 42, '#f8b800', 2);
+      drawText(ui, `${this.picks.length} SPELL${this.picks.length === 1 ? '' : 'S'} PICKED`, 16, 64, '#fcfcfc');
+      drawText(ui, `CAST THEM IN ORDER WITH ${k('cast')}`, 16, 78, '#bcbcbc');
+      drawText(ui, `CPU DECK: ${STARTER_NAME[this.m.cpu].toUpperCase()}`, 16, 100, '#7c7c7c');
     }
-    drawTextOutlined(c, `${k('attack')} PICK  ${k('cast')} UNDO  ${k('custom')} FIGHT`, 6, H - 9, '#fcfcfc');
+
+    // right: cast order
+    frame(ui, 244, 34, 228, 112, '#000000', PICKED);
+    drawText(ui, 'CAST ORDER', 252, 42, PICKED);
+    if (!this.picks.length) drawText(ui, 'CLICK CARDS TO QUEUE THEM', 252, 58, '#7c7c7c');
+    this.picks.slice(0, 6).forEach((i, n) => {
+      const cd = CARDS[offer[i]], y = 56 + n * 12;
+      drawText(ui, `${n + 1}`, 252, y, PICKED);
+      P(ui, ELEMENT_COLOR[cd.element], 264, y, 3, 7);
+      drawText(ui, cd.name.toUpperCase(), 272, y, RARITY_COLOR[cd.rarity]);
+      drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, '#fcfcfc');
+    });
+    const over = f.cls === 'mage' && total > f.res;
+    drawText(ui, `TOTAL COST ${total}`, 252, 130, over ? '#f83800' : '#bcbcbc');
+    drawText(ui, f.cls === 'warrior' ? 'PAY ON CAST' : 'REFILLS', 464 - (f.cls === 'warrior' ? 11 : 7) * 6, 130, '#7c7c7c');
+
+    // fight button
+    const onOk = this.cursor === offer.length;
+    zone('fight', 300, 152, 116, 28);
+    frame(ui, 300, 152, 116, 28, onOk ? '#f8b800' : '#000000', '#fcfcfc');
+    drawTextCentered(ui, 'FIGHT!', 358, 159, onOk ? '#000000' : '#f8b800', 2, false);
+
+    // the hand
+    offer.forEach((id, i) => {
+      const x = handX(i, offer.length), base = HAND_Y + handArc(i, offer.length);
+      const order = this.picks.indexOf(i), on = this.cursor === i;
+      zone(`card:${i}`, x, base - 22, CARD_W, CARD_H + 22);
+      const y = base - (order >= 0 ? 14 : 0) - (on ? 8 : 0);
+      drawCardFace(ui, CARDS[id], x, y, { order, lit: on });
+      if (on && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, '#f8b800', 1, false);
+    });
+    hint(ui, `CLICK: PICK  RIGHT-CLICK: UNDO   KEYS: ${k('left')}/${k('right')} + ${k('attack')}  ${k('cast')} UNDO  ${k('custom')} FIGHT`);
   }
 }

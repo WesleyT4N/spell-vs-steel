@@ -1,10 +1,10 @@
 // Match setup: both fighters, the player's deck, CPU difficulty.
-import { setScene, hint, type Scene } from './scene';
+import { setScene, hint, zone, hot, listMouse, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { getSprite, drawFighterSprite, teamColor, SKINS, skinOf, mirrorSkin, type ClassId } from '../art/sprites';
-import { P, W, H, frame, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered } from '../engine/font';
-import { wasPressed, navPressed, k } from '../engine/input';
+import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
+import { drawText, drawTextCentered, textWidth } from '../engine/font';
+import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
 import { loadCustom, validate, STARTER_NAME } from '../game/deck';
@@ -14,6 +14,12 @@ import { TitleScene } from './title';
 
 const CLASSES: ClassId[] = ['warrior', 'mage'];
 const ROWS = ['YOU', 'SKIN', 'DECK', 'EDIT DECK', 'CPU', 'CPU SKIN', 'CPU LEVEL', 'MATCH', 'FIGHT!'] as const;
+type RowName = (typeof ROWS)[number];
+
+// layout (UI pixels)
+const RX = 72, RW = UW - 144, Y0 = 150, RH = 16;
+const VX = RX + RW - 16; // right edge of the value column
+const SW = 14;           // skin swatch pitch
 
 export class SetupScene implements Scene {
   m: MatchConfig = loadMatch();
@@ -26,115 +32,161 @@ export class SetupScene implements Scene {
     return !!d && validate(d).length === 0;
   }
 
+  private mySkin(): string { return skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id; }
+  private cpuSkin(): string {
+    return this.m.p1 === this.m.cpu ? mirrorSkin(this.m.cpu, this.mySkin(), this.m.cpuSkin[this.m.cpu]) : skinOf(this.m.cpu, this.m.cpuSkin[this.m.cpu]).id;
+  }
+
+  /** Step a row's value left or right. */
+  private change(row: RowName, d: 1 | -1): void {
+    const cycle = <T>(list: readonly T[], v: T): T => list[(list.indexOf(v) + d + list.length) % list.length];
+    if (row === 'YOU') { this.m.p1 = cycle(CLASSES, this.m.p1); this.m.p1Deck = 'starter'; }
+    else if (row === 'DECK') this.m.p1Deck = this.m.p1Deck === 'starter' ? 'custom' : 'starter';
+    else if (row === 'CPU') this.m.cpu = cycle(CLASSES, this.m.cpu);
+    else if (row === 'SKIN') this.m.p1Skin[this.m.p1] = cycle(SKINS[this.m.p1].map(s => s.id), this.m.p1Skin[this.m.p1]);
+    else if (row === 'CPU SKIN') this.m.cpuSkin[this.m.cpu] = cycle(SKINS[this.m.cpu].map(s => s.id), this.m.cpuSkin[this.m.cpu]);
+    else if (row === 'CPU LEVEL') this.m.difficulty = this.m.difficulty === 'easy' ? 'normal' : 'easy';
+    else if (row === 'MATCH') this.m.bestOf = cycle([1, 3, 5] as const, this.m.bestOf);
+    else return;
+    sfx('move');
+    saveMatch(this.m);
+  }
+
+  private pickSkin(mine: boolean, n: number): void {
+    const cls = mine ? this.m.p1 : this.m.cpu;
+    const id = SKINS[cls][n]?.id;
+    if (!id) return;
+    if (mine) this.m.p1Skin[cls] = id; else this.m.cpuSkin[cls] = id;
+    sfx('select');
+    saveMatch(this.m);
+  }
+
+  private activate(row: RowName): void {
+    if (row === 'EDIT DECK') { sfx('select'); setScene(new DeckBuilderScene(this.m.p1, () => setScene(new SetupScene()))); return; }
+    if (row === 'FIGHT!') { this.fight(); return; }
+    this.change(row, 1);
+  }
+
+  private fight(): void {
+    if (this.m.p1Deck === 'custom' && !this.customValid()) {
+      this.msg = 'CUSTOM DECK IS NOT READY'; this.msgT = 2; sfx('deny');
+      return;
+    }
+    sfx('select');
+    saveMatch(this.m);
+    setScene(new BattleScene(this.m));
+  }
+
   update(dt: number): void {
     this.msgT = Math.max(0, this.msgT - dt);
+    if (wasPressed('back') || mouse.rclick) { sfx('back'); setScene(new TitleScene()); return; }
+
+    // mouse: skin thumbnails and swatches pick directly, arrows step, a row click steps forward
+    if (mouse.click) {
+      const thumb = hot('thumb'), mine = hot('swatch'), theirs = hot('cswatch'), arrow = hot('arrow');
+      if (thumb >= 0) { this.pickSkin(ROWS[this.sel] === 'SKIN', thumb); return; }
+      if (mine >= 0) { this.sel = ROWS.indexOf('SKIN'); this.pickSkin(true, mine); return; }
+      if (theirs >= 0) { this.sel = ROWS.indexOf('CPU SKIN'); this.pickSkin(false, theirs); return; }
+      if (arrow >= 0) { this.sel = arrow >> 1; this.change(ROWS[this.sel], arrow & 1 ? 1 : -1); return; }
+    }
+    const clicked = listMouse('row', this.sel, i => { this.sel = i; sfx('move'); });
+    if (clicked >= 0) { this.sel = clicked; this.activate(ROWS[clicked]); return; }
+    if (mouse.wheel && hot('row') === this.sel) this.change(ROWS[this.sel], mouse.wheel > 0 ? 1 : -1);
+
     if (navPressed('up', dt)) { this.sel = (this.sel + ROWS.length - 1) % ROWS.length; sfx('move'); }
     if (navPressed('down', dt)) { this.sel = (this.sel + 1) % ROWS.length; sfx('move'); }
     const l = navPressed('left', dt), r = navPressed('right', dt);
-    if (l || r) {
-      const d = r ? 1 : -1;
+    if (l || r) this.change(ROWS[this.sel], r ? 1 : -1);
+    if (wasPressed('custom')) { this.fight(); return; }
+    if (wasPressed('confirm')) {
       const row = ROWS[this.sel];
-      const cycle = <T>(list: readonly T[], v: T): T => list[(list.indexOf(v) + d + list.length) % list.length];
-      if (row === 'YOU') { this.m.p1 = cycle(CLASSES, this.m.p1); this.m.p1Deck = 'starter'; sfx('move'); }
-      if (row === 'DECK') { this.m.p1Deck = this.m.p1Deck === 'starter' ? 'custom' : 'starter'; sfx('move'); }
-      if (row === 'CPU') { this.m.cpu = cycle(CLASSES, this.m.cpu); sfx('move'); }
-      if (row === 'SKIN') { const ids = SKINS[this.m.p1].map(s => s.id); this.m.p1Skin[this.m.p1] = cycle(ids, this.m.p1Skin[this.m.p1]); sfx('move'); }
-      if (row === 'CPU SKIN') { const ids = SKINS[this.m.cpu].map(s => s.id); this.m.cpuSkin[this.m.cpu] = cycle(ids, this.m.cpuSkin[this.m.cpu]); sfx('move'); }
-      if (row === 'CPU LEVEL') { this.m.difficulty = this.m.difficulty === 'easy' ? 'normal' : 'easy'; sfx('move'); }
-      if (row === 'MATCH') { this.m.bestOf = cycle([1, 3, 5] as const, this.m.bestOf); sfx('move'); }
-      saveMatch(this.m);
-    }
-    if (wasPressed('back')) { sfx('back'); setScene(new TitleScene()); return; }
-    if (wasPressed('confirm') || wasPressed('custom')) {
-      const row = ROWS[this.sel];
-      if (row === 'EDIT DECK') { sfx('select'); setScene(new DeckBuilderScene(this.m.p1, () => setScene(new SetupScene()))); return; }
-      if (row === 'FIGHT!' || wasPressed('custom')) {
-        if (this.m.p1Deck === 'custom' && !this.customValid()) {
-          this.msg = 'CUSTOM DECK IS NOT READY'; this.msgT = 2; sfx('deny');
-          return;
-        }
-        sfx('select');
-        saveMatch(this.m);
-        setScene(new BattleScene(this.m));
-        return;
-      }
+      if (row === 'EDIT DECK' || row === 'FIGHT!') { this.activate(row); return; }
       this.sel = ROWS.length - 1;
       sfx('move');
     }
   }
 
-  draw(c: Ctx, tick: number): void {
+  draw(c: Ctx, tick: number, ui: Ctx): void {
     getArena().draw(c, tick, 0);
     c.fillStyle = 'rgba(0,0,24,0.55)';
     c.fillRect(0, 0, W, H);
-    drawTextCentered(c, 'VERSUS CPU', W / 2, 6, '#f8b800');
+    drawTextCentered(ui, 'VERSUS CPU', UW / 2, 8, '#f8b800', 2);
 
-    // portraits
     const bob = Math.floor(tick / 4) % 2;
-    const mySkin = skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id;
-    const cpuSkin = this.m.p1 === this.m.cpu ? mirrorSkin(this.m.cpu, mySkin, this.m.cpuSkin[this.m.cpu]) : skinOf(this.m.cpu, this.m.cpuSkin[this.m.cpu]).id;
+    const mySkin = this.mySkin(), cpuSkin = this.cpuSkin();
     const focus = ROWS[this.sel];
     if (focus === 'SKIN' || focus === 'CPU SKIN') {
-      // skin picker: every skin as an in-game sprite, the pick framed
+      // skin picker: every skin as an in-game sprite, click one to wear it
       const mine = focus === 'SKIN', cls = mine ? this.m.p1 : this.m.cpu, cur = mine ? mySkin : cpuSkin;
-      frame(c, 8, 16, W - 16, 54, '#000000', teamColor(cls, cur, false));
-      drawText(c, mine ? 'YOU' : 'CPU', 13, 19, '#fcfcfc');
-      const list = SKINS[cls], gap = 26, x1 = W / 2 - ((list.length - 1) * gap) / 2;
+      frame(ui, 16, 30, UW - 32, 110, '#000000', teamColor(cls, cur, false));
+      drawText(ui, mine ? 'YOUR SKIN' : 'CPU SKIN', 24, 36, '#fcfcfc');
+      const list = SKINS[cls], gap = 54, x1 = UW / 2 - ((list.length - 1) * gap) / 2;
       list.forEach((sk, n) => {
-        const fx = x1 + n * gap, picked = sk.id === cur;
-        if (picked) frame(c, Math.round(fx - 12), 28, 24, 38, '#0000a8', '#fcfcfc');
-        drawFighterSprite(c, getSprite(cls, sk.id, false), fx, 62 - (picked ? bob : 0), !mine, 'none', 1);
+        const fx = x1 + n * gap, picked = sk.id === cur, id = `thumb:${n}`;
+        zone(id, Math.round(fx - 24), 48, 48, 86);
+        const over = hot('thumb') === n;
+        if (picked || over) frame(ui, Math.round(fx - 24), 48, 48, 86, picked ? '#0000a8' : '#000000', picked ? '#fcfcfc' : '#7c7c7c');
+        drawFighterSprite(ui, getSprite(cls, sk.id, false), fx, 128 - (picked ? bob * 2 : 0), !mine, 'none', 2);
       });
     } else {
-    frame(c, 10, 16, 52, 54, '#000000', teamColor(this.m.p1, mySkin, false));
-    drawFighterSprite(c, getSprite(this.m.p1, mySkin, false), 36, 66 - bob, false, 'none', 2);
-    drawTextCentered(c, 'YOU', 36, 18, '#fcfcfc', 1, false);
-    frame(c, W - 62, 16, 52, 54, '#000000', teamColor(this.m.cpu, cpuSkin, false));
-    drawFighterSprite(c, getSprite(this.m.cpu, cpuSkin, false), W - 36, 66 - (1 - bob), true, 'none', 2);
-    drawTextCentered(c, 'CPU', W - 36, 18, '#fcfcfc', 1, false);
-    drawTextCentered(c, 'VS', W / 2, 38, '#f8b800', 2);
+      frame(ui, 24, 30, 104, 110, '#000000', teamColor(this.m.p1, mySkin, false));
+      drawFighterSprite(ui, getSprite(this.m.p1, mySkin, false), 76, 132 - bob * 2, false, 'none', 4);
+      drawTextCentered(ui, 'YOU', 76, 34, '#fcfcfc', 1, false);
+      frame(ui, UW - 128, 30, 104, 110, '#000000', teamColor(this.m.cpu, cpuSkin, false));
+      drawFighterSprite(ui, getSprite(this.m.cpu, cpuSkin, false), UW - 76, 132 - (1 - bob) * 2, true, 'none', 4);
+      drawTextCentered(ui, 'CPU', UW - 76, 34, '#fcfcfc', 1, false);
+      drawTextCentered(ui, 'VS', UW / 2, 70, '#f8b800', 4);
+      P(ui, 'rgba(0,0,0,0.7)', 140, 104, UW - 280, 32);
+      const deck = this.m.p1Deck === 'starter' ? STARTER_NAME[this.m.p1].toUpperCase() : 'CUSTOM';
+      drawTextCentered(ui, `${this.m.p1.toUpperCase()} (${deck})`, UW / 2, 110, '#bcbcbc', 1, false);
+      drawTextCentered(ui, `VS ${this.m.cpu.toUpperCase()} (${STARTER_NAME[this.m.cpu].toUpperCase()})`, UW / 2, 122, '#7c7c7c', 1, false);
     }
 
     // option rows
-    const x0 = 36, y0 = 77, rh = 8;
-    frame(c, x0 - 14, y0 - 4, W - 2 * x0 + 28, ROWS.length * rh + 4, '#000000', '#fcfcfc');
+    frame(ui, RX - 8, Y0 - 6, RW + 16, ROWS.length * RH + 8, '#000000', '#fcfcfc');
     ROWS.forEach((row, i) => {
-      const y = y0 + i * rh;
+      const y = Y0 + i * RH, ty = y + 4;
       const on = i === this.sel;
-      if (on) P(c, '#0000a8', x0 - 12, y - 1, W - 2 * x0 + 24, rh);
-      const label = row === 'FIGHT!' || row === 'EDIT DECK' ? '' : row;
-      let value = '';
-      if (row === 'YOU') value = this.m.p1.toUpperCase();
-      if (row === 'DECK') value = this.m.p1Deck === 'starter' ? `STARTER: ${STARTER_NAME[this.m.p1].toUpperCase()}` : `CUSTOM${this.customValid() ? '' : ' (NOT READY)'}`;
-      if (row === 'CPU') value = this.m.cpu.toUpperCase();
-      if (row === 'CPU LEVEL') value = this.m.difficulty.toUpperCase();
-      if (row === 'SKIN' || row === 'CPU SKIN') {
-        // no names: one swatch per skin in its main color, the chosen one framed
-        const cls = row === 'SKIN' ? this.m.p1 : this.m.cpu;
-        const cur = row === 'SKIN' ? mySkin : cpuSkin;
-        drawText(c, row, x0, y, '#bcbcbc');
-        const list = SKINS[cls], sx = W - x0 - list.length * 9 - (on ? 8 : 0);
-        if (on) { drawText(c, '←', sx - 8, y, '#fcfcfc'); drawText(c, '→', sx + list.length * 9 + 2, y, '#fcfcfc'); }
-        list.forEach((sk, n) => {
-          const px = sx + n * 9;
-          if (sk.id === cur) P(c, '#fcfcfc', px - 1, y - 1, 8, 8);
-          P(c, '#000000', px, y, 6, 6);
-          P(c, teamColor(cls, sk.id, false), px + 1, y + 1, 4, 4);
-        });
-        if (on && tick % 8 < 6) drawText(c, '→', x0 - 10, y, '#f8b800');
+      zone(`row:${i}`, RX - 6, y - 1, RW + 12, RH - 1);
+      if (on) P(ui, '#0000a8', RX - 6, y - 1, RW + 12, RH - 2);
+      if (on && tick % 8 < 6) drawText(ui, '→', RX, ty, '#f8b800');
+      if (row === 'FIGHT!' || row === 'EDIT DECK') {
+        drawTextCentered(ui, row, UW / 2, ty, row === 'FIGHT!' ? '#f8b800' : '#fcfcfc', 1, false);
         return;
       }
-      if (row === 'MATCH') value = this.m.bestOf === 1 ? 'SINGLE' : `BEST OF ${this.m.bestOf}`;
-      if (label) {
-        drawText(c, label, x0, y, '#bcbcbc');
-        const v = on ? `← ${value} →` : value;
-        drawText(c, v, W - x0 - v.length * 6 + 1, y, on ? '#fcfcfc' : '#fcfcfc');
+      drawText(ui, row, RX + 14, ty, on ? '#fcfcfc' : '#bcbcbc');
+      // every value row gets clickable arrows either side of the value
+      let vw: number;
+      if (row === 'SKIN' || row === 'CPU SKIN') {
+        const mine = row === 'SKIN', cls = mine ? this.m.p1 : this.m.cpu, cur = mine ? mySkin : cpuSkin;
+        const list = SKINS[cls];
+        vw = list.length * SW;
+        const sx = VX - vw;
+        list.forEach((sk, n) => {
+          const px = sx + n * SW;
+          zone(`${mine ? 'swatch' : 'cswatch'}:${n}`, px - 1, y, SW, RH - 3);
+          if (sk.id === cur) P(ui, '#fcfcfc', px - 2, y + 1, 12, 12);
+          P(ui, '#000000', px, y + 3, 8, 8);
+          P(ui, teamColor(cls, sk.id, false), px + 1, y + 4, 6, 6);
+        });
       } else {
-        drawTextCentered(c, row, W / 2, y, row === 'FIGHT!' ? '#f8b800' : '#fcfcfc', 1, false);
+        let value = '';
+        if (row === 'YOU') value = this.m.p1.toUpperCase();
+        if (row === 'DECK') value = this.m.p1Deck === 'starter' ? `STARTER: ${STARTER_NAME[this.m.p1].toUpperCase()}` : `CUSTOM${this.customValid() ? '' : ' (NOT READY)'}`;
+        if (row === 'CPU') value = this.m.cpu.toUpperCase();
+        if (row === 'CPU LEVEL') value = this.m.difficulty.toUpperCase();
+        if (row === 'MATCH') value = this.m.bestOf === 1 ? 'SINGLE ROUND' : `BEST OF ${this.m.bestOf}`;
+        vw = textWidth(value);
+        drawText(ui, value, VX - vw, ty, '#fcfcfc');
       }
-      if (on && tick % 8 < 6) drawText(c, '→', x0 - 10, y, '#f8b800');
+      const lit = on || hot('row') === i;
+      const ax = VX - vw - 16;
+      zone(`arrow:${i * 2}`, ax - 4, y - 1, 14, RH - 2);
+      zone(`arrow:${i * 2 + 1}`, VX + 2, y - 1, 14, RH - 2);
+      drawText(ui, '←', ax, ty, hot('arrow') === i * 2 ? '#f8b800' : lit ? '#fcfcfc' : '#3c3c3c');
+      drawText(ui, '→', VX + 6, ty, hot('arrow') === i * 2 + 1 ? '#f8b800' : lit ? '#fcfcfc' : '#3c3c3c');
     });
-    if (this.msgT > 0) { P(c, '#000000', 0, 62, W, 10); drawTextCentered(c, this.msg, W / 2, 63, '#f83800'); }
-    hint(c, `${k('left')}/${k('right')} CHANGE  ${k('attack')} OK  ${k('cast')} BACK  ${k('custom')} FIGHT`);
+    if (this.msgT > 0) { P(ui, '#000000', 0, 128, UW, 16); drawTextCentered(ui, this.msg, UW / 2, 132, '#f83800'); }
+    hint(ui, `CLICK TO CHANGE   ${k('left')}/${k('right')}: CHANGE   ${k('custom')}: FIGHT   ${k('cast')} / RIGHT-CLICK: BACK`);
   }
 }

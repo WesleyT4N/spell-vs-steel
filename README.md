@@ -28,7 +28,7 @@ npm run sim      # headless CPU-vs-CPU matches; prints win rates, match length, 
 
 These are the defaults. **Options** (title menu or pause menu) has master, music and sound effect volume, music and sound effect on/off, and **Key Mapping**, which rebinds movement, attack, cast, Draw screen and pause. Settings save in the browser; arrows, Esc and M always work.
 
-Draw screen: J picks or unpicks a spell (cast order is pick order), K undoes the last pick, Space starts the fight. Deck builder: D or J adds a copy, A or K removes one, Q / E switch class, Enter finishes.
+**Menus are mouse-first.** Hover highlights, click picks, right-click backs out. Draw screen: the 5 drawn spells are a hand of cards; hover one to read it, click to queue it (cast order is pick order), right-click to undo, click FIGHT! to start. Deck builder: hover a spell to read it, click to add a copy, right-click to remove one, wheel to scroll, click the class tabs to switch. The keyboard still works everywhere (J picks, K undoes, Space fights; in the deck builder D/A add and remove, Q/E switch class). Combat is keyboard only.
 
 ## Rules in the prototype
 
@@ -43,7 +43,8 @@ Every number worth tuning is in [`src/game/tuning.ts`](src/game/tuning.ts). Spel
 
 ## Code map
 
-- `src/engine/` canvas helpers, bitmap font, keyboard input, sound effects and the music sequencer, song data
+- `src/main.ts` the loop. The fight draws at 240×160 and is scaled 2× under a sharp 480×320 UI layer that menus, cards and overlays draw on
+- `src/engine/` canvas helpers, bitmap font, keyboard and mouse input, sound effects and the music sequencer, song data
 - `src/art/` Cartridge NES sprites, the Grand Colosseum arena, the logo
 - `src/game/` battle rules (`battle.ts`), spells, decks, CPU, drawing (`battleView.ts`)
-- `src/scenes/` title, setup, deck builder, battle (Draw screen, pause, results), controls
+- `src/scenes/` title, setup, deck builder, battle (Draw screen, pause, results), options, controls, card faces (`cardView.ts`); clickable zones live in `scene.ts`

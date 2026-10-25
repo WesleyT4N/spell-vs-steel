@@ -1,26 +1,38 @@
-import { W, H, P } from './engine/gfx';
+import { W, H, UW, UH, P } from './engine/gfx';
 import { drawTextCentered } from './engine/font';
 import { initInput, endFrame, wasPressed } from './engine/input';
 import { toggleMute } from './engine/audio';
-import { setScene, getScene } from './scenes/scene';
+import { setScene, getScene, commitZones, hotZone } from './scenes/scene';
 import { TitleScene } from './scenes/title';
 
+// The screen is the sharp UI resolution. The world draws at 240×160 offscreen and is scaled up 2×
+// underneath, so the fight keeps its chunky pixels while menus and text get twice the room.
 const canvas = document.getElementById('game') as HTMLCanvasElement;
-canvas.width = W;
-canvas.height = H;
+canvas.width = UW;
+canvas.height = UH;
 const c = canvas.getContext('2d')!;
 c.imageSmoothingEnabled = false;
 
+const offscreen = (w: number, h: number): CanvasRenderingContext2D => {
+  const o = document.createElement('canvas');
+  o.width = w; o.height = h;
+  const x = o.getContext('2d')!;
+  x.imageSmoothingEnabled = false;
+  return x;
+};
+const world = offscreen(W, H);
+const ui = offscreen(UW, UH);
+
 function fit(): void {
-  // largest integer scale that fits, so pixels stay square
-  const s = Math.max(1, Math.floor(Math.min(window.innerWidth / W, window.innerHeight / H)));
-  canvas.style.width = `${W * s}px`;
-  canvas.style.height = `${H * s}px`;
+  // half steps of the screen are whole steps of the world, so the fight's pixels stay square
+  const s = Math.max(0.5, Math.floor(Math.min(window.innerWidth / UW, window.innerHeight / UH) * 2) / 2);
+  canvas.style.width = `${UW * s}px`;
+  canvas.style.height = `${UH * s}px`;
 }
 window.addEventListener('resize', fit);
 fit();
 
-initInput();
+initInput(canvas);
 // Inside an embedded frame, keys only arrive after the page gets focus.
 let engaged = false;
 const engage = (): void => { engaged = true; canvas.focus(); };
@@ -45,12 +57,17 @@ function frame(now: number): void {
     tickAcc += STEP;
     if (tickAcc >= 1 / 8) { tickAcc -= 1 / 8; tick++; }
   }
-  getScene()?.draw(c, tick);
+  ui.clearRect(0, 0, UW, UH);
+  getScene()?.draw(world, tick, ui);
   if (!engaged) {
-    P(c, '#000000', 0, 60, W, 22);
-    drawTextCentered(c, 'CLICK HERE, THEN USE THE KEYBOARD', W / 2, 64, tick % 8 < 6 ? '#f8b800' : '#fcfcfc', 1, false);
-    drawTextCentered(c, 'SOUND ON  (M TO MUTE)', W / 2, 73, '#bcbcbc', 1, false);
+    P(ui, '#000000', 0, 128, UW, 30);
+    drawTextCentered(ui, 'CLICK HERE TO START', UW / 2, 133, tick % 8 < 6 ? '#f8b800' : '#fcfcfc', 1, false);
+    drawTextCentered(ui, 'MOUSE FOR MENUS, KEYBOARD TO FIGHT  (M TO MUTE)', UW / 2, 145, '#bcbcbc', 1, false);
   }
+  c.drawImage(world.canvas, 0, 0, UW, UH);
+  c.drawImage(ui.canvas, 0, 0);
+  commitZones();
+  canvas.style.cursor = hotZone() ? 'pointer' : 'default';
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
