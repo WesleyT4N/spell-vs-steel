@@ -211,7 +211,6 @@ const warrior: CardDef[] = [
       lunge(x, foe.col - x.dir, foe.row, 0.18, 0.85, 0.2);
       for (let i = 0; i < 3; i++) b.later(0.22 + i * 0.25, () => {
         b.addFx('cleaveHeavy', f.side, foe.col, foe.row, 0.18);
-        sfx('slashHeavy');
         b.damage(foe, 70 * x.mult, f, { spell: true, element: 'steel', targeted: true });
       });
     },
@@ -398,7 +397,6 @@ const mage: CardDef[] = [
           const row = p.row;
           const r2 = row === 2 ? 1 : row + 1;
           const cells: Array<[number, number]> = [[col, row], [col + d, row], [col, r2], [col + d, r2]];
-          sfx('explode');
           b.shake = 0.2;
           for (const [c, rr] of cells) { b.addFx('explode', src.side, c, rr, 0.35); b.burn(c, rr, 5, 15); }
           b.strike(src, cells, 100 * x.mult, { spell: true, element: 'fire' });
@@ -452,7 +450,6 @@ const mage: CardDef[] = [
       x.b.mark(x.foe.col, x.foe.row, 1, '#f83800');
       targeted(x, 1, (c, r) => {
         x.b.addFx('pillar', x.f.side, c, r, 0.45);
-        sfx('explode');
         x.b.strike(x.f, [[c, r]], 130 * x.mult, { spell: true, element: 'fire' });
         for (let rr = 0; rr < 3; rr++) x.b.burn(c, rr, 5, 15);
       });
@@ -501,7 +498,6 @@ const mage: CardDef[] = [
       x.b.later(1.5, () => {
         x.b.shake = 0.5;
         x.b.cheer = 2;
-        sfx('explode');
         for (const [c, r] of cells) { x.b.addFx('explode', x.f.side, c, r, 0.5); x.b.burn(c, r, 5, 15); }
         x.b.strike(x.f, cells, 180 * x.mult, { spell: true, element: 'fire' });
       });
@@ -554,7 +550,6 @@ const mage: CardDef[] = [
         b.later(i * 0.25, () => b.mark(c, r, 0.5, '#f83800'));
         b.later(i * 0.25 + 0.5, () => {
           b.addFx('explode', f.side, c, r, 0.35);
-          sfx('explode');
           b.burn(c, r, 5, 15);
           b.strike(f, [[c, r]], 50 * x.mult, { spell: true, element: 'fire', noFlinch: true });
         });
