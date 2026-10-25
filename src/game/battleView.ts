@@ -2,7 +2,7 @@
 import { k } from '../engine/input';
 import { Colosseum, drawPanel, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, type Tint } from '../art/sprites';
-import { P, UW, UH, blob, frame, type Ctx } from '../engine/gfx';
+import { P, UW, UH, blob, frame, glow, type Ctx } from '../engine/gfx';
 import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '../engine/font';
 import { drawCardIcon } from '../scenes/cardView';
 import { CARDS, ELEMENT_COLOR } from './cards';
@@ -99,18 +99,32 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number): void {
     if (b.phase === 'ko' && Math.floor(b.koT * 8) % 2 === 0) drawFighterSprite(c, s, fx, y + 2, flip, 'ghost');
     return;
   }
-  // charge aura
-  if (f.charging && f.charge > 0.15) {
-    const full = f.charge >= TUNING.heavyCharge;
-    const col = full ? (tick % 2 ? '#fcfcfc' : '#f8b800') : '#3cbcfc';
-    const r = 6 + (tick % 3);
-    for (let i = 0; i < 6; i++) {
-      const ang = (i / 6) * Math.PI * 2 + b.time * 6;
-      P(c, col, fx + Math.cos(ang) * r, y - 9 + Math.sin(ang) * r * 0.8, 1, 1);
+  // charge aura: sparks spiral in toward the fighter, then a bright ring pulses once the heavy is ready
+  const charge = f.charging && f.charge > 0.15 ? Math.min(1, f.charge / TUNING.heavyCharge) : 0;
+  const ready = charge >= 1;
+  if (charge > 0) {
+    const cy = y - 9;
+    glow(c, fx, cy, 10 + charge * 10, ready ? '248,184,0' : '60,188,252', 0.25 + charge * 0.35);
+    if (!ready) {
+      for (let i = 0; i < 10; i++) {
+        const ph = (b.time * 2.2 + i / 10) % 1;          // each spark falls inward over its cycle
+        const r = 22 - ph * 16, ang = (i / 10) * Math.PI * 2 + b.time * 5;
+        const col = ph > 0.7 ? '#fcfcfc' : charge > 0.6 ? '#a4e4fc' : '#3cbcfc';
+        P(c, col, fx + Math.cos(ang) * r, cy + Math.sin(ang) * r * 0.75, 2, 2);
+      }
+    } else {
+      const r = 11 + (tick % 2);
+      for (let i = 0; i < 16; i++) {
+        const ang = (i / 16) * Math.PI * 2 + b.time * 3;
+        P(c, tick % 2 ? '#f8b800' : '#fcfcfc', fx + Math.cos(ang) * r, cy + Math.sin(ang) * r * 0.75, 2, 1);
+      }
     }
+    // ground glow under the feet grows with the charge
+    const gw = Math.round(6 + charge * 10);
+    P(c, ready ? (tick % 2 ? '#f8b800' : '#fcfcfc') : '#3cbcfc', x - gw / 2, y + 1, gw, 1);
   }
   let tint: Tint = 'none';
-  if (f.flash > 0) tint = 'flash';
+  if (f.flash > 0 || (ready && tick % 4 === 0)) tint = 'flash';
   else if (f.st.frozen > 0) tint = 'ice';
   else if (f.st.stunned > 0 && tick % 2) tint = 'stun';
   const bob = f.pose === 'idle' && Math.floor(b.time * 2.5) % 2 ? 1 : 0;
@@ -316,6 +330,7 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number): void {
     drawTextCentered(ui, t.text, pc.x * UI, (pc.y - 34) * UI - t.t * 28, t.color, big ? 2 : 1);
   }
   for (const f of b.f) drawFighterHud(ui, b, f, tick);
+  for (const f of b.f) drawChargeBar(ui, b, f, tick);
   // Draw gauge
   const gx = UW / 2 - 70, gw = 140;
   frame(ui, gx, 8, gw, 12, '#000000', '#fcfcfc');
@@ -439,4 +454,15 @@ function drawNextSpell(ui: Ctx, b: Battle, f: Fighter): void {
   drawText(ui, s, 24, UH - 18, ok ? '#fcfcfc' : '#7c7c7c');
   if (more) drawText(ui, `+${more}`, 24 + textWidth(s) + 12, UH - 18, '#7c7c7c');
   if (!ok) drawText(ui, `NEED ${card.cls === 'warrior' ? 'RAGE' : 'MANA'}`, tw + 44, UH - 18, '#f83800');
+}
+
+/** A charge meter under a fighter's feet while a heavy winds up; flashes READY when full. */
+function drawChargeBar(ui: Ctx, b: Battle, f: Fighter, tick: number): void {
+  if (f.dead || !f.charging || f.charge <= 0.15) return;
+  const p = Math.min(1, f.charge / TUNING.heavyCharge);
+  const { x, y } = fighterPos(b, f);
+  const bx = x * UI - 16, by = (y + 4) * UI;
+  frame(ui, bx, by, 32, 6, '#000000', '#000000');
+  P(ui, p >= 1 ? (tick % 2 ? '#f8b800' : '#fcfcfc') : '#3cbcfc', bx + 1, by + 1, Math.round(30 * p), 4);
+  if (p >= 1) drawTextCentered(ui, 'HEAVY!', x * UI, by + 8, tick % 2 ? '#f8b800' : '#fcfcfc', 1);
 }
