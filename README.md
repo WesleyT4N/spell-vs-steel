@@ -12,7 +12,18 @@ npm run dev      # local dev server
 npm run build    # type-check, then build dist/index.html (one self-contained file)
                  # and dist/artifact.html (the same game, shaped for a claude.ai artifact)
 npm run sim      # headless CPU-vs-CPU matches; prints win rates, match length, damage sources
+npm run sim -- 100 --cards   # same, with per-card casts, damage and win rate when cast
 ```
+
+## Dev tools
+
+**Title > DEV TOOLS** (or open the page with `#cards`, `#sandbox` or `#lab`):
+
+- **Card encyclopedia**: every spell of every class as card faces, filtered by class, rarity and element. Hover to read, J (or the button) tests the card in the sandbox. Classes come from `cards.ts`, so new classes show up on their own.
+- **Sandbox** (debug mode): a real fight with a panel docked on the right. Cast any spell for either side on demand or queue it for K, pick the enemy (still dummy, walker, turret, CPU easy/normal), turn on can't-die and free spells, slow time to 0.1×, pause and step frames (P, .), freeze or stun either side, set enemy HP, move fighters by clicking panels, and read live state plus a hit log that names the spell behind every hit.
+- **Balance lab**: CPU-vs-CPU matches in the browser. Win rate with a 95% range, match length, damage split, per-card stats (casts, damage per cast, share, win rate when cast) and a class-vs-class matrix. Every number in `tuning.ts` and a damage % per card can be edited live; edits apply to the whole game until reload, and "Copy overrides" gives the JSON to paste back or commit.
+
+Code lives in `src/dev/` (instrumentation, sims, tuning edits, DOM helpers) and `src/scenes/` (`devMenu`, `encyclopedia`, `sandbox`, `lab`). The instrumentation wraps one Battle instance, so `battle.ts` has no dev-only code.
 
 ## Controls
 

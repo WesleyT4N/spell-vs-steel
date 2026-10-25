@@ -4,6 +4,7 @@ import { initInput, endFrame, wasPressed } from './engine/input';
 import { toggleMute } from './engine/audio';
 import { setScene, getScene, commitZones, hotZone } from './scenes/scene';
 import { TitleScene } from './scenes/title';
+import { devFromHash } from './scenes/devMenu';
 
 // The screen is the sharp UI resolution. The world draws at 240×160 offscreen and is scaled up 2×
 // underneath, so the fight keeps its chunky pixels while menus and text get twice the room.
@@ -25,7 +26,9 @@ const ui = offscreen(UW, UH);
 
 function fit(): void {
   // half steps of the screen are whole steps of the world, so the fight's pixels stay square
-  const s = Math.max(0.5, Math.floor(Math.min(window.innerWidth / UW, window.innerHeight / UH) * 2) / 2);
+  // dev tools can dock a panel on the right and reserve its width
+  const room = window.innerWidth - Number(document.body.dataset.reserveRight ?? 0);
+  const s = Math.max(0.5, Math.floor(Math.min(room / UW, window.innerHeight / UH) * 2) / 2);
   canvas.style.width = `${UW * s}px`;
   canvas.style.height = `${UH * s}px`;
 }
@@ -38,7 +41,7 @@ let engaged = false;
 const engage = (): void => { engaged = true; canvas.focus(); };
 window.addEventListener('pointerdown', engage);
 window.addEventListener('keydown', () => { engaged = true; });
-setScene(new TitleScene());
+if (!devFromHash(() => setScene(new TitleScene()))) setScene(new TitleScene());
 
 const STEP = 1 / 60;
 let acc = 0;
