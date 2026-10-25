@@ -49,7 +49,7 @@ export const ranger: CardDef[] = [
         homing: { p: 0, dur: 0.5, sx: x.f.col, sy: x.f.row, target: x.foe.side },
         onHit: (b, t) => { if (t) b.damage(t, 40 * x.mult, b.f[1 - t.side], { spell: true, element: 'nature' }); },
       });
-      sfx('missile');
+      sfx('shot_hawk', { pan: (x.f.col - 2.5) / 3 });
     },
   },
   {
@@ -200,7 +200,6 @@ export const ranger: CardDef[] = [
       b.text(t, 'STUCK', '#f87800');
       b.later(2, () => {
         const cells: Array<[number, number]> = [[t.col, t.row], [t.col - 1, t.row], [t.col + 1, t.row], [t.col, t.row - 1], [t.col, t.row + 1]];
-        sfx('explode');
         b.shake = 0.25;
         for (const [c, r] of cells) if (b.inGrid(c, r)) b.addFx('explode', x.f.side, c, r, 0.4);
         b.strike(x.f, cells, 120 * x.mult, { spell: true, element: 'fire' });
