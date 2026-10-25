@@ -982,11 +982,13 @@ export class Battle {
     this.text(f, 'ASLEEP', '#9878f8');
   }
 
-  /** Bless a panel until the next Draw screen. A new blessing replaces the old one. */
+  /** Bless a panel until the next Draw screen. A new blessing replaces the old one and clears enemy traps. */
   bless(col: number, row: number, kind: BlessKind): void {
     const p = this.panel(col, row);
     if (!p || p.hole > 0) return;
     p.bless = 999; p.blessKind = kind; p.blessAcc = 0; p.manaAcc = 0;
+    // holy ground clears any enemy trap hidden on it
+    this.traps = this.traps.filter(t => !(t.col === col && t.row === row && t.side !== p.owner));
   }
 
   /** Curse an enemy panel of `side` until the next Draw screen. */
@@ -1282,6 +1284,8 @@ export class Battle {
     if (!p || p.hole > 0) return;
     p.burn = Math.max(p.burn, secs);
     p.burnDps = Math.max(p.burnDps, dps);
+    // fire burns a blessing away
+    p.bless = 0;
   }
 
   placeWall(f: Fighter, col: number, row: number, hp: number, kind: Wall['kind'], t: number, invuln = false): boolean {
