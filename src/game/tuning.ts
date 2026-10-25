@@ -13,7 +13,7 @@ export const TUNING = {
   /** Seconds between steps when a direction is held. */
   moveRepeat: 0.16,
 
-  /** Holding the attack button this long arms the heavy attack. */
+  /** Wind-up between pressing heavy attack and the swing. */
   heavyCharge: 1.0,
 
   warrior: {
