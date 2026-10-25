@@ -9,10 +9,10 @@ import { playMusic, sfx, isMuted } from '../engine/audio';
 import { MENU_SONG } from '../engine/music';
 import { SetupScene } from './setup';
 import { DeckBuilderScene } from './deckbuilder';
-import { ControlsScene } from './controls';
+import { OptionsScene } from './options';
 import { loadMatch } from '../game/match';
 
-const ITEMS = ['VERSUS CPU', 'DECK BUILDER', 'CONTROLS'];
+const ITEMS = ['VERSUS CPU', 'DECK BUILDER', 'OPTIONS'];
 
 export class TitleScene implements Scene {
   sel = 0;
@@ -28,7 +28,7 @@ export class TitleScene implements Scene {
       sfx('select');
       if (this.sel === 0) setScene(new SetupScene());
       if (this.sel === 1) setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
-      if (this.sel === 2) setScene(new ControlsScene(() => setScene(new TitleScene())));
+      if (this.sel === 2) setScene(new OptionsScene(() => setScene(new TitleScene())));
     }
   }
 

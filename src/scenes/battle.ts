@@ -15,6 +15,7 @@ import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
 import { drawCardDetail } from './deckbuilder';
 import { SetupScene } from './setup';
 import { TitleScene } from './title';
+import { OptionsScene } from './options';
 
 export class BattleScene implements Scene {
   b: Battle;
@@ -113,15 +114,16 @@ export class BattleScene implements Scene {
   }
 
   private updatePause(dt: number): void {
-    const items = 3;
+    const items = 4;
     if (navPressed('up', dt)) { this.pauseSel = (this.pauseSel + items - 1) % items; sfx('move'); }
     if (navPressed('down', dt)) { this.pauseSel = (this.pauseSel + 1) % items; sfx('move'); }
     if (wasPressed('back') && !wasPressed('pause')) { this.paused = false; return; }
     if (wasPressed('confirm') || (wasPressed('pause') && this.pauseSel === 0)) {
       sfx('select');
       if (this.pauseSel === 0) this.paused = false;
-      if (this.pauseSel === 1) setScene(new BattleScene(this.m, this.score));
-      if (this.pauseSel === 2) { stopMusic(); setScene(new TitleScene()); }
+      if (this.pauseSel === 1) setScene(new OptionsScene(() => setScene(this)));
+      if (this.pauseSel === 2) setScene(new BattleScene(this.m, this.score));
+      if (this.pauseSel === 3) { stopMusic(); setScene(new TitleScene()); }
     }
   }
 
@@ -177,7 +179,7 @@ export class BattleScene implements Scene {
     if (this.paused) {
       dim(c, 0.55);
       drawTextCentered(c, 'PAUSED', W / 2, 40, '#fcfcfc', 2);
-      drawMenu(c, ['RESUME', 'RESTART', 'QUIT TO TITLE'], this.pauseSel, W / 2, 70, tick, { width: 104 });
+      drawMenu(c, ['RESUME', 'OPTIONS', 'RESTART', 'QUIT TO TITLE'], this.pauseSel, W / 2, 66, tick, { width: 104 });
       hint(c, `${k('attack')}: SELECT  ${k('cast')}: RESUME`);
     }
   }
