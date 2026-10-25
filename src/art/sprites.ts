@@ -23,27 +23,38 @@ const DEFS: Record<ClassId, SpriteDef> = {
 /** A skin recolors palette letters and may repaint a few inner pixels; the outline never changes. */
 export interface Skin { id: string; name: string; set: Record<string, string>; px?: Array<[number, number, string]> }
 
-// From the approved skins page (art/skins.html).
+// Fighting-game style colors from the approved skins page (art/skins-data.ts). The first is the default.
 export const SKINS: Record<ClassId, Skin[]> = {
   warrior: [
-    { id: 'base', name: 'Crimson Vanguard', set: {} },
-    { id: 'gilded', name: 'Gilded Champion', set: { b: '#fcfcfc', c: '#bcbcbc', d: '#fcfcfc', e: '#ac7c00', f: '#f8d878', g: '#f8b800', h: '#fcfcfc', i: '#f8d878', j: '#d82800', k: '#bcbcbc', l: '#881400' } },
-    { id: 'obsidian', name: 'Obsidian Warlord', set: { b: '#f0d0b0', c: '#7c7c7c', d: '#d8b8f8', e: '#000000', f: '#4428bc', g: '#e40058', h: '#940084', i: '#d800cc', j: '#d8b8f8', k: '#4428bc', l: '#4428bc', m: '#000000' }, px: [[11, 7, 'g']] },
-    { id: 'north', name: 'Northman', set: { b: '#fcfcfc', c: '#bcbcbc', g: '#f83800', h: '#ac7c00', i: '#f0d0b0', j: '#fcfcfc', k: '#503000', l: '#881400' }, px: [[11, 8, 'g'], [12, 8, 'g'], [10, 8, 'g']] },
-    { id: 'grave', name: 'Grave Knight', set: { b: '#f0d0b0', c: '#7c7c7c', d: '#b8f8d8', e: '#004058', f: '#7c7c7c', g: '#58f898', h: '#008888', i: '#00e8d8', j: '#58f898', k: '#004058', l: '#004058', m: '#bcbcbc' }, px: [[12, 7, 'm']] },
-    { id: 'jade', name: 'Jade Sentinel', set: { b: '#f8b800', c: '#ac7c00', d: '#b8f8b8', e: '#00a844', f: '#58d854', g: '#503000', h: '#f8b800', i: '#f8d878', j: '#00a800', k: '#ac7c00', l: '#005800' } },
+    { id: 'red', name: 'Red', set: { f: '#f87858', e: '#881400', i: '#f87858', h: '#d82800', k: '#881400', j: '#f8b800' } },
+    { id: 'blue', name: 'Blue', set: { f: '#6888fc', e: '#0000a8', i: '#6888fc', h: '#0058f8', k: '#0000a8', j: '#f8b800' } },
+    { id: 'green', name: 'Green', set: { f: '#58d854', e: '#005800', i: '#58d854', h: '#00a800', k: '#005800', j: '#f8b800' } },
+    { id: 'yellow', name: 'Yellow', set: { f: '#f8d878', e: '#ac7c00', i: '#f8d878', h: '#f8b800', k: '#ac7c00', j: '#d82800' } },
+    { id: 'purple', name: 'Purple', set: { f: '#9878f8', e: '#4428bc', i: '#9878f8', h: '#6844fc', k: '#4428bc', j: '#f8b800' } },
+    { id: 'pink', name: 'Pink', set: { f: '#f8b8f8', e: '#d800cc', i: '#f8b8f8', h: '#f878f8', k: '#d800cc', j: '#fcfcfc' } },
+    { id: 'black', name: 'Black', set: { f: '#7c7c7c', e: '#3c3c3c', i: '#7c7c7c', h: '#3c3c3c', k: '#000000', j: '#d82800' } },
+    { id: 'white', name: 'White', set: { f: '#fcfcfc', e: '#bcbcbc', i: '#fcfcfc', h: '#fcfcfc', k: '#bcbcbc', j: '#f8b800' } },
   ],
   mage: [
-    { id: 'base', name: 'Azure Magus', set: {} },
-    { id: 'star', name: 'Starweaver', set: { b: '#9878f8', c: '#6844fc', h: '#4428bc', g: '#f8d878', e: '#fcfcfc', f: '#f8d878', m: '#fcfcfc' }, px: [[6, 3, 'm'], [6, 5, 'm'], [4, 11, 'm'], [4, 15, 'm'], [6, 14, 'm'], [3, 16, 'm']] },
-    { id: 'ember', name: 'Ember Sage', set: { b: '#d82800', c: '#a81000', h: '#881400', g: '#503000', d: '#503000', e: '#f8b800', f: '#e45c10', k: '#bcbcbc', l: '#7c7c7c' } },
-    { id: 'necro', name: 'Necromancer', set: { b: '#7c7c7c', c: '#3c3c3c', h: '#4428bc', g: '#f0d0b0', d: '#f0d0b0', e: '#58f898', f: '#00a844', i: '#bcbcbc', k: '#7c7c7c', l: '#3c3c3c', j: '#bcbcbc' } },
-    { id: 'druid', name: 'Verdant Druid', set: { b: '#58d854', c: '#00a800', h: '#005800', g: '#ac7c00', d: '#ac7c00', e: '#b8f818', f: '#00a800', m: '#f8b800' }, px: [[7, 13, 'm'], [3, 17, 'm'], [6, 17, 'm']] },
-    { id: 'sakura', name: 'Sakura Enchantress', set: { b: '#f8b8f8', c: '#f878f8', h: '#d800cc', g: '#fcfcfc', e: '#fcfcfc', f: '#f8a4c0', k: '#fcfcfc', l: '#f8b8f8' } },
+    { id: 'blue', name: 'Blue', set: {} },
+    { id: 'red', name: 'Red', set: { b: '#f87858', c: '#d82800', h: '#881400', g: '#f8b800' } },
+    { id: 'green', name: 'Green', set: { b: '#58d854', c: '#00a800', h: '#005800', g: '#f8b800' } },
+    { id: 'yellow', name: 'Yellow', set: { b: '#f8d878', c: '#f8b800', h: '#ac7c00', g: '#d82800' } },
+    { id: 'purple', name: 'Purple', set: { b: '#9878f8', c: '#6844fc', h: '#4428bc', g: '#f8b800' } },
+    { id: 'pink', name: 'Pink', set: { b: '#f8b8f8', c: '#f878f8', h: '#d800cc', g: '#fcfcfc' } },
+    { id: 'black', name: 'Black', set: { b: '#7c7c7c', c: '#3c3c3c', h: '#000000', g: '#d82800' } },
+    { id: 'white', name: 'White', set: { b: '#fcfcfc', c: '#fcfcfc', h: '#bcbcbc', g: '#f8b800', k: '#bcbcbc', l: '#7c7c7c' } },
   ],
 };
 
 export const skinOf = (cls: ClassId, id: string): Skin => SKINS[cls].find(s => s.id === id) ?? SKINS[cls][0];
+export const defaultSkin = (cls: ClassId): string => SKINS[cls][0].id;
+
+/** Mirror matches: when both pick the same class and color, the second player takes the next color. */
+export function mirrorSkin(cls: ClassId, mine: string, theirs: string): string {
+  const list = SKINS[cls], a = skinOf(cls, mine).id, b = skinOf(cls, theirs).id;
+  return a === b ? list[(list.findIndex(s => s.id === b) + 1) % list.length].id : b;
+}
 
 /** Palette and pixel rows for a class in a skin (plus the mirror-match ALT recolor). */
 function skinned(cls: ClassId, skinId: string, alt: boolean): { pal: string[]; rows: string[] } {

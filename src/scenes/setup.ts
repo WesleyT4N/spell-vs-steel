@@ -1,7 +1,7 @@
 // Match setup: both fighters, the player's deck, CPU difficulty.
 import { setScene, hint, type Scene } from './scene';
 import { getArena } from '../game/battleView';
-import { getSprite, drawFighterSprite, teamColor, SKINS, type ClassId } from '../art/sprites';
+import { getSprite, drawFighterSprite, teamColor, SKINS, skinOf, mirrorSkin, type ClassId } from '../art/sprites';
 import { P, W, H, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k } from '../engine/input';
@@ -71,13 +71,13 @@ export class SetupScene implements Scene {
 
     // portraits
     const bob = Math.floor(tick / 4) % 2;
-    const mySkin = this.m.p1Skin[this.m.p1], cpuSkin = this.m.cpuSkin[this.m.cpu];
+    const mySkin = skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id;
+    const cpuSkin = this.m.p1 === this.m.cpu ? mirrorSkin(this.m.cpu, mySkin, this.m.cpuSkin[this.m.cpu]) : skinOf(this.m.cpu, this.m.cpuSkin[this.m.cpu]).id;
     frame(c, 10, 16, 52, 54, '#000000', teamColor(this.m.p1, mySkin, false));
     drawFighterSprite(c, getSprite(this.m.p1, mySkin, false), 36, 66 - bob, false, 'none', 2);
     drawTextCentered(c, 'YOU', 36, 18, '#fcfcfc', 1, false);
-    const alt = this.m.p1 === this.m.cpu && mySkin === cpuSkin;
-    frame(c, W - 62, 16, 52, 54, '#000000', teamColor(this.m.cpu, cpuSkin, alt));
-    drawFighterSprite(c, getSprite(this.m.cpu, cpuSkin, alt), W - 36, 66 - (1 - bob), true, 'none', 2);
+    frame(c, W - 62, 16, 52, 54, '#000000', teamColor(this.m.cpu, cpuSkin, false));
+    drawFighterSprite(c, getSprite(this.m.cpu, cpuSkin, false), W - 36, 66 - (1 - bob), true, 'none', 2);
     drawTextCentered(c, 'CPU', W - 36, 18, '#fcfcfc', 1, false);
     drawTextCentered(c, 'VS', W / 2, 38, '#f8b800', 2);
 
@@ -92,7 +92,7 @@ export class SetupScene implements Scene {
       let value = '';
       if (row === 'YOU') value = this.m.p1.toUpperCase();
       if (row === 'DECK') value = this.m.p1Deck === 'starter' ? `STARTER: ${STARTER_NAME[this.m.p1].toUpperCase()}` : `CUSTOM${this.customValid() ? '' : ' (NOT READY)'}`;
-      if (row === 'CPU') value = this.m.cpu.toUpperCase() + (alt ? ' (ALT)' : '');
+      if (row === 'CPU') value = this.m.cpu.toUpperCase();
       if (row === 'CPU LEVEL') value = this.m.difficulty.toUpperCase();
       if (row === 'SKIN' || row === 'CPU SKIN') {
         // no names: one swatch per skin in its main color, the chosen one framed
