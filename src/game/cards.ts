@@ -144,7 +144,7 @@ const warrior: CardDef[] = [
   },
   {
     id: 'war_banner', name: 'War Banner', cls: 'warrior', cost: 2, rarity: 'uncommon', element: 'steel', damaging: true, lock: 0.4,
-    dmg: '10', short: 'Steal the enemy front column for 6s. Anyone there is knocked back.',
+    dmg: '10', short: 'Steal the enemy front column for 5s. Anyone there is knocked back.',
     cast: x => {
       const { b, f, foe } = x;
       const col = b.frontCol(foe.side);
@@ -156,11 +156,11 @@ const warrior: CardDef[] = [
       for (let r = 0; r < 3; r++) {
         const p = b.panels[col][r];
         p.owner = f.side;
-        p.ownerT = 6;
+        p.ownerT = 5;
       }
       b.walls = b.walls.filter(w => !(w.col === col && w.side === foe.side));
       if (foe.col === col) b.relocate(foe);
-      b.addFx('banner', f.side, col, 1, 6);
+      b.addFx('banner', f.side, col, 1, 5);
     },
   },
   {
