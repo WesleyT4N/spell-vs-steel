@@ -8,7 +8,7 @@ import { battleHash } from '../net/hash';
 import { NO_INPUT, type NetInput } from '../net/protocol';
 import type { NetSession } from '../net/session';
 import { P, UW, type Ctx } from '../engine/gfx';
-import { drawTextCentered } from '../engine/font';
+import { drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { RESULT_SONG } from '../engine/music';
@@ -167,7 +167,7 @@ export class OnlineBattleScene extends BattleScene {
     const b = this.b, net = this.net;
     // connection readout, top corner under the HUD
     const ping = net.rtt ? `PING ${Math.round(net.rtt)}MS  DELAY ${net.delay}F` : '';
-    if (b.phase === 'fight') drawTextCentered(ui, ping, UW / 2, 48, '#7c7c7c', 1, false);
+    if (b.phase === 'fight') drawTextOutlined(ui, ping, Math.round(UW / 2 - textWidth(ping) / 2), 48, '#bcbcbc');
     if (net.desync) drawTextCentered(ui, 'DESYNC: THE TWO GAMES DISAGREE', UW / 2, 270, '#f83800', 1);
     if (b.phase === 'custom' && this.locked) {
       P(ui, '#000000', 300, 152, 116, 28);
