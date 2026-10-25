@@ -13,7 +13,7 @@ import { CARDS } from '../game/cards';
 import { starterDeck, toList } from '../game/deck';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
-import { getSprite, drawFighterSprite, defaultSkin, type ClassId } from '../art/sprites';
+import { getSprite, drawFighterSprite, defaultSkin } from '../art/sprites';
 import { P, W, H, UW, UH, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, wrap } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
@@ -39,11 +39,13 @@ const GAUGE_STEP = 4;
 const HEAVY_MIN = 18;
 
 /** Hands dealt on the tutorial's Draw screen: cheap spells that show off cost, order and aiming. */
-const LESSON_HAND: Record<ClassId, string[]> = {
+// The tutorial teaches the two launch classes only.
+type TutorialClass = 'warrior' | 'mage';
+const LESSON_HAND: Record<TutorialClass, string[]> = {
   warrior: ['battle_shout', 'step_slash', 'guard', 'lunge', 'execute'],
   mage: ['arcane_missiles', 'ignite', 'arcane_focus', 'frost_nova', 'fireball'],
 };
-const LESSON_TRY: Record<ClassId, string> = {
+const LESSON_TRY: Record<TutorialClass, string> = {
   warrior: 'TRY BATTLE SHOUT, THEN STEP SLASH',
   mage: 'TRY ARCANE MISSILES, THEN IGNITE',
 };
@@ -404,7 +406,7 @@ class Dummy {
 }
 
 export class TutorialScene implements Scene {
-  cls: ClassId = 'warrior';
+  cls: TutorialClass = 'warrior';
   /** Picking a class before the lessons start. */
   choosing = true;
   chooseSel = 0;
@@ -442,7 +444,7 @@ export class TutorialScene implements Scene {
     return this.b.phase === 'custom' ? 'none' : this.inner.pad();
   }
 
-  private begin(cls: ClassId): void {
+  private begin(cls: TutorialClass): void {
     this.cls = cls;
     this.choosing = false;
     const saved = loadMatch();

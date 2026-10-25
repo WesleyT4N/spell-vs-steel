@@ -1,5 +1,6 @@
 // Match setup: both fighters, the player's deck, CPU difficulty.
 import { setScene, hint, zone, hot, listMouse, showSel, type Scene } from './scene';
+import { PLAYABLE } from '../game/classes';
 import { getArena } from '../game/battleView';
 import { getSprite, drawFighterSprite, teamColor, SKINS, skinOf, mirrorSkin, type ClassId } from '../art/sprites';
 import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
@@ -12,7 +13,7 @@ import { BattleScene } from './battle';
 import { DeckBuilderScene } from './deckbuilder';
 import { TitleScene } from './title';
 
-const CLASSES: ClassId[] = ['warrior', 'mage'];
+const CLASSES: ClassId[] = PLAYABLE;
 const ROWS = ['YOU', 'SKIN', 'DECK', 'EDIT DECK', 'CPU', 'CPU SKIN', 'CPU LEVEL', 'MATCH', 'FIGHT!'] as const;
 type RowName = (typeof ROWS)[number];
 

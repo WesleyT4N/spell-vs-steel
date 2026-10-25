@@ -5,14 +5,14 @@ import { Cpu } from '../src/game/ai';
 import { starterDeck, toList } from '../src/game/deck';
 import { battleHash } from '../src/net/hash';
 import { seeded } from '../src/game/rng';
-import type { ClassId } from '../src/art/sprites';
+import { CLASS_IDS } from '../src/game/classes';
 
 const N = Number(process.argv[2] ?? 20);
-const classes: ClassId[] = ['warrior', 'mage'];
+const classes = CLASS_IDS;
 let failures = 0;
 for (let m = 0; m < N; m++) {
   const seed = 1000 + m;
-  const a = classes[m % 2], bc = classes[(m >> 1) % 2];
+  const a = classes[m % classes.length], bc = classes[Math.floor(m / classes.length) % classes.length];
   const make = (): Battle => new Battle({ cls: a, deck: toList(starterDeck(a)), name: 'A' }, { cls: bc, deck: toList(starterDeck(bc)), name: 'B' }, seed);
   const x = make(), y = make();
   // inputs come from CPUs driving battle x (their own Math.random is fine: the intents are what get shared)

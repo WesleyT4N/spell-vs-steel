@@ -1,6 +1,7 @@
 // Versus CPU: runs a Battle, the custom screen, pause and results.
 import { setScene, dim, drawMenu, hint, zone, hot, isHot, listMouse, showSel, resetSel, type Scene } from './scene';
-import { Battle, NO_INTENT, type Dir, type Intent, type Side } from '../game/battle';
+import { CLASS_INFO } from '../game/classes';
+import { Battle, NO_INTENT, heavyChargeOf, type Dir, type Intent, type Side } from '../game/battle';
 import { drawBattle, drawBattleUi } from '../game/battleView';
 import { Cpu } from '../game/ai';
 import { CARDS, ELEMENT_COLOR, RARITY_COLOR } from '../game/cards';
@@ -97,7 +98,7 @@ export class BattleScene implements Scene {
     const ci = this.cpu.intent(b, b.f[1], dt);
     b.update(dt, [pi, ci]);
     // charging heavies hum (rising pitch, then a warble when ready); a quick tap stays silent
-    for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / TUNING.heavyCharge) : null);
+    for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / heavyChargeOf(f)) : null);
     if ((b.phase as string) === 'over' && !this.ended) {
       this.ended = true;
       resetSel();
@@ -217,7 +218,7 @@ export class BattleScene implements Scene {
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
     const b = this.b;
-    drawBattle(c, b, tick);
+    drawBattle(c, b, tick, this.me);
     if (b.phase !== 'custom') drawBattleUi(ui, b, tick, this.me);
     if (this.m.bestOf > 1 && b.phase !== 'over' && b.phase !== 'custom') {
       const round = this.score[0] + this.score[1] + 1;
@@ -301,9 +302,10 @@ export class BattleScene implements Scene {
       drawText(ui, cd.name.toUpperCase(), 272, y, RARITY_COLOR[cd.rarity]);
       drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, short[i] > 0 ? (builds ? resColor(cd) : '#f83800') : '#fcfcfc');
     });
+    const info = CLASS_INFO[f.cls];
     const over = !builds && this.picks.some(i => short[i] > 0);
     drawText(ui, `TOTAL COST ${total}`, 252, 120, over ? '#f83800' : '#bcbcbc');
-    drawText(ui, f.cls === 'warrior' ? 'PAY ON CAST' : 'REFILLS', 464 - (f.cls === 'warrior' ? 11 : 7) * 6, 120, '#7c7c7c');
+    drawText(ui, info.refill, 464 - info.refill.length * 6, 120, '#7c7c7c');
 
     // fight button
     const onOk = this.cursor === offer.length && showSel();
@@ -343,14 +345,14 @@ export class BattleScene implements Scene {
   /** Header resource pips, with what the picked spells would add blinking in. */
   private drawResourcePreview(ui: Ctx, tick: number): void {
     const b = this.b, f = b.f[this.me], offer = b.offer[this.me];
-    const mage = f.cls === 'mage';
+    const mage = f.cls === 'mage', info = CLASS_INFO[f.cls];
     let gainMax = 0, gainRes = 0, refill = false;
     for (const i of this.picks) {
       const g = CARDS[offer[i]].gain;
       if (!g) continue;
       gainMax += g.max ?? 0; gainRes += g.res ?? 0; refill ||= !!g.refill;
     }
-    const cap = mage ? TUNING.mage.manaCap : TUNING.warrior.rageMax;
+    const cap = mage ? TUNING.mage.manaCap : f.cls === 'warrior' ? TUNING.warrior.rageMax : f.resMax;
     const max = mage ? f.resMax : cap;
     const newMax = Math.min(cap, max + gainMax);
     const now = Math.floor(f.res);
@@ -362,16 +364,15 @@ export class BattleScene implements Scene {
       const px = x0 + i * 11, py = 8;
       const isSlot = i < max, newSlot = !isSlot && i < newMax;
       P(ui, '#000000', px - 1, py - 1, 10, 12);
-      P(ui, isSlot ? (mage ? '#0000a8' : '#503000') : newSlot ? '#3c3c3c' : '#181818', px, py, 8, 10);
-      if (i < now) { P(ui, mage ? (i >= max ? '#f878f8' : '#3cbcfc') : '#d82800', px, py, 8, 10); P(ui, '#fcfcfc', px, py, 8, 2); }
+      P(ui, isSlot ? info.pipBase : newSlot ? '#3c3c3c' : '#181818', px, py, 8, 10);
+      if (i < now) { P(ui, i >= max ? '#f878f8' : info.pip, px, py, 8, 10); P(ui, '#fcfcfc', px, py, 8, 2); }
       else if (i < after && blink) { P(ui, i >= newMax ? '#f878f8' : '#a4e4fc', px + 1, py + 1, 6, 8); }
       if (newSlot && blink) { P(ui, '#f8b800', px - 1, py - 1, 10, 1); P(ui, '#f8b800', px - 1, py + 10, 10, 1); }
     }
-    const label = mage ? 'MANA' : 'RAGE';
-    drawText(ui, label, x0 - 30, 10, mage ? '#a4e4fc' : '#f87858');
+    drawText(ui, info.res, x0 - info.res.length * 6 - 6, 10, info.resColor);
     const parts: string[] = [];
     if (newMax > max) parts.push(`+${newMax - max} MAX`);
     if (after > now) parts.push(refill && after - now > gainRes ? 'REFILL' : `+${after - now}`);
-    if (parts.length) drawText(ui, parts.join(' '), x0 - 36 - textWidth(parts.join(' ')), 10, '#f8b800');
+    if (parts.length) drawText(ui, parts.join(' '), x0 - info.res.length * 6 - 12 - textWidth(parts.join(' ')), 10, '#f8b800');
   }
 }

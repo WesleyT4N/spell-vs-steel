@@ -1,11 +1,11 @@
-// Every Warrior and Mage spell from the design doc. Numbers follow the doc; prototype-only
+// Every Warrior and Mage spell from the design doc (Rogue, Ranger and Cleric drafts live in cardsRogue/Ranger/Cleric.ts). Numbers follow the doc; prototype-only
 // interpretations are called out in the `short` text or a comment.
-import type { Battle, CastCtx, Fighter, Side } from './battle';
+import type { Battle, CastCtx, Fighter } from './battle';
 import type { ClassId } from '../art/sprites';
 import { sfx } from '../engine/audio';
 import { shuffle } from './rng';
 
-export type Element = 'steel' | 'fire' | 'frost' | 'arcane';
+export type Element = 'steel' | 'fire' | 'frost' | 'arcane' | 'shadow' | 'poison' | 'nature' | 'holy';
 export type Rarity = 'common' | 'uncommon' | 'legendary' | 'mythic';
 
 export interface CardDef {
@@ -23,6 +23,8 @@ export interface CardDef {
   dmg: string;
   /** Resource the spell gives its caster when cast, previewed on the Draw screen. */
   gain?: { max?: number; res?: number; refill?: boolean };
+  /** Only castable while the caster is in Stealth (Ambush); otherwise it waits at the top of the queue. */
+  needsStealth?: boolean;
   /** One-line rules text (keep under ~90 chars, it has to fit a 240px screen). */
   short: string;
   cast: (x: CastCtx) => void;
@@ -32,33 +34,10 @@ export interface CardDef {
 
 export const MAX_COPIES: Record<Rarity, number> = { common: 4, uncommon: 2, legendary: 1, mythic: 1 };
 
-// ---------- shared helpers ----------
-const sameRow = (b: Battle, f: Fighter): boolean => b.foe(f).row === f.row;
-const ahead = (b: Battle, f: Fighter, n: number): boolean => {
-  const foe = b.foe(f), d = b.dir(f);
-  if (foe.row !== f.row) return false;
-  const dist = (foe.col - f.col) * d;
-  return dist >= 1 && dist <= n;
-};
-const cellsAhead = (x: CastCtx, from: number, to: number, row = x.f.row): Array<[number, number]> => {
-  const out: Array<[number, number]> = [];
-  for (let i = from; i <= to; i++) out.push([x.f.col + i * x.dir, row]);
-  return out;
-};
-const allEnemyPanels = (b: Battle, side: Side): Array<[number, number]> => {
-  const out: Array<[number, number]> = [];
-  for (let c = 0; c < 6; c++) for (let r = 0; r < 3; r++) if (b.panels[c][r].owner !== side) out.push([c, r]);
-  return out;
-};
-const lowHp = (f: Fighter, pct: number): boolean => f.hp / f.maxHp < pct;
-
-/** Move the caster's sprite out and back (dash/leap), purely visual. */
-function lunge(x: CastCtx, toCol: number, toRow: number, out: number, hold: number, back: number, arc = 0): void {
-  const { b, f } = x;
-  const px = (toCol - f.col) * 38, py = (toRow - f.row) * 19;
-  b.anim(out, p => { f.dx = px * p; f.dy = py * p - Math.sin(p * Math.PI) * arc; });
-  b.later(out + hold, () => b.anim(back, p => { f.dx = px * (1 - p); f.dy = py * (1 - p) - Math.sin(p * Math.PI) * arc * 0.5; }));
-}
+import { sameRow, ahead, cellsAhead, allEnemyPanels, lowHp, lunge } from './cardUtil';
+import { rogue } from './cardsRogue';
+import { ranger } from './cardsRanger';
+import { cleric } from './cardsCleric';
 
 // ---------- Warrior ----------
 const warrior: CardDef[] = [
@@ -233,7 +212,7 @@ const warrior: CardDef[] = [
       for (let i = 0; i < 3; i++) b.later(0.22 + i * 0.25, () => {
         b.addFx('cleaveHeavy', f.side, foe.col, foe.row, 0.18);
         sfx('slashHeavy');
-        b.damage(foe, 70 * x.mult, f, { spell: true, element: 'steel' });
+        b.damage(foe, 70 * x.mult, f, { spell: true, element: 'steel', targeted: true });
       });
     },
   },
@@ -462,7 +441,7 @@ const mage: CardDef[] = [
     cast: x => {
       x.b.later(0.15, () => {
         x.b.addFx('arcaneHit', x.f.side, x.foe.col, x.foe.row, 0.35);
-        x.b.damage(x.foe, 90 * x.mult, x.f, { spell: true, element: 'arcane' });
+        x.b.damage(x.foe, 90 * x.mult, x.f, { spell: true, element: 'arcane', targeted: true });
       });
     },
   },
@@ -536,7 +515,7 @@ const mage: CardDef[] = [
       x.b.later(0.2, () => {
         x.b.addFx('arcaneHit', x.f.side, x.foe.col, x.foe.row, 0.5);
         x.b.shake = 0.3;
-        x.b.damage(x.foe, dmg, x.f, { spell: true, element: 'arcane' });
+        x.b.damage(x.foe, dmg, x.f, { spell: true, element: 'arcane', targeted: true });
       });
     },
     ai: (_b, f) => f.res >= 4,
@@ -585,7 +564,11 @@ const mage: CardDef[] = [
   {
     id: 'deep_freeze', name: 'Deep Freeze', cls: 'mage', cost: 3, rarity: 'legendary', element: 'frost', damaging: false, lock: 0.3,
     dmg: '-', short: 'Freeze the enemy for 2.5s. They cannot move or act.',
-    cast: x => { x.b.addFx('shard', x.f.side, x.foe.col, x.foe.row, 0.4); x.b.freeze(x.foe, 2.5); },
+    cast: x => {
+      if (!x.b.targetable(x.foe)) { x.b.text(x.foe, 'MISS', '#bcbcbc'); return; }
+      x.b.addFx('shard', x.f.side, x.foe.col, x.foe.row, 0.4);
+      x.b.freeze(x.foe, 2.5);
+    },
   },
   // Mythics
   {
@@ -617,9 +600,9 @@ const mage: CardDef[] = [
   },
 ];
 
-export const ALL_CARDS: CardDef[] = [...warrior, ...mage];
+export const ALL_CARDS: CardDef[] = [...warrior, ...mage, ...rogue, ...ranger, ...cleric];
 export const CARDS: Record<string, CardDef> = Object.fromEntries(ALL_CARDS.map(c => [c.id, c]));
 export const cardsFor = (cls: ClassId): CardDef[] => ALL_CARDS.filter(c => c.cls === cls);
 
-export const ELEMENT_COLOR: Record<Element, string> = { steel: '#bcbcbc', fire: '#f87800', frost: '#3cbcfc', arcane: '#f878f8' };
+export const ELEMENT_COLOR: Record<Element, string> = { steel: '#bcbcbc', fire: '#f87800', frost: '#3cbcfc', arcane: '#f878f8', shadow: '#9878f8', poison: '#b8f818', nature: '#58d854', holy: '#f8d878' };
 export const RARITY_COLOR: Record<Rarity, string> = { common: '#bcbcbc', uncommon: '#58d854', legendary: '#f8b800', mythic: '#f878f8' };

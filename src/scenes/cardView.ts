@@ -2,6 +2,7 @@
 import { P, frame, dith, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth, wrap } from '../engine/font';
 import { ELEMENT_COLOR, RARITY_COLOR, type CardDef, type Element } from '../game/cards';
+import { CLASS_INFO } from '../game/classes';
 
 const EMBLEM: Record<Element | 'shield', string[]> = {
   shield: ['#########', '####.####', '####.####', '#.......#', '####.####', '.###.###.', '.###.###.', '..##.##..', '...#.#...'],
@@ -9,10 +10,14 @@ const EMBLEM: Record<Element | 'shield', string[]> = {
   fire: ['....#....', '...##....', '...###...', '..####.#.', '.######..', '.#######.', '#########', '.#######.', '..#####..'],
   frost: ['....#....', '.#..#..#.', '..#.#.#..', '...###...', '#########', '...###...', '..#.#.#..', '.#..#..#.', '....#....'],
   arcane: ['....#....', '....#....', '...###...', '..#####..', '#########', '..#####..', '...###...', '....#....', '....#....'],
+  shadow: ['...####..', '..##.....', '.##......', '.##......', '.##......', '.##......', '.##......', '..##.....', '...####..'],
+  poison: ['....#....', '....#....', '...###...', '..#####..', '.#######.', '.###.###.', '.##...##.', '..##.##..', '...###...'],
+  nature: ['......###', '....#####', '...######', '..######.', '.######..', '.#####...', '.###.....', '#.#......', '#........'],
+  holy: ['...###...', '...###...', '#########', '#########', '...###...', '...###...', '...###...', '...###...', '...###...'],
 };
 
-export const resName = (card: CardDef): string => (card.cls === 'warrior' ? 'RAGE' : 'MANA');
-export const resColor = (card: CardDef): string => (card.cls === 'warrior' ? '#f87858' : '#a4e4fc');
+export const resName = (card: CardDef): string => CLASS_INFO[card.cls].res;
+export const resColor = (card: CardDef): string => CLASS_INFO[card.cls].resColor;
 const costText = (card: CardDef): string => (card.cost === 'all' ? 'A' : String(card.cost));
 
 export function drawEmblem(c: Ctx, el: Element | 'shield', cx: number, cy: number, s: number, col: string): void {
@@ -74,7 +79,7 @@ export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: 
   if (opts.lit || order >= 0) { P(c, edge, x + 1, y + 1, w - 2, 1); P(c, edge, x + 1, y + h - 2, w - 2, 1); }
   // cost gem
   const short = opts.short ?? -1, hard = short > 0 && !opts.builds;
-  const gem = hard ? '#3c3c3c' : card.cls === 'warrior' ? '#d82800' : '#0058f8';
+  const gem = hard ? '#3c3c3c' : CLASS_INFO[card.cls].gem;
   P(c, short === 0 ? '#f8b800' : '#000000', x + 2, y + 2, 18, 18);
   P(c, '#000000', x + 3, y + 3, 16, 16);
   P(c, gem, x + 4, y + 4, 14, 14);
