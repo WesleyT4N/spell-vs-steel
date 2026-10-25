@@ -14,7 +14,7 @@ import { starterDeck, toList, STARTER_NAME } from '../game/deck';
 import { playerDeck, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
 import { P, UW, frame, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered } from '../engine/font';
+import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse } from '../engine/input';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
@@ -245,12 +245,11 @@ export class BattleScene implements Scene {
     const secs = Math.ceil(this.timer);
     drawTextCentered(ui, String(secs).padStart(2, '0'), UW / 2, 6, secs <= 5 && tick % 4 < 2 ? '#f83800' : '#f8b800', 2);
     const total = this.picks.reduce((a, i) => { const cc = CARDS[offer[i]].cost; return a + (cc === 'all' ? 1 : cc); }, 0);
-    const res = f.cls === 'warrior' ? `RAGE ${f.res.toFixed(1).replace('.0', '')}/5` : `MANA ${f.res}/${f.resMax}`;
-    drawText(ui, res, UW - 10 - res.length * 6, 10, f.cls === 'warrior' ? '#f87858' : '#a4e4fc');
+    this.drawResourcePreview(ui, tick);
 
     // left: the card being read
     const card = offer[this.cursor] ? CARDS[offer[this.cursor]] : null;
-    frame(ui, 8, 34, 228, 146, '#000000', card ? ELEMENT_COLOR[card.element] : '#7c7c7c');
+    frame(ui, 8, 34, 228, 130, '#000000', card ? ELEMENT_COLOR[card.element] : '#7c7c7c');
     if (card) drawCardDetail(ui, card, 16, 42, 212);
     else {
       drawText(ui, 'START THE FIGHT', 16, 42, '#f8b800', 2);
@@ -260,10 +259,10 @@ export class BattleScene implements Scene {
     }
 
     // right: cast order
-    frame(ui, 244, 34, 228, 112, '#000000', PICKED);
+    frame(ui, 244, 34, 228, 98, '#000000', PICKED);
     drawText(ui, 'CAST ORDER', 252, 42, PICKED);
     if (!this.picks.length) drawText(ui, 'CLICK CARDS TO QUEUE THEM', 252, 58, '#7c7c7c');
-    this.picks.slice(0, 6).forEach((i, n) => {
+    this.picks.slice(0, 5).forEach((i, n) => {
       const cd = CARDS[offer[i]], y = 56 + n * 12;
       drawText(ui, `${n + 1}`, 252, y, PICKED);
       P(ui, ELEMENT_COLOR[cd.element], 264, y, 3, 7);
@@ -271,14 +270,15 @@ export class BattleScene implements Scene {
       drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, '#fcfcfc');
     });
     const over = f.cls === 'mage' && total > f.res;
-    drawText(ui, `TOTAL COST ${total}`, 252, 130, over ? '#f83800' : '#bcbcbc');
-    drawText(ui, f.cls === 'warrior' ? 'PAY ON CAST' : 'REFILLS', 464 - (f.cls === 'warrior' ? 11 : 7) * 6, 130, '#7c7c7c');
+    drawText(ui, `TOTAL COST ${total}`, 252, 120, over ? '#f83800' : '#bcbcbc');
+    drawText(ui, f.cls === 'warrior' ? 'PAY ON CAST' : 'REFILLS', 464 - (f.cls === 'warrior' ? 11 : 7) * 6, 120, '#7c7c7c');
 
     // fight button
     const onOk = this.cursor === offer.length;
-    zone('fight', 300, 152, 116, 28);
-    frame(ui, 300, 152, 116, 28, onOk ? '#f8b800' : '#000000', '#fcfcfc');
-    drawTextCentered(ui, 'FIGHT!', 358, 159, onOk ? '#000000' : '#f8b800', 2, false);
+    // sits above the highest a raised card can reach (HAND_Y - 2 * LIFT)
+    zone('fight', 300, 138, 116, 24);
+    frame(ui, 300, 138, 116, 24, onOk ? '#f8b800' : '#000000', '#fcfcfc');
+    drawTextCentered(ui, 'FIGHT!', 358, 143, onOk ? '#000000' : '#f8b800', 2, false);
 
     // the hand
     offer.forEach((id, i) => {
@@ -291,5 +291,40 @@ export class BattleScene implements Scene {
       if (!this.mouseMode && this.cursor === i && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, '#f8b800', 1, false);
     });
     hint(ui, `CLICK: PICK  RIGHT-CLICK: UNDO   KEYS: ${k('left')}/${k('right')} + ${k('attack')}  ${k('cast')} UNDO  ${k('custom')} FIGHT`);
+  }
+
+  /** Header resource pips, with what the picked spells would add blinking in. */
+  private drawResourcePreview(ui: Ctx, tick: number): void {
+    const b = this.b, f = b.f[0], offer = b.offer[0];
+    const mage = f.cls === 'mage';
+    let gainMax = 0, gainRes = 0, refill = false;
+    for (const i of this.picks) {
+      const g = CARDS[offer[i]].gain;
+      if (!g) continue;
+      gainMax += g.max ?? 0; gainRes += g.res ?? 0; refill ||= !!g.refill;
+    }
+    const cap = mage ? TUNING.mage.manaCap : TUNING.warrior.rageMax;
+    const max = mage ? f.resMax : cap;
+    const newMax = Math.min(cap, max + gainMax);
+    const now = Math.floor(f.res);
+    const after = Math.max(refill ? newMax : now, now) + gainRes;
+    const slots = Math.max(cap, after);
+    const blink = tick % 4 < 3;
+    const x0 = UW - 10 - slots * 11;
+    for (let i = 0; i < slots; i++) {
+      const px = x0 + i * 11, py = 8;
+      const isSlot = i < max, newSlot = !isSlot && i < newMax;
+      P(ui, '#000000', px - 1, py - 1, 10, 12);
+      P(ui, isSlot ? (mage ? '#0000a8' : '#503000') : newSlot ? '#3c3c3c' : '#181818', px, py, 8, 10);
+      if (i < now) { P(ui, mage ? (i >= max ? '#f878f8' : '#3cbcfc') : '#d82800', px, py, 8, 10); P(ui, '#fcfcfc', px, py, 8, 2); }
+      else if (i < after && blink) { P(ui, i >= newMax ? '#f878f8' : '#a4e4fc', px + 1, py + 1, 6, 8); }
+      if (newSlot && blink) { P(ui, '#f8b800', px - 1, py - 1, 10, 1); P(ui, '#f8b800', px - 1, py + 10, 10, 1); }
+    }
+    const label = mage ? 'MANA' : 'RAGE';
+    drawText(ui, label, x0 - 30, 10, mage ? '#a4e4fc' : '#f87858');
+    const parts: string[] = [];
+    if (newMax > max) parts.push(`+${newMax - max} MAX`);
+    if (after > now) parts.push(refill && after - now > gainRes ? 'REFILL' : `+${after - now}`);
+    if (parts.length) drawText(ui, parts.join(' '), x0 - 36 - textWidth(parts.join(' ')), 10, '#f8b800');
   }
 }
