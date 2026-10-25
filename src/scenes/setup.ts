@@ -1,5 +1,5 @@
 // Match setup: both fighters, the player's deck, CPU difficulty.
-import { setScene, hint, zone, hot, listMouse, type Scene } from './scene';
+import { setScene, hint, zone, hot, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { getSprite, drawFighterSprite, teamColor, SKINS, skinOf, mirrorSkin, type ClassId } from '../art/sprites';
 import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
@@ -114,7 +114,7 @@ export class SetupScene implements Scene {
 
     const bob = Math.floor(tick / 4) % 2;
     const mySkin = this.mySkin(), cpuSkin = this.cpuSkin();
-    const focus = ROWS[this.sel];
+    const focus = showSel() ? ROWS[this.sel] : null;
     if (focus === 'SKIN' || focus === 'CPU SKIN') {
       // skin picker: every skin as an in-game sprite, click one to wear it
       const mine = focus === 'SKIN', cls = mine ? this.m.p1 : this.m.cpu, cur = mine ? mySkin : cpuSkin;
@@ -146,7 +146,7 @@ export class SetupScene implements Scene {
     frame(ui, RX - 8, Y0 - 6, RW + 16, ROWS.length * RH + 8, '#000000', '#fcfcfc');
     ROWS.forEach((row, i) => {
       const y = Y0 + i * RH, ty = y + 4;
-      const on = i === this.sel;
+      const on = i === this.sel && showSel();
       zone(`row:${i}`, RX - 6, y - 1, RW + 12, RH - 1);
       if (on) P(ui, '#0000a8', RX - 6, y - 1, RW + 12, RH - 2);
       if (on && tick % 8 < 6) drawText(ui, '→', RX, ty, '#f8b800');

@@ -1,5 +1,5 @@
 // Dev tools menu: card encyclopedia, debug sandbox and balance lab.
-import { setScene, drawMenu, hint, listMouse, type Scene } from './scene';
+import { setScene, drawMenu, hint, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { W, H, UW, type Ctx } from '../engine/gfx';
 import { drawTextCentered } from '../engine/font';
@@ -50,7 +50,7 @@ export class DevMenuScene implements Scene {
     c.fillRect(0, 0, W, H);
     drawTextCentered(ui, 'DEV TOOLS', UW / 2, 48, '#f8b800', 3);
     drawMenu(ui, ITEMS, this.sel, UW / 2, 112, tick, { width: 240, gap: 24 });
-    drawTextCentered(ui, ABOUT[this.sel], UW / 2, 232, '#bcbcbc');
+    if (showSel()) drawTextCentered(ui, ABOUT[this.sel], UW / 2, 232, '#bcbcbc');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   ${k('cast')}: BACK`);
   }
 }
