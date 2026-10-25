@@ -40,10 +40,11 @@ export class TitleScene implements Scene {
     c.fillRect(0, 0, W, H);
     // fighters flanking the logo
     const bob = Math.floor(this.t * 2.5) % 2;
-    drawFighterSprite(c, getSprite('warrior', defaultSkin('warrior'), false), 34, 130 - bob, false, 'none', 2);
-    drawFighterSprite(c, getSprite('mage', defaultSkin('mage'), false), 206, 130 - (1 - bob), true, 'none', 2);
+    // the Mage stands under SPELL, the Warrior under STEEL, facing each other
+    drawFighterSprite(c, getSprite('mage', defaultSkin('mage'), false), 34, 130 - (1 - bob), false, 'none', 2);
+    drawFighterSprite(c, getSprite('warrior', defaultSkin('warrior'), false), 206, 130 - bob, true, 'none', 2);
     P(c, '#000000', 22, 131, 24, 2); P(c, '#000000', 194, 131, 24, 2);
-    drawLogo(c, W / 2, 10);
+    drawLogo(c, W / 2, 10, this.t);
     drawMenu(ui, ITEMS, this.sel, UW / 2, 186, tick, { width: 200, gap: 24 });
     drawTextCentered(ui, 'PROTOTYPE 0.2', UW / 2, 280, '#7c7c7c', 1, false);
     if (isMuted()) drawText(ui, 'MUTED', 8, 8, '#7c7c7c');
