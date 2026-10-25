@@ -1,7 +1,7 @@
 // Every number worth tweaking after a playtest lives here.
 
 export const TUNING = {
-  hp: { warrior: 600, mage: 500 },
+  hp: { warrior: 870, mage: 720 },
 
   /** Seconds for the shared custom gauge to fill. */
   gaugeSeconds: 10,
@@ -17,21 +17,21 @@ export const TUNING = {
   heavyCharge: 1.0,
 
   warrior: {
-    lightDamage: 10,
-    heavyDamage: 45,
+    lightDamage: 7,
+    heavyDamage: 32,
     lightLock: 0.45,
     heavyLock: 0.4,
     rageMax: 5,
     rageLightHit: 0,
-    rageHeavyHit: 1,
+    rageHeavyHit: 1.5,
     /** Taking damage builds Rage in proportion to the damage: 1 pip per this much, capped per hit. */
     rageDamagePerPip: 40,
     rageWhenHitMax: 1,
   },
 
   mage: {
-    lightDamage: 8,
-    heavyDamage: 40,
+    lightDamage: 6,
+    heavyDamage: 28,
     lightLock: 0.4,
     heavyLock: 0.35,
     manaStart: 1,
@@ -45,7 +45,7 @@ export const TUNING = {
   /** Frozen or stunned targets take this multiplier from all sources. */
   frozenBonus: 1.5,
   /** Hits this big make the target flinch (cancels charging, brief lockout). */
-  flinchThreshold: 40,
+  flinchThreshold: 28,
   flinchTime: 0.3,
   /** Burning panels tick this often (seconds). */
   burnTick: 0.5,
