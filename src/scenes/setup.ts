@@ -73,6 +73,19 @@ export class SetupScene implements Scene {
     const bob = Math.floor(tick / 4) % 2;
     const mySkin = skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id;
     const cpuSkin = this.m.p1 === this.m.cpu ? mirrorSkin(this.m.cpu, mySkin, this.m.cpuSkin[this.m.cpu]) : skinOf(this.m.cpu, this.m.cpuSkin[this.m.cpu]).id;
+    const focus = ROWS[this.sel];
+    if (focus === 'SKIN' || focus === 'CPU SKIN') {
+      // skin picker: every skin as an in-game sprite, the pick framed
+      const mine = focus === 'SKIN', cls = mine ? this.m.p1 : this.m.cpu, cur = mine ? mySkin : cpuSkin;
+      frame(c, 8, 16, W - 16, 54, '#000000', teamColor(cls, cur, false));
+      drawText(c, mine ? 'YOU' : 'CPU', 13, 19, '#fcfcfc');
+      const list = SKINS[cls], gap = 26, x1 = W / 2 - ((list.length - 1) * gap) / 2;
+      list.forEach((sk, n) => {
+        const fx = x1 + n * gap, picked = sk.id === cur;
+        if (picked) frame(c, Math.round(fx - 12), 28, 24, 38, '#0000a8', '#fcfcfc');
+        drawFighterSprite(c, getSprite(cls, sk.id, false), fx, 62 - (picked ? bob : 0), !mine, 'none', 1);
+      });
+    } else {
     frame(c, 10, 16, 52, 54, '#000000', teamColor(this.m.p1, mySkin, false));
     drawFighterSprite(c, getSprite(this.m.p1, mySkin, false), 36, 66 - bob, false, 'none', 2);
     drawTextCentered(c, 'YOU', 36, 18, '#fcfcfc', 1, false);
@@ -80,6 +93,7 @@ export class SetupScene implements Scene {
     drawFighterSprite(c, getSprite(this.m.cpu, cpuSkin, false), W - 36, 66 - (1 - bob), true, 'none', 2);
     drawTextCentered(c, 'CPU', W - 36, 18, '#fcfcfc', 1, false);
     drawTextCentered(c, 'VS', W / 2, 38, '#f8b800', 2);
+    }
 
     // option rows
     const x0 = 36, y0 = 77, rh = 8;
