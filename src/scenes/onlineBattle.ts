@@ -1,5 +1,5 @@
 // An online round: the Versus scene, driven by the lockstep session instead of a CPU.
-import { setScene, dim, hint } from './scene';
+import { setScene, dim, hint, resetSel } from './scene';
 import { BattleScene } from './battle';
 import { TitleScene } from './title';
 import { Battle, heavyChargeOf, type Side } from '../game/battle';
@@ -73,7 +73,7 @@ export class OnlineBattleScene extends BattleScene {
 
     // the fight keeps running under the pause menu: there is no pausing an online match
     if (this.paused) this.updatePause(dt);
-    else if (b.phase === 'fight' && wasPressed('pause')) { this.paused = true; this.pauseSel = 0; sfx('select'); }
+    else if (b.phase === 'fight' && wasPressed('pause')) { this.paused = true; this.pauseSel = 0; resetSel(); sfx('select'); }
     const live = b.phase === 'fight' && !this.paused;
     const now: NetInput = live ? { ...this.playerIntent(dt), draw: wasPressed('custom') } : NO_INPUT;
     this.pend = this.pend ? merge(this.pend, now) : now;
@@ -103,6 +103,7 @@ export class OnlineBattleScene extends BattleScene {
     for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / heavyChargeOf(f)) : null);
     if ((b.phase as string) === 'over' && !this.ended) {
       this.ended = true;
+      resetSel();
       if (b.winner !== null) this.score[b.winner]++;
       this.paused = false;
       stopMusic();

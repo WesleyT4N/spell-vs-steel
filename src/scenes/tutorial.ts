@@ -1,7 +1,7 @@
 // Interactive tutorial for players new to Battle Network: a scripted fight against a training dummy.
 // It drives a regular BattleScene (so the fight and the Draw screen look and play exactly like a match)
 // and layers lessons, goals and pointers on top. Every step can be skipped from the pause menu.
-import { setScene, dim, drawMenu, hint, listMouse, isHot, type Scene } from './scene';
+import { setScene, dim, drawMenu, hint, listMouse, isHot, showSel, resetSel, type Scene } from './scene';
 import { BattleScene } from './battle';
 import { TitleScene } from './title';
 import { SetupScene } from './setup';
@@ -17,6 +17,7 @@ import { getSprite, drawFighterSprite, defaultSkin } from '../art/sprites';
 import { P, W, H, UW, UH, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, wrap } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
+import { touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG } from '../engine/music';
 
@@ -437,6 +438,12 @@ export class TutorialScene implements Scene {
 
   enter(): void { playMusic('battle', BATTLE_SONG); }
 
+  pad(): PadMode {
+    if (this.choosing || this.paused) return 'back';
+    if (this.done) return 'none';
+    return this.b.phase === 'custom' ? 'none' : this.inner.pad();
+  }
+
   private begin(cls: TutorialClass): void {
     this.cls = cls;
     this.choosing = false;
@@ -481,6 +488,7 @@ export class TutorialScene implements Scene {
   private openDraw(): void {
     this.b.beginCustom();
     this.inner.cursor = 0;
+    resetSel();
     this.inner.lift = [];
     this.inner.picks = [];
   }
@@ -493,6 +501,7 @@ export class TutorialScene implements Scene {
   private finish(): void {
     this.done = true;
     this.doneSel = 0;
+    resetSel();
     markDone();
     stopMusic();
     sfx('win');
@@ -507,7 +516,7 @@ export class TutorialScene implements Scene {
     const b = this.b;
     this.denyT = Math.max(0, this.denyT - dt);
 
-    if (wasPressed('pause') && !wasPressed('confirm') && b.phase !== 'custom') { this.paused = true; this.pauseSel = 0; this.quiet(); sfx('select'); return; }
+    if (wasPressed('pause') && !wasPressed('confirm') && b.phase !== 'custom') { this.paused = true; this.pauseSel = 0; resetSel(); this.quiet(); sfx('select'); return; }
 
     // lesson pages hold the fight still
     if (this.page < this.pages.length) {
@@ -653,8 +662,8 @@ export class TutorialScene implements Scene {
 
   private drawGoal(ui: Ctx, s: Step, tick: number): void {
     const x = UW / 2 - 104, w = 208, y = 36;
-    const lines = wrap(s.goal(this), 32).slice(0, 2);
-    const tip = s.tip ? wrap(s.tip(this), 32).slice(0, 4 - lines.length) : [];
+    const lines = wrap(touchText(s.goal(this)), 32).slice(0, 2);
+    const tip = s.tip ? wrap(touchText(s.tip(this)), 32).slice(0, 4 - lines.length) : [];
     const h = 16 + (lines.length + tip.length) * 9;
     frame(ui, x, y, w, h, '#000000', '#f8b800');
     drawText(ui, this.lessonLabel(), x + 6, y + 4, '#7c7c7c');
@@ -676,7 +685,7 @@ export class TutorialScene implements Scene {
     const pg = this.pages[this.page];
     dim(ui, 0.6);
     const x = 40, w = UW - 80;
-    const paras = pg.body.map(p => wrap(p, Math.floor((w - 28) / 6)));
+    const paras = pg.body.map(p => wrap(touchText(p), Math.floor((w - 28) / 6)));
     const bodyH = paras.reduce((a, l) => a + l.length * 10 + 6, 0);
     const h = 52 + bodyH;
     const y = Math.max(40, Math.round((UH - 14 - h) / 2));
@@ -703,13 +712,13 @@ export class TutorialScene implements Scene {
     c.fillStyle = 'rgba(0,0,24,0.55)';
     c.fillRect(0, 0, W, H);
     const bob = Math.floor(performance.now() / 400) % 2;
-    drawFighterSprite(c, getSprite('warrior', defaultSkin('warrior'), false), 36, 130 - (this.chooseSel === 0 ? bob : 0), false, 'none', 2);
-    drawFighterSprite(c, getSprite('mage', defaultSkin('mage'), false), 204, 130 - (this.chooseSel === 1 ? bob : 0), true, 'none', 2);
+    drawFighterSprite(c, getSprite('warrior', defaultSkin('warrior'), false), 36, 130 - (this.chooseSel === 0 && showSel() ? bob : 0), false, 'none', 2);
+    drawFighterSprite(c, getSprite('mage', defaultSkin('mage'), false), 204, 130 - (this.chooseSel === 1 && showSel() ? bob : 0), true, 'none', 2);
     drawTextCentered(ui, 'TUTORIAL', UW / 2, 28, '#f8b800', 3);
     drawTextCentered(ui, 'LEARN TO FIGHT AGAINST A TRAINING DUMMY. ABOUT 5 MINUTES.', UW / 2, 60, '#bcbcbc', 1, false);
     drawTextCentered(ui, 'WHICH CLASS DO YOU WANT TO LEARN?', UW / 2, 74, '#fcfcfc', 1, false);
     drawMenu(ui, ['WARRIOR', 'MAGE', 'BACK'], this.chooseSel, UW / 2, 112, tick, { width: 160, gap: 24 });
-    const blurb = this.chooseSel === 0
+    const blurb = !showSel() ? '' : this.chooseSel === 0
       ? 'SWORD AND SHIELD. FIGHTS UP CLOSE AND BUILDS RAGE BY LANDING HEAVY HITS AND TAKING DAMAGE.'
       : this.chooseSel === 1
         ? 'STAFF AND SPELLBOOK. FIGHTS FROM RANGE, WITH MANA THAT GROWS EVERY DRAW UNTIL MAGES HIT HARDEST OF ALL.'
