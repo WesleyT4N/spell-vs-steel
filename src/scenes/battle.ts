@@ -177,7 +177,7 @@ export class BattleScene implements Scene {
   private get need(): number { return Math.ceil(this.m.bestOf / 2); }
   private get setOver(): boolean { return Math.max(...this.score) >= this.need; }
   private get resultItems(): string[] {
-    return this.setOver ? ['REMATCH', 'CHANGE SETUP', 'TITLE'] : ['NEXT ROUND', 'TITLE'];
+    return this.setOver ? ['REMATCH', 'CHARACTER SELECT', 'TITLE'] : ['NEXT ROUND', 'TITLE'];
   }
 
   private updateResult(dt: number): void {
@@ -192,7 +192,7 @@ export class BattleScene implements Scene {
       const choice = this.resultItems[this.resultSel];
       if (choice === 'NEXT ROUND') setScene(new BattleScene(this.m, this.score));
       if (choice === 'REMATCH') setScene(new BattleScene(this.m));
-      if (choice === 'CHANGE SETUP') setScene(new SetupScene());
+      if (choice === 'CHARACTER SELECT') setScene(new SetupScene());
       if (choice === 'TITLE') setScene(new TitleScene());
     }
   }
