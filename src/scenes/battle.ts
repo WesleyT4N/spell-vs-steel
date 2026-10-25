@@ -1,5 +1,5 @@
 // Versus CPU: runs a Battle, the custom screen, pause and results.
-import { setScene, dim, drawMenu, hint, zone, hot, isHot, listMouse, type Scene } from './scene';
+import { setScene, dim, drawMenu, hint, zone, hot, isHot, listMouse, showSel, resetSel, type Scene } from './scene';
 import { CLASS_INFO } from '../game/classes';
 import { Battle, NO_INTENT, heavyChargeOf, type Dir, type Intent, type Side } from '../game/battle';
 import { drawBattle, drawBattleUi } from '../game/battleView';
@@ -17,9 +17,10 @@ import { TUNING } from '../game/tuning';
 import { P, UW, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse } from '../engine/input';
+import { touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
-import { drawCardDetail, drawCardFace, CARD_W, CARD_H, PICKED } from './cardView';
+import { drawCardDetail, drawCardFace, resName, resColor, CARD_W, CARD_H, PICKED } from './cardView';
 import { SetupScene } from './setup';
 import { TitleScene } from './title';
 import { OptionsScene } from './options';
@@ -55,6 +56,14 @@ export class BattleScene implements Scene {
 
   enter(): void { playMusic('battle', BATTLE_SONG); }
 
+  pad(): PadMode {
+    const b = this.b;
+    if (this.paused) return 'back';
+    // the Draw screen and results are all taps (tap a picked card again to undo it)
+    if (b.phase === 'custom' || b.phase === 'over') return 'none';
+    return b.canOpenCustom() ? 'fight-ready' : 'fight';
+  }
+
   protected playerIntent(dt: number): Intent {
     const f = this.b.f[this.me];
     const d = heldDir();
@@ -78,7 +87,7 @@ export class BattleScene implements Scene {
     if (b.phase === 'over') { this.updateResult(dt); b.update(dt, [NO_INTENT, NO_INTENT]); return; }
 
     if (this.paused) { this.updatePause(dt); return; }
-    if (b.phase === 'fight' && wasPressed('pause')) { this.paused = true; this.pauseSel = 0; sfx('select'); return; }
+    if (b.phase === 'fight' && wasPressed('pause')) { this.paused = true; this.pauseSel = 0; resetSel(); sfx('select'); return; }
 
     if (b.phase === 'fight' && wasPressed('custom') && b.canOpenCustom()) {
       b.beginCustom();
@@ -92,6 +101,7 @@ export class BattleScene implements Scene {
     for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / heavyChargeOf(f)) : null);
     if ((b.phase as string) === 'over' && !this.ended) {
       this.ended = true;
+      resetSel();
       if (b.winner !== null) this.score[b.winner]++;
       stopMusic();
       if (b.winner === this.me) sfx('win');
@@ -101,6 +111,7 @@ export class BattleScene implements Scene {
 
   protected openCustom(): void {
     this.cursor = 0;
+    resetSel();
     this.lift = [];
     this.picks = [];
     this.timer = TUNING.customTimer;
@@ -144,7 +155,7 @@ export class BattleScene implements Scene {
   /** Raise level of hand card `i`: 0 resting, 1 hovered, 2 picked. */
   private level(i: number): number {
     if (this.picks.includes(i)) return 2;
-    const hovered = this.mouseMode ? hot('card') === i : this.cursor === i;
+    const hovered = this.mouseMode ? hot('card') === i : this.cursor === i && showSel();
     return hovered ? 1 : 0;
   }
 
@@ -254,12 +265,26 @@ export class BattleScene implements Scene {
     drawTextCentered(ui, String(secs).padStart(2, '0'), UW / 2, 6, secs <= 5 && tick % 4 < 2 ? '#f83800' : '#f8b800', 2);
     const total = this.picks.reduce((a, i) => { const cc = CARDS[offer[i]].cost; return a + (cc === 'all' ? 1 : cc); }, 0);
     this.drawResourcePreview(ui, tick);
+    const short = this.shortfalls();
+    // Rage is earned in the fight and paid on cast, so a short Warrior card is "later", not "can't"
+    const builds = f.cls === 'warrior';
 
     // left: the card being read
-    const card = offer[this.cursor] ? CARDS[offer[this.cursor]] : null;
+    const card = showSel() && offer[this.cursor] ? CARDS[offer[this.cursor]] : null;
     frame(ui, 8, 34, 228, 130, '#000000', card ? ELEMENT_COLOR[card.element] : '#7c7c7c');
-    if (card) drawCardDetail(ui, card, 16, 42, 212);
-    else {
+    if (card) {
+      drawCardDetail(ui, card, 16, 42, 212);
+      const need = short[this.cursor];
+      if (need > 0) {
+        if (builds) drawText(ui, `BUILD ${need} MORE ${resName(card)} IN THE FIGHT`, 16, 152, resColor(card));
+        else drawText(ui, `NEED ${need} MORE ${resName(card)}`, 16, 152, '#f83800');
+      }
+    } else if (!showSel()) {
+      drawText(ui, 'YOUR HAND', 16, 42, '#f8b800', 2);
+      drawText(ui, 'TOUCH AND HOLD A CARD TO READ IT', 16, 64, '#fcfcfc');
+      drawText(ui, 'TAP CARDS TO PICK THEM, IN CAST ORDER', 16, 78, '#bcbcbc');
+      drawText(ui, this.rivalDeckText(), 16, 100, '#7c7c7c');
+    } else {
       drawText(ui, 'START THE FIGHT', 16, 42, '#f8b800', 2);
       drawText(ui, `${this.picks.length} SPELL${this.picks.length === 1 ? '' : 'S'} PICKED`, 16, 64, '#fcfcfc');
       drawText(ui, `CAST THEM IN ORDER WITH ${k('cast')}`, 16, 78, '#bcbcbc');
@@ -269,21 +294,21 @@ export class BattleScene implements Scene {
     // right: cast order
     frame(ui, 244, 34, 228, 98, '#000000', PICKED);
     drawText(ui, 'CAST ORDER', 252, 42, PICKED);
-    if (!this.picks.length) drawText(ui, 'CLICK CARDS TO QUEUE THEM', 252, 58, '#7c7c7c');
+    if (!this.picks.length) drawText(ui, touchText('CLICK CARDS TO QUEUE THEM'), 252, 58, '#7c7c7c');
     this.picks.slice(0, 5).forEach((i, n) => {
       const cd = CARDS[offer[i]], y = 56 + n * 12;
       drawText(ui, `${n + 1}`, 252, y, PICKED);
       P(ui, ELEMENT_COLOR[cd.element], 264, y, 3, 7);
       drawText(ui, cd.name.toUpperCase(), 272, y, RARITY_COLOR[cd.rarity]);
-      drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, '#fcfcfc');
+      drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, short[i] > 0 ? (builds ? resColor(cd) : '#f83800') : '#fcfcfc');
     });
     const info = CLASS_INFO[f.cls];
-    const over = (f.cls === 'mage' || f.cls === 'rogue' || f.cls === 'cleric') && total > f.res;
+    const over = !builds && this.picks.some(i => short[i] > 0);
     drawText(ui, `TOTAL COST ${total}`, 252, 120, over ? '#f83800' : '#bcbcbc');
     drawText(ui, info.refill, 464 - info.refill.length * 6, 120, '#7c7c7c');
 
     // fight button
-    const onOk = this.cursor === offer.length;
+    const onOk = this.cursor === offer.length && showSel();
     // sits above the highest a raised card can reach (HAND_Y - 2 * LIFT)
     zone('fight', 300, 138, 116, 24);
     frame(ui, 300, 138, 116, 24, onOk ? '#f8b800' : '#000000', '#fcfcfc');
@@ -296,10 +321,25 @@ export class BattleScene implements Scene {
       // the hit box covers every raise level, so a rising card never slips out from under the pointer
       zone(`card:${i}`, x, HAND_Y - 2 * LIFT, CARD_W, CARD_H + 2 * LIFT);
       const y = HAND_Y - Math.round(this.lift[i] ?? 0);
-      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1 || (lvl === 2 && this.cursor === i) });
-      if (!this.mouseMode && this.cursor === i && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, '#f8b800', 1, false);
+      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1 || (lvl === 2 && this.cursor === i && showSel()), short: short[i], builds });
+      if (!this.mouseMode && this.cursor === i && showSel() && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, '#f8b800', 1, false);
     });
     hint(ui, `CLICK: PICK  RIGHT-CLICK: UNDO   KEYS: ${k('left')}/${k('right')} + ${k('attack')}  ${k('cast')} UNDO  ${k('custom')} FIGHT`);
+  }
+
+  /**
+   * How much resource each hand card is missing right now (0 = payable). Picked cards are checked at
+   * their place in the cast order; the rest as if queued next, after what the picks spend and gain.
+   */
+  private shortfalls(): number[] {
+    const b = this.b, f = b.f[this.me], offer = b.offer[this.me];
+    const picked = this.picks.map(i => CARDS[offer[i]]);
+    const plan = b.planCosts(f, picked);
+    return offer.map((id, i) => {
+      const at = this.picks.indexOf(i);
+      const left = at >= 0 ? plan.left[at] : b.planCosts(f, [...picked, CARDS[id]]).left[picked.length];
+      return Math.max(0, -left);
+    });
   }
 
   /** Header resource pips, with what the picked spells would add blinking in. */

@@ -662,6 +662,35 @@ export class Battle {
     return f.res >= this.costOf(f, card);
   }
 
+  /**
+   * Walks Draw-screen picks in cast order from what `f` holds right now: `left[i]` is what remains after
+   * paying pick i (negative = short by that much), `rest` is what the queue leaves for one more spell.
+   * Resource gained mid-fight (Rage from hits) isn't counted, so it reads "affordable now".
+   */
+  planCosts(f: Fighter, cards: CardDef[]): { left: number[]; rest: number } {
+    const free = f.st.avatar > 0 || f.st.ascendance > 0;
+    const cap = f.cls === 'mage' ? TUNING.mage.manaCap : TUNING.warrior.rageMax;
+    let max = f.cls === 'mage' ? f.resMax : cap, res = Math.floor(f.res), power = f.powerLeft;
+    const left = cards.map(card => {
+      let cost = 0;
+      if (!free) {
+        cost = card.cost === 'all' ? Math.max(1, res) : Math.max(0, card.cost - (power > 0 ? 1 : 0));
+        if (power > 0 && card.cost !== 'all' && card.cost > 0) power--;
+      }
+      res -= cost;
+      const short = res;
+      res = Math.max(0, res);
+      const g = card.gain;
+      if (g) {
+        max = Math.min(cap, max + (g.max ?? 0));
+        if (g.refill) res = Math.max(res, max);
+        res += g.res ?? 0;
+      }
+      return short;
+    });
+    return { left, rest: res };
+  }
+
   // ---------- attacks ----------
   basicAttack(f: Fighter, kind: 'light' | 'heavy'): void {
     const foe = this.foe(f);

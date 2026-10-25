@@ -1,4 +1,4 @@
-import { hint, zone, listMouse, type Scene } from './scene';
+import { hint, zone, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
@@ -54,7 +54,7 @@ export class ControlsScene implements Scene {
     drawTextCentered(ui, 'KEY MAPPING', UW / 2, 26, '#f8b800', 2, false);
     ROWS.forEach((row, i) => {
       const y = rowY(i), ty = y + 6;
-      const on = i === this.sel;
+      const on = i === this.sel && showSel();
       zone(`row:${i}`, PX - 12, y, PW + 24, RH - 2);
       if (on) P(ui, '#0000a8', PX - 12, y, PW + 24, RH - 2);
       if (on && tick % 8 < 6) drawText(ui, '→', PX - 4, ty, '#f8b800');

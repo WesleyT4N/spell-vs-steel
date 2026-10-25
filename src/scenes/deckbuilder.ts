@@ -1,5 +1,5 @@
 // Grimoire builder: 30 spells, 4/2/1 copy limits, max 5 Legendaries, exactly 1 Mythic. Autosaves to the browser.
-import { hint, zone, hot, isHot, button, type Scene } from './scene';
+import { hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { teamColor, type ClassId } from '../art/sprites';
 import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
@@ -9,11 +9,11 @@ import { sfx } from '../engine/audio';
 import { cardsFor, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef } from '../game/cards';
 import { canAdd, countRarity, deckSize, loadCustom, saveCustom, starterDeck, validate, DECK_SIZE, MAX_LEGENDARIES, type DeckCounts } from '../game/deck';
 import { loadMatch, saveMatch } from '../game/match';
-import { CLASS_IDS } from '../game/classes';
+import { PLAYABLE } from '../game/classes';
 import { drawCardFace, resColor, resName, CARD_W, CARD_H } from './cardView';
 
 const RARITY_ORDER = { common: 0, uncommon: 1, legendary: 2, mythic: 3 };
-const CLASSES: ClassId[] = CLASS_IDS;
+const CLASSES: ClassId[] = PLAYABLE;
 
 // layout (UI pixels)
 const VISIBLE = 16, RH = 14;
@@ -147,7 +147,7 @@ export class DeckBuilderScene implements Scene {
       const idx = this.scroll + i;
       if (idx >= this.rows) break;
       const y = LY + i * RH, ty = y + 3;
-      const on = idx === this.sel;
+      const on = idx === this.sel && showSel();
       zone(`row:${idx}`, LX + 1, y - 1, LW - 2, RH);
       if (on) P(ui, '#0000a8', LX + 1, y - 1, LW - 2, RH);
       const card = this.cards[idx];
@@ -175,7 +175,7 @@ export class DeckBuilderScene implements Scene {
     P(ui, '#bcbcbc', LX + LW + 1, by - 2, 3, bh);
 
     // detail: the card itself, its numbers, then its rules
-    const card = this.cards[this.sel];
+    const card = showSel() ? this.cards[this.sel] : undefined;
     const dh = VISIBLE * RH + 6;
     frame(ui, DX, LY - 4, DW, dh, '#000000', card ? ELEMENT_COLOR[card.element] : '#7c7c7c');
     if (card) {
@@ -194,6 +194,8 @@ export class DeckBuilderScene implements Scene {
       let ry = LY + CARD_H + 16;
       drawText(ui, card.name.toUpperCase(), DX + 8, ry, '#fcfcfc'); ry += 14;
       for (const l of wrap(card.short.toUpperCase(), Math.floor((DW - 16) / 6))) { drawText(ui, l, DX + 8, ry, '#bcbcbc'); ry += 11; }
+    } else if (!showSel()) {
+      drawText(ui, 'TOUCH A CARD TO READ IT', DX + 8, LY + 8, '#bcbcbc');
     } else {
       drawText(ui, this.sel === this.cards.length ? 'PUT THE STARTER DECK BACK' : 'REMOVE EVERY SPELL', DX + 8, LY + 8, '#bcbcbc');
     }

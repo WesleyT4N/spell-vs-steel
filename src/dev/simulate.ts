@@ -1,4 +1,5 @@
 // Headless CPU-vs-CPU matches with per-card stats. Used by the balance lab and scripts/sim.ts.
+import { PLAYABLE } from '../game/classes';
 import { Battle, type Side } from '../game/battle';
 import { Cpu } from '../game/ai';
 import { CARDS } from '../game/cards';
@@ -8,7 +9,7 @@ import { SKINS, type ClassId } from '../art/sprites';
 import { instrument } from './instrument';
 
 /** Every class with sprites; new classes show up in the dev tools as soon as they are added. */
-export const classIds = (): ClassId[] => Object.keys(SKINS) as ClassId[];
+export const classIds = (): ClassId[] => (Object.keys(SKINS) as ClassId[]).filter(c => PLAYABLE.includes(c));
 
 export interface SideSpec { cls: ClassId; deck: DeckCounts; cpu: Difficulty; label?: string }
 

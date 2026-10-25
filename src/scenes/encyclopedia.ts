@@ -7,6 +7,7 @@ import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { sfx } from '../engine/audio';
+import { PLAYABLE } from '../game/classes';
 import { ALL_CARDS, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef, type Element, type Rarity } from '../game/cards';
 import { starterDeck, STARTER_NAME } from '../game/deck';
 import { drawCardDetail, drawCardFace, CARD_W, CARD_H } from './cardView';
@@ -28,7 +29,7 @@ export class EncyclopediaScene implements Scene {
   element: Element | null = null;
   sel = 0;
   scroll = 0;
-  private classes: ClassId[] = [...new Set(ALL_CARDS.map(c => c.cls))];
+  private classes: ClassId[] = [...new Set(ALL_CARDS.map(c => c.cls))].filter(c => PLAYABLE.includes(c));
 
   constructor(private back: () => void, private test?: (card: CardDef) => void) {}
 
@@ -37,7 +38,7 @@ export class EncyclopediaScene implements Scene {
   private list(): CardDef[] {
     const order = this.classes;
     return ALL_CARDS
-      .filter(c => (!this.cls || c.cls === this.cls) && (!this.rarity || c.rarity === this.rarity) && (!this.element || c.element === this.element))
+      .filter(c => order.includes(c.cls) && (!this.cls || c.cls === this.cls) && (!this.rarity || c.rarity === this.rarity) && (!this.element || c.element === this.element))
       .sort((a, b) => order.indexOf(a.cls) - order.indexOf(b.cls) || RANK[a.rarity] - RANK[b.rarity] || costNum(a) - costNum(b) || a.name.localeCompare(b.name));
   }
 

@@ -5,6 +5,7 @@ import { getSprite, drawFighterSprite, defaultSkin } from '../art/sprites';
 import { P, W, H, UW, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k } from '../engine/input';
+import type { PadMode } from '../engine/touch';
 import { playMusic, sfx, isMuted } from '../engine/audio';
 import { MENU_SONG } from '../engine/music';
 import { SetupScene } from './setup';
@@ -25,6 +26,7 @@ export class TitleScene implements Scene {
   t = 0;
 
   enter(): void { playMusic('menu', MENU_SONG); }
+  pad(): PadMode { return 'none'; }
 
   update(dt: number): void {
     this.t += dt;

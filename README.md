@@ -57,6 +57,12 @@ Anything random in the rules must use the battle's generator (`b.rand()`, `shuff
 | Enter / Esc | Pause |
 | M | Mute |
 
+### Phones and tablets
+
+On a touch screen the game shows an on-screen pad during fights: a d-pad (slide your thumb to change direction), **J / ATTACK** (tap for light, hold and release for heavy), **K / CAST** (hold a direction to aim), **DRAW** (lights up when the gauge is full) and **PAUSE**. Menus are tapped directly: a quick tap clicks, touching and holding a card reads it without picking it, dragging scrolls lists, and a **BACK** button stands in for right-click. On the Draw screen, tap a picked card again to undo it. Room codes are typed by tapping the code boxes. Portrait puts the pad under the screen; landscape puts it on either side.
+
+The pad follows the last input: a touch turns it on, a key press turns it off. `?touch=1` forces it on (handy for testing on a desktop), `?touch=0` forces it off. Code: `src/engine/touch.ts`; screens say which controls they want through `Scene.pad()`.
+
 These are the defaults. **Options** (title menu or pause menu) has master, music and sound effect volume, music and sound effect on/off, and **Key Mapping**, which rebinds movement, attack, cast, Draw screen and pause. Settings save in the browser; arrows, Esc and M always work.
 
 **Menus are mouse-first.** Hover highlights, click picks, right-click backs out. Draw screen: the 5 drawn spells are a hand of cards; hover one to read it, click to queue it (cast order is pick order), right-click to undo, click FIGHT! to start. Deck builder: hover a spell to read it, click to add a copy, right-click to remove one, wheel to scroll, click the class tabs to switch. The keyboard still works everywhere (J picks, K undoes, Space fights; in the deck builder D/A add and remove, Q/E switch class). Combat is keyboard only.

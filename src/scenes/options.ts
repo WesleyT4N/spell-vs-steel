@@ -1,4 +1,4 @@
-import { setScene, hint, zone, hot, listMouse, type Scene } from './scene';
+import { setScene, hint, zone, hot, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
@@ -80,7 +80,7 @@ export class OptionsScene implements Scene {
     const s = getAudioSettings();
     ROWS.forEach(([row, label], i) => {
       const y = rowY(i);
-      const on = i === this.sel;
+      const on = i === this.sel && showSel();
       zone(`row:${i}`, PX - 12, y, PW + 24, RH - 2);
       if (on) P(ui, '#0000a8', PX - 12, y, PW + 24, RH - 2);
       const ty = y + 8;
