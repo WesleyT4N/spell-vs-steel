@@ -5,7 +5,37 @@ let master: GainNode, sfxBus: GainNode, musicBus: GainNode, reverb: ConvolverNod
 let noiseBuf: AudioBuffer;
 let muted = false;
 
-try { muted = localStorage.getItem('svs:muted') === '1'; } catch { /* storage blocked */ }
+/** Player audio settings. Volumes run 0-10. */
+export interface AudioSettings { master: number; sfx: number; music: number; sfxOn: boolean; musicOn: boolean }
+const AUDIO_KEY = 'svs:audio';
+let settings: AudioSettings = { master: 8, sfx: 10, music: 10, sfxOn: true, musicOn: true };
+
+try {
+  muted = localStorage.getItem('svs:muted') === '1';
+  const raw = localStorage.getItem(AUDIO_KEY);
+  if (raw) settings = { ...settings, ...(JSON.parse(raw) as Partial<AudioSettings>) };
+} catch { /* storage blocked */ }
+
+// Base mix levels at full volume.
+const MASTER = 1, SFX_LEVEL = 0.45, MUSIC_LEVEL = 0.32;
+const masterGain = (): number => (muted ? 0 : MASTER * settings.master / 10);
+const sfxGain = (): number => (settings.sfxOn ? SFX_LEVEL * settings.sfx / 10 : 0);
+const musicGain = (): number => (settings.musicOn ? MUSIC_LEVEL * settings.music / 10 : 0);
+
+function applyGains(): void {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  master.gain.setTargetAtTime(masterGain(), t, 0.02);
+  sfxBus.gain.setTargetAtTime(sfxGain(), t, 0.02);
+  musicBus.gain.setTargetAtTime(musicGain(), t, 0.02);
+}
+
+export const getAudioSettings = (): AudioSettings => ({ ...settings });
+export function setAudioSettings(patch: Partial<AudioSettings>): void {
+  settings = { ...settings, ...patch };
+  try { localStorage.setItem(AUDIO_KEY, JSON.stringify(settings)); } catch { /* storage blocked */ }
+  applyGains();
+}
 
 function init(): AudioContext | null {
   if (ctx) return ctx;
@@ -13,10 +43,10 @@ function init(): AudioContext | null {
   if (!AC) return null;
   ctx = new AC();
   master = ctx.createGain();
-  master.gain.value = muted ? 0 : 0.8;
+  master.gain.value = masterGain();
   master.connect(ctx.destination);
-  sfxBus = ctx.createGain(); sfxBus.gain.value = 0.45; sfxBus.connect(master);
-  musicBus = ctx.createGain(); musicBus.gain.value = 0.32; musicBus.connect(master);
+  sfxBus = ctx.createGain(); sfxBus.gain.value = sfxGain(); sfxBus.connect(master);
+  musicBus = ctx.createGain(); musicBus.gain.value = musicGain(); musicBus.connect(master);
   // SNES-ish echo: a short generated reverb tail
   reverb = ctx.createConvolver();
   const len = Math.floor(ctx.sampleRate * 1.6);
@@ -43,7 +73,7 @@ export function unlockAudio(): void {
 export function toggleMute(): boolean {
   muted = !muted;
   try { localStorage.setItem('svs:muted', muted ? '1' : '0'); } catch { /* storage blocked */ }
-  if (ctx) master.gain.setTargetAtTime(muted ? 0 : 0.8, ctx.currentTime, 0.02);
+  applyGains();
   return muted;
 }
 export const isMuted = (): boolean => muted;
@@ -85,7 +115,7 @@ const SFX: Record<string, Blip[]> = {
 
 export function sfx(name: string): void {
   const c = ctx;
-  if (!c || c.state !== 'running' || muted) return;
+  if (!c || c.state !== 'running' || muted || !settings.sfxOn || settings.sfx === 0) return;
   const list = SFX[name];
   if (!list) return;
   const t0 = c.currentTime;

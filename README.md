@@ -26,7 +26,7 @@ npm run sim      # headless CPU-vs-CPU matches; prints win rates, match length, 
 | Enter / Esc | Pause |
 | M | Mute |
 
-These are the defaults. **Controls** on the title menu rebinds movement, attack, cast, Draw screen and pause (saved in the browser); arrows, Esc and M always work.
+These are the defaults. **Options** (title menu or pause menu) has master, music and sound effect volume, music and sound effect on/off, and **Key Mapping**, which rebinds movement, attack, cast, Draw screen and pause. Settings save in the browser; arrows, Esc and M always work.
 
 Draw screen: J picks or unpicks a spell (cast order is pick order), K undoes the last pick, Space starts the fight. Deck builder: D or J adds a copy, A or K removes one, Q / E switch class, Enter finishes.
 
