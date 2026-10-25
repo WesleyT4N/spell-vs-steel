@@ -2,11 +2,12 @@
 import { k } from '../engine/input';
 import { Colosseum, drawPanel, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, type Tint } from '../art/sprites';
-import { P, W, blob, frame, mix, type Ctx } from '../engine/gfx';
-import { drawText, drawTextOutlined, drawTextCentered, textWidth } from '../engine/font';
-import { CARDS, ELEMENT_COLOR, type Element } from './cards';
+import { P, UW, UH, blob, frame, type Ctx } from '../engine/gfx';
+import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '../engine/font';
+import { drawCardIcon } from '../scenes/cardView';
+import { CARDS, ELEMENT_COLOR } from './cards';
 import { TUNING } from './tuning';
-import type { Battle, Fighter, Fx, Projectile, Wall } from './battle';
+import type { Battle, Fighter, Fx, Projectile, StatusKey, Wall } from './battle';
 
 const FIRE = ['#f83800', '#fca044', '#f8b800', '#fce0a8'];
 const ICE = ['#0058f8', '#3cbcfc', '#a4e4fc', '#fcfcfc'];
@@ -53,12 +54,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number): void {
   }
   for (const pr of b.projectiles) drawProjectile(c, b, pr);
   for (const e of b.fx) drawFx(c, b, e);
-  for (const t of b.texts) {
-    const pc = panelFoot(t.x, t.y);
-    drawTextCentered(c, t.text, pc.x, pc.y - 34 - t.t * 14, t.color);
-  }
   c.restore();
-  drawHud(c, b, tick);
 }
 
 function drawHole(c: Ctx, col: number, row: number, owner: 0 | 1): void {
@@ -305,63 +301,142 @@ function drawFx(c: Ctx, _b: Battle, e: Fx): void {
       }
       break;
     }
-    case 'castName': {
-      if (e.t > 1.0) break;
-      const name = String(e.data?.name ?? '').toUpperCase();
-      const col = ELEMENT_COLOR[(e.data?.el as Element) ?? 'steel'];
-      const tw = textWidth(name);
-      const bx = e.side === 0 ? 4 : W - tw - 10;
-      frame(c, bx, 30, tw + 6, 11, '#000000', col);
-      drawText(c, name, bx + 3, 32, '#fcfcfc');
-      break;
-    }
+    case 'castName': break; // drawn on the UI layer by drawCastCallout
   }
 }
 
-// ---------- HUD ----------
-function drawHud(c: Ctx, b: Battle, tick: number): void {
-  for (const f of b.f) {
-    const right = f.side === 1;
-    const x = right ? W - 62 : 4;
-    // HP box (BN style)
-    frame(c, x, 4, 58, 13, '#000000', teamColor(f.cls, f.skin, f.alt));
-    const hp = String(Math.max(0, Math.ceil(f.hp)));
-    const low = f.hp / f.maxHp < 0.3;
-    drawText(c, hp, x + 56 - textWidth(hp, 1) - 2, 7, low && tick % 4 < 2 ? '#f83800' : '#fcfcfc');
-    drawText(c, f.cls === 'warrior' ? 'WAR' : 'MAG', x + 3, 7, '#bcbcbc');
-    // resource
-    drawResource(c, f, x, 19, tick);
+// ---------- HUD (sharp UI layer, 480×320) ----------
+const UI = 2; // world-to-UI scale
+
+/** Everything drawn over the fight at UI resolution: HP, resources, the Draw gauge, statuses, damage numbers, cast callouts. */
+export function drawBattleUi(ui: Ctx, b: Battle, tick: number): void {
+  for (const t of b.texts) {
+    const pc = panelFoot(t.x, t.y);
+    const big = /^\d+$/.test(t.text);
+    drawTextCentered(ui, t.text, pc.x * UI, (pc.y - 34) * UI - t.t * 28, t.color, big ? 2 : 1);
   }
-  // custom gauge
-  const gx = 84, gw = 72;
-  frame(c, gx, 4, gw, 7, '#000000', '#fcfcfc');
+  for (const f of b.f) drawFighterHud(ui, b, f, tick);
+  // Draw gauge
+  const gx = UW / 2 - 70, gw = 140;
+  frame(ui, gx, 8, gw, 12, '#000000', '#fcfcfc');
   const full = b.gauge >= 1;
-  P(c, full ? (tick % 4 < 2 ? '#f8b800' : '#fcfcfc') : '#3cbcfc', gx + 1, 5, Math.round((gw - 2) * b.gauge), 5);
-  drawTextCentered(c, full ? `${k('custom')}: DRAW` : 'DRAW', 120, 13, full ? '#f8b800' : '#bcbcbc');
+  P(ui, full ? (tick % 4 < 2 ? '#f8b800' : '#fcfcfc') : '#3cbcfc', gx + 1, 9, Math.round((gw - 2) * b.gauge), 10);
+  if (!full) P(ui, '#a4e4fc', gx + 1, 9, Math.round((gw - 2) * b.gauge), 2);
+  drawTextCentered(ui, full ? `${k('custom')}: DRAW` : 'DRAW', UW / 2, 24, full ? '#f8b800' : '#bcbcbc');
+  for (const e of b.fx) if (e.kind === 'castName') drawCastCallout(ui, e);
+  drawNextSpell(ui, b, b.f[0]);
 }
 
-function drawResource(c: Ctx, f: Fighter, x: number, y: number, tick: number): void {
+function drawFighterHud(ui: Ctx, b: Battle, f: Fighter, tick: number): void {
+  const right = f.side === 1, w = 132;
+  const x = right ? UW - w - 8 : 8;
+  // HP box with a bar
+  frame(ui, x, 6, w, 30, '#000000', teamColor(f.cls, f.skin, f.alt));
+  drawText(ui, f.name, x + 6, 10, '#fcfcfc');
+  drawText(ui, f.cls === 'warrior' ? 'WARRIOR' : 'MAGE', x + 6, 20, '#7c7c7c');
+  const hp = String(Math.max(0, Math.ceil(f.hp)));
+  const low = f.hp / f.maxHp < 0.3;
+  drawText(ui, hp, x + w - 6 - textWidth(hp, 2), 9, low && tick % 4 < 2 ? '#f83800' : '#fcfcfc', 2);
+  const ratio = Math.max(0, f.hp / f.maxHp);
+  P(ui, '#3c3c3c', x + 2, 31, w - 4, 3);
+  P(ui, low ? '#f83800' : ratio < 0.6 ? '#f8b800' : '#58d854', right ? x + 2 + Math.round((w - 4) * (1 - ratio)) : x + 2, 31, Math.round((w - 4) * ratio), 3);
+  drawResource(ui, f, right ? x + w - 92 : x, 42, tick);
+  drawStatuses(ui, b, f, right ? x + w : x, 58, right);
+}
+
+function drawResource(ui: Ctx, f: Fighter, x: number, y: number, tick: number): void {
+  const pip = (i: number, base: string, fill: string | null, hi: string): void => {
+    const px = x + 36 + i * 11;
+    P(ui, '#000000', px - 1, y - 1, 10, 11);
+    P(ui, base, px, y, 8, 9);
+    if (fill) { P(ui, fill, px, y, 8, 9); P(ui, hi, px, y, 8, 2); }
+  };
   if (f.cls === 'warrior') {
-    drawTextOutlined(c, 'RAGE', x, y, '#f87858');
+    drawTextOutlined(ui, 'RAGE', x, y + 1, '#f87858');
     for (let i = 0; i < 5; i++) {
       const v = f.res - i;
-      const px = x + 28 + i * 6;
-      P(c, '#000000', px - 1, y - 1, 6, 9);
-      P(c, '#503000', px, y, 4, 7);
-      if (v >= 1) { P(c, f.st.avatar > 0 ? '#f8b800' : '#d82800', px, y, 4, 7); P(c, '#f87858', px, y, 4, 1); }
-      else if (v >= 0.5) P(c, '#881400', px, y + 3, 4, 4);
+      if (v >= 1) pip(i, '#503000', f.st.avatar > 0 ? '#f8b800' : '#d82800', '#f87858');
+      else { pip(i, '#503000', null, ''); if (v >= 0.5) P(ui, '#881400', x + 36 + i * 11, y + 4, 8, 5); }
     }
   } else {
-    drawTextOutlined(c, 'MANA', x, y, '#a4e4fc');
+    drawTextOutlined(ui, 'MANA', x, y + 1, '#a4e4fc');
     const max = Math.max(5, Math.ceil(f.res));
     for (let i = 0; i < max; i++) {
-      const px = x + 28 + i * 6;
-      const filled = i < f.res, cap = i < f.resMax;
-      P(c, '#000000', px - 1, y - 1, 6, 9);
-      P(c, cap ? '#0000a8' : '#3c3c3c', px, y, 4, 7);
-      if (filled) { P(c, i >= f.resMax ? '#f878f8' : '#3cbcfc', px, y, 4, 7); P(c, '#fcfcfc', px, y, 1, 2); }
+      const cap = i < f.resMax;
+      pip(i, cap ? '#0000a8' : '#3c3c3c', i < f.res ? (i >= f.resMax ? '#f878f8' : '#3cbcfc') : null, '#fcfcfc');
     }
-    if (f.powerLeft > 0 && tick % 4 < 3) drawTextOutlined(c, '-1', x + 30 + max * 6, y, '#f878f8');
+    if (f.powerLeft > 0 && tick % 4 < 3) drawTextOutlined(ui, '-1', x + 38 + max * 11, y + 1, '#f878f8');
   }
-  void mix;
+}
+
+// Active effects as small timed tags under the resource bar.
+const STATUS_TAGS: Partial<Record<StatusKey, [string, string]>> = {
+  frozen: ['FROZEN', '#a4e4fc'], stunned: ['STUNNED', '#f8b800'], iceBlock: ['ICE BLOCK', '#a4e4fc'],
+  roared: ['WEAKENED', '#bcbcbc'], berserk: ['BERSERK', '#f83800'], avatar: ['AVATAR', '#f8b800'],
+  ascendance: ['ASCENDANCE', '#f878f8'], lastStand: ['LAST STAND', '#f87858'], reflect: ['REFLECT', '#fcfcfc'],
+  counterspell: ['COUNTER', '#f878f8'], mortal: ['MORTAL WOUND', '#f83800'], evoLock: ['EVO LOCK', '#7c7c7c'],
+  frostNova: ['NOVA ARMED', '#3cbcfc'], glacial: ['GLACIAL', '#3cbcfc'],
+};
+const SHIELD_TAG: Record<string, string> = { guard: 'GUARD', ironSkin: 'IRON SKIN', barrier: 'BARRIER', unbreakable: 'UNBREAKABLE' };
+
+function drawStatuses(ui: Ctx, b: Battle, f: Fighter, edge: number, y: number, right: boolean): void {
+  const tags: Array<[string, string]> = [];
+  for (const [key, [label, col]] of Object.entries(STATUS_TAGS) as Array<[StatusKey, [string, string]]>) {
+    const t = f.st[key];
+    if (t <= 0 || (key === 'frostNova' && f.frostNovaUsed)) continue;
+    tags.push([`${label} ${t.toFixed(1)}`, col]);
+  }
+  for (const s of f.shields) if (s.hp > 0 || s.kind === 'guard') tags.push([`${SHIELD_TAG[s.kind] ?? s.kind.toUpperCase()}${s.kind === 'guard' ? '' : ` ${Math.ceil(s.hp)}`}`, '#a4e4fc']);
+  if (f.shout > 0) tags.push(['SHOUT', '#f8b800']);
+  if (f.rallyLeft > 0) tags.push([`RALLY ×${f.rallyLeft}`, '#f8b800']);
+  if (f.powerLeft > 0) tags.push([`POWER ×${f.powerLeft}`, '#f878f8']);
+  const p = b.panels[f.col][f.row];
+  if (p.burn > 0) tags.push(['ON FIRE', '#fca044']);
+  let cx = edge, cy = y;
+  for (const [s, col] of tags.slice(0, 8)) {
+    const tw = textWidth(s) + 8;
+    if (right ? cx - tw < edge - 200 : cx + tw > edge + 200) { cx = edge; cy += 13; }
+    const tx = right ? cx - tw : cx;
+    frame(ui, tx, cy, tw, 11, '#000000', col);
+    drawText(ui, s, tx + 4, cy + 2, col);
+    cx = right ? tx - 3 : tx + tw + 3;
+  }
+}
+
+/** The card a fighter just cast, slid in under their HUD so both sides can read it. */
+function drawCastCallout(ui: Ctx, e: Fx): void {
+  const card = CARDS[String(e.data?.id)];
+  if (!card || e.t > 2) return;
+  const w = 188, h = 58, right = e.side === 1;
+  const slide = Math.min(1, e.t / 0.12), fade = e.t > 1.7 ? (2 - e.t) / 0.3 : 1;
+  const x = right ? UW - 8 - w + Math.round((1 - slide) * (w + 8)) : 8 - Math.round((1 - slide) * (w + 8)), y = 86;
+  ui.save();
+  ui.globalAlpha = Math.max(0, fade);
+  frame(ui, x, y, w, h, '#000000', ELEMENT_COLOR[card.element]);
+  drawCardIcon(ui, card, x + 6, y + 6, 32);
+  const tx = x + 44;
+  drawText(ui, card.name.toUpperCase(), tx, y + 6, '#fcfcfc');
+  const res = card.cls === 'warrior' ? 'RAGE' : 'MANA';
+  const meta = `${card.cost === 'all' ? 'ALL' : card.cost} ${res}${card.dmg !== '-' ? `  DMG ${card.dmg.toUpperCase()}` : ''}`;
+  drawText(ui, meta, tx, y + 17, card.cls === 'warrior' ? '#f87858' : '#a4e4fc');
+  wrap(card.short.toUpperCase(), Math.floor((w - 50) / 6)).slice(0, 3).forEach((l, i) => drawText(ui, l, tx, y + 29 + i * 9, '#bcbcbc'));
+  if (e.data?.countered) {
+    ui.fillStyle = 'rgba(0,0,0,0.55)'; ui.fillRect(x, y, w, h);
+    drawTextCentered(ui, 'COUNTERED', x + w / 2, y + h / 2 - 7, '#f878f8', 2);
+  }
+  ui.restore();
+}
+
+/** What the cast key will do next, bottom left. */
+function drawNextSpell(ui: Ctx, b: Battle, f: Fighter): void {
+  if (b.phase !== 'fight' || !f.queue.length) return;
+  const card = CARDS[f.queue[0]], ok = b.canAfford(f, card);
+  const more = f.queue.length - 1;
+  const s = `${k('cast')}: ${card.name.toUpperCase()}`;
+  const tw = textWidth(s) + (more ? textWidth(`  +${more}`) : 0);
+  frame(ui, 8, UH - 22, tw + 28, 16, '#000000', ok ? ELEMENT_COLOR[card.element] : '#7c7c7c');
+  P(ui, ok ? ELEMENT_COLOR[card.element] : '#3c3c3c', 12, UH - 18, 8, 8);
+  drawText(ui, s, 24, UH - 18, ok ? '#fcfcfc' : '#7c7c7c');
+  if (more) drawText(ui, `+${more}`, 24 + textWidth(s) + 12, UH - 18, '#7c7c7c');
+  if (!ok) drawText(ui, `NEED ${card.cls === 'warrior' ? 'RAGE' : 'MANA'}`, tw + 44, UH - 18, '#f83800');
 }

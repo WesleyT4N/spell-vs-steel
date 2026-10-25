@@ -15,7 +15,7 @@ export const resName = (card: CardDef): string => (card.cls === 'warrior' ? 'RAG
 export const resColor = (card: CardDef): string => (card.cls === 'warrior' ? '#f87858' : '#a4e4fc');
 const costText = (card: CardDef): string => (card.cost === 'all' ? 'A' : String(card.cost));
 
-function drawEmblem(c: Ctx, el: Element | 'shield', cx: number, cy: number, s: number, col: string): void {
+export function drawEmblem(c: Ctx, el: Element | 'shield', cx: number, cy: number, s: number, col: string): void {
   const rows = EMBLEM[el], x0 = Math.round(cx - (9 * s) / 2), y0 = Math.round(cy - (9 * s) / 2);
   for (const [dx, dy, color] of [[s, s, '#000000'], [0, 0, col]] as const)
     rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === '#') P(c, color, x0 + x * s + dx, y0 + y * s + dy, s, s); }));
@@ -96,4 +96,11 @@ export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: 
     P(c, PICKED, x + w - 18, y - 6, 20, 18);
     drawTextCentered(c, String(order + 1), x + w - 8, y - 3, '#000000', 2, false);
   }
+}
+
+/** A square art tile with the card's emblem, for compact callouts. */
+export function drawCardIcon(c: Ctx, card: CardDef, x: number, y: number, size: number): void {
+  P(c, '#000000', x - 1, y - 1, size + 2, size + 2);
+  c.drawImage(artBox(card.element, size, size), x, y);
+  drawEmblem(c, card.element === 'steel' && card.dmg === '-' ? 'shield' : card.element, x + size / 2, y + size / 2, Math.max(2, Math.floor(size / 12)), ELEMENT_COLOR[card.element]);
 }

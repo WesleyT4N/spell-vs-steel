@@ -648,7 +648,7 @@ export class Battle {
 
     const foe = this.foe(f);
     this.fx = this.fx.filter(e => !(e.kind === 'castName' && e.side === f.side));
-    this.addFx('castName', f.side, f.col, f.row, 1.1, { name: card.name, el: card.element });
+    this.addFx('castName', f.side, f.col, f.row, 2.2, { id: card.id });
     f.pose = 'cast';
     f.poseT = 0.3;
     f.lock = Math.max(f.lock, card.lock ?? 0.3);
@@ -656,6 +656,8 @@ export class Battle {
     if (foe.st.counterspell > 0 && card.id !== 'counterspell') {
       foe.st.counterspell = 0;
       this.text(f, 'COUNTERED', '#f878f8');
+      const callout = this.fx.find(e => e.kind === 'castName' && e.side === f.side);
+      if (callout?.data) callout.data.countered = 1;
       this.addFx('counter', f.side, f.col, f.row, 0.5);
       sfx('deny');
       return;
