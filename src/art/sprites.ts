@@ -1,6 +1,12 @@
 // Cartridge-style NES fighters, extracted from the round-3 sprite page (art/sprite-styles-round3.html).
 // Rogue, Ranger and Cleric are the Classic set (art/classic-sprites.ts); their skins recolor the tint letters b/c/d.
 import type { Ctx } from '../engine/gfx';
+import { HIRES } from './hiresSprites';
+
+/** Draw the 24px fighters from the reference sheet (art/hi-res) instead of the ~18px Cartridge sprites. */
+export const USE_HIRES = true;
+/** Sprite pixels per world pixel (1: both sprite sets draw at world resolution). */
+const RES = 1;
 
 export type ClassId = 'warrior' | 'mage' | 'rogue' | 'ranger' | 'cleric';
 
@@ -104,6 +110,11 @@ export function mirrorSkin(cls: ClassId, mine: string, theirs: string): string {
 
 /** Palette and pixel rows for a class in a skin (plus the mirror-match ALT recolor). */
 function skinned(cls: ClassId, skinId: string, alt: boolean): { pal: string[]; rows: string[] } {
+  if (USE_HIRES) {
+    const h = HIRES[cls], pal = h.pal.slice();
+    for (const [ch, col] of Object.entries(h.skins[skinOf(cls, skinId).id] ?? {})) pal[ch.charCodeAt(0) - 97] = col;
+    return { pal, rows: h.rows };
+  }
   const def = DEFS[cls], skin = skinOf(cls, skinId);
   const pal = def.pal.slice();
   for (const [ch, col] of Object.entries(skin.set)) pal[ch.charCodeAt(0) - 97] = col;
@@ -122,7 +133,8 @@ const ALT: Record<ClassId, Record<number, string>> = {
 
 export type Tint = 'none' | 'flash' | 'ice' | 'stun' | 'ghost';
 
-export interface Sprite { w: number; h: number; ax: number; img: Record<Tint, HTMLCanvasElement> }
+/** w, h and ax are in world pixels; `res` is sprite pixels per world pixel. */
+export interface Sprite { w: number; h: number; ax: number; res: number; img: Record<Tint, HTMLCanvasElement> }
 
 const cache = new Map<string, Sprite>();
 
@@ -157,7 +169,8 @@ export function getSprite(cls: ClassId, skin: string, alt: boolean): Sprite {
     const tints: Tint[] = ['none', 'flash', 'ice', 'stun', 'ghost'];
     const img = {} as Record<Tint, HTMLCanvasElement>;
     for (const t of tints) img[t] = bake({ rows }, pal, t);
-    s = { w: def.rows[0].length, h: def.rows.length, ax: def.ax, img };
+    const ax = USE_HIRES ? HIRES[cls].ax : def.ax;
+    s = { w: rows[0].length / RES, h: rows.length / RES, ax: ax / RES, res: RES, img };
     cache.set(key, s);
   }
   return s;
@@ -165,19 +178,21 @@ export function getSprite(cls: ClassId, skin: string, alt: boolean): Sprite {
 
 /** Draw with feet at (footX, footY). `flip` mirrors so the sprite faces left. */
 export function drawFighterSprite(c: Ctx, s: Sprite, footX: number, footY: number, flip: boolean, tint: Tint = 'none', scale = 1): void {
-  const ax = flip ? s.w - 1 - s.ax : s.ax;
-  const img = s.img[tint];
-  const x = Math.round(footX - ax * scale), y = Math.round(footY - s.h * scale);
-  if (!flip) { c.drawImage(img, x, y, s.w * scale, s.h * scale); return; }
+  const img = s.img[tint], px = scale / s.res; // size of one sprite pixel where we draw
+  const ax = flip ? img.width - 1 - s.ax * s.res : s.ax * s.res;
+  const snap = (v: number): number => Math.round(v / px) * px;
+  const x = snap(footX - ax * px), y = snap(footY - img.height * px), w = img.width * px, h = img.height * px;
+  if (!flip) { c.drawImage(img, x, y, w, h); return; }
   c.save();
-  c.translate(x + s.w * scale, y);
+  c.translate(x + w, y);
   c.scale(-1, 1);
-  c.drawImage(img, 0, 0, s.w * scale, s.h * scale);
+  c.drawImage(img, 0, 0, w, h);
   c.restore();
 }
 
 /** The main team color of a fighter, for HUD accents. */
 export function teamColor(cls: ClassId, skin: string, alt: boolean): string {
   // the tabard (Warrior h), robe (Mage c) or the mid tint tone (c) of the Classic set
+  if (USE_HIRES) return skinned(cls, skin, alt).pal[HIRES[cls].team.charCodeAt(0) - 97];
   return skinned(cls, skin, alt).pal[cls === 'warrior' ? 7 : 2];
 }

@@ -1,7 +1,8 @@
-// WebAudio sound: NES-style blip effects and a tiny SNES-style sequencer for the two BGM tracks.
+// WebAudio sound: realistic combat/spell effects (sfxReal), NES-style blips for menus, and a tiny SNES-style sequencer for the BGM.
+import { playReal, type RealOpts } from './sfxReal';
 
 let ctx: AudioContext | null = null;
-let master: GainNode, sfxBus: GainNode, musicBus: GainNode, reverb: ConvolverNode, reverbSend: GainNode;
+let master: GainNode, sfxBus: GainNode, realBus: GainNode, musicBus: GainNode, reverb: ConvolverNode, reverbSend: GainNode;
 let noiseBuf: AudioBuffer;
 let muted = false;
 
@@ -46,6 +47,7 @@ function init(): AudioContext | null {
   master.gain.value = masterGain();
   master.connect(ctx.destination);
   sfxBus = ctx.createGain(); sfxBus.gain.value = sfxGain(); sfxBus.connect(master);
+  realBus = ctx.createGain(); realBus.gain.value = 0.75; realBus.connect(sfxBus);
   musicBus = ctx.createGain(); musicBus.gain.value = musicGain(); musicBus.connect(master);
   // SNES-ish echo: a short generated reverb tail
   reverb = ctx.createConvolver();
@@ -127,9 +129,11 @@ export function withoutSfx<T>(fn: () => T): T {
   try { return fn(); } finally { quiet--; }
 }
 
-export function sfx(name: string): void {
+/** Play a sound effect. Combat and spell names have a realistic recipe; the rest (menus) are blips. */
+export function sfx(name: string, o?: RealOpts): void {
   const c = ctx;
   if (!c || c.state !== 'running' || quiet || muted || !settings.sfxOn || settings.sfx === 0) return;
+  if (playReal(c, realBus, name, o)) return;
   const list = SFX[name];
   if (!list) return;
   const t0 = c.currentTime;
@@ -160,6 +164,9 @@ export function sfx(name: string): void {
     src.stop(t + b.d + 0.02);
   }
 }
+
+/** The sound that goes with a spell effect's visual (see battle.addFx). */
+export function sfxFx(kind: string, o?: RealOpts): void { sfx('fx:' + kind, o); }
 
 // ---------- music ----------
 // Tracks are written as one token per step: a note ("D5", "C#4", "Bb3"), "-" to hold, "." for a rest.
