@@ -24,7 +24,7 @@ type RowName = (typeof ROWS)[number];
 type Mode = 'menu' | 'code' | 'busy' | 'room' | 'error';
 
 const RX = 140, RW = UW - 164, Y0 = 44, RH = 18;
-const NET_NAME: Record<TransportKind, string> = { room: 'CLAUDE.AI ROOM', peer: 'PEER TO PEER (WEBRTC)', local: 'LOCAL TABS (TEST)' };
+const NET_NAME: Record<TransportKind, string> = { room: 'HOSTED ROOM', peer: 'PEER TO PEER (WEBRTC)', local: 'LOCAL TABS (TEST)' };
 
 export class OnlineScene implements Scene {
   /** How far the top half of the screen moves in phone portrait (set each draw). */
