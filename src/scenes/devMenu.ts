@@ -1,7 +1,8 @@
 // Dev tools menu: card encyclopedia, debug sandbox and balance lab.
 import { setScene, drawMenu, hint, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
-import { W, H, UW, type Ctx } from '../engine/gfx';
+import { drawStage } from '../art/arena';
+import { UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k } from '../engine/input';
 import { sfx } from '../engine/audio';
@@ -45,9 +46,9 @@ export class DevMenuScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    getArena().draw(c, tick, 0);
+    drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(0,0,24,0.7)';
-    c.fillRect(0, 0, W, H);
+    c.fillRect(...screenRect());
     drawTextCentered(ui, 'DEV TOOLS', UW / 2, 48, '#f8b800', 3);
     drawMenu(ui, ITEMS, this.sel, UW / 2, 112, tick, { width: 240, gap: 24 });
     if (showSel()) drawTextCentered(ui, ABOUT[this.sel], UW / 2, 232, '#bcbcbc');

@@ -2,7 +2,8 @@
 // Tuning edits apply to the whole game (Versus and the sandbox too) until the page reloads.
 import type { Scene } from './scene';
 import { getArena } from '../game/battleView';
-import { W, H, type Ctx } from '../engine/gfx';
+import { drawStage } from '../art/arena';
+import { screenRect, type Ctx } from '../engine/gfx';
 import { withoutSfx } from '../engine/audio';
 import { CARDS, RARITY_COLOR, cardsFor } from '../game/cards';
 import { loadCustom, starterDeck, validate, STARTER_NAME, type DeckCounts } from '../game/deck';
@@ -84,9 +85,9 @@ export class LabScene implements Scene {
   }
 
   draw(c: Ctx, tick: number): void {
-    getArena().draw(c, tick, 0);
+    drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(0,0,24,0.85)';
-    c.fillRect(0, 0, W, H);
+    c.fillRect(...screenRect());
   }
 
   // ---------- running ----------
