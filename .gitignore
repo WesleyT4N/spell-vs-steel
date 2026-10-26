@@ -2,3 +2,7 @@ node_modules
 dist
 dist-prod
 .DS_Store
+dist-fuzz
+fuzz-out
+dist-test
+test-results

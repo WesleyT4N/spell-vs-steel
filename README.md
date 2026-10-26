@@ -17,11 +17,38 @@ npm run build:prod  # player-facing build in dist-prod/: dev tools off and their
 npm run sim      # headless CPU-vs-CPU matches; prints win rates, match length, damage sources
 npm run sim -- 100 --cards   # same, with per-card casts, damage and win rate when cast
 npm run netcheck # two seeded battles fed the same inputs must stay identical (online play depends on it)
+npm run fuzz -- 500   # rules fuzzer: random legal decks, mashing/random/CPU inputs, odd Draw picks, training
+                      # resets; checks invariants every frame and replays each match to prove determinism
 ```
+
+Browser checks (need Playwright with Chromium; they create `dist-fuzz/` and `fuzz-out/`, both ignored):
+
+```
+npm run fuzz:ui -- 10 90      # random keys, clicks and taps on every screen at 5 screen shapes; reports thrown
+                              # errors, frozen frame loops and screens you can't back out of
+npm run perf -- 4 5           # CPU vs CPU on every stage at phone sizes with 4x CPU throttle: fps, canvas
+                              # calls and main-thread time per frame (opens #bench=stage,classA,classB)
+node scripts/pixeldiff.mjs old/index.html new/index.html   # golden frames: two builds on a fake clock and a
+                              # seeded Math.random must match pixel for pixel (use after rendering speedups)
+```
+
+## Tests
+
+CI (`.github/workflows/ci.yml`) runs on every PR, against the PR merged into main, so two PRs that each pass alone but break each other once merged get caught. It also runs on every push to main.
+
+```sh
+npm run typecheck     # the game and the tests
+npm test              # full matches, online determinism, combo counter (a few seconds)
+npm run test:screens  # every screen at every screen shape, saved to test-results/screens
+```
+
+- **Full matches** (`tests/matches.ts`): CPU vs CPU for every class pair (mirrors included) at every CPU level, plus every ready-made deck, three seeds each. Every frame checks rules that hold whatever the balance is (HP and resources in range, fighters on the grid and apart, nothing piling up), and every match must end in a KO. Ready-made decks must be legal. A failure prints its seed: `npx tsx tests/matches.ts --seed 123 --only warrior,mage` replays it.
+- **Screens** (`tests/screens/`): `harness.ts` opens each screen the way the game does (title, options, every select step, stage select, each deck builder, online lobby, the Draw screen, a fight, pause, a whole round to the results, training, each tutorial, dev tools), and `run.ts` shoots it at 4:3, 3:2, 16:9, 21:9, 32:9, phone portrait and phone landscape. A shot fails if the page throws or logs an error, the screen is blank, or it doesn't fill the window the way `fit()` promises. Shots are seeded with a frozen clock, so the same code always draws the same pixels. **Add new screens to `harness.ts`.**
+- **Visual diff**: on a PR, CI also shoots main and lists every screen whose pixels changed (in the job summary), with base, PR and diff images side by side in the `screens-report` artifact (`report/report.html`). Changes there are expected when a PR touches visuals, so they never fail the build; they're there to spot changes nobody meant to make.
 
 ## Dev tools
 
-In dev builds (`npm run dev`, `npm run build`): **Title > DEV TOOLS**, or open the page with `#cards`, `#sandbox` or `#lab`. The `DEV_TOOLS` flag (`src/flags.ts`, set per build in `vite.config.ts`) hides the menu item and routes in `npm run build:prod`, and since the tools load through a dynamic import, none of their code ships in that build. Gate any future dev-only feature on the same flag.
+In dev builds (`npm run dev`, `npm run build`): **Title > DEV TOOLS**, or open the page with `#cards`, `#sandbox` or `#lab` (`#bench=stage,classA,classB` starts a CPU vs CPU match to watch, for profiling). The `DEV_TOOLS` flag (`src/flags.ts`, set per build in `vite.config.ts`) hides the menu item and routes in `npm run build:prod`, and since the tools load through a dynamic import, none of their code ships in that build. Gate any future dev-only feature on the same flag.
 
 - **Card encyclopedia**: every spell of every class as card faces, filtered by class, rarity and element. Hover to read, J (or the button) tests the card in the sandbox. Classes come from `cards.ts`, so new classes show up on their own.
 - **Sandbox** (debug mode): a real fight with a panel docked on the right. Cast any spell for either side on demand or queue it for K, pick the enemy (still dummy, walker, turret, CPU easy/normal), turn on can't-die and free spells, slow time to 0.1×, pause and step frames (P, .), freeze or stun either side, set enemy HP, move fighters by clicking panels, and read live state plus a hit log that names the spell behind every hit.
