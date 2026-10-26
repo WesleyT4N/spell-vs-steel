@@ -1,7 +1,7 @@
 import { setScene, hint, zone, hot, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
-import { P, UW, screenRect, type Ctx } from '../engine/gfx';
+import { P, UW, screenRect, vy, vspan, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx, getAudioSettings, setAudioSettings, isMuted, toggleMute, voiceLine, announce } from '../engine/audio';
@@ -41,6 +41,7 @@ function preview(row: Row): void {
 // layout (UI pixels)
 const PX = 64, PW = UW - 128, Y0 = 56, RH = 20, BAR_X = 236, BLOCK = 14;
 const rowY = (i: number): number => Y0 + i * RH + (i >= 8 ? 10 : 0);
+// phone portrait spreads the rows into the spare height (vy); `off` centers a row's contents in its taller box
 
 /** Audio settings and a door to the key mapping screen. Settings save in the browser. */
 export class OptionsScene implements Scene {
@@ -95,28 +96,28 @@ export class OptionsScene implements Scene {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.35)';
     c.fillRect(...screenRect());
-    win(ui, PX - 16, 18, PW + 32, 262);
-    drawTextCentered(ui, 'OPTIONS', UW / 2, 30, RED_INK, 2, false);
+    win(ui, PX - 16, vy(18), PW + 32, vspan(18, 262));
+    drawTextCentered(ui, 'OPTIONS', UW / 2, vy(30), RED_INK, 2, false);
     const s = getAudioSettings();
     ROWS.forEach(([row, label], i) => {
-      const y = rowY(i);
+      const y = vy(rowY(i)), rh = vspan(rowY(i), RH), off = Math.round((rh - RH) / 2);
       const on = i === this.sel && showSel();
-      zone(`row:${i}`, PX - 12, y, PW + 24, RH - 2);
-      if (on) selRow(ui, PX - 12, y, PW + 24, RH - 2);
-      const ty = y + 6;
+      zone(`row:${i}`, PX - 12, y, PW + 24, rh - 2);
+      if (on) selRow(ui, PX - 12, y, PW + 24, rh - 2);
+      const ty = y + 6 + off;
       if (on && tick % 8 < 6) drawText(ui, '→', PX - 4, ty, PAPER);
       drawText(ui, label, PX + 10, ty, on ? INK : INK2);
       if (isVol(row)) {
         const v = s[row];
         const live = isLive(row, s);
         drawText(ui, '←', BAR_X - 14, ty, on ? INK : TRIM);
-        zone(`step:${i * 2}`, BAR_X - 18, y, 14, RH - 2);
+        zone(`step:${i * 2}`, BAR_X - 18, y, 14, rh - 2);
         for (let n = 0; n < 10; n++) {
-          zone(`block:${i * 100 + n}`, BAR_X + n * BLOCK, y + 2, BLOCK, RH - 4);
-          P(ui, n < v ? (live ? RED_INK : TRIM) : BURN, BAR_X + n * BLOCK + 1, y + 4, BLOCK - 4, 10);
+          zone(`block:${i * 100 + n}`, BAR_X + n * BLOCK, y + 2, BLOCK, rh - 4);
+          P(ui, n < v ? (live ? RED_INK : TRIM) : BURN, BAR_X + n * BLOCK + 1, y + 4 + off, BLOCK - 4, 10);
         }
         drawText(ui, '→', BAR_X + 10 * BLOCK + 2, ty, on ? INK : TRIM);
-        zone(`step:${i * 2 + 1}`, BAR_X + 10 * BLOCK, y, 14, RH - 2);
+        zone(`step:${i * 2 + 1}`, BAR_X + 10 * BLOCK, y, 14, rh - 2);
         drawText(ui, String(v), BAR_X + 10 * BLOCK + 20, ty, live ? INK : TRIM);
       }
       if (row === 'musicOn' || row === 'sfxOn') drawText(ui, s[row] ? 'ON' : 'OFF', BAR_X, ty, s[row] ? '#007800' : RED_INK);

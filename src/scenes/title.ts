@@ -112,7 +112,7 @@ export class TitleScene implements Scene {
     }
     drawLogo(c, W / 2, 10, this.t);
     const { gap, scale, width, versionY } = menuLayout();
-    drawMenu(ui, ITEMS, this.sel, UW / 2, MENU_Y, tick, { width, gap, scale });
+    drawMenu(ui, ITEMS, this.sel, UW / 2, MENU_Y, tick, { width, gap, scale, grow: false });
     // first-timers get a nudge toward the tutorial
     if (!tutorialDone() && tick % 8 < 6) {
       const x = scale > 1 ? UW / 2 + textWidth('TUTORIAL', scale) / 2 + 8 : UW / 2 + 40;
