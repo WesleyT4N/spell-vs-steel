@@ -3,7 +3,7 @@
 import { planGrid, type GridJobResult, type GridPlan } from '../src/dev/grid';
 import { defaultTuning } from '../src/dev/tuningEdit';
 import type { Overrides } from '../src/dev/tuningEdit';
-import { ALL_CARDS } from '../src/game/cards';
+import { ALL_CARDS, CARDS } from '../src/game/cards';
 import type { PoolKind } from '../src/dev/archetypes';
 import type { ClassId } from '../src/art/sprites';
 import type { Difficulty } from '../src/game/tuning';
@@ -21,11 +21,14 @@ export const BAND: [number, number] = [0.55, 0.65];
  * A knob only ever touches one class's own numbers (no cross-class rules):
  * its HP, its basic attacks, or the power of all its spells.
  */
-export interface Knob { id: string; cls: ClassId; kind: 'hp' | 'light' | 'heavy' | 'power' }
+export interface Knob { id: string; cls: ClassId; kind: 'hp' | 'light' | 'heavy' | 'power' | 'card'; card?: string }
 
 export function knobsFor(classes: ClassId[], kinds: Knob['kind'][] = ['hp', 'power', 'light', 'heavy']): Knob[] {
-  return classes.flatMap(cls => kinds.map(kind => ({ id: `${cls}.${kind}`, cls, kind })));
+  return classes.flatMap(cls => kinds.filter(k => k !== 'card').map(kind => ({ id: `${cls}.${kind}`, cls, kind })));
 }
+
+/** One card's own power (used for the Mythic each ready-made deck is built around). */
+export const cardKnob = (id: string): Knob => ({ id: `${id}.power`, cls: CARDS[id].cls as ClassId, kind: 'card', card: id });
 
 /** A patch: knob id -> relative change (0.05 = +5%). */
 export type Patch = Record<string, number>;
@@ -39,7 +42,8 @@ export function patchOverrides(p: Patch, knobs: Knob[]): Overrides {
   for (const k of knobs) {
     const x = p[k.id] ?? 0;
     if (!x) continue;
-    if (k.kind === 'power') for (const c of ALL_CARDS) { if (c.cls === k.cls) ov.cardPower[c.id] = 1 + x; }
+    if (k.kind === 'power') for (const c of ALL_CARDS) { if (c.cls === k.cls) ov.cardPower[c.id] = (ov.cardPower[c.id] ?? 1) * (1 + x); }
+    else if (k.kind === 'card') ov.cardPower[k.card!] = (ov.cardPower[k.card!] ?? 1) * (1 + x);
     else ov.tuning[knobPath(k)] = defaultTuning(knobPath(k)) * (1 + x);
   }
   return ov;
@@ -51,7 +55,7 @@ export function roundPatch(p: Patch, knobs: Knob[]): Patch {
   for (const k of knobs) {
     const x = p[k.id] ?? 0;
     if (!x) continue;
-    if (k.kind === 'power') { const r = Math.round(x * 100) / 100; if (r) out[k.id] = r; continue; }
+    if (k.kind === 'power' || k.kind === 'card') { const r = Math.round(x * 100) / 100; if (r) out[k.id] = r; continue; }
     const base = defaultTuning(knobPath(k));
     const step = k.kind === 'hp' ? 5 : 1;
     const v = Math.round(base * (1 + x) / step) * step;
@@ -62,6 +66,7 @@ export function roundPatch(p: Patch, knobs: Knob[]): Patch {
 
 export function describeKnob(k: Knob, x: number): string {
   if (k.kind === 'power') return `${k.cls} spells ${x >= 0 ? '+' : ''}${Math.round(x * 100)}%`;
+  if (k.kind === 'card') return `${CARDS[k.card!].name} ${x >= 0 ? '+' : ''}${Math.round(x * 100)}%`;
   const base = defaultTuning(knobPath(k));
   const v = Math.round(base * (1 + x) * 10) / 10;
   const what = k.kind === 'hp' ? 'HP' : k.kind === 'light' ? 'light attack' : 'heavy attack';
@@ -107,3 +112,18 @@ export async function evaluate(pool: SimPool, spec: EvalSpec, ov: Overrides, rep
   const res = await pool.run(plan.jobs.map(job => ({ job, ov, seed: (spec.seed ?? 1) * 7919 + job.i * 104729 + rep * 15485863 })));
   return { plan, res };
 }
+
+/** Each ready-made deck's win rate minus its class's, over a preset-style run (playstyles pooled). Keys like "warrior:bulwark". */
+export function deckGaps(plan: GridPlan, res: GridJobResult[]): Record<string, number> {
+  const deck: Record<string, [number, number]> = {}, cls: Record<string, [number, number]> = {};
+  const add = (t: Record<string, [number, number]>, k: string, w: number, l: number): void => { const x = (t[k] ??= [0, 0]); x[0] += w; x[1] += l; };
+  res.forEach((r, i) => {
+    const [a, b] = plan.pairs[i];
+    add(deck, a.key.split('/')[0], r.wins, r.losses); add(deck, b.key.split('/')[0], r.losses, r.wins);
+    add(cls, a.cls, r.wins, r.losses); add(cls, b.cls, r.losses, r.wins);
+  });
+  const rt = (x: [number, number]): number => x[0] / Math.max(1, x[0] + x[1]);
+  return Object.fromEntries(Object.entries(deck).map(([k, x]) => [k, rt(x) - rt(cls[k.split(':')[0]])]));
+}
+/** Ready-made decks may sit this far from their class average for free. */
+export const DECK_SLACK = 0.04;
