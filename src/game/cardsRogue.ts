@@ -247,11 +247,11 @@ export const rogue: CardDef[] = [
   },
   {
     id: 'pandemic', name: 'Pandemic', cls: 'rogue', cost: 1, rarity: 'mythic', element: 'poison', damaging: false, lock: 0.4,
-    dmg: 'up to ~300', short: 'Apply 5 Poison stacks. For 6s Poison ticks twice as fast and cannot be cleansed.',
+    dmg: 'up to ~240', short: 'Apply 4 Poison stacks. For 6s Poison ticks twice as fast and cannot be cleansed.',
     cast: x => {
       if (!x.b.targetable(x.foe)) { x.b.text(x.foe, 'MISS', '#bcbcbc'); return; }
       x.foe.st.pandemic = 6;
-      x.b.addPoison(x.foe, 5);
+      x.b.addPoison(x.foe, 4);
       x.foe.poisonT = 6;
       for (const [c, r] of allEnemyPanels(x.b, x.f.side)) x.b.addFx('toxicPuff', x.f.side, c, r, 0.5);
       x.b.cheer = 2;
