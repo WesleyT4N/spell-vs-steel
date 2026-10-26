@@ -10,7 +10,7 @@ import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { PLAYABLE } from '../game/classes';
 import { ALL_CARDS, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef, type Element, type Rarity } from '../game/cards';
-import { starterDeck, STARTER_NAME } from '../game/deck';
+import { presetsFor } from '../game/deck';
 import { drawCardDetail, drawCardFace, CARD_W, CARD_H } from './cardView';
 import { win, INK2, RED_INK, TRIM } from './skin';
 import { CardPreview } from './cardPreview';
@@ -180,8 +180,8 @@ export class EncyclopediaScene implements Scene {
       let y = drawCardDetail(ui, card, DX + 6, clipY() + CLIP_BOX + 16, DW - 12) + 4;
       const line = (s: string, col: string): void => { drawText(ui, s, DX + 6, y, col); y += 11; };
       line(`${card.cls.toUpperCase()}   MAX ${MAX_COPIES[card.rarity]} PER DECK`, INK2);
-      const inStarter = starterDeck(card.cls)[card.id] ?? 0;
-      line(inStarter ? `${STARTER_NAME[card.cls].toUpperCase()}: ${inStarter}` : 'NOT IN STARTER', inStarter ? '#007800' : TRIM);
+      const presets = presetsFor(card.cls), inDecks = presets.filter(p => p.cards[card.id]).length;
+      line(inDecks ? `IN ${inDecks} OF ${presets.length} READY DECKS` : 'IN NO READY DECK', inDecks ? '#007800' : TRIM);
       line(`CAST LOCK ${(card.lock ?? 0.3).toFixed(2)}S`, TRIM);
       if (this.test) button(ui, 'test', `${k('attack')}: TEST IN SANDBOX`, DX + 6, clipY() + clipH() - 22, DW - 12, 16, false, RED_INK);
     }
