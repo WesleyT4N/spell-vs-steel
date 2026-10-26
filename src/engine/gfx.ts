@@ -13,9 +13,11 @@ export const UH = H * 2;
 export const view = { w: W, h: H, ox: 0, oy: 0 };
 /** Narrowest and widest screen shapes; past these the window letterboxes. */
 export const MIN_ASPECT = 4 / 3, MAX_ASPECT = 7 / 3;
+/** Phones in portrait may go taller, filling the top half of the screen. */
+export const PORTRAIT_MIN_ASPECT = 3 / 4;
 /** Size the view for a window shape. Returns true when it changed. */
-export function setView(aspect: number): boolean {
-  const a = Math.min(MAX_ASPECT, Math.max(MIN_ASPECT, aspect));
+export function setView(aspect: number, min = MIN_ASPECT): boolean {
+  const a = Math.min(MAX_ASPECT, Math.max(min, aspect));
   // margins stay whole world pixels on both sides, so the content never lands between pixels
   const w = a >= W / H ? W + 2 * Math.round((H * a - W) / 2) : W;
   const h = a >= W / H ? H : H + 2 * Math.round((W / a - H) / 2);
@@ -121,9 +123,9 @@ export function frame(c: Ctx, x: number, y: number, w: number, h: number, fill =
   P(c, fill, x + 1, y + 1, w - 2, h - 2);
 }
 
-export function layer(fn: (c: Ctx) => void): HTMLCanvasElement {
+export function layer(fn: (c: Ctx) => void, w = W, h = H): HTMLCanvasElement {
   const o = document.createElement('canvas');
-  o.width = W; o.height = H;
+  o.width = w; o.height = h;
   fn(o.getContext('2d')!);
   return o;
 }
