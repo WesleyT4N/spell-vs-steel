@@ -1,4 +1,4 @@
-import { setScene, drawMenu, hint, listMouse, type Scene } from './scene';
+import { pushScene, drawMenu, hint, listMouse, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { drawLogo } from '../art/logo';
@@ -129,6 +129,8 @@ export class TitleScene implements Scene {
   motes = Array.from({ length: 14 }, (_, i) => ({ x: (i * 53) % W, y: 40 + ((i * 37) % 100), s: 6 + (i % 4) * 3 }));
 
   enter(): void { playMusic('menu', MENU_SONG); }
+  // a screen opened from here (the sandbox, a fight) may have changed the music
+  resume(): void { playMusic('menu', MENU_SONG); }
   pad(): PadMode { return 'none'; }
 
   /** The side about to be knocked out, and the one knocking it. */
@@ -178,15 +180,15 @@ export class TitleScene implements Scene {
     if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
       sfx('select');
       const item = ITEMS[this.sel];
-      if (item === 'ARCADE MODE') setScene(new CharSelectScene(undefined, 0, 'arcade'));
-      if (item === 'VERSUS MODE') setScene(new CharSelectScene());
-      if (item === 'ONLINE MODE') setScene(new OnlineScene());
-      if (item === 'TRAINING MODE') setScene(new CharSelectScene(undefined, 0, 'training'));
-      if (item === 'TUTORIAL') setScene(new CharSelectScene(undefined, 0, 'tutorial'));
-      if (item === 'DECK BUILDER') setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
-      if (item === 'OPTIONS') setScene(new OptionsScene(() => setScene(new TitleScene())));
+      if (item === 'ARCADE MODE') pushScene(new CharSelectScene(undefined, 0, 'arcade'));
+      if (item === 'VERSUS MODE') pushScene(new CharSelectScene());
+      if (item === 'ONLINE MODE') pushScene(new OnlineScene());
+      if (item === 'TRAINING MODE') pushScene(new CharSelectScene(undefined, 0, 'training'));
+      if (item === 'TUTORIAL') pushScene(new CharSelectScene(undefined, 0, 'tutorial'));
+      if (item === 'DECK BUILDER') pushScene(new DeckBuilderScene(loadMatch().p1));
+      if (item === 'OPTIONS') pushScene(new OptionsScene());
       // loaded on demand, so the prod build (DEV_TOOLS off) carries none of the dev tools code
-      if (item === 'DEV TOOLS' && DEV_TOOLS) void import('./devMenu').then(m => setScene(new m.DevMenuScene(() => setScene(new TitleScene()))));
+      if (item === 'DEV TOOLS' && DEV_TOOLS) void import('./devMenu').then(m => pushScene(new m.DevMenuScene()));
     }
   }
 

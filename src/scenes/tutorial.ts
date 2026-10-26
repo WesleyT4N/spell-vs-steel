@@ -1,9 +1,8 @@
 // Interactive tutorial for players new to Battle Network: a scripted fight against a training dummy.
 // It drives a regular BattleScene (so the fight and the Draw screen look and play exactly like a match)
 // and layers lessons, goals and pointers on top. Every step can be skipped from the pause menu.
-import { setScene, dim, drawMenu, hint, listMouse, isHot, resetSel, type Scene } from './scene';
+import { pushScene, replaceScene, popTo, goHome, dim, drawMenu, hint, listMouse, isHot, resetSel, type Scene } from './scene';
 import { BattleScene } from './battle';
-import { TitleScene } from './title';
 import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { Battle, NO_INTENT, COLS, type Fighter, type Intent, type Mark, type Projectile } from '../game/battle';
@@ -716,8 +715,8 @@ export class TutorialScene implements Scene {
       sfx('select');
       this.paused = false;
       if (this.pauseSel === 1) { this.dummy.shooting = false; this.dummy.warn = -1; this.next(); }
-      if (this.pauseSel === 2) setScene(new TutorialScene(this.cls));
-      if (this.pauseSel === 3) { stopMusic(); setScene(new TitleScene()); }
+      if (this.pauseSel === 2) replaceScene(new TutorialScene(this.cls));
+      if (this.pauseSel === 3) { stopMusic(); goHome(); }
     }
   }
 
@@ -732,10 +731,11 @@ export class TutorialScene implements Scene {
       sfx('select');
       stopMusic();
       const choice = TutorialScene.DONE[this.doneSel];
-      if (choice === 'VERSUS MODE') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); setScene(new CharSelectScene()); }
-      if (choice === 'DECK BUILDER') setScene(new DeckBuilderScene(this.cls, () => setScene(new TitleScene())));
-      if (choice === 'TRY ANOTHER CLASS') setScene(new CharSelectScene(undefined, 0, 'tutorial'));
-      if (choice === 'TITLE') setScene(new TitleScene());
+      // these start a new path from the title, so BACK from them lands there
+      if (choice === 'VERSUS MODE') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); goHome(); pushScene(new CharSelectScene()); }
+      if (choice === 'DECK BUILDER') { goHome(); pushScene(new DeckBuilderScene(this.cls)); }
+      if (choice === 'TRY ANOTHER CLASS') popTo(s => s instanceof CharSelectScene, () => new CharSelectScene(undefined, 0, 'tutorial'));
+      if (choice === 'TITLE') goHome();
     }
   }
 

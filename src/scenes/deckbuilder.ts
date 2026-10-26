@@ -1,6 +1,6 @@
 // Grimoire builder: 30 spells, 4/2/1 copy limits, max 5 Legendaries, exactly 1 Mythic. Autosaves to the browser.
 // Opening it (or switching class) first asks what to start from: your saved deck, a ready-made deck or an empty one.
-import { hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
+import { popScene, hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { teamColor, type ClassId } from '../art/sprites';
@@ -50,7 +50,7 @@ export class DeckBuilderScene implements Scene {
   /** The tile grid's window this frame, for scrolling and keeping the selection in view. */
   private grid = { top: 0, h: 0 };
 
-  constructor(public cls: ClassId, private back: () => void) {
+  constructor(public cls: ClassId, private back: () => void = popScene) {
     this.load();
   }
 

@@ -1,6 +1,6 @@
 // Local Versus: runs a Battle, the custom screen, pause and results. Either side can be a player at this
 // keyboard or the CPU, so it covers you vs the CPU (on either side), two players on one keyboard, and CPU vs CPU.
-import { setScene, dim, drawMenu, hint, zone, hot, isHot, listMouse, showSel, resetSel, type Scene } from './scene';
+import { pushScene, replaceScene, popTo, goHome, dim, drawMenu, hint, zone, hot, isHot, listMouse, showSel, resetSel, type Scene } from './scene';
 import { CLASS_INFO } from '../game/classes';
 import { Battle, NO_INTENT, heavyChargeOf, type Dir, type Intent, type Side } from '../game/battle';
 import { drawBattle, drawBattleUi } from '../game/battleView';
@@ -26,7 +26,6 @@ import { win, plaque, pip, disc, banner, PAPER, PAPER2, BURN, INK, INK2, TRIM, R
 import { CharSelectScene } from './select';
 import { StatsPanel, type StatsData } from './statsView';
 import { trackStats, roundRecord, setTotals, topSpell, type BattleStats, type RoundRecord } from '../game/stats';
-import { TitleScene } from './title';
 import { OptionsScene } from './options';
 
 export class BattleScene implements Scene {
@@ -104,6 +103,7 @@ export class BattleScene implements Scene {
   protected keyOf(s: Side, a: 'left' | 'right' | 'attack' | 'cast' | 'custom'): string { return this.twoPlayer ? localKey(s, a) : k(a); }
 
   enter(): void { playMusic('battle', BATTLE_SONG); }
+  resume(): void { playMusic('battle', BATTLE_SONG); }
 
   pad(): PadMode {
     const b = this.b;
@@ -296,9 +296,9 @@ export class BattleScene implements Scene {
     if (wasPressed('confirm') || clicked >= 0 || (wasPressed('pause') && this.pauseSel === 0)) {
       sfx('select');
       if (this.pauseSel === 0) this.paused = false;
-      if (this.pauseSel === 1) setScene(new OptionsScene(() => setScene(this)));
-      if (this.pauseSel === 2) setScene(this.again(this.score, this.rounds));
-      if (this.pauseSel === 3) { stopMusic(); setScene(new TitleScene()); }
+      if (this.pauseSel === 1) pushScene(new OptionsScene());
+      if (this.pauseSel === 2) replaceScene(this.again(this.score, this.rounds));
+      if (this.pauseSel === 3) { stopMusic(); goHome(); }
     }
   }
 
@@ -337,10 +337,11 @@ export class BattleScene implements Scene {
 
   /** A results menu item was picked. */
   protected onResult(choice: string): void {
-    if (choice === 'NEXT ROUND') setScene(this.again(this.score, this.rounds));
-    if (choice === 'REMATCH') setScene(this.again([0, 0], []));
-    if (choice === 'CHARACTER SELECT') setScene(new CharSelectScene());
-    if (choice === 'TITLE') setScene(new TitleScene());
+    if (choice === 'NEXT ROUND') replaceScene(this.again(this.score, this.rounds));
+    if (choice === 'REMATCH') replaceScene(this.again([0, 0], []));
+    // back to the character select this match came from, picks intact
+    if (choice === 'CHARACTER SELECT') popTo(s => s instanceof CharSelectScene, () => new CharSelectScene());
+    if (choice === 'TITLE') goHome();
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
