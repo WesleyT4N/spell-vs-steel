@@ -1,6 +1,6 @@
 // Draws a Battle: arena, panels, fighters, spell effects and the HUD.
 import { k } from '../engine/input';
-import { drawPanel, drawStage, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState } from '../art/arena';
+import { drawPanel, drawStage, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, TEAM_RIM, type PanelState } from '../art/arena';
 import { getStage } from '../art/stages';
 import type { Stage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, type Tint } from '../art/sprites';
@@ -214,7 +214,7 @@ function drawHawk(c: Ctx, x: number, y: number, d: number, up: boolean): void {
 function drawHole(c: Ctx, col: number, row: number, owner: 0 | 1): void {
   const x = X0 + col * PW, y = Y0 + row * (FACE + LIP);
   P(c, '#000000', x, y - 1, PW, FACE + LIP + 1);
-  P(c, owner === 0 ? '#881400' : '#0058f8', x + 1, y, PW - 2, 1);
+  P(c, TEAM_RIM[owner][1], x + 1, y, PW - 2, 1);
   P(c, '#1a1218', x + 3, y + 2, PW - 6, FACE - 2);
 }
 
