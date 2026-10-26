@@ -1,4 +1,4 @@
-import { W, H, UW, UH, P, view, setView, screenRect } from './engine/gfx';
+import { W, H, UW, UH, P, view, setView, screenRect, MIN_ASPECT, PORTRAIT_MIN_ASPECT } from './engine/gfx';
 import { drawTextCentered } from './engine/font';
 import { initInput, endFrame, wasPressed } from './engine/input';
 import { toggleMute } from './engine/audio';
@@ -34,7 +34,7 @@ function fit(): void {
   // dev tools can dock a panel on the right and reserve its width
   const bw = vw - Number(document.body.dataset.reserveRight ?? 0);
   const bh = portrait ? vh * 0.5 : vh;
-  if (setView(bw / bh)) {
+  if (setView(bw / bh, portrait ? PORTRAIT_MIN_ASPECT : MIN_ASPECT)) {
     world.canvas.width = view.w; world.canvas.height = view.h;
     ui.canvas.width = view.w * 2; ui.canvas.height = view.h * 2;
     world.imageSmoothingEnabled = ui.imageSmoothingEnabled = false; // resizing resets context state

@@ -258,10 +258,10 @@ export class BattleScene implements Scene {
     dim(c, 0.5);
 
     // header: turn, timer, resource
-    // the header bar reaches the screen's edges
-    const [sx, sy, sw] = screenRect(2);
-    P(ui, '#000000', sx, sy, sw, 28 - sy);
-    P(ui, '#0000a8', sx, sy, sw, 26 - sy);
+    // the header bar reaches the screen's sides
+    const [sx, , sw] = screenRect(2);
+    P(ui, '#000000', sx, 0, sw, 28);
+    P(ui, '#0000a8', sx, 0, sw, 26);
     drawText(ui, `DRAW   TURN ${b.turn}`, 10, 10, '#fcfcfc');
     const secs = Math.ceil(this.timer);
     drawTextCentered(ui, String(secs).padStart(2, '0'), UW / 2, 6, secs <= 5 && tick % 4 < 2 ? '#f83800' : '#f8b800', 2);

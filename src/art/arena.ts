@@ -82,8 +82,8 @@ export interface Stage {
   draw(c: Ctx, t: number, cheer?: number): void;
 }
 
-// Stages are painted for a 3:2 screen. Wider or taller screens get the edges mirrored outward,
-// so the scenery (sky, walls, crowd, sand) carries on into the margins without seams.
+// Stages are painted for a 3:2 screen. Wider or taller screens get the sides and floor mirrored outward
+// and the sky stretched upward, so the scenery carries on into the margins without seams.
 let flat: Ctx | null = null, wide: Ctx | null = null;
 const buffer = (w: number, h: number, old: Ctx | null): Ctx => {
   if (old && old.canvas.width === w && old.canvas.height === h) return old;
@@ -93,6 +93,23 @@ const buffer = (w: number, h: number, old: Ctx | null): Ctx => {
   x.imageSmoothingEnabled = false;
   return x;
 };
+// The sky above a stage on tall screens: its top edge's average color, deepening upward. Cached per stage and size.
+const skies = new Map<string, HTMLCanvasElement>();
+function skyCap(st: Stage, f: HTMLCanvasElement, w: number, h: number): HTMLCanvasElement {
+  const key = `${st.id}:${w}x${h}`;
+  let sky = skies.get(key);
+  if (!sky) {
+    const px = f.getContext('2d')!.getImageData(0, 0, W, 1).data;
+    let r = 0, g = 0, b = 0;
+    for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i + 1]; b += px[i + 2]; }
+    const hex = (v: number): string => Math.round(v / W).toString(16).padStart(2, '0');
+    const top = `#${hex(r)}${hex(g)}${hex(b)}`;
+    sky = layer(c => vgrad(c, 0, 0, w, h, [mix(top, '#000000', 0.45), mix(top, '#000000', 0.3), mix(top, '#000000', 0.15), top]), w, h);
+    skies.set(key, sky);
+  }
+  return sky;
+}
+
 /** Draw a stage's backdrop over the whole visible screen. */
 export function drawStage(c: Ctx, st: Stage, t: number, cheer = 0): void {
   const { w, h, ox, oy } = view;
@@ -109,7 +126,8 @@ export function drawStage(c: Ctx, st: Stage, t: number, cheer = 0): void {
   }
   if (oy) {
     const g = x.canvas;
-    x.save(); x.translate(0, 2 * oy); x.scale(1, -1); x.drawImage(g, 0, oy, w, oy, 0, oy, w, oy); x.restore();
+    // above: more sky, since mirrored walls hanging upside down look wrong
+    x.drawImage(skyCap(st, f, w, oy), 0, 0);
     x.save(); x.translate(0, 2 * (oy + H)); x.scale(1, -1); x.drawImage(g, 0, oy + H - oy, w, oy, 0, oy + H - oy, w, oy); x.restore();
   }
   c.drawImage(x.canvas, -ox, -oy);
