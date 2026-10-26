@@ -2,6 +2,7 @@
 import { PLAYABLE } from '../game/classes';
 import { Battle, type Side } from '../game/battle';
 import { Cpu } from '../game/ai';
+import { styleById } from '../game/playstyles';
 import { CARDS } from '../game/cards';
 import { starterDeck, toList, type DeckCounts } from '../game/deck';
 import type { Difficulty } from '../game/tuning';
@@ -11,7 +12,7 @@ import { instrument } from './instrument';
 /** Every class with sprites; new classes show up in the dev tools as soon as they are added. */
 export const classIds = (): ClassId[] => (Object.keys(SKINS) as ClassId[]).filter(c => PLAYABLE.includes(c));
 
-export interface SideSpec { cls: ClassId; deck: DeckCounts; cpu: Difficulty; label?: string }
+export interface SideSpec { cls: ClassId; deck: DeckCounts; cpu: Difficulty; label?: string; /** Playstyle id (default: balanced). */ style?: string }
 
 export interface MatchResult {
   winner: Side | null;
@@ -40,7 +41,7 @@ export function runMatch(a: SideSpec, bSpec: SideSpec, tick: number = DT): Match
     if (h.by === null || !h.dealt) return;
     dmg[h.by][h.source] = (dmg[h.by][h.source] ?? 0) + h.dealt;
   };
-  const cpus = [new Cpu(a.cpu), new Cpu(bSpec.cpu)];
+  const cpus = [new Cpu(a.cpu, styleById(a.style ?? '')), new Cpu(bSpec.cpu, styleById(bSpec.style ?? ''))];
   // the player opens the Draw screen whenever they like; this opens it a little after it fills (2% a frame at 60fps)
   const openChance = 1 - Math.pow(0.98, tick / DT);
   let t = 0;

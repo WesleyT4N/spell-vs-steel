@@ -16,6 +16,7 @@ import { parseScript, toScript } from '../dev/script';
 import { planGrid, foldGrid, cellRate, cellRange, classTotal, favorable, ruleChecks, FAV, THIN, LOPSIDED, type GridPlan, type GridReport } from '../dev/grid';
 import { runGrid, type GridRun } from '../dev/gridRunner';
 import { archetypesFor, mythicOf, type PoolKind } from '../dev/archetypes';
+import { styleById } from '../game/playstyles';
 import { h, btn, choice, setBadge } from '../dev/dom';
 
 // the corner badge, hooked up the first time the lab opens
@@ -196,7 +197,7 @@ export class LabScene implements Scene {
     const run = btn('Run matchup', () => this.runSingle(), 'primary');
     const mat = btn('Run class matrix', () => this.runMatrix());
     const g = cfg.grid;
-    const kind = choice<PoolKind>([['starter', 'Starters'], ['archetype', 'Archetypes'], ['variant', 'Archetype variants'], ['random', 'Random decks']], g.kind, v => { g.kind = v; });
+    const kind = choice<PoolKind>([['starter', 'Starters'], ['archetype', 'Archetypes'], ['variant', 'Archetype variants'], ['random', 'Random decks'], ['style', 'CPU styles + their decks'], ['style-starter', 'CPU styles, starters']], g.kind, v => { g.kind = v; });
     const gn = choice<number>([[10, '10'], [20, '20'], [40, '40'], [100, '100']], g.n, v => { g.n = v; });
     const gk = choice<number>([[2, '2'], [3, '3'], [5, '5'], [8, '8']], g.k, v => { g.k = v; });
     const hz = choice<number>([[60, '60 (exact)'], [30, '30 (fast)']], g.hz, v => { g.hz = v; });
@@ -322,7 +323,7 @@ export class LabScene implements Scene {
       const row = r.deckGrid[d.key] ?? {};
       const tot = Object.values(row).reduce((s, c) => ({ wins: s.wins + c.wins, losses: s.losses + c.losses, draws: s.draws + c.draws }), { wins: 0, losses: 0, draws: 0 });
       const arch = archetypesFor(d.cls).find(a => d.key.startsWith(`${d.cls}:${a.id}`));
-      return h('tr', {}, h('td', { title: arch?.plan ?? '' }, `${cap(d.cls)} ${d.name}`), h('td', { class: 'muted' }, CARDS[mythicOf(d.deck)]?.name ?? '-'),
+      return h('tr', {}, h('td', { title: d.style ? styleById(d.style).desc : arch?.plan ?? '' }, `${cap(d.cls)} ${d.name}`), h('td', { class: 'muted' }, CARDS[mythicOf(d.deck)]?.name ?? '-'),
         ...ids.map(c => (c === d.cls ? h('td', { class: 'muted' }, '-') : h('td', { style: `color:${color(cellRate(row[c]))}` }, Number.isNaN(cellRate(row[c])) ? '…' : pct(cellRate(row[c]))))),
         h('td', {}, Number.isNaN(cellRate(tot)) ? '…' : pct(cellRate(tot))));
     });

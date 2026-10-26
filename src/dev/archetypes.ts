@@ -4,6 +4,7 @@ import { CARDS, ALL_CARDS, MAX_COPIES, type CardDef } from '../game/cards';
 import { DECK_SIZE, MAX_LEGENDARIES, canAdd, validate, deckSize, starterDeck, type DeckCounts } from '../game/deck';
 import { seeded, type Rng } from '../game/rng';
 import type { ClassId } from '../art/sprites';
+import { stylesFor } from '../game/playstyles';
 
 export interface Archetype {
   id: string;
@@ -159,13 +160,14 @@ export function randomDeck(cls: ClassId, rand: Rng): DeckCounts {
   return d;
 }
 
-export interface PoolDeck { cls: ClassId; key: string; name: string; deck: DeckCounts }
+export interface PoolDeck { cls: ClassId; key: string; name: string; deck: DeckCounts; /** CPU playstyle id (default: balanced). */ style?: string }
 
-export type PoolKind = 'starter' | 'archetype' | 'variant' | 'random';
+export type PoolKind = 'starter' | 'archetype' | 'variant' | 'random' | 'style' | 'style-starter';
 
 /**
  * Decks for one class. `starter` = the shipped starter, `archetype` = each archetype's fixed list,
- * `variant` = `k` random builds of each archetype, `random` = `k` random legal decks.
+ * `variant` = `k` random builds of each archetype, `random` = `k` random legal decks,
+ * `style` = each CPU playstyle with its matching archetype, `style-starter` = each playstyle with the starter.
  */
 export function deckPool(cls: ClassId, kind: PoolKind, k: number, seed: number): PoolDeck[] {
   const rand = seeded(seed);
@@ -174,6 +176,13 @@ export function deckPool(cls: ClassId, kind: PoolKind, k: number, seed: number):
   if (kind === 'archetype') for (const a of archetypesFor(cls)) out.push({ cls, key: `${cls}:${a.id}`, name: a.name, deck: buildArchetype(cls, a) });
   if (kind === 'variant') {
     for (const a of archetypesFor(cls)) for (let i = 0; i < k; i++) out.push({ cls, key: `${cls}:${a.id}#${i + 1}`, name: `${a.name} #${i + 1}`, deck: buildArchetype(cls, a, rand) });
+  }
+  if (kind === 'style' || kind === 'style-starter') {
+    for (const s of stylesFor(cls)) {
+      const a = archetypesFor(cls).find(x => x.id === s.deck);
+      const deck = kind === 'style' && a ? buildArchetype(cls, a) : starterDeck(cls);
+      out.push({ cls, key: `${cls}:${s.id.replace(`${cls}_`, '')}`, name: s.name, deck, style: s.id });
+    }
   }
   if (kind === 'random') for (let i = 0; i < k; i++) out.push({ cls, key: `${cls}:random#${i + 1}`, name: `Random #${i + 1}`, deck: randomDeck(cls, rand) });
   for (const p of out) {

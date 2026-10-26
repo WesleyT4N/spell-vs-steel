@@ -48,7 +48,7 @@ export function planGrid(classes: ClassId[], kind: PoolKind, k: number, seed: nu
   return { kind, decks, pairs, jobs };
 }
 
-const spec = (d: PoolDeck): SideSpec => ({ cls: d.cls, deck: d.deck, cpu: 'normal', label: d.key });
+const spec = (d: PoolDeck): SideSpec => ({ cls: d.cls, deck: d.deck, cpu: 'normal', label: d.key, style: d.style });
 
 export function runJob(job: GridJob): GridJobResult {
   const r: GridJobResult = { i: job.i, wins: 0, losses: 0, draws: 0, time: 0, casts: [{}, {}] };
