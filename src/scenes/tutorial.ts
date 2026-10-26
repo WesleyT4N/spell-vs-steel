@@ -4,7 +4,7 @@
 import { setScene, dim, drawMenu, hint, listMouse, isHot, showSel, resetSel, type Scene } from './scene';
 import { BattleScene } from './battle';
 import { TitleScene } from './title';
-import { SetupScene } from './setup';
+import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { Battle, NO_INTENT, COLS, type Fighter, type Intent, type Mark, type Projectile } from '../game/battle';
 import { drawBattle, getArena } from '../game/battleView';
@@ -624,7 +624,7 @@ export class TutorialScene implements Scene {
       sfx('select');
       stopMusic();
       const choice = TutorialScene.DONE[this.doneSel];
-      if (choice === 'VERSUS CPU') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); setScene(new SetupScene()); }
+      if (choice === 'VERSUS CPU') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); setScene(new CharSelectScene()); }
       if (choice === 'DECK BUILDER') setScene(new DeckBuilderScene(this.cls, () => setScene(new TitleScene())));
       if (choice === 'TRY THE OTHER CLASS') { const t = new TutorialScene(); setScene(t); t.begin(this.cls === 'warrior' ? 'mage' : 'warrior'); }
       if (choice === 'TITLE') setScene(new TitleScene());

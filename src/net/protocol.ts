@@ -6,9 +6,20 @@ import type { ClassId } from '../art/sprites';
 import type { Dir, Intent } from '../game/battle';
 
 /** Bump when the rules or the protocol change, so mismatched builds refuse to play each other. */
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;
 
 export interface Hello { cls: ClassId; skin: string; deck: string[] }
+
+/** Character and stage select: where this side's cursor is and what it has locked in. */
+export interface Lobby {
+  /** 0 picking a fighter, 1 picking a skin, 2 fighter locked in (final). */
+  step: 0 | 1 | 2;
+  /** Roster tile under the cursor (the last one is RANDOM). */
+  tile: number;
+  /** Stage under the cursor, or this side's vote once `voted` ('random' is a vote too). */
+  stage: string;
+  voted: boolean;
+}
 
 export interface Packet {
   v: number;
@@ -20,7 +31,9 @@ export interface Packet {
   t: number;
   et: number;
   ed: number;
+  /** This side's fighter: the latest pick during character select, final once `lobby.step` is 2. */
   hello: Hello;
+  lobby?: Lobby;
   /** Host only: the match everyone plays. */
   start?: { seed: number; bestOf: 1 | 3 | 5 };
   /** Highest round this side is ready to start (1 = first round). */
