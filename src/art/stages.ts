@@ -2,7 +2,7 @@
 // Every stage keeps the same grid and red/blue panel rims; only the scenery and panel faces change.
 import { P, rng, clamp, vnoise, hash, mix, type Ctx } from '../engine/gfx';
 import { Colosseum, stoneTex, PURPLE, GOLD, type PanelLook, type Stage } from './arena';
-import { stamp, wide, put, sky, mod, tone, bands, disc, ball, halo, blocks, inkBanner, inkTorch, inkCloud, cone, inkPine, clump, BW, XL, XR, YT, YB } from './ink';
+import { stamp, wide, put, sky, mod, tone, bands, disc, ball, halo, blocks, inkBanner, inkTorch, inkCloud, cone, inkPine, clump, sparks, BW, XL, XR, YT, YB } from './ink';
 
 function poly(c: Ctx, pts: number[][], fill: string): void {
   c.fillStyle = fill; c.beginPath();
@@ -183,6 +183,13 @@ const DRAFTS: StageDef[] = [
     inkBanner(c, -6, 58, 9, 20, PURPLE, GOLD, GREY_INK, t);
     inkBanner(c, 238, 58, 9, 20, PURPLE, GOLD, GREY_INK, t);
     inkTorch(c, 100, 64, t, 0, GREY_INK); inkTorch(c, 139, 64, t, 1, GREY_INK);
+    // guards pacing the wall walk, only head, shoulders and spear above the merlons
+    [[44, 88, 0], [152, 198, 40], [-24, 0, 90], [242, 266, 20]].forEach(([x0, x1, ph]) => {
+      const span = x1 - x0, k = mod(t * 0.5 + ph, span * 2), x = Math.round(x0 + (k < span ? k : span * 2 - k)), bob = Math.floor(t / 2) % 2;
+      P(c, GREY_INK, x - 2, 39 - bob, 5, 8); P(c, '#9690a8', x - 1, 40 - bob, 3, 2); P(c, '#e8b890', x - 1, 42 - bob, 3, 1);
+      P(c, PURPLE[1], x - 1, 43 - bob, 3, 3); P(c, GOLD[1], x, 44 - bob, 1, 1);
+      P(c, '#5a3a1a', x + (k < span ? 3 : -3), 34 - bob, 1, 12); P(c, '#e6e2ec', x + (k < span ? 3 : -3), 32 - bob, 1, 2);
+    });
     const r = rng(63);
     for (let i = 0; i < 4; i++) {
       const ph = r() * 300, y0 = 14 + r() * 20 - (i === 3 ? 40 : 0), x = XL - 30 + mod(ph + t * (1.4 + i * 0.3), BW + 60), flap = Math.floor(t / 2 + i) % 2;
@@ -267,6 +274,21 @@ const DRAFTS: StageDef[] = [
     c.restore();
   },
   over(c, t){
+    for (const [cy, sp, w] of [[20, 0.25, 14], [34, 0.4, 10], [52, 0.18, 18]]) {
+      const cx = 80 + mod(t * sp + cy * 3, 80);
+      for (let x = Math.floor(cx - w / 2); x < cx + w / 2; x++) for (let y = cy - 2; y < cy + 2; y++) {
+        const e = Math.abs(x - cx) / (w / 2) + Math.abs(y - cy + 0.5) / 2;
+        if (e < 1.2 && inWin(x, y) && x !== 120 && y !== 44) P(c, y < cy ? '#5a6aa8' : '#3a4a84', x, y);
+      }
+    }
+    const BOOK = [['#8a2a1a', '#c84a2a'], ['#1a4a6a', '#3a7ab0'], ['#2a5a2a', '#4a9a4a'], ['#5a2a74', '#8a44a0']];
+    [[44, 30, 0], [196, 26, 1], [-26, 44, 2], [264, 40, 3]].forEach(([bx, by, i]) => {
+      const x = Math.round(bx + Math.sin(t * 0.05 + i * 2) * 10), y = Math.round(by + Math.sin(t * 0.09 + i) * 4), open = Math.floor(t / 3 + i) % 2;
+      halo(c, x + 3, y + 2, 6, '120,180,255', 0.18);
+      P(c, '#0a0614', x - 1, y - 1 - open, 9, 5 + open);
+      P(c, BOOK[i][0], x, y, 3, 3); P(c, BOOK[i][0], x + 4, y, 3, 3); P(c, BOOK[i][1], x, y, 3, 1); P(c, BOOK[i][1], x + 4, y, 3, 1);
+      P(c, '#f0e8d0', x + 1, y - 1 - open, 2, 1 + open); P(c, '#f0e8d0', x + 4, y - 1 - open, 2, 1 + open); P(c, '#c8b8a0', x + 3, y - 1, 1, 4);
+    });
     [[105, 12], [136, 52], [112, 60], [131, 14], [108, 38]].forEach(([x, y], i) => { if ((t + i * 3) % 9 < 6) P(c, '#ffffff', x, y); });
     const a = t * 0.08;
     ([[16, 5, '#e8b840'], [11, 3.5, '#c89030'], [6, 2.5, '#f8d878']] as const).forEach(([rx, ry, col], i) => {
@@ -346,6 +368,15 @@ const DRAFTS: StageDef[] = [
       const y = YT + (y0 + t * sp) % (94 - YT);
       const x = XL + mod(x0 + Math.sin((t + y0) * 0.1) * (far ? 2 : 4), BW);
       if (far) P(c, '#c8d0f0', x, y); else { P(c, '#ffffff', x, y, 2, 2); P(c, '#8a96c8', x + 1, y + 2, 1, 1); }
+    }
+    const n = Math.floor(t / 60), age = t % 60;
+    if (age < 10) {
+      const sx = XL + hash(n, 1, 7) * BW * 0.7, sy = YT + 10 + hash(n, 2, 7) * 60;
+      for (let k = 0; k < 10; k++) { const d = age * 5 - k; if (d >= 0) P(c, k < 2 ? '#ffffff' : k < 5 ? '#c8d8ff' : '#6a7ab8', sx + d * 2, sy + d, 2, 1); }
+    }
+    for (let g = 0; g < 3; g++) {
+      const gy = [84, 90, 20][g], x = XL - 60 + mod(t * 5 + g * 150, BW + 120);
+      for (let k = 0; k < 7; k++) P(c, k % 2 ? '#ffffff' : '#c8d4f0', x - k * 6 + Math.round(Math.sin(k + t * 0.3) * 1), gy + (k % 3) - 1, 4, 1);
     }
   }
 },
@@ -458,6 +489,16 @@ const DRAFTS: StageDef[] = [
       for (let y = 10; y < 46; y += 3) { P(c, '#08080c', cx - 1, y - 1, 5, 4); P(c, '#44444e', cx, y, 3, 2); P(c, '#9494a6', cx, y, 1, 1); P(c, '#ff8040', cx + 2, y, 1, 2); }
       P(c, '#08080c', cx - 3, 45, 9, 6); P(c, '#44444e', cx - 2, 46, 7, 4); P(c, '#9494a6', cx - 2, 46, 7, 1);
     }
+    const hit = t % 24;
+    if (hit < 7) { sparks(c, 66, 75, hit / 7, Math.floor(t / 24), 14, ['#ffffff', '#ffe890', '#ffb840', '#f05a10', '#8a1400']); if (hit < 2) halo(c, 66, 75, 8, '255,220,120', 0.5); }
+    for (let b = 0; b < 6; b++) {
+      const n = Math.floor((t + b * 7) / 16), age = (t + b * 7) % 16, x = XL + Math.floor(hash(n, b, 3) * BW);
+      if (age < 6) { const rr = age < 4 ? 1 + age * 0.5 : 0; if (rr) ball(c, x, 88 - rr, rr, rr, ['#c83000', '#ff8a20', '#ffe890']); else { P(c, '#ffb840', x - 2, 85, 1, 1); P(c, '#ffb840', x + 2, 84, 1, 1); P(c, '#ffe890', x, 83, 1, 1); } }
+    }
+    for (let k = 0; k < 6; k++) {
+      const age = mod(t * 0.4 + k * 9, 54), y = 6 - age * 1.6, x = 120 + Math.sin(age * 0.12 + k) * (2 + age * 0.15), rad = 3 + age * 0.12;
+      disc(c, age < 20 ? '#2a201c' : '#1e1614', Math.round(x), Math.round(y), rad); disc(c, '#3a2e28', Math.round(x - 1), Math.round(y - 1), Math.max(1, rad - 2));
+    }
     const r = rng(45);
     for (let i = 0; i < 40; i++) {
       const sx = XL + r() * BW, sp = 0.8 + r(), ph = r() * 160;
@@ -553,6 +594,16 @@ const DRAFTS: StageDef[] = [
       if ((t + i * 3) % 12 >= 7) continue;
       halo(c, x, y, 3, '200,255,100', 0.5); P(c, '#f0ffa0', x, y);
     }
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const glow = 0.03 + 0.03 * Math.sin(t * 0.08);
+    [[96, 10], [124, 7], [150, 12]].forEach(([x, w], i) => poly(c, [[x - 10, -26], [x + w - 10, -26], [x + w + 36, 92], [x + 18, 92]], `rgba(255,230,150,${(glow * (1 + 0.5 * Math.sin(t * 0.05 + i * 2))).toFixed(3)})`));
+    c.restore();
+    [[40, 70, '#f0a8c8'], [190, 66, '#f8e070'], [150, 84, '#a8d8f8'], [-30, 60, '#f0f0e0'], [270, 70, '#f0a8c8']].forEach(([bx, by, col], i) => {
+      const x = Math.round((bx as number) + Math.sin(t * 0.07 + i * 3) * 18), y = Math.round((by as number) + Math.sin(t * 0.17 + i) * 6), up = (t + i) % 2;
+      P(c, '#1e2218', x, y, 1, 2);
+      if (up) { P(c, col as string, x - 2, y - 2, 2, 2); P(c, col as string, x + 1, y - 2, 2, 2); }
+      else { P(c, col as string, x - 1, y, 1, 2); P(c, col as string, x + 1, y, 1, 2); }
+    });
     for (let i = 0; i < 6; i++) {
       const ph = r() * 100, sx = 30 + r() * 180;
       const y = (ph + t * 0.5) % 92, x = sx + Math.sin((y + ph) * 0.1) * 8;

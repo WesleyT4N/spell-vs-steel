@@ -18,9 +18,10 @@ export function inked(ink: string | null, fn: (c: Ctx) => void, w = W, h = H): H
 }
 // Stages are painted larger than the 240x160 world: MX extra columns each side covers the widest screen
 // (21:9) and MY extra rows above and below covers the tallest (a phone in portrait). Stage code draws in
-// world coordinates; anything from XL..XR and YT..YB may be seen.
-export const MX = 68, MY = 80, BW = W + 2 * MX, BH = H + 2 * MY;
-export const XL = -MX, XR = W + MX, YT = -MY, YB = H + MY;
+// world coordinates; anything from XL..XR and YT..YB may be seen. drawStage shows the whole scene LIFT
+// rows higher than it was painted, leaving a strip of floor between the scenery and the top grid row.
+export const MX = 68, MY = 80, LIFT = 10, BW = W + 2 * MX, BH = H + 2 * MY + LIFT;
+export const XL = -MX, XR = W + MX, YT = -MY, YB = H + MY + LIFT;
 
 /** An offscreen canvas covering the whole oversized stage, with world (0,0) at (MX, MY). */
 export function wide(fn: (c: Ctx) => void): HTMLCanvasElement {
@@ -184,3 +185,19 @@ export function clump(c: Ctx, cx: number, cy: number, r: number, ramp: string[],
   }
 }
 
+
+/** A small bird in flight: two wing strokes that flap up and down. */
+export function bird(c: Ctx, x: number, y: number, flap: boolean, col: string): void {
+  P(c, col, x, y, 1, 1);
+  if (flap) { P(c, col, x - 2, y - 1, 2, 1); P(c, col, x + 1, y - 1, 2, 1); }
+  else { P(c, col, x - 2, y, 2, 1); P(c, col, x + 1, y, 2, 1); P(c, col, x - 3, y + 1, 1, 1); P(c, col, x + 3, y + 1, 1, 1); }
+}
+
+/** A burst of sparks flying out and falling, `age` 0..1 through its life. */
+export function sparks(c: Ctx, x: number, y: number, age: number, seed: number, n: number, cols: string[]): void {
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI * (0.15 + 0.7 * ((Math.sin(seed * 12.9 + i * 78.2) + 1) / 2)), v = 10 + 8 * ((Math.sin(seed * 3.1 + i * 9.7) + 1) / 2);
+    const px = x + Math.cos(a) * v * age, py = y + Math.sin(a) * v * age + 14 * age * age;
+    P(c, cols[Math.min(cols.length - 1, Math.floor(age * cols.length))], px, py, 1, 1);
+  }
+}
