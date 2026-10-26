@@ -1,6 +1,6 @@
 // The "Inked" stage toolkit: scenery drawn like the 24px fighters. Every piece gets a 1px outline in a dark
 // ink of its own material, shading is flat 3-5 tone bands (no dithering, no noise), and gradients step in hard bands.
-import { P, W, H, clamp, type Ctx } from '../engine/gfx';
+import { P, W, H, clamp, mix, type Ctx } from '../engine/gfx';
 
 /** Paint into a transparent layer, then trace a 1px outline around everything opaque. */
 export function inked(ink: string | null, fn: (c: Ctx) => void, w = W, h = H): HTMLCanvasElement {
@@ -9,15 +9,34 @@ export function inked(ink: string | null, fn: (c: Ctx) => void, w = W, h = H): H
   const c = o.getContext('2d')!;
   fn(c);
   if (!ink) return o;
+  c.setTransform(1, 0, 0, 1, 0, 0);
   const d = c.getImageData(0, 0, w, h).data;
   const on = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] > 0;
   c.fillStyle = ink;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (!on(x, y) && (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1))) c.fillRect(x, y, 1, 1);
   return o;
 }
-/** Draw an outlined piece straight onto `c`. */
+// Stages are painted larger than the 240x160 world: MX extra columns each side covers the widest screen
+// (21:9) and MY extra rows above and below covers the tallest (a phone in portrait). Stage code draws in
+// world coordinates; anything from XL..XR and YT..YB may be seen.
+export const MX = 68, MY = 80, BW = W + 2 * MX, BH = H + 2 * MY;
+export const XL = -MX, XR = W + MX, YT = -MY, YB = H + MY;
+
+/** An offscreen canvas covering the whole oversized stage, with world (0,0) at (MX, MY). */
+export function wide(fn: (c: Ctx) => void): HTMLCanvasElement {
+  const o = document.createElement('canvas');
+  o.width = BW; o.height = BH;
+  const c = o.getContext('2d')!;
+  c.translate(MX, MY);
+  fn(c);
+  return o;
+}
+/** Blit a `wide` canvas back in world coordinates. */
+export const put = (c: Ctx, o: HTMLCanvasElement): void => c.drawImage(o, XL, YT);
+
+/** Draw an outlined piece straight onto `c`, anywhere on the oversized stage. */
 export function stamp(c: Ctx, ink: string | null, fn: (c: Ctx) => void): void {
-  c.drawImage(inked(ink, fn), 0, 0);
+  put(c, inked(ink, c => { c.translate(MX, MY); fn(c); }, BW, BH));
 }
 
 /** The step of a dark-to-light ramp nearest to `v` (0..1). */
@@ -31,6 +50,18 @@ export function bands(c: Ctx, x: number, y: number, w: number, h: number, cols: 
     P(c, cols[i], x, y + a, w, b - a);
   }
 }
+
+/**
+ * A sky in hard bands from y = 0 down to `bottom`, spanning the whole oversized stage. Above the world's top
+ * edge the bands keep going, each step deeper toward `deep`, so tall screens get more sky.
+ */
+export function sky(c: Ctx, bottom: number, cols: string[], deep = '#000000'): void {
+  bands(c, XL, 0, BW, bottom, cols);
+  const bh = Math.max(3, Math.round(bottom / cols.length));
+  for (let i = 1, y = -bh; y + bh > YT; i++, y -= bh) P(c, mix(cols[0], deep, Math.min(0.6, i * 0.09)), XL, y, BW, bh);
+}
+/** x mod n, always 0..n-1 (stage x runs negative into the left margin). */
+export const mod = (x: number, n: number): number => ((x % n) + n) % n;
 
 export function disc(c: Ctx, col: string, cx: number, cy: number, r: number): void {
   for (let y = -r; y <= r; y++) {

@@ -1,8 +1,8 @@
 // The stages besides the Grand Colosseum, drawn "Inked" like the fighters (see ink.ts).
 // Every stage keeps the same grid and red/blue panel rims; only the scenery and panel faces change.
-import { P, W, H, rng, clamp, vnoise, hash, mix, layer, type Ctx } from '../engine/gfx';
+import { P, rng, clamp, vnoise, hash, mix, type Ctx } from '../engine/gfx';
 import { Colosseum, stoneTex, PURPLE, GOLD, type PanelLook, type Stage } from './arena';
-import { stamp, tone, bands, disc, ball, halo, blocks, inkBanner, inkTorch, inkCloud, cone, inkPine, clump } from './ink';
+import { stamp, wide, put, sky, mod, tone, bands, disc, ball, halo, blocks, inkBanner, inkTorch, inkCloud, cone, inkPine, clump, BW, XL, XR, YT, YB } from './ink';
 
 function poly(c: Ctx, pts: number[][], fill: string): void {
   c.fillStyle = fill; c.beginPath();
@@ -12,16 +12,16 @@ function poly(c: Ctx, pts: number[][], fill: string): void {
 /** A ridge line made of straight-sided peaks, roughened a little so it reads as rock. */
 function terrain(peaks: number[][], k: number, rough: number, seed: number): (x: number) => number {
   const out: number[] = [];
-  for (let x = -1; x <= W + 1; x++) {
+  for (let x = XL - 1; x <= XR + 1; x++) {
     let t = Infinity;
     for (const [px, py] of peaks) t = Math.min(t, py + Math.abs(x - px) * k);
-    out[x + 1] = t + (vnoise(x * 2, 0, 9, seed) - 0.5) * rough;
+    out[x - XL + 1] = t + (vnoise(x * 2 + 400, 0, 9, seed) - 0.5) * rough;
   }
-  return x => out[clamp(Math.round(x) + 1, 0, W + 2)];
+  return x => out[clamp(Math.round(x) - XL + 1, 0, BW + 2)];
 }
 /** A mountain range in flat tones, lit from the right: rock and snow, each with a lit and a shaded face. */
 function range(c: Ctx, prof: (x: number) => number, bottom: number, rock: string[], snow: string[], snowline: number, ink: string): void {
-  for (let x = 0; x < W; x++) {
+  for (let x = XL; x < XR; x++) {
     const top = Math.round(prof(x)), lit = prof(x + 1) - prof(x - 1) > 0;
     const line = snowline + Math.round(Math.sin(x * 0.21) * 3 + Math.sin(x * 0.57) * 2) - (lit ? 0 : 3);
     for (let y = Math.max(0, top); y < bottom; y++) {
@@ -56,13 +56,13 @@ class DraftStage implements Stage {
   private front: HTMLCanvasElement | null;
   constructor(private d: StageDef) {
     this.id = d.id; this.name = d.name; this.tag = d.tag; this.panel = d.panel; this.panelSeed = d.panelSeed; this.tex = d.tex;
-    this.back = d.back ? layer(c => d.back!(c)) : null;
-    this.front = d.front ? layer(c => d.front!(c)) : null;
+    this.back = d.back ? wide(c => d.back!(c)) : null;
+    this.front = d.front ? wide(c => d.front!(c)) : null;
   }
   draw(c: Ctx, t: number): void {
-    if (this.back) c.drawImage(this.back, 0, 0);
+    if (this.back) put(c, this.back);
     this.d.behind?.(c, t);
-    if (this.front) c.drawImage(this.front, 0, 0);
+    if (this.front) put(c, this.front);
     this.d.over?.(c, t);
   }
 }
@@ -109,10 +109,10 @@ const DRAFTS: StageDef[] = [
   panel: { face: '#b8b4bc', hi: '#e8e4ea', lo: '#76727e', lip: '#56525e', lipLo: '#000000' },
   tex: stoneTex,
   back(c){
-    bands(c, 0, 0, W, 72, SKY);
+    sky(c, 72, SKY, '#101848');
     disc(c, '#f8c050', 66, 12, 6); disc(c, '#fce49c', 66, 12, 5); disc(c, '#fffbe8', 65, 11, 3);
-    const hills = terrain([[0, 56], [70, 50], [150, 54], [230, 48]], 0.25, 6, 21);
-    for (let x = 0; x < W; x++) { const top = Math.round(hills(x)); P(c, '#4e7c94', x, top, 1, 1); P(c, hills(x + 1) > hills(x - 1) ? '#82aab6' : '#6a96a8', x, top + 1, 1, 80 - top); }
+    const hills = terrain([[-60, 52], [0, 56], [70, 50], [150, 54], [230, 48], [300, 54]], 0.25, 6, 21);
+    for (let x = XL; x < XR; x++) { const top = Math.round(hills(x)); P(c, '#4e7c94', x, top, 1, 1); P(c, hills(x + 1) > hills(x - 1) ? '#82aab6' : '#6a96a8', x, top + 1, 1, 80 - top); }
     // the distant keep
     const KS = ['#4e5c7c', '#6a7896', '#8a98b2', '#a6b2c8'];
     stamp(c, '#38425e', c => {
@@ -128,18 +128,18 @@ const DRAFTS: StageDef[] = [
   },
   behind(c, t){
     dayClouds ??= cloudsDay.map(f => f());
-    [[20, 4], [130, 0], [210, 10]].forEach(([cx, cy], i) => c.drawImage(dayClouds![i], Math.round(((cx + t * 0.18 * (1 + i * 0.3)) % 300) - 44), cy));
+    [[20, 4], [130, 0], [210, 10], [-30, -26], [170, -40], [280, -18], [60, -62]].forEach(([cx, cy], i) => c.drawImage(dayClouds![i % 3], Math.round(XL - 44 + mod(cx - XL + t * 0.18 * (1 + (i % 3) * 0.3), BW + 88)), cy));
   },
   front(c){
     const r = rng(62);
     // curtain wall
     stamp(c, GREY_INK, c => {
-      blocks(c, 0, 52, W, 40, 10, 5, [GREY[0], GREY[1], GREY[2], GREY[3]], r);
-      merlons(c, 0, W, 46, 6, 8, 5, GREY);
-      P(c, GREY[4], 0, 52, W, 1);
+      blocks(c, -70, 52, BW + 10, 40, 10, 5, [GREY[0], GREY[1], GREY[2], GREY[3]], r);
+      merlons(c, -72, XR, 46, 6, 8, 5, GREY);
+      P(c, GREY[4], XL, 52, BW, 1);
     });
-    P(c, 'rgba(20,16,30,0.3)', 0, 53, W, 2);
-    stamp(c, IVY_INK, c => [[30, 54, 26], [74, 56, 18], [160, 54, 30], [200, 58, 16]].forEach(([vx, vy, len], k) => ivy(c, vx, vy, len, k)));
+    P(c, 'rgba(20,16,30,0.3)', XL, 53, BW, 2);
+    stamp(c, IVY_INK, c => [[30, 54, 26], [74, 56, 18], [160, 54, 30], [200, 58, 16], [-14, 56, 22], [254, 55, 24]].forEach(([vx, vy, len], k) => ivy(c, vx, vy, len, k)));
     // gatehouse
     stamp(c, GREY_INK, c => {
       blocks(c, 96, 37, 48, 55, 8, 6, [GREY[0], GREY[1], GREY[2], GREY[3]], r);
@@ -152,7 +152,7 @@ const DRAFTS: StageDef[] = [
       P(c, PURPLE[1], 118, 45, 5, 4); P(c, GOLD[2], 120, 46, 1, 2);
     });
     // round towers
-    for (const tx of [6, 204]) {
+    for (const tx of [-62, 6, 204, 272]) {
       const tw = 30, cx = tx + tw / 2;
       stamp(c, GREY_INK, c => {
         for (let y = 26; y < 92; y++) for (let x = tx; x < tx + tw; x++) {
@@ -169,21 +169,23 @@ const DRAFTS: StageDef[] = [
     }
     // flagstones
     const FL = ['#4a4652', '#7e7a84', '#94909a', '#aeaab2'];
-    for (let y = 90; y < H; y++) for (let x = 0; x < W; x++) {
+    for (let y = 90; y < YB; y++) for (let x = XL; x < XR; x++) {
       const row = Math.floor((y - 90) / 7), off = (row * 9) % 16, cellX = Math.floor((x + off) / 16);
-      const seam = (y - 90) % 7 === 6 || (x + off) % 16 === 15;
-      P(c, seam ? FL[0] : (y - 90) % 7 === 0 || (x + off) % 16 === 0 ? FL[3] : hash(cellX, row, 4) < 0.35 ? FL[1] : FL[2], x, y);
+      const seam = (y - 90) % 7 === 6 || mod(x + off, 16) === 15;
+      P(c, seam ? FL[0] : (y - 90) % 7 === 0 || mod(x + off, 16) === 0 ? FL[3] : hash(cellX, row, 4) < 0.35 ? FL[1] : FL[2], x, y);
     }
-    for (let i = 0; i < 26; i++) { const x = Math.floor(r() * W), y = 92 + Math.floor(r() * 66); P(c, IVY[0], x, y, 3, 1); P(c, IVY[1], x + 1, y - 1, 1, 1); }
-    P(c, 'rgba(20,16,30,0.3)', 0, 90, W, 3);
+    for (let i = 0; i < 60; i++) { const x = XL + Math.floor(r() * BW), y = 92 + Math.floor(r() * (YB - 94)); P(c, IVY[0], x, y, 3, 1); P(c, IVY[1], x + 1, y - 1, 1, 1); }
+    P(c, 'rgba(20,16,30,0.3)', XL, 90, BW, 3);
   },
   over(c, t){
     inkBanner(c, 58, 56, 9, 20, PURPLE, GOLD, GREY_INK, t);
     inkBanner(c, 174, 56, 9, 20, PURPLE, GOLD, GREY_INK, t);
+    inkBanner(c, -6, 58, 9, 20, PURPLE, GOLD, GREY_INK, t);
+    inkBanner(c, 238, 58, 9, 20, PURPLE, GOLD, GREY_INK, t);
     inkTorch(c, 100, 64, t, 0, GREY_INK); inkTorch(c, 139, 64, t, 1, GREY_INK);
     const r = rng(63);
-    for (let i = 0; i < 3; i++) {
-      const ph = r() * 300, y0 = 14 + r() * 20, x = ((ph + t * (1.4 + i * 0.3)) % 300) - 30, flap = Math.floor(t / 2 + i) % 2;
+    for (let i = 0; i < 4; i++) {
+      const ph = r() * 300, y0 = 14 + r() * 20 - (i === 3 ? 40 : 0), x = XL - 30 + mod(ph + t * (1.4 + i * 0.3), BW + 60), flap = Math.floor(t / 2 + i) % 2;
       P(c, '#2a2a34', x, y0, 1, 1); P(c, '#2a2a34', x - 2, y0 - flap, 2, 1); P(c, '#2a2a34', x + 1, y0 - flap, 2, 1);
     }
   }
@@ -198,7 +200,8 @@ const DRAFTS: StageDef[] = [
   },
   back(c){
     const r = rng(22);
-    blocks(c, 0, 0, W, 92, 16, 6, ['#0a0614', '#181028', '#20163a', '#2c2048'], r, 0.08);
+    blocks(c, -80, -84, 400, 176, 16, 6, ['#0a0614', '#181028', '#20163a', '#2c2048'], r, 0.08);
+    P(c, 'rgba(0,0,10,0.35)', XL, YT, BW, 30 - YT);
     // the window: frame, night sky in bands, moon, tracery
     const NIGHT = ['#0a1030', '#121c48', '#1c2c66', '#2a4080', '#3a5494'];
     for (let y = 0; y < 76; y++) for (let x = 94; x <= 146; x++) {
@@ -215,7 +218,7 @@ const DRAFTS: StageDef[] = [
     P(c, '#0a0614', 93, 71, 54, 1); P(c, '#6e60a0', 94, 72, 52, 1); P(c, '#3c3060', 94, 73, 52, 1); P(c, '#0a0614', 94, 74, 52, 1);
     // bookshelves
     const WD = ['#2e160a', '#43220f', '#5a3018', '#784424', '#98603a'];
-    for (const [sx, sw] of [[2, 44], [48, 44], [148, 44], [194, 44]]) stamp(c, '#0a0402', c => {
+    for (const [sx, sw] of [[-90, 44], [-44, 44], [2, 44], [48, 44], [148, 44], [194, 44], [240, 44], [286, 44]]) stamp(c, '#0a0402', c => {
       P(c, '#140804', sx, 8, sw, 84);
       P(c, WD[3], sx, 4, 3, 88); P(c, WD[2], sx + sw - 3, 4, 3, 88); P(c, WD[4], sx, 4, 1, 88);
       P(c, WD[4], sx - 1, 3, sw + 2, 1); P(c, WD[3], sx - 1, 4, sw + 2, 3); P(c, WD[1], sx - 1, 7, sw + 2, 1);
@@ -244,17 +247,23 @@ const DRAFTS: StageDef[] = [
         P(c, WD[4], sx + 3, y, sw - 6, 1); P(c, WD[3], sx + 3, y + 1, sw - 6, 1); P(c, WD[0], sx + 3, y + 2, sw - 6, 1);
       }
     });
+    // the ceiling: a carved beam on corbels over the shelves
+    stamp(c, '#0a0402', c => {
+      P(c, WD[4], XL, -14, BW, 1); P(c, WD[3], XL, -13, BW, 3); P(c, WD[1], XL, -10, BW, 2);
+      for (let x = -66; x < XR; x += 46) { P(c, WD[3], x, -8, 6, 3); P(c, WD[2], x + 1, -5, 4, 2); P(c, WD[4], x, -8, 6, 1); }
+      for (let x = -40; x < XR; x += 46) { P(c, '#5a4a30', x + 2, -40, 1, 26); P(c, '#8a6a20', x, -40, 5, 1); }
+    });
     // checkered floor
-    for (let y = 92; y < H; y++) for (let x = 0; x < W; x++) {
-      const tile = (Math.floor(x / 12) + Math.floor((y - 92) / 6)) % 2, top = (y - 92) % 6 === 0;
+    for (let y = 92; y < YB; y++) for (let x = XL; x < XR; x++) {
+      const tile = mod(Math.floor(x / 12) + Math.floor((y - 92) / 6), 2), top = (y - 92) % 6 === 0;
       P(c, tile ? (top ? '#3a2e56' : '#2a2040') : (top ? '#241c36' : '#16102a'), x, y);
     }
-    P(c, 'rgba(0,0,0,0.45)', 0, 92, W, 3);
+    P(c, 'rgba(0,0,0,0.45)', XL, 92, BW, 3);
     // the orrery stand
     stamp(c, '#140c02', c => { P(c, '#5a4010', 117, 80, 6, 10); P(c, '#a07020', 117, 80, 2, 10); P(c, '#3a2808', 112, 88, 16, 3); P(c, '#e8b840', 112, 88, 16, 1); });
     // moonlight on the floor, flat
     c.save(); c.globalCompositeOperation = 'lighter';
-    poly(c, [[100, 92], [140, 92], [128, 160], [76, 160]], 'rgba(90,110,220,0.08)');
+    poly(c, [[100, 92], [140, 92], [124, YB], [60, YB]], 'rgba(90,110,220,0.08)');
     c.restore();
   },
   over(c, t){
@@ -268,7 +277,7 @@ const DRAFTS: StageDef[] = [
     });
     halo(c, 120, 76, 9, '255,200,80', 0.3);
     disc(c, '#5a2a00', 120, 76, 4); ball(c, 120, 76, 3, 3, ['#c87010', '#f8b830', '#fff0a0', '#ffffff']);
-    [[24, 30], [66, 22], [176, 24], [214, 32], [92, 56], [150, 52]].forEach(([x, y], i) => {
+    [[24, 30], [66, 22], [176, 24], [214, 32], [92, 56], [150, 52], [-22, 26], [262, 28], [-60, 40], [300, 40]].forEach(([x, y], i) => {
       const b = Math.round(Math.sin(t * 0.35 + i * 1.3) * 1.5);
       halo(c, x + 1, y + b - 1, 9, '255,180,80', 0.25);
       P(c, '#2a1a10', x - 1, y + b - 1, 4, 8);
@@ -276,9 +285,9 @@ const DRAFTS: StageDef[] = [
       P(c, (t + i) % 2 ? '#ff8a20' : '#ffb030', x, y + b - 3, 2, 3); P(c, '#fff4c0', x, y + b - 2, 1, 2);
     });
     const r = rng(23);
-    for (let i = 0; i < 14; i++) {
-      const ph = r() * 100, cx = 20 + r() * 200, sp = 0.5 + r() * 0.6;
-      const y = 92 - ((ph + t * sp) % 90), x = cx + Math.sin((y + ph) * 0.12) * 4;
+    for (let i = 0; i < 22; i++) {
+      const ph = r() * 100, cx = XL + 10 + r() * (BW - 20), sp = 0.5 + r() * 0.6;
+      const y = 92 - ((ph + t * sp) % 150), x = cx + Math.sin((y + ph) * 0.12) * 4;
       P(c, '#3cb8e0', x - 1, y, 3, 1); P(c, '#3cb8e0', x, y - 1, 1, 3); P(c, '#e0fcff', x, y);
     }
   }
@@ -293,9 +302,9 @@ const DRAFTS: StageDef[] = [
   },
   back(c){
     const r = rng(33);
-    bands(c, 0, 0, W, 84, ['#080c26', '#121842', '#232660', '#3c3478', '#644a8c', '#9a6496', '#d08494', '#f4aa8c']);
-    for (let i = 0; i < 60; i++) {
-      const x = Math.floor(r() * W), y = Math.floor(r() * 40), b = r();
+    sky(c, 84, ['#080c26', '#121842', '#232660', '#3c3478', '#644a8c', '#9a6496', '#d08494', '#f4aa8c'], '#000008');
+    for (let i = 0; i < 150; i++) {
+      const x = XL + Math.floor(r() * BW), y = YT + Math.floor(r() * (40 - YT)), b = r();
       P(c, b > 0.8 ? '#ffffff' : b > 0.4 ? '#b8c0f0' : '#6870b0', x, y);
       if (b > 0.95) { P(c, '#6870b0', x - 1, y); P(c, '#6870b0', x + 1, y); P(c, '#6870b0', x, y - 1); P(c, '#6870b0', x, y + 1); }
     }
@@ -304,37 +313,38 @@ const DRAFTS: StageDef[] = [
     // the aurora: a flat ribbon in three steps
     c.save(); c.globalCompositeOperation = 'lighter';
     const ph = t * 0.06;
-    for (let x = 0; x < W; x++) {
+    for (let x = XL; x < XR; x++) {
       const y = Math.round(14 + Math.sin(x * 0.035 + ph) * 6 + Math.sin(x * 0.09 - ph * 1.3) * 3);
       const a = Math.sin(x * 0.05 + ph * 2) > 0 ? 1 : 0.7;
       c.fillStyle = `rgba(150,255,200,${0.3 * a})`; c.fillRect(x, y, 1, 2);
       c.fillStyle = `rgba(60,220,160,${0.2 * a})`; c.fillRect(x, y + 2, 1, 5);
       c.fillStyle = `rgba(60,200,180,${0.1 * a})`; c.fillRect(x, y + 7, 1, 6);
-      if (x % 3 === 0) { c.fillStyle = `rgba(120,140,255,${0.12 * a})`; c.fillRect(x, y - 6, 1, 6); }
+      if (mod(x, 3) === 0) { c.fillStyle = `rgba(120,140,255,${0.12 * a})`; c.fillRect(x, y - 6, 1, 6); }
     }
     c.restore();
   },
   front(c){
     const r = rng(34);
-    range(c, terrain([[30, 38], [96, 26], [158, 34], [214, 24]], 0.9, 8, 5), 80, ['#6c64a0', '#9a90c0'], ['#bcb8dc', '#f0ecfa'], 46, '#4a4278');
-    P(c, 'rgba(240,170,160,0.16)', 0, 66, W, 14);
-    range(c, terrain([[0, 52], [64, 44], [132, 54], [190, 46], [250, 56]], 0.75, 10, 9), 88, ['#262c5c', '#3a4480'], ['#8a96c8', '#d0daf4'], 58, '#10143a');
+    range(c, terrain([[-50, 30], [30, 38], [96, 26], [158, 34], [214, 24], [290, 34]], 0.9, 8, 5), 80, ['#6c64a0', '#9a90c0'], ['#bcb8dc', '#f0ecfa'], 46, '#4a4278');
+    P(c, 'rgba(240,170,160,0.16)', XL, 66, BW, 14);
+    range(c, terrain([[-56, 48], [0, 52], [64, 44], [132, 54], [190, 46], [250, 56], [304, 46]], 0.75, 10, 9), 88, ['#262c5c', '#3a4480'], ['#8a96c8', '#d0daf4'], 58, '#10143a');
     const near = terrain([[-20, 70], [80, 68], [170, 72], [260, 66]], 0.08, 6, 13);
-    for (let x = 0; x < W; x++) {
+    for (let x = XL; x < XR; x++) {
       const top = Math.round(near(x));
       P(c, '#0e1430', x, top - 1); P(c, '#e8eefc', x, top, 1, 2); P(c, '#a8b4d8', x, top + 2); P(c, '#141c40', x, top + 3, 1, 92 - top);
     }
-    stamp(c, '#03060e', c => { for (let i = 0; i < 26; i++) { const x = Math.floor(r() * W); inkPine(c, x, Math.round(near(x)) + 3, 9 + Math.floor(r() * 8), ['#060c1a', '#0e1c30', '#1a2e44'], '#dce6fa'); } });
-    bands(c, 0, 88, W, 72, ['#8496cc', '#a0b0dc', '#b8c6ea', '#d0daf4', '#e8eefc']);
-    for (let y = 94; y < H; y += 6) for (let x = 0; x < W; x++) { const s = Math.sin(x * 0.07 + y * 1.3); if (s > 0.7) P(c, '#7888c0', x, y); else if (s > 0.55) P(c, '#ffffff', x, y - 1); }
-    for (let i = 0; i < 30; i++) P(c, '#ffffff', Math.floor(r() * W), 92 + Math.floor(r() * 68));
+    stamp(c, '#03060e', c => { for (let i = 0; i < 40; i++) { const x = XL + Math.floor(r() * BW); inkPine(c, x, Math.round(near(x)) + 3, 9 + Math.floor(r() * 8), ['#060c1a', '#0e1c30', '#1a2e44'], '#dce6fa'); } });
+    bands(c, XL, 88, BW, 72, ['#8496cc', '#a0b0dc', '#b8c6ea', '#d0daf4', '#e8eefc']);
+    P(c, '#e8eefc', XL, 160, BW, YB - 160);
+    for (let y = 94; y < YB; y += 6) for (let x = XL; x < XR; x++) { const s = Math.sin(x * 0.07 + y * 1.3); if (s > 0.7) P(c, '#7888c0', x, y); else if (s > 0.55) P(c, '#ffffff', x, y - 1); }
+    for (let i = 0; i < 70; i++) P(c, '#ffffff', XL + Math.floor(r() * BW), 92 + Math.floor(r() * (YB - 92)));
   },
   over(c, t){
     const r = rng(35);
-    for (let i = 0; i < 60; i++) {
-      const x0 = r() * 240, y0 = r() * 94, far = r() < 0.6, sp = far ? 0.4 + r() * 0.3 : 0.9 + r() * 0.8;
-      const y = (y0 + t * sp) % 94;
-      const x = (x0 + Math.sin((t + y0) * 0.1) * (far ? 2 : 4) + 240) % 240;
+    for (let i = 0; i < 130; i++) {
+      const x0 = r() * BW, y0 = r() * (94 - YT), far = r() < 0.6, sp = far ? 0.4 + r() * 0.3 : 0.9 + r() * 0.8;
+      const y = YT + (y0 + t * sp) % (94 - YT);
+      const x = XL + mod(x0 + Math.sin((t + y0) * 0.1) * (far ? 2 : 4), BW);
       if (far) P(c, '#c8d0f0', x, y); else { P(c, '#ffffff', x, y, 2, 2); P(c, '#8a96c8', x + 1, y + 2, 1, 1); }
     }
   }
@@ -349,26 +359,33 @@ const DRAFTS: StageDef[] = [
   back(c){
     const r = rng(44), ROCK = ['#140a08', '#22120c', '#341c12', '#4a2a1a', '#663c22', '#8a5430'], INK = '#080404';
     // the cave wall: big flat boulders, each lit by the nearest fire, outlined in ink
-    const lights = [[38, 50, 70], [202, 50, 70], [120, 74, 46], [120, 92, 90]];
+    const lights = [[38, 50, 70], [202, 50, 70], [120, 74, 46], [120, 92, 90], [-36, 50, 60], [272, 50, 60]];
     const G = 14, seeds: number[][] = [];
-    for (let gy = -1; gy <= 98 / G + 1; gy++) for (let gx = -1; gx <= W / G + 1; gx++) seeds.push([gx * G + r() * G, gy * G + r() * G * 0.8]);
+    // seeds on a jittered grid; each pixel only checks the 3x3 grid cells around it
+    const gx0 = Math.floor(XL / G) - 1, gy0 = Math.floor(YT / G) - 1, gw = Math.ceil(XR / G) + 2 - gx0, gh = Math.ceil(98 / G) + 2 - gy0;
+    for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) seeds.push([(gx + gx0) * G + r() * G, (gy + gy0) * G + r() * G * 0.8]);
     const cell = (x: number, y: number): number => {
       let best = 0, bd = Infinity;
-      for (let i = 0; i < seeds.length; i++) { const dx = seeds[i][0] - x, dy = (seeds[i][1] - y) * 1.4, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; } }
+      const cx = Math.floor(x / G) - gx0, cy = Math.floor(y / G) - gy0;
+      for (let j = Math.max(0, cy - 2); j <= Math.min(gh - 1, cy + 2); j++) for (let i = Math.max(0, cx - 2); i <= Math.min(gw - 1, cx + 2); i++) {
+        const k = j * gw + i, dx = seeds[k][0] - x, dy = (seeds[k][1] - y) * 1.4, d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = k; }
+      }
       return best;
     };
+    const RW = BW, at = (x: number, y: number): number => (y - YT) * RW + (x - XL);
     const ids: number[] = [];
-    for (let y = 0; y < 98; y++) for (let x = 0; x < W; x++) ids[y * W + x] = cell(x, y);
+    for (let y = YT; y < 98; y++) for (let x = XL; x < XR; x++) ids[at(x, y)] = cell(x, y);
     const lit = seeds.map(([sx, sy]) => { let L = 0; for (const [lx, ly, rad] of lights) L += clamp(1 - Math.hypot(sx - lx, (sy - ly) * 1.3) / rad) ** 1.3; return clamp(0.12 + L * 0.7); });
-    for (let y = 0; y < 98; y++) for (let x = 0; x < W; x++) {
-      const id = ids[y * W + x];
-      const edge = (x < W - 1 && ids[y * W + x + 1] !== id) || (y < 97 && ids[(y + 1) * W + x] !== id);
-      const rim = (x > 0 && ids[y * W + x - 1] !== id) || (y > 0 && ids[(y - 1) * W + x] !== id);
+    for (let y = YT; y < 98; y++) for (let x = XL; x < XR; x++) {
+      const id = ids[at(x, y)];
+      const edge = (x < XR - 1 && ids[at(x + 1, y)] !== id) || (y < 97 && ids[at(x, y + 1)] !== id);
+      const rim = (x > XL && ids[at(x - 1, y)] !== id) || (y > YT && ids[at(x, y - 1)] !== id);
       P(c, edge ? INK : tone(ROCK, lit[id] + (rim ? 0.2 : 0)), x, y);
     }
     // stalactites
     stamp(c, INK, c => {
-      for (let i = 0; i < 16; i++) {
+      for (let i = -5; i < 21; i++) {
         const sx = Math.round(4 + i * 15 + r() * 6), len = 8 + r() * 14, w = 3 + r() * 3;
         for (let j = 0; j < len; j++) { const hw = Math.round(w * (1 - j / len)); for (let dx = -hw; dx <= hw; dx++) P(c, dx >= hw - 1 ? '#6a3a20' : dx < 0 ? '#1a0e0a' : '#2e1a10', sx + dx, j); }
       }
@@ -403,12 +420,20 @@ const DRAFTS: StageDef[] = [
       });
     });
     // the rock lip above the floor
-    for (let x = 0; x < W; x++) { P(c, '#e8743a', x, 91); P(c, '#8a4422', x, 92); P(c, '#341c12', x, 93, 1, 4); P(c, INK, x, 97); }
-    P(c, '#0c0604', 0, 98, W, H - 98);
+    for (let x = XL; x < XR; x++) { P(c, '#e8743a', x, 91); P(c, '#8a4422', x, 92); P(c, '#341c12', x, 93, 1, 4); P(c, INK, x, 97); }
+    P(c, '#0c0604', XL, 98, BW, YB - 98);
+    // the cave floor: basalt slabs split by glowing cracks, fading into the dark
+    stamp(c, INK, c => {
+      for (let row = 0, y = 100; y < YB; row++, y += 14) for (let x = XL - 20 + (row % 2) * 17; x < XR; x += 34) {
+        const lit = y < 170 ? 1 : 0, w = 28 + Math.floor(r() * 4);
+        P(c, ['#1a0e0a', '#22120c'][lit], x, y, w, 11); P(c, ['#22120c', '#341c12'][lit], x, y, w, 1); P(c, ['#22120c', '#341c12'][lit], x, y, 1, 11);
+      }
+    });
+    for (let row = 0, y = 112; y < YB; row++, y += 14) if (row % 3 === 1) for (let x = XL; x < XR; x++) if (hash(x >> 3, row, 9) < 0.18) P(c, '#c83000', x, y, 1, 1);
   },
   over(c, t){
     const LAVA = ['#8a1400', '#c83000', '#f05a10', '#ff8a20', '#ffb840', '#ffe890'];
-    for (const lx of [36, 200]) {
+    for (const lx of [-40, 36, 200, 268]) {
       halo(c, lx + 4, 50, 26, '255,90,20', 0.18);
       P(c, '#3a0800', lx - 1, 10, 1, 77); P(c, '#3a0800', lx + 9, 10, 1, 77);
       for (let y = 10; y < 87; y++) for (let i = 0; i < 9; i++) {
@@ -417,8 +442,8 @@ const DRAFTS: StageDef[] = [
       }
       for (let i = 0; i < 4; i++) { const ph = (t * 0.7 + i * 5) % 8; ball(c, lx + 1 + i * 2.5, 86 - ph * 0.6, 1.5, 1.5, ['#c83000', '#ff8a20', '#ffe890']); }
     }
-    for (let x = 0; x < W; x++) for (let y = 86; y < 91; y++) P(c, tone(LAVA, 0.55 + Math.sin(x * 0.25 - t * 0.9 + y * 1.4) * 0.3), x, y);
-    for (let x = 0; x < W; x++) P(c, '#3a0800', x, 85);
+    for (let x = XL; x < XR; x++) for (let y = 86; y < 91; y++) P(c, tone(LAVA, 0.55 + Math.sin(x * 0.25 - t * 0.9 + y * 1.4) * 0.3), x, y);
+    P(c, '#3a0800', XL, 85, BW, 1);
     // fire in the forge mouth: flat tongues
     for (let x = 110; x <= 130; x++) {
       const hgt = 8 + Math.round((Math.sin(x * 0.9 + t * 1.3) + Math.sin(x * 0.37 - t * 0.8)) * 3);
@@ -434,9 +459,9 @@ const DRAFTS: StageDef[] = [
       P(c, '#08080c', cx - 3, 45, 9, 6); P(c, '#44444e', cx - 2, 46, 7, 4); P(c, '#9494a6', cx - 2, 46, 7, 1);
     }
     const r = rng(45);
-    for (let i = 0; i < 22; i++) {
-      const sx = r() * 240, sp = 0.8 + r(), ph = r() * 80;
-      const y = 84 - ((ph + t * sp) % 80), x = sx + Math.sin((t + ph) * 0.15) * 3;
+    for (let i = 0; i < 40; i++) {
+      const sx = XL + r() * BW, sp = 0.8 + r(), ph = r() * 160;
+      const y = 84 - ((ph + t * sp) % (84 - YT)), x = sx + Math.sin((t + ph) * 0.15) * 3;
       P(c, y < 30 ? '#c83000' : '#ffd060', x, y); if (y > 50) P(c, '#ff8a20', x, y + 1);
     }
   }
@@ -452,21 +477,21 @@ const DRAFTS: StageDef[] = [
   },
   back(c){
     const r = rng(55);
-    bands(c, 0, 0, W, 80, ['#142436', '#1a3444', '#24504e', '#3c6c58', '#7a9a64', '#c8bc72', '#f0d688']);
+    sky(c, 80, ['#142436', '#1a3444', '#24504e', '#3c6c58', '#7a9a64', '#c8bc72', '#f0d688'], '#04080c');
     halo(c, 132, 66, 34, '255,220,140', 0.3);
     stamp(c, '#1e3434', c => {
-      for (let x = -6; x < W + 6; x += 9) clump(c, x, 58 + Math.sin(x * 0.07) * 4, 7, ['#2e4a48', '#3a5a54', '#4a6c5e', '#6a8a6a'], r, 4);
-      P(c, '#2e4a48', 0, 64, W, 28);
+      for (let x = XL - 6; x < XR + 6; x += 9) clump(c, x, 58 + Math.sin(x * 0.07) * 4, 7, ['#2e4a48', '#3a5a54', '#4a6c5e', '#6a8a6a'], r, 4);
+      P(c, '#2e4a48', XL, 64, BW, 28);
     });
     stamp(c, '#0a1a14', c => {
-      for (let x = -6; x < W + 6; x += 11) clump(c, x, 70 + Math.sin(x * 0.05 + 2) * 3, 8, ['#16302a', '#1e3e30', '#2a5038', '#3c6840'], r, 5);
-      P(c, '#16302a', 0, 76, W, 16);
+      for (let x = XL - 6; x < XR + 6; x += 11) clump(c, x, 70 + Math.sin(x * 0.05 + 2) * 3, 8, ['#16302a', '#1e3e30', '#2a5038', '#3c6840'], r, 5);
+      P(c, '#16302a', XL, 76, BW, 16);
     });
   },
   front(c){
     const r = rng(56), STN = ['#464c40', '#5e6656', '#7a826e', '#9aa28a', '#bcc4a8'], SINK = '#1e2218';
     c.save(); c.globalCompositeOperation = 'lighter';
-    [[96, 10], [124, 7], [150, 12]].forEach(([x, w]) => poly(c, [[x, 0], [x + w, 0], [x + w + 36, 92], [x + 18, 92]], 'rgba(255,230,150,0.07)'));
+    [[96, 10], [124, 7], [150, 12]].forEach(([x, w]) => poly(c, [[x - 10, -26], [x + w - 10, -26], [x + w + 36, 92], [x + 18, 92]], 'rgba(255,230,150,0.07)'));
     c.restore();
     // temple steps, columns and lintel
     stamp(c, SINK, c => {
@@ -493,8 +518,8 @@ const DRAFTS: StageDef[] = [
     });
     // the great trees framing the ruins
     const BARK = ['#1e140c', '#2e2014', '#42301e', '#5a442a', '#76603a'];
-    for (const [tx, tw, side] of [[0, 22, 1], [218, 22, -1]]) stamp(c, '#0a0604', c => {
-      for (let y = 0; y < 92; y++) {
+    for (const [tx, tw, side] of [[-64, 18, 1], [-36, 16, -1], [0, 22, 1], [218, 22, -1], [260, 16, 1], [286, 18, -1]]) stamp(c, '#0a0604', c => {
+      for (let y = YT; y < 92; y++) {
         const flare = y > 74 ? Math.round((y - 74) ** 1.4 * 0.5) : 0;
         for (let x = tx - (side < 0 ? flare : 0); x < tx + tw + (side > 0 ? flare : 0); x++) {
           const u = (x - tx) / tw, lit = side > 0 ? u : 1 - u;
@@ -509,11 +534,16 @@ const DRAFTS: StageDef[] = [
     stamp(c, '#050e08', c => {
       for (let i = 0; i < 18; i++) { const x = i < 9 ? i * 9 - 4 : 240 - (i - 9) * 9 + 4; clump(c, x, 4 + (i % 3) * 5, 9, LEAF, r, 5); }
       [[86, 0], [120, -3], [154, 0]].forEach(([x, y]) => clump(c, x, y, 8, LEAF, r, 4));
+      // the canopy carries on above and to the sides, thinning toward a gap over the temple
+      for (let x = XL - 4; x < 0; x += 9) for (let y = 14; y > YT - 10; y -= 12) clump(c, x, y + mod(x, 5), 9, LEAF, r, 5);
+      for (let x = 244; x < XR + 4; x += 9) for (let y = 14; y > YT - 10; y -= 12) clump(c, x, y + mod(x, 5), 9, LEAF, r, 5);
+      for (let x = -4; x < 248; x += 10) for (let y = -12; y > YT - 10; y -= 12) if (Math.abs(x - 120) > 30 + (y + 12) * 0.6) clump(c, x, y + mod(x, 7), 9, LEAF, r, 5);
     });
-    bands(c, 0, 90, W, 70, ['#16301a', '#1e3c1e', '#284a24', '#32582a', '#3c662e']);
-    P(c, '#0a1a0e', 0, 90, W, 1);
-    for (let i = 0; i < 70; i++) { const x = Math.floor(r() * W), y = 93 + Math.floor(r() * 66); P(c, '#4c7a34', x, y - 2, 1, 3); P(c, '#6a9a44', x + 1, y - 1, 1, 2); P(c, '#16301a', x - 1, y, 1, 1); }
-    for (let i = 0; i < 18; i++) P(c, ['#f0f0e0', '#f0a8c8', '#f8e070'][i % 3], Math.floor(r() * W), 92 + Math.floor(r() * 68));
+    bands(c, XL, 90, BW, 70, ['#16301a', '#1e3c1e', '#284a24', '#32582a', '#3c662e']);
+    P(c, '#3c662e', XL, 160, BW, YB - 160);
+    P(c, '#0a1a0e', XL, 90, BW, 1);
+    for (let i = 0; i < 160; i++) { const x = XL + Math.floor(r() * BW), y = 93 + Math.floor(r() * (YB - 94)); P(c, '#4c7a34', x, y - 2, 1, 3); P(c, '#6a9a44', x + 1, y - 1, 1, 2); P(c, '#16301a', x - 1, y, 1, 1); }
+    for (let i = 0; i < 40; i++) P(c, ['#f0f0e0', '#f0a8c8', '#f8e070'][i % 3], XL + Math.floor(r() * BW), 92 + Math.floor(r() * (YB - 92)));
   },
   over(c, t){
     const r = rng(57);

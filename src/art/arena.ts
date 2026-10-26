@@ -1,7 +1,7 @@
 // Grand Colosseum and the panel grid every stage shares. Stages are drawn "Inked" like the 24px fighters:
 // outlined pieces, flat cel shading, no dithering (toolkit in ink.ts). The other stages live in stages.ts.
-import { P, W, H, view, rng, mix, layer, type Ctx } from '../engine/gfx';
-import { inked, bands, disc, blocks, inkBanner, inkTorch, inkCloud } from './ink';
+import { P, view, rng, mix, type Ctx } from '../engine/gfx';
+import { inked, wide, put, sky, mod, disc, blocks, inkBanner, inkTorch, inkCloud, MX, MY, BW, BH, XL, XR, YT, YB } from './ink';
 
 export const COLS = 6, ROWS = 3, PW = 38, FACE = 15, LIP = 4, X0 = 6, Y0 = 98;
 /** Panel rims per side, [light, dark], from the fighters' red and blue. */
@@ -39,55 +39,24 @@ export interface Stage {
   draw(c: Ctx, t: number, cheer?: number): void;
 }
 
-// Stages are painted for a 3:2 screen. Wider or taller screens get the sides and floor mirrored outward
-// and the sky stretched upward, so the scenery carries on into the margins without seams.
-let flat: Ctx | null = null, wide: Ctx | null = null;
-const buffer = (w: number, h: number, old: Ctx | null): Ctx => {
-  if (old && old.canvas.width === w && old.canvas.height === h) return old;
-  const o = document.createElement('canvas');
-  o.width = w; o.height = h;
-  const x = o.getContext('2d')!;
-  x.imageSmoothingEnabled = false;
-  return x;
-};
-// The sky above a stage on tall screens: its top edge's average color, deepening upward. Cached per stage and size.
-const skies = new Map<string, HTMLCanvasElement>();
-function skyCap(st: Stage, f: HTMLCanvasElement, w: number, h: number): HTMLCanvasElement {
-  const key = `${st.id}:${w}x${h}`;
-  let sky = skies.get(key);
-  if (!sky) {
-    const px = f.getContext('2d')!.getImageData(0, 0, W, 1).data;
-    let r = 0, g = 0, b = 0;
-    for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i + 1]; b += px[i + 2]; }
-    const hex = (v: number): string => Math.round(v / W).toString(16).padStart(2, '0');
-    const top = `#${hex(r)}${hex(g)}${hex(b)}`;
-    sky = layer(c => bands(c, 0, 0, w, h, [mix(top, '#000000', 0.45), mix(top, '#000000', 0.3), mix(top, '#000000', 0.15), top]), w, h);
-    skies.set(key, sky);
-  }
-  return sky;
-}
+// Stages are painted larger than the world (see MX/MY in ink.ts), so a wider or taller screen just shows
+// more of the arena. Each frame the stage draws into one oversized buffer and the visible part is copied out.
+let big: Ctx | null = null;
 
 /** Draw a stage's backdrop over the whole visible screen. */
 export function drawStage(c: Ctx, st: Stage, t: number, cheer = 0): void {
   const { w, h, ox, oy } = view;
-  if (!ox && !oy) { st.draw(c, t, cheer); return; }
-  flat = buffer(W, H, flat);
-  flat.clearRect(0, 0, W, H);
-  st.draw(flat, t, cheer);
-  wide = buffer(w, h, wide);
-  const f = flat.canvas, x = wide;
-  x.drawImage(f, ox, oy);
-  if (ox) {
-    x.save(); x.translate(2 * ox, 0); x.scale(-1, 1); x.drawImage(f, 0, 0, ox, H, ox, oy, ox, H); x.restore();
-    x.save(); x.translate(2 * (ox + W), 0); x.scale(-1, 1); x.drawImage(f, W - ox, 0, ox, H, ox + W - ox, oy, ox, H); x.restore();
+  if (!big) {
+    const o = document.createElement('canvas');
+    o.width = BW; o.height = BH;
+    big = o.getContext('2d')!;
+    big.imageSmoothingEnabled = false;
+    big.translate(MX, MY);
   }
-  if (oy) {
-    const g = x.canvas;
-    // above: more sky, since mirrored walls hanging upside down look wrong
-    x.drawImage(skyCap(st, f, w, oy), 0, 0);
-    x.save(); x.translate(0, 2 * (oy + H)); x.scale(1, -1); x.drawImage(g, 0, oy + H - oy, w, oy, 0, oy + H - oy, w, oy); x.restore();
-  }
-  c.drawImage(x.canvas, -ox, -oy);
+  big.clearRect(XL, YT, BW, BH);
+  st.draw(big, t, cheer);
+  const sx = Math.max(0, MX - ox), sy = Math.max(0, MY - oy);
+  c.drawImage(big.canvas, sx, sy, Math.min(w, BW - sx), Math.min(h, BH - sy), sx - MX, sy - MY, Math.min(w, BW - sx), Math.min(h, BH - sy));
 }
 
 const STONE: PanelLook = { face: '#bdb7cc', hi: '#eee9e7', lo: '#7e7890', lip: '#5c566c', lipLo: '#000000' };
@@ -122,24 +91,28 @@ export class Colosseum implements Stage {
   crowd: Fan[] = [];
 
   constructor() {
-    this.back = layer(c => {
-      bands(c, 0, 0, W, 50, SKY);
+    this.back = wide(c => {
+      sky(c, 50, SKY, '#101848');
       disc(c, '#f8c050', 204, 8, 6); disc(c, '#fce49c', 204, 8, 5); disc(c, '#fffbe8', 203, 7, 3);
     });
     this.clouds = [0.9, 0.7, 0.8].map((s, i) => inkCloud(s, i === 1, '#8aa0d4', '#c8d8f4', '#ffffff', '#4a5ca8'));
-    this.front = layer(c => this.drawFront(c));
+    this.front = wide(c => this.drawFront(c));
   }
 
   private drawFront(c0: Ctx): void {
     const r = rng(12), S = SAND_ST, D = DARK, WL = GREY;
-    // the stands and the podium wall, drawn flat, then bent to follow the bowl
-    const flat = layer(c => {
+    // the stands and the podium wall, drawn flat (x shifted by MX), then bent to follow the bowl
+    const flat = document.createElement('canvas');
+    flat.width = BW; flat.height = 96;
+    {
+      const c = flat.getContext('2d')!;
       c.drawImage(inked(SAND_INK, c => {
-        for (let x = 0; x < W; x++) {
-          if (x % 28 === 9) P(c, S[0], x, 0, 1, 9); // flag poles
+        c.translate(MX, 0);
+        for (let x = XL; x < XR; x++) {
+          if (mod(x, 28) === 9) P(c, S[0], x, 0, 1, 9); // flag poles
           // attic: cornice and a wall with small windows
           P(c, S[4], x, 9); P(c, S[3], x, 10); P(c, S[1], x, 11);
-          const am = (x + 3) % 14;
+          const am = mod(x + 3, 14);
           P(c, S[2], x, 12, 1, 8);
           if (am >= 6 && am <= 7) P(c, D[0], x, 14, 1, 4);
           if (am === 5) P(c, S[3], x, 14, 1, 4);
@@ -168,12 +141,13 @@ export class Colosseum implements Stage {
         }
         for (const px of [99, 139]) { P(c, GOLD[2], px, 42, 1, 20); P(c, GOLD[0], px + 1, 42, 1, 20); }
         P(c, GOLD[2], 99, 60, 42, 1); P(c, GOLD[0], 99, 61, 42, 1);
-      }, W, 64), 0, 0);
+      }, BW, 64), 0, 0);
       c.drawImage(inked(GREY_INK, c => {
-        P(c, WL[4], 0, 1, W, 1); P(c, WL[3], 0, 2, W, 1); P(c, WL[1], 0, 3, W, 1); P(c, GREY_INK, 0, 4, W, 1);
-        blocks(c, 0, 5, W, 24, 12, 6, [WL[0], WL[1], WL[2], WL[3]], r);
+        c.translate(MX, 0);
+        P(c, WL[4], XL, 1, BW, 1); P(c, WL[3], XL, 2, BW, 1); P(c, WL[1], XL, 3, BW, 1); P(c, GREY_INK, XL, 4, BW, 1);
+        blocks(c, -72, 5, BW + 4, 24, 12, 6, [WL[0], WL[1], WL[2], WL[3]], r);
         // gates with portcullises
-        for (const [gx, gr] of [[120, 12], [52, 8], [188, 8]]) {
+        for (const [gx, gr] of [[120, 12], [52, 8], [188, 8], [-16, 8], [256, 8]]) {
           const cy = 29 - gr;
           for (let y = cy - gr - 4; y < 29; y++) for (let x = gx - gr - 4; x <= gx + gr + 4; x++) {
             const ddx = x - gx, dy = Math.min(0, y - cy), d = Math.sqrt(ddx * ddx + dy * dy);
@@ -192,17 +166,17 @@ export class Colosseum implements Stage {
           P(c, WL[3], nx - 4, 8, 1, 16); P(c, WL[4], nx - 4, 7, 1, 1);
           P(c, WL[3], nx - 5, 24, 11, 1);
         }
-      }, W, 30), 0, 61);
-    }, W, 96);
+      }, BW, 30), 0, 61);
+    }
     // sand, with a few pebbles
-    P(c0, SAND[2], 0, 80, W, H - 80);
-    for (let i = 0; i < 40; i++) { const x = Math.floor(r() * W), y = 94 + Math.floor(r() * 64); P(c0, SAND[3], x, y, 2, 1); P(c0, SAND[1], x, y + 1, 2, 1); }
-    for (let x = 0; x < W; x++) {
+    P(c0, SAND[2], XL, 80, BW, YB - 80);
+    for (let i = 0; i < 90; i++) { const x = XL + Math.floor(r() * BW), y = 94 + Math.floor(r() * (YB - 96)); P(c0, SAND[3], x, y, 2, 1); P(c0, SAND[1], x, y + 1, 2, 1); }
+    for (let x = XL; x < XR; x++) {
       const o = k(x);
-      c0.drawImage(flat, x, 0, 1, 91, x, -o, 1, 91);
+      c0.drawImage(flat, x + MX, 0, 1, 91, x, -o, 1, 91);
       P(c0, SAND[1], x, 91 - o, 1, 3); P(c0, SAND[0], x, 91 - o, 1, 1);
     }
-    for (let x = 1; x < W - 1; x += 3) {
+    for (let x = XL + 1; x < XR - 1; x += 3) {
       const o = k(x);
       for (let y = 47 - o; y < 62 - o; y += 4) {
         if (x > 96 && x < 144) continue;
@@ -213,9 +187,9 @@ export class Colosseum implements Stage {
   }
 
   draw(c: Ctx, t: number, cheer = 0): void {
-    c.drawImage(this.back, 0, 0);
-    [[30, 1], [150, -1], [230, 3]].forEach(([cx, cy], i) => c.drawImage(this.clouds[i], Math.round(((cx + t * 0.2 * (1 + i * 0.3)) % 300) - 44), cy));
-    c.drawImage(this.front, 0, 0);
+    put(c, this.back);
+    [[30, 1], [150, -1], [230, 3], [-40, -24], [300, -14], [100, -46]].forEach(([cx, cy], i) => c.drawImage(this.clouds[i % 3], Math.round(XL - 44 + mod(cx - XL + t * 0.2 * (1 + (i % 3) * 0.3), BW + 88)), cy));
+    put(c, this.front);
     const hopEvery = cheer > 0 ? 4 : 16;
     for (const [x, y, body, skin, ph] of this.crowd) {
       const hop = (t + ph) % hopEvery < 2 ? 1 : 0;
@@ -226,13 +200,15 @@ export class Colosseum implements Stage {
     // the emperor
     P(c, SKIN[0][1], 119, 49, 3, 2); P(c, GOLD[2], 118, 47, 5, 1);
     P(c, PURPLE[1], 117, 51, 7, 9); P(c, PURPLE[3], 117, 51, 2, 9); P(c, GOLD[2], 120, 51, 1, 9);
-    for (let x = 9; x < W; x += 28) {
+    for (let x = 9 - 28 * 3; x < XR; x += 28) {
       const o = k(x), wv = (t + x) % 6 < 3 ? 1 : 0;
       P(c, PURPLE[3], x + 1, 1 - o, 5, 1); P(c, PURPLE[2], x + 1, 2 - o, 4 + wv, 1); P(c, PURPLE[1], x + 1, 3 - o, 2 + wv, 1);
     }
-    for (const bx of [18, 212]) inkBanner(c, bx, 67 - k(bx + 5), 10, 19, PURPLE, GOLD, GREY_INK, t);
+    for (const bx of [-60, 18, 212, 290]) inkBanner(c, bx, 67 - k(bx + 5), 10, 19, PURPLE, GOLD, GREY_INK, t);
     inkTorch(c, 70, 72 - k(70), t, 0, GREY_INK);
     inkTorch(c, 168, 72 - k(168), t, 1, GREY_INK);
+    inkTorch(c, -34, 72 - k(-34), t, 2, GREY_INK);
+    inkTorch(c, 274, 72 - k(274), t, 3, GREY_INK);
   }
 }
 
