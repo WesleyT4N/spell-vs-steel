@@ -1,7 +1,7 @@
 // Online soak test: whole online matches between two simulated machines, headless, over a fake
 // network with lag, jitter, packet loss, duplicates, outages and claude.ai-room style "latest value
 // only" delivery, with machines that hitch, run at different refresh rates or get backgrounded.
-// Both machines run the real NetSession + Lockstep code (the same the online scene runs); CPUs press
+// Both machines run the real NetSession + Netplay (rollback) code (the same the online scene runs); CPUs press
 // the keys. Every checksum is compared, so any desync shows up with the match seed to replay it.
 //
 //   npx tsx scripts/netsoak.ts [matches] [--jobs N] [--seed S] [--only scenario] [--verbose]
@@ -14,7 +14,7 @@ import { presetsFor, toList } from '../src/game/deck';
 import { CLASS_IDS } from '../src/game/classes';
 import { seeded } from '../src/game/rng';
 import { battleHash } from '../src/net/hash';
-import { Lockstep, STEP } from '../src/net/lockstep';
+import { Netplay, STEP } from '../src/net/netplay';
 import { NO_INPUT, type Hello, type NetInput, type Packet } from '../src/net/protocol';
 import { NetSession, clock, type NetStatus } from '../src/net/session';
 import type { Transport, TransportKind } from '../src/net/transport';
@@ -139,7 +139,7 @@ interface RoundLog { hashes: Map<number, number>; picks: string[]; final?: numbe
 class Machine {
   net: NetSession;
   cpu: Cpu;
-  ls: Lockstep | null = null;
+  ls: Netplay | null = null;
   b: Battle | null = null;
   score: [number, number] = [0, 0];
   roundNo = 0;
@@ -171,7 +171,7 @@ class Machine {
     this.b = new Battle(specs[0], specs[1], roundSeed(net.start!.seed, n));
     this.roundNo = n;
     net.beginRound(n);
-    this.ls = new Lockstep(net, this.b);
+    this.ls = new Netplay(net, this.b);
     const log: RoundLog = { hashes: new Map(), picks: [], frames: 0 };
     this.logs.set(n, log);
     this.ls.onHash = (f, h) => log.hashes.set(f, h);
@@ -205,7 +205,7 @@ class Machine {
       if (ls.settle()) this.think = this.thinkTime();
       return;
     }
-    if (b.phase === 'over') {
+    if (b.phase === 'over' && ls.settled) {
       const log = this.logs.get(this.roundNo)!;
       if (log.final === undefined) {
         log.final = battleHash(b); log.winner = b.winner; log.frames = ls.frame;
