@@ -6,6 +6,7 @@
 //   --k 4            random decks per class (random pool) or builds per archetype (variant pool)
 //   --classes a,b    only these classes
 //   --workers 4      worker threads (default: all cores)
+//   --cpu normal     CPU difficulty for both sides (easy, normal, hard)
 //   --seed 1         seed for the random and variant decks, so a run can be repeated with the same lists
 //   --tick 60        simulation steps per second (the game runs at 60). 30 is ~1.4x faster and within a few points.
 //   --check-tick     also run each pool at 60 and print how far --tick moved each cell
@@ -24,6 +25,7 @@ import { applyOverrides, overrideCount, type Overrides } from '../src/dev/tuning
 import { parseScript, toScript } from '../src/dev/script';
 import { CARDS } from '../src/game/cards';
 import type { ClassId } from '../src/art/sprites';
+import type { Difficulty } from '../src/game/tuning';
 
 // Workers start from plain JS that registers tsx, then load this same file.
 const BOOT = `const { workerData } = require('node:worker_threads');
@@ -35,7 +37,7 @@ if (!isMainThread) {
 }
 
 function parseArgs(argv: string[]) {
-  const o = { pools: ['starter', 'archetype', 'random'] as PoolKind[], n: 40, k: 4, classes: [] as string[], workers: availableParallelism(), seed: 1, hz: 60, checkTick: false, cards: false, out: '', script: '' };
+  const o = { pools: ['starter', 'archetype', 'random'] as PoolKind[], n: 40, k: 4, classes: [] as string[], workers: availableParallelism(), seed: 1, cpu: 'normal' as Difficulty, hz: 60, checkTick: false, cards: false, out: '', script: '' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], v = (): string => argv[++i] ?? '';
     if (a === '--pools') o.pools = v().split(',') as PoolKind[];
@@ -44,6 +46,7 @@ function parseArgs(argv: string[]) {
     else if (a === '--classes') o.classes = v().split(',');
     else if (a === '--workers') o.workers = Number(v());
     else if (a === '--seed') o.seed = Number(v());
+    else if (a === '--cpu') o.cpu = v() as Difficulty;
     else if (a === '--tick') o.hz = Number(v());
     else if (a === '--check-tick') o.checkTick = true;
     else if (a === '--cards') o.cards = true;
@@ -95,7 +98,7 @@ class Pool {
 }
 
 async function runPool(pool: Pool, kind: PoolKind, classes: ClassId[], o: ReturnType<typeof parseArgs>, hz = o.hz): Promise<GridReport> {
-  const plan = planGrid(classes, kind, o.k, o.seed, o.n, hz);
+  const plan = planGrid(classes, kind, o.k, o.seed, o.n, hz, o.cpu);
   const t0 = Date.now();
   const r = foldGrid(plan, await pool.run(plan.jobs));
   console.error(`  ${kind} @${hz}Hz: ${plan.decks.length} decks, ${plan.jobs.length} deck pairs, ${r.matches} matches in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
@@ -145,7 +148,7 @@ async function main(): Promise<void> {
   applyOverrides(ov);
   const classes = classIds().filter(c => !o.classes.length || o.classes.includes(c));
   const pool = new Pool(Math.max(1, o.workers), ov);
-  console.error(`balance: ${classes.join(', ')} | pools ${o.pools.join(', ')} | ${o.n} matches per deck pair | ${o.hz}Hz | ${pool.workers.length} workers`);
+  console.error(`balance: ${classes.join(', ')} | pools ${o.pools.join(', ')} | ${o.n} matches per deck pair | ${o.cpu} CPU | ${o.hz}Hz | ${pool.workers.length} workers`);
   if (overrideCount(ov)) console.error(`  script:\n${toScript(ov).replace(/^/gm, '    ')}`);
   const reports: GridReport[] = [];
   for (const kind of o.pools) reports.push(await runPool(pool, kind, classes, o));
@@ -168,7 +171,7 @@ async function main(): Promise<void> {
   }
   pool.close();
 
-  const md: string[] = [`# Balance grid`, '', `Classes: ${classes.join(', ')}. ${o.n} matches per deck pair (sides alternate), Normal CPU on both sides, ${o.hz} steps per second, seed ${o.seed}.`, ''];
+  const md: string[] = [`# Balance grid`, '', `Classes: ${classes.join(', ')}. ${o.n} matches per deck pair (sides alternate), ${o.cpu} CPU on both sides, ${o.hz} steps per second, seed ${o.seed}.`, ''];
   if (overrideCount(ov)) md.push('Script for this run:', '', '```', toScript(ov), '```', '');
   md.push(`Rules checked: every class has at least 2 favorable matchups (over ${FAV * 100}%, flagged thin under ${THIN * 100}%), nothing at or past ${LOPSIDED * 100}-${100 - LOPSIDED * 100}, and each class beats its two intended counters (${Object.entries(WHEEL).map(([a, bs]) => `${a} > ${bs.join(', ')}`).join('; ')}).`, '');
   for (const r of reports) {

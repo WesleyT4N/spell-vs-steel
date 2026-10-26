@@ -190,7 +190,7 @@ export class LabScene implements Scene {
       deckSel.addEventListener('change', () => { s.deck = deckSel.value as DeckChoice; });
       fillDecks();
       const cls = choice(classIds().map(c => [c, cap(c)] as [ClassId, string]), s.cls, v => { s.cls = v; fillDecks(); });
-      const cpu = choice<Difficulty>([['easy', 'Easy'], ['normal', 'Normal']], s.cpu, v => { s.cpu = v; });
+      const cpu = choice<Difficulty>([['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']], s.cpu, v => { s.cpu = v; });
       return h('div', { style: 'margin-bottom:6px' }, h('div', { class: 'muted' }, i ? 'Side B (right)' : 'Side A (left)'), cls.el, h('div', { class: 'row' }, deckSel, h('span', { class: 'muted' }, 'CPU'), cpu.el));
     };
     const n = choice<number>([[20, '20'], [50, '50'], [100, '100'], [250, '250'], [500, '500']], cfg.n, v => { cfg.n = v; });

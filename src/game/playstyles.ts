@@ -2,6 +2,7 @@
 // temperament, and each names the deck archetype it plays best with (src/dev/archetypes.ts) for the sims.
 import type { ClassId } from '../art/sprites';
 import { CARDS } from './cards';
+import type { Difficulty } from './tuning';
 
 export type Temperament = 'aggro' | 'conservative' | 'defensive';
 export type Role = 'damage' | 'defense' | 'control' | 'setup';
@@ -89,3 +90,37 @@ export const PLAYSTYLES: Playstyle[] = [
 
 export const stylesFor = (cls: ClassId): Playstyle[] => PLAYSTYLES.filter(s => s.cls === cls);
 export const styleById = (id: string): Playstyle => PLAYSTYLES.find(s => s.id === id) ?? BALANCED;
+
+/** How fully each difficulty commits to its style: Easy plays a watered-down version (on top of its slow reactions). */
+const COMMIT: Record<Difficulty, number> = { easy: 0.5, normal: 0.5, hard: 0.5 };
+
+/** A style as played at a difficulty: its numeric knobs pulled toward the standard CPU by (1 - commitment). */
+export function playedAt(s: Playstyle, d: Difficulty): Playstyle {
+  const k = COMMIT[d];
+  if (k === 1) return s;
+  const mix = (a: number, base: number): number => base + (a - base) * k;
+  const prefer = Object.fromEntries(Object.entries(s.prefer).map(([r, v]) => [r, mix(v, 0)])) as Record<Role, number>;
+  return { ...s, dodge: mix(s.dodge, 1), evade: mix(s.evade, 0), attack: mix(s.attack, 1), patience: mix(s.patience, 1), eager: mix(s.eager, 0), prefer };
+}
+
+/**
+ * The style a CPU of this class brings to a match: Easy always plays its readable aggro style,
+ * Normal any of its three, Hard the one that does best against the player's class (COUNTER, from sims).
+ */
+export function styleFor(cls: ClassId, d: Difficulty, foe: ClassId, rand: () => number = Math.random): Playstyle {
+  const mine = stylesFor(cls);
+  if (!mine.length) return BALANCED;
+  if (d === 'easy') return mine.find(s => s.kind === 'aggro') ?? mine[0];
+  const counter = d === 'hard' ? COUNTER[cls]?.[foe] : undefined;
+  if (counter) return styleById(counter);
+  return mine[Math.floor(rand() * mine.length)];
+}
+
+/** Hard CPU's pick per matchup: CPU class -> player class -> style id. From `npm run balance -- --pools style-starter --cpu hard`. */
+const COUNTER: Partial<Record<ClassId, Partial<Record<ClassId, string>>>> = {
+  warrior: { mage: 'warrior_juggernaut', rogue: 'warrior_berserker', ranger: 'warrior_juggernaut', priest: 'warrior_juggernaut' },
+  mage: { warrior: 'mage_archmage', rogue: 'mage_blaster', ranger: 'mage_blaster', priest: 'mage_blaster' },
+  rogue: { warrior: 'rogue_cutthroat', mage: 'rogue_cutthroat', ranger: 'rogue_duelist', priest: 'rogue_cutthroat' },
+  ranger: { warrior: 'ranger_sniper', mage: 'ranger_sniper', rogue: 'ranger_sniper', priest: 'ranger_sniper' },
+  priest: { warrior: 'priest_plaguelord', mage: 'priest_plaguelord', rogue: 'priest_plaguelord', ranger: 'priest_shepherd' },
+};

@@ -3,6 +3,7 @@
 import { runMatch, wilson, type SideSpec } from './simulate';
 import { deckPool, type PoolDeck, type PoolKind } from './archetypes';
 import type { ClassId } from '../art/sprites';
+import type { Difficulty } from '../game/tuning';
 
 export interface GridJob { i: number; a: SideSpec; b: SideSpec; n: number; tick: number }
 /** Wins and losses are from deck `a`'s point of view, whichever side it started on. */
@@ -37,18 +38,18 @@ export const FAV = 0.5, THIN = 0.53, LOPSIDED = 0.67;
 export interface GridPlan { kind: PoolKind; decks: PoolDeck[]; pairs: Array<[PoolDeck, PoolDeck]>; jobs: GridJob[] }
 
 /** Every pair of decks from different classes, once each; `n` matches per pair with sides alternating. */
-export function planGrid(classes: ClassId[], kind: PoolKind, k: number, seed: number, n: number, hz: number): GridPlan {
+export function planGrid(classes: ClassId[], kind: PoolKind, k: number, seed: number, n: number, hz: number, cpu: Difficulty = 'normal'): GridPlan {
   const decks = classes.flatMap((c, ci) => deckPool(c, kind, k, seed * 1000 + ci));
   const pairs: GridPlan['pairs'] = [], jobs: GridJob[] = [];
   for (let x = 0; x < decks.length; x++) for (let y = x + 1; y < decks.length; y++) {
     if (decks[x].cls === decks[y].cls) continue;
     pairs.push([decks[x], decks[y]]);
-    jobs.push({ i: jobs.length, a: spec(decks[x]), b: spec(decks[y]), n, tick: 1 / hz });
+    jobs.push({ i: jobs.length, a: spec(decks[x], cpu), b: spec(decks[y], cpu), n, tick: 1 / hz });
   }
   return { kind, decks, pairs, jobs };
 }
 
-const spec = (d: PoolDeck): SideSpec => ({ cls: d.cls, deck: d.deck, cpu: 'normal', label: d.key, style: d.style });
+const spec = (d: PoolDeck, cpu: Difficulty): SideSpec => ({ cls: d.cls, deck: d.deck, cpu, label: d.key, style: d.style });
 
 export function runJob(job: GridJob): GridJobResult {
   const r: GridJobResult = { i: job.i, wins: 0, losses: 0, draws: 0, time: 0, casts: [{}, {}] };

@@ -133,6 +133,7 @@ export const TUNING = {
   cpu: {
     easy: { think: 0.6, aim: 0.55, dodge: 0, castPatience: 3 },
     normal: { think: 0.22, aim: 0.9, dodge: 0.85, castPatience: 1.5 },
+    hard: { think: 0.12, aim: 1, dodge: 1, castPatience: 1 },
   },
 } as const;
 
