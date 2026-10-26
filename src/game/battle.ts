@@ -48,6 +48,12 @@ export interface Fighter {
   /** Seconds of action lock (attacks, casts). */
   lock: number;
   moveCd: number;
+  /** Seconds until the next step is allowed (TUNING.moveCooldown). */
+  stepCd: number;
+  /** A step tapped during stepCd, taken as soon as it ends. */
+  moveBuf: Dir | null;
+  /** Seconds left on the global cooldown between spell casts (TUNING.castCooldown). */
+  castCd: number;
   charging: boolean;
   charge: number;
   /** Rage pips (Warrior) or current Mana (Mage). */
@@ -469,7 +475,7 @@ export class Battle {
         continue;
       }
       this.addFx('trapPop', t.side, t.col, t.row, 0.5, { kind: t.kind });
-      if (t.kind === 'freeze') { this.damage(v, 20, src, { spell: true, element: 'frost' }); this.freeze(v, 1.5); }
+      if (t.kind === 'freeze') { this.damage(v, 20, src, { spell: true, element: 'frost' }); this.freeze(v, 2); }
       else if (t.kind === 'explode') {
         const cells: Array<[number, number]> = [[t.col, t.row], [t.col - 1, t.row], [t.col + 1, t.row], [t.col, t.row - 1], [t.col, t.row + 1]];
         for (const [c, r] of cells) if (this.inGrid(c, r)) this.addFx('explode', t.side, c, r, 0.35);
@@ -518,7 +524,7 @@ export class Battle {
           f.frostNovaUsed = true;
           f.st.frostNova = 0;
           this.damage(foe, TUNING.frostNovaDamage, f, { spell: true, element: 'frost' });
-          this.freeze(foe, 1.5);
+          this.freeze(foe, 2);
           this.addFx('nova', f.side, f.col, f.row, 0.5);
           this.addFx('nova', f.side, foe.col, foe.row, 0.5);
           this.shake = Math.max(this.shake, 0.2);
@@ -549,6 +555,8 @@ export class Battle {
     f.shields = f.shields.filter(s => s.t > 0 && s.hp > 0);
     f.lock = Math.max(0, f.lock - dt);
     f.moveCd = Math.max(0, f.moveCd - dt);
+    f.stepCd = Math.max(0, f.stepCd - dt);
+    f.castCd = Math.max(0, f.castCd - dt);
     f.flash = Math.max(0, f.flash - dt);
     f.poseT = Math.max(0, f.poseT - dt);
     if (f.poseT === 0) f.pose = 'idle';
@@ -571,11 +579,18 @@ export class Battle {
     if (sp.smoke > 0 && sp.smokeSide === f.side && f.st.revealed <= 0 && f.st.hunted <= 0) f.st.stealth = Math.max(f.st.stealth, 0.1);
 
     const disabled = f.st.frozen > 0 || f.st.stunned > 0 || f.st.iceBlock > 0 || f.st.sleep > 0 || f.st.channel > 0;
-    if (disabled) { f.charging = false; f.charge = 0; return; }
+    if (disabled) { f.charging = false; f.charge = 0; f.moveBuf = null; return; }
     const busy = f.lock > 0 || f.st.flinch > 0;
 
     // any move during a backstab window blinks the Rogue home instead
-    if (intent.move && !busy) { if (f.st.backstab > 0) { this.blinkHome(f); f.moveCd = TUNING.moveRepeat; } else this.tryMove(f, intent.move); }
+    if (intent.move) f.moveBuf = intent.move;
+    if (f.moveBuf && f.stepCd <= 0) {
+      const d = f.moveBuf;
+      f.moveBuf = null;
+      if (!busy) {
+        if (f.st.backstab > 0) { this.blinkHome(f); f.moveCd = TUNING.moveRepeat; f.stepCd = TUNING.moveCooldown; } else this.tryMove(f, d);
+      }
+    }
 
     if (intent.attackPressed && !busy) {
       this.basicAttack(f, 'light');
@@ -626,6 +641,7 @@ export class Battle {
     this.leavePanel(f.col, f.row);
     f.col = nc; f.row = nr;
     f.moveCd = TUNING.moveRepeat;
+    f.stepCd = TUNING.moveCooldown;
     sfx('step', { pan: panOf(nc) });
     return true;
   }
@@ -953,7 +969,7 @@ export class Battle {
 
   freeze(f: Fighter, t: number): void {
     if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
-    f.st.frozen = Math.max(f.st.frozen, t);
+    f.st.frozen = Math.max(f.st.frozen, t, TUNING.ccMin);
     f.charging = false;
     this.text(f, 'FROZEN', '#3cbcfc');
     sfx('freeze', { pan: panOf(f.col) });
@@ -961,7 +977,7 @@ export class Battle {
 
   stun(f: Fighter, t: number): void {
     if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
-    f.st.stunned = Math.max(f.st.stunned, t);
+    f.st.stunned = Math.max(f.st.stunned, t, TUNING.ccMin);
     f.charging = false;
     this.text(f, 'STUN', '#f8b800');
   }
@@ -1113,7 +1129,7 @@ export class Battle {
 
   // ---------- spells ----------
   castTop(f: Fighter, held: Dir | null): void {
-    if (!f.queue.length) return;
+    if (!f.queue.length || f.castCd > 0) return;
     const card = CARDS[f.queue[0]];
     if (f.st.evoLock > 0) { this.text(f, 'CAN\'T CAST', '#bcbcbc'); return; }
     if (f.st.silenced > 0) { this.text(f, 'SILENCED', '#9878f8'); sfx('deny'); f.lock = 0.15; return; }
@@ -1126,6 +1142,7 @@ export class Battle {
     }
     f.queue.shift();
     f.discard.push(card.id);
+    f.castCd = TUNING.castCooldown;
     const cost = this.costOf(f, card);
     const spent = card.cost === 'all' ? (f.st.ascendance > 0 ? Math.max(1, f.resMax) : f.res) : cost;
     if (!(f.st.avatar > 0 || f.st.ascendance > 0)) f.res -= card.cost === 'all' ? f.res : cost;
@@ -1293,7 +1310,7 @@ function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => nu
   return {
     side, cls, skin: spec.skin ?? defaultSkin(cls), alt, name, hp: maxHp, maxHp,
     col: side === 0 ? 1 : 4, row: 1, dx: 0, dy: 0,
-    lock: 0, moveCd: 0, charging: false, charge: 0,
+    lock: 0, moveCd: 0, stepCd: 0, moveBuf: null, castCd: 0, charging: false, charge: 0,
     res: START_RES[cls],
     resMax: cls === 'mage' ? TUNING.mage.manaStart : cls === 'warrior' ? TUNING.warrior.rageMax : 5,
     bonusManaNext: 0,

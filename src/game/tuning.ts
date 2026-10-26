@@ -12,6 +12,12 @@ export const TUNING = {
 
   /** Seconds between steps when a direction is held. */
   moveRepeat: 0.16,
+  /** Minimum seconds between any two steps, taps included, so nobody can jitter back and forth. A tap during it is buffered. */
+  moveCooldown: 0.1,
+  /** Global cooldown: minimum seconds between two spell casts. */
+  castCooldown: 0.5,
+  /** Shortest freeze or stun in seconds, so the attacker always gets a follow-up cast in. */
+  ccMin: 2,
 
   /** Holding the attack button this long arms the heavy attack. */
   heavyCharge: 1.0,
@@ -53,7 +59,7 @@ export const TUNING = {
     /** After a backstab the Rogue may keep acting from in front of the enemy this long before blinking home. */
     backstabWindow: 2,
     /** Vanish: the next attack spell stuns for this long. */
-    vanishStun: 1.5,
+    vanishStun: 2,
     riposteDamage: 80,
   },
 
