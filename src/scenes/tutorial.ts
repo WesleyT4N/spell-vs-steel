@@ -694,7 +694,7 @@ export class TutorialScene implements Scene {
     }
   }
 
-  private static DONE = ['VERSUS CPU', 'DECK BUILDER', 'TRY ANOTHER CLASS', 'TITLE'];
+  private static DONE = ['VERSUS', 'DECK BUILDER', 'TRY ANOTHER CLASS', 'TITLE'];
   private updateDone(dt: number): void {
     const items = TutorialScene.DONE.length;
     const clicked = listMouse('menu', this.doneSel, i => { this.doneSel = i; sfx('move'); });
@@ -705,7 +705,7 @@ export class TutorialScene implements Scene {
       sfx('select');
       stopMusic();
       const choice = TutorialScene.DONE[this.doneSel];
-      if (choice === 'VERSUS CPU') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); setScene(new CharSelectScene()); }
+      if (choice === 'VERSUS') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); setScene(new CharSelectScene()); }
       if (choice === 'DECK BUILDER') setScene(new DeckBuilderScene(this.cls, () => setScene(new TitleScene())));
       if (choice === 'TRY ANOTHER CLASS') setScene(new CharSelectScene(undefined, 0, 'tutorial'));
       if (choice === 'TITLE') setScene(new TitleScene());

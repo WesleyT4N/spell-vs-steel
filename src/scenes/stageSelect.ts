@@ -105,7 +105,7 @@ export class StageSelectScene implements Scene {
   private start(): void {
     useStage(this.final!);
     if (this.net) { setScene(new OnlineBattleScene(this.net, [0, 0], 1)); return; }
-    setScene(new BattleScene(this.m));
+    setScene(new BattleScene(this.m, [0, 0], undefined, this.m.sides));
   }
 
   update(dt: number): void {
