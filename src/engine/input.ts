@@ -75,6 +75,51 @@ export const k = (a: Bindable): string => keyName(keys[a]);
 // Keys the rebinding screen refuses (they are reserved for menus and muting).
 export const RESERVED = new Set(['Escape', 'KeyM', 'KeyQ', 'KeyE', 'KeyR', 'Backspace']);
 
+// ---------- local versus: two players on one keyboard ----------
+export type LocalAct = 'up' | 'down' | 'left' | 'right' | 'attack' | 'cast' | 'custom';
+/**
+ * Fixed layouts for two players sharing a keyboard: the left player on WASD with F/G/H under the right hand,
+ * the right player on the arrows with . / and right Shift just above them (or the numpad). The touch pad
+ * plays as the left player. These ignore the rebinding screen, which stays for single-player keys.
+ */
+export const LOCAL_KEYS: [Record<LocalAct, string[]>, Record<LocalAct, string[]>] = [
+  { up: ['KeyW', 'PadUp'], down: ['KeyS', 'PadDown'], left: ['KeyA', 'PadLeft'], right: ['KeyD', 'PadRight'], attack: ['KeyF', 'PadAttack'], cast: ['KeyG', 'PadCast'], custom: ['KeyH', 'PadDraw'] },
+  { up: ['ArrowUp', 'Numpad8'], down: ['ArrowDown', 'Numpad5'], left: ['ArrowLeft', 'Numpad4'], right: ['ArrowRight', 'Numpad6'], attack: ['Period', 'Numpad1'], cast: ['Slash', 'Numpad2'], custom: ['ShiftRight', 'Numpad3'] },
+];
+const LOCAL_CODES = new Set(LOCAL_KEYS.flatMap(l => Object.values(l).flat()));
+const rawHeld = new Set<string>();
+const rawPressed = new Set<string>();
+/** Held local-versus codes in the order they went down, so each player's latest direction wins. */
+const rawOrder: string[] = [];
+function pressRaw(code: string, isDown: boolean): void {
+  const i = rawOrder.indexOf(code);
+  if (i >= 0) rawOrder.splice(i, 1);
+  if (isDown) { if (!rawHeld.has(code)) rawPressed.add(code); rawHeld.add(code); rawOrder.push(code); }
+  else rawHeld.delete(code);
+}
+export const localDown = (p: 0 | 1, a: LocalAct): boolean => LOCAL_KEYS[p][a].some(c => rawHeld.has(c));
+export const localPressed = (p: 0 | 1, a: LocalAct): boolean => LOCAL_KEYS[p][a].some(c => rawPressed.has(c));
+/** Player `p`'s most recently pressed direction that is still held. */
+export function localDir(p: 0 | 1): 'up' | 'down' | 'left' | 'right' | null {
+  const l = LOCAL_KEYS[p];
+  for (let i = rawOrder.length - 1; i >= 0; i--) {
+    for (const d of ['up', 'down', 'left', 'right'] as const) if (l[d].includes(rawOrder[i])) return d;
+  }
+  return null;
+}
+/** Like navPressed, for one local player's keys. */
+const localRepeat: Record<string, number> = {};
+export function localNav(p: 0 | 1, a: 'up' | 'down' | 'left' | 'right', dt: number, delay = 0.32, rate = 0.08): boolean {
+  const id = `${p}${a}`;
+  if (localPressed(p, a)) { localRepeat[id] = delay; return true; }
+  if (!localDown(p, a)) { localRepeat[id] = 0; return false; }
+  localRepeat[id] -= dt;
+  if (localRepeat[id] <= 0) { localRepeat[id] = rate; return true; }
+  return false;
+}
+/** On-screen name of local player `p`'s key for an action. */
+export const localKey = (p: 0 | 1, a: LocalAct): string => keyName(LOCAL_KEYS[p][a][0]);
+
 const down = new Set<Action>();
 const pressed = new Set<Action>();
 const released = new Set<Action>();
@@ -97,7 +142,7 @@ function onKey(e: KeyboardEvent, isDown: boolean): void {
     cb(e.code);
     return;
   }
-  if (!BINDINGS[e.code]) return;
+  if (!BINDINGS[e.code] && !LOCAL_CODES.has(e.code)) return;
   e.preventDefault();
   if (isDown && e.repeat) return;
   press(e.code, isDown);
@@ -105,6 +150,7 @@ function onKey(e: KeyboardEvent, isDown: boolean): void {
 
 /** Press or release a key code (a real key, or one of the touch pad's Pad codes). */
 function press(code: string, isDown: boolean): void {
+  if (LOCAL_CODES.has(code)) pressRaw(code, isDown);
   const acts = BINDINGS[code];
   if (!acts) return;
   if (isDown) heldCodes.add(code); else heldCodes.delete(code);
@@ -203,7 +249,7 @@ export function initInput(canvas?: HTMLCanvasElement): void {
   if (canvas) initMouse(canvas);
   window.addEventListener('keydown', e => onKey(e, true));
   window.addEventListener('keyup', e => onKey(e, false));
-  window.addEventListener('blur', () => { down.clear(); heldCodes.clear(); dirOrder.length = 0; });
+  window.addEventListener('blur', () => { down.clear(); heldCodes.clear(); dirOrder.length = 0; rawHeld.clear(); rawOrder.length = 0; });
   // iOS only lets sound start from the end of a touch
   for (const ev of ['pointerdown', 'pointerup', 'touchend']) window.addEventListener(ev, () => unlockAudio());
 }
@@ -218,7 +264,7 @@ export function heldDir(): 'up' | 'down' | 'left' | 'right' | null {
 }
 /** Call once at the end of every frame. */
 export function endFrame(): void {
-  pressed.clear(); released.clear();
+  pressed.clear(); released.clear(); rawPressed.clear();
   mouse.click = mouse.rclick = mouse.moved = mouse.touched = false; mouse.wheel = 0;
 }
 

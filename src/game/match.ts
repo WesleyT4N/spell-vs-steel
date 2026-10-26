@@ -4,10 +4,18 @@ import { CLASS_IDS } from './classes';
 import type { Difficulty } from './tuning';
 import { loadCustom, starterDeck, toList, validate } from './deck';
 
+/** Who plays a side in local Versus: someone at this keyboard, or the CPU. */
+export type Ctl = 'player' | 'cpu';
+
 export interface MatchConfig {
+  /** Left side's fighter and deck. (Named from when the left side was always you.) */
   p1: ClassId;
   p1Deck: 'starter' | 'custom';
+  /** Right side's fighter and deck. */
   cpu: ClassId;
+  cpuDeck: 'starter' | 'custom';
+  /** Local Versus: who plays the left and right side. */
+  sides: [Ctl, Ctl];
   difficulty: Difficulty;
   /** Chosen skin per class, for the player and for the CPU. */
   p1Skin: Record<ClassId, string>;
@@ -22,7 +30,7 @@ const KEY = 'svs:match';
 
 export function loadMatch(): MatchConfig {
   const skins = (): Record<ClassId, string> => Object.fromEntries(CLASS_IDS.map(c => [c, defaultSkin(c)])) as Record<ClassId, string>;
-  const def: MatchConfig = { p1: 'warrior', p1Deck: 'starter', cpu: 'mage', difficulty: 'normal', bestOf: 3, stage: 'colosseum', p1Skin: skins(), cpuSkin: skins() };
+  const def: MatchConfig = { p1: 'warrior', p1Deck: 'starter', cpu: 'mage', cpuDeck: 'starter', sides: ['player', 'cpu'], difficulty: 'normal', bestOf: 3, stage: 'colosseum', p1Skin: skins(), cpuSkin: skins() };
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return def;
@@ -36,10 +44,21 @@ export function saveMatch(m: MatchConfig): void {
 }
 
 /** The card list the player will fight with (falls back to the starter if the custom deck is invalid). */
-export function playerDeck(m: MatchConfig): string[] {
-  if (m.p1Deck === 'custom') {
-    const d = loadCustom(m.p1);
+export function playerDeck(m: MatchConfig): string[] { return sideDeck(m, 0); }
+
+/** The card list a side fights with: its class's custom deck if picked and valid, else the starter. */
+export function sideDeck(m: MatchConfig, s: 0 | 1): string[] {
+  const cls = s === 0 ? m.p1 : m.cpu;
+  if ((s === 0 ? m.p1Deck : m.cpuDeck) === 'custom') {
+    const d = loadCustom(cls);
     if (d && validate(d).length === 0) return toList(d);
   }
-  return toList(starterDeck(m.p1));
+  return toList(starterDeck(cls));
+}
+
+/** The name a side goes by in a local match: YOU and CPU, P1 and P2 when two people play, CPU 1 and CPU 2 when nobody does. */
+export function sideName(sides: [Ctl, Ctl], s: 0 | 1): string {
+  const humans = sides.filter(c => c === 'player').length;
+  if (sides[s] === 'cpu') return humans === 0 ? `CPU ${s + 1}` : 'CPU';
+  return humans === 2 ? `P${s + 1}` : 'YOU';
 }
