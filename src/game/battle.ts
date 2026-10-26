@@ -475,7 +475,7 @@ export class Battle {
         continue;
       }
       this.addFx('trapPop', t.side, t.col, t.row, 0.5, { kind: t.kind });
-      if (t.kind === 'freeze') { this.damage(v, 20, src, { spell: true, element: 'frost' }); this.freeze(v, 1.5); }
+      if (t.kind === 'freeze') { this.damage(v, 20, src, { spell: true, element: 'frost' }); this.freeze(v, 1.75); }
       else if (t.kind === 'explode') {
         const cells: Array<[number, number]> = [[t.col, t.row], [t.col - 1, t.row], [t.col + 1, t.row], [t.col, t.row - 1], [t.col, t.row + 1]];
         for (const [c, r] of cells) if (this.inGrid(c, r)) this.addFx('explode', t.side, c, r, 0.35);
@@ -524,7 +524,7 @@ export class Battle {
           f.frostNovaUsed = true;
           f.st.frostNova = 0;
           this.damage(foe, TUNING.frostNovaDamage, f, { spell: true, element: 'frost' });
-          this.freeze(foe, 1.5);
+          this.freeze(foe, 1.75);
           this.addFx('nova', f.side, f.col, f.row, 0.5);
           this.addFx('nova', f.side, foe.col, foe.row, 0.5);
           this.shake = Math.max(this.shake, 0.2);
@@ -969,7 +969,7 @@ export class Battle {
 
   freeze(f: Fighter, t: number): void {
     if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
-    f.st.frozen = Math.max(f.st.frozen, t);
+    f.st.frozen = Math.max(f.st.frozen, t, ccMin());
     f.charging = false;
     this.text(f, 'FROZEN', '#3cbcfc');
     sfx('freeze', { pan: panOf(f.col) });
@@ -977,7 +977,7 @@ export class Battle {
 
   stun(f: Fighter, t: number): void {
     if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
-    f.st.stunned = Math.max(f.st.stunned, t);
+    f.st.stunned = Math.max(f.st.stunned, t, ccMin());
     f.charging = false;
     this.text(f, 'STUN', '#f8b800');
   }
@@ -1291,6 +1291,9 @@ export interface CastCtx {
   /** How many other spells this fighter cast in the last `secs` seconds (Shiv, Kidney Shot). */
   castsWithin: (secs: number) => number;
 }
+
+/** Shortest freeze or stun: one global cooldown plus time to land the follow-up. */
+const ccMin = (): number => TUNING.castCooldown + TUNING.ccFollowUp;
 
 /** Seconds to arm a fighter's heavy attack. */
 export function heavyChargeOf(f: Fighter): number {
