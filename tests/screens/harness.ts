@@ -5,6 +5,7 @@ import './frameClock';
 import '../../src/main';
 import { setScene, getScene } from '../../src/scenes/scene';
 import { endFrame } from '../../src/engine/input';
+import { spread } from '../../src/engine/gfx';
 import { TitleScene } from '../../src/scenes/title';
 import { OptionsScene } from '../../src/scenes/options';
 import { ControlsScene } from '../../src/scenes/controls';
@@ -69,6 +70,8 @@ const screens: Record<string, () => void> = {
 declare global { interface Window { __test: unknown } }
 window.__test = {
   names: Object.keys(screens),
+  /** True when the screen shown uses its full-height phone layout (it fills the whole window, not the top half). */
+  tall: (): boolean => spread.tall,
   show(name: string): void {
     const open = screens[name];
     if (!open) throw new Error(`no screen named ${name}`);

@@ -9,8 +9,8 @@ import { PLAYABLE, CLASS_INFO } from '../game/classes';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getSprite, getPortrait, drawFighterSprite, teamColor, SKINS, skinOf, mirrorSkin, type ClassId } from '../art/sprites';
-import { P, UW, screenRect, fillScreen, vy, vspan, mix, dith, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered } from '../engine/font';
+import { P, UW, screenRect, fillScreen, vy, vspan, mix, dith, spread, type Ctx } from '../engine/gfx';
+import { drawText, drawTextCentered, wrap } from '../engine/font';
 import { win, plaque, banner, vsSeal, FRAME, GOLD, INK, INK2, TRIM, PAPER, RED_INK, BLUE_INK } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
@@ -26,6 +26,8 @@ import { ArcadeLadderScene } from './arcade';
 import { newRun, loadRecords, clock } from '../game/arcade';
 import { useStage } from '../game/battleView';
 import { STAGE_IDS } from '../art/stages';
+import type { PadMode } from '../engine/touch';
+import { bigButton, actionBar, barTapped, swipeIn, tallArea, dots, TAP, GAP, PAD } from './touchUi';
 
 /** Roster tiles: every playable class, then RANDOM. */
 const TILES = PLAYABLE.length + 1;
@@ -47,8 +49,9 @@ const BACKDROP: Record<ClassId, [string, string, string]> = {
   ranger: ['#002800', '#005800', '#00a800'],
   priest: ['#503000', '#ac7c00', '#f8d878'],
 };
-// portrait frame (UI pixels): the 40x32 bust at 2x inside a 2px ink border
-const FW = 84, FH = 68, PORTRAIT_IN = 0.18;
+const PORTRAIT_IN = 0.18;
+/** Portrait frame size (UI pixels) at a zoom: the 40x32 bust inside a 2px ink border (2x by default). */
+const frameW = (z: number): number => 40 * z + 4, frameH = (z: number): number => 32 * z + 4;
 
 /** 0/1: picking the left side's fighter/skin, 2/3: the right side's (skipped online), 4: options. */
 type Step = 0 | 1 | 2 | 3 | 4;
@@ -85,6 +88,11 @@ export class CharSelectScene implements Scene {
     this.cur = this.tileOf(this.slotClass(this.step >= 2 && !net ? 1 : 0));
     if (net) this.sync();
   }
+
+  tall(): boolean { return true; }
+  pad(): PadMode { return spread.tall ? 'none' : 'back'; }
+  /** Full-height phone layout: where each side's panel and the color row were drawn, for swipes. */
+  private tallRects: { panel: Array<[number, number, number, number]>; colors: [number, number, number, number] | null } = { panel: [], colors: null };
 
   private get tutorial(): boolean { return this.mode === 'tutorial'; }
   private get training(): boolean { return this.mode === 'training'; }
@@ -230,6 +238,7 @@ export class CharSelectScene implements Scene {
       if (this.locked) { if (wasPressed('back') || mouse.rclick) this.back(); return; }
     }
     if (wasPressed('back') || mouse.rclick) { this.back(); return; }
+    if (spread.tall && this.tallInput()) { this.sync(); return; }
 
     if (mouse.click) {
       const tile = hot('tile'), sw = hot('swatch'), csw = hot('cswatch'), chip = hot('chip');
@@ -287,10 +296,44 @@ export class CharSelectScene implements Scene {
     this.sync();
   }
 
+  /** Full-height phone layout: the action bar and swipes. True when something was handled. */
+  private tallInput(): boolean {
+    if (barTapped('back')) { this.back(); return true; }
+    if (barTapped('primary')) {
+      if (this.tutorial) { sfx('select'); setScene(new TutorialScene(this.m.p1 as TutorialClass)); }
+      else if (!this.locked) this.next();
+      return true;
+    }
+    // swipe a fighter panel to step its class; swipe the color row to step the skin
+    for (const s of [0, 1] as const) {
+      const r = this.tallRects.panel[s];
+      if (!r || (s === 1 && (this.net || this.tutorial || this.arcade))) continue;
+      const d = swipeIn(...r);
+      if (!d) continue;
+      const i = PLAYABLE.indexOf(this.slotClass(s)), cls = PLAYABLE[(i + d + PLAYABLE.length) % PLAYABLE.length];
+      this.setClass(s, cls);
+      if (this.slot === s && (this.step === 0 || this.step === 2)) this.step = (s === 0 ? 1 : 3) as Step;
+      this.cur = this.tileOf(cls);
+      sfx('move');
+      return true;
+    }
+    const cr = this.tallRects.colors;
+    const d = cr ? swipeIn(...cr) : 0;
+    if (d) { this.stepSkin(this.colorSide(), d); return true; }
+    return false;
+  }
+
+  /** Whose colors the phone layout's color row shows: the side being picked, else the focused one. */
+  private colorSide(): 0 | 1 {
+    if (this.net || this.arcade || this.tutorial) return 0;
+    return this.step === 2 || this.step === 3 ? 1 : this.step === 4 && this.local ? this.focus : 0;
+  }
+
   draw(c: Ctx, tick: number, ui: Ctx): void {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.35)';
     c.fillRect(...screenRect());
+    if (spread.tall) { this.drawTall(ui, tick); return; }
 
     const net = this.net, rl = net?.rivalLobby, rival = net?.rival;
     // what each slot shows: the hovered tile while choosing, the pick after
@@ -350,12 +393,7 @@ export class CharSelectScene implements Scene {
       const chips = this.chips, cw = net ? 140 : this.local ? 104 : 86, gap = 6, x0 = Math.round(UW / 2 - (chips.length * cw + (chips.length - 1) * gap) / 2);
       chips.forEach((ch, i) => {
         const x = x0 + i * (cw + gap), on = this.step === 4 && this.chip === i && showSel();
-        let label: string = ch;
-        if (ch === 'DECK') label = this.m.p1Deck === 'custom' ? `CUSTOM DECK${this.customValid() ? '' : '!'}` : deckLabel(this.m.p1, this.m.p1Deck);
-        if (ch === 'EDIT DECK' && this.local) label = `EDIT ${this.focus === 0 ? 'LEFT' : 'RIGHT'} DECK`;
-        if (ch === 'CPU LEVEL') label = `CPU: ${this.m.difficulty.toUpperCase()}`;
-        if (ch === 'MATCH') label = this.m.bestOf === 1 ? '1 ROUND' : `BEST OF ${this.m.bestOf}`;
-        if (ch === 'NEXT') label = net ? (this.locked ? 'LOCKED IN' : 'LOCK IN') : this.training || this.arcade ? 'START →' : 'STAGE →';
+        const label = this.chipLabel(ch);
         button(ui, `chip:${i}`, label, x, vy(CY), cw, vspan(CY, CH), on, ch === 'NEXT' ? (this.step === 4 ? '#f8b800' : '#7c7c7c') : '#fcfcfc');
       });
     }
@@ -374,6 +412,15 @@ export class CharSelectScene implements Scene {
       : this.locked ? `${k('cast')} / RIGHT-CLICK: LEAVE ROOM`
         : this.step === 4 ? `${keys}: MOVE   ${k('attack')}: CHANGE   ${k('cast')} / RIGHT-CLICK: BACK`
           : `${keys} OR HOVER: CHOOSE   ${k('attack')} / CLICK: PICK   ${k('cast')} / RIGHT-CLICK: BACK`);
+  }
+
+  private chipLabel(ch: Chip): string {
+    if (ch === 'DECK') return this.m.p1Deck === 'custom' ? `CUSTOM DECK${this.customValid() ? '' : '!'}` : deckLabel(this.m.p1, this.m.p1Deck);
+    if (ch === 'EDIT DECK' && this.local) return `EDIT ${this.focus === 0 ? 'LEFT' : 'RIGHT'} DECK`;
+    if (ch === 'CPU LEVEL') return `CPU: ${this.m.difficulty.toUpperCase()}`;
+    if (ch === 'MATCH') return this.m.bestOf === 1 ? '1 ROUND' : `BEST OF ${this.m.bestOf}`;
+    if (ch === 'NEXT') return this.net ? (this.locked ? 'LOCKED IN' : 'LOCK IN') : this.training || this.arcade ? 'START →' : 'STAGE →';
+    return ch;
   }
 
   private statusLine(): { text: string; color: string; blink: boolean } | null {
@@ -416,23 +463,24 @@ export class CharSelectScene implements Scene {
    * A fighter's portrait in an ink frame over a wash in its element, facing the middle. A new pick slides in from
    * the outer edge behind a white flash. `cls` null draws the empty frame (RANDOM, or a rival still connecting).
    */
-  private drawPortrait(ui: Ctx, s: 0 | 1, cls: ClassId | null, skin: string, cx: number, y: number): void {
+  private drawPortrait(ui: Ctx, s: 0 | 1, cls: ClassId | null, skin: string, cx: number, y: number, z = 2): void {
+    const FW = frameW(z), FH = frameH(z);
     const x = cx - FW / 2, key = `${cls}:${skin}`, sh = this.shown[s];
     if (sh.key !== key) { sh.key = key; sh.at = sh.at < 0 ? -1 : this.t; }
     const k = sh.at < 0 ? 1 : Math.min(1, (this.t - sh.at) / PORTRAIT_IN);
     P(ui, '#000000', x - 1, y - 1, FW + 2, FH + 2);
     P(ui, FRAME, x, y, FW, FH);
     const ix = x + 2, iy = y + 2, iw = FW - 4, ih = FH - 4;
-    // dithered bands, light toward the bottom; 2px dither cells to match the 2x portrait pixels
+    // dithered bands, light toward the bottom; dither cells match the portrait's pixels
     const ramp = cls ? BACKDROP[cls] : ['#000000', '#1c1c38', '#3c3c3c'] as const;
-    for (let yy = 0; yy < ih; yy += 2) {
+    for (let yy = 0; yy < ih; yy += z) {
       const v = (yy / ih) * (ramp.length - 1), b = Math.min(ramp.length - 2, Math.floor(v)), f = v - b;
-      for (let xx = 0; xx < iw; xx += 2) P(ui, dith(xx >> 1, yy >> 1) < f ? ramp[b + 1] : ramp[b], ix + xx, iy + yy, 2, 2);
+      for (let xx = 0; xx < iw; xx += z) P(ui, dith(xx / z, yy / z) < f ? ramp[b + 1] : ramp[b], ix + xx, iy + yy, Math.min(z, iw - xx), Math.min(z, ih - yy));
     }
     if (!cls) return;
-    const img = getPortrait(cls, skin), pw = img.width * 2, ph = img.height * 2;
+    const img = getPortrait(cls, skin), pw = img.width * z, ph = img.height * z;
     // slides from the outer edge (left panel from the left), snapped to the 2px grid
-    const off = Math.round(((1 - k) ** 2 * (s === 0 ? -iw : iw)) / 2) * 2;
+    const off = Math.round(((1 - k) ** 2 * (s === 0 ? -iw : iw)) / z) * z;
     ui.save();
     ui.beginPath(); ui.rect(ix, iy, iw, ih); ui.clip();
     const px = cx - pw / 2 + off, py = iy + ih - ph;
@@ -441,7 +489,7 @@ export class CharSelectScene implements Scene {
     ui.restore();
     if (k < 1) {
       // the arrival flash fades out in dithered steps
-      for (let yy = 0; yy < ih; yy += 2) for (let xx = 0; xx < iw; xx += 2) if (dith(xx >> 1, yy >> 1) > k * 1.6) P(ui, '#fcfcfc', ix + xx, iy + yy, 2, 2);
+      for (let yy = 0; yy < ih; yy += z) for (let xx = 0; xx < iw; xx += z) if (dith(xx / z, yy / z) > k * 1.6) P(ui, '#fcfcfc', ix + xx, iy + yy, Math.min(z, iw - xx), Math.min(z, ih - yy));
     }
     // a thin team-color sill under the bust
     P(ui, cls ? mix(teamColor(cls, skin, false), '#000000', 0.2) : FRAME, ix, iy + ih - 2, iw, 2);
@@ -499,5 +547,148 @@ export class CharSelectScene implements Scene {
       P(ui, '#000000', px + 2, py + 1, 8, 8);
       P(ui, teamColor(cls, sk.id, false), px + 3, py + 2, 6, 6);
     });
+  }
+
+  // ---------- full-height phone layout ----------
+
+  private drawTall(ui: Ctx, tick: number): void {
+    const a = tallArea(), net = this.net, rl = net?.rivalLobby, rival = net?.rival;
+    const x0 = a.x + PAD, w = a.w - PAD * 2;
+    const barTop = a.y + a.h - 84;
+    let y = a.y + 12;
+    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, y);
+    y += 40;
+
+    // laid out from the bar up: options, colors and the roster sit in the thumb zone; the two sides fill the rest
+    const cols = 3, tw = Math.floor((w - GAP * (cols - 1)) / cols), th = 108;
+    const chips = this.chips.map((ch, i) => ({ ch, i })).filter(o => o.ch !== 'NEXT');
+    const showChips = !this.tutorial && chips.length > 0 && (this.step === 4 || !net);
+    const cs = this.colorSide(), cls = this.slotClass(cs), list = SKINS[cls];
+    const sw = Math.min(52, Math.floor((w - 4 * (list.length - 1)) / list.length));
+    const chipY = barTop - 14 - (TAP + 6);
+    const colorY = (showChips ? chipY : barTop - 4) - 14 - sw;
+    const rosterY = colorY - 14 - 2 * th - GAP;
+    const statusY = rosterY - 26;
+    const ph = Math.max(220, Math.min(360, statusY - 10 - y));
+    const z = ph >= 330 ? 4 : 3;
+
+    // the two sides, with the VS seal between them
+    const pw = Math.floor((w - 40) / 2);
+    const showing = (s: 0 | 1): { cls: ClassId | null; skin: string } => {
+      if (s === 1 && net) {
+        if (!rival || !rl) return { cls: null, skin: '' };
+        if (rl.step === 0) return { cls: rl.tile === RANDOM ? null : PLAYABLE[rl.tile] ?? null, skin: '' };
+        return { cls: rival.cls, skin: rival.skin };
+      }
+      const choosing = s === this.slot && (this.step === 0 || this.step === 2);
+      if (choosing && showSel()) return { cls: this.cur === RANDOM ? null : PLAYABLE[this.cur], skin: '' };
+      return { cls: this.slotClass(s), skin: s === 0 ? this.mySkin() : this.cpuSkin() };
+    };
+    this.tallRects.panel = [[x0, y, pw, ph], [x0 + w - pw, y, pw, ph]];
+    this.drawTallSlot(ui, 0, showing(0), x0, y, pw, ph, tick, z);
+    if (this.tutorial) this.drawTallNote(ui, x0 + w - pw, y, pw, ph, 'OPPONENT', 'DUMMY', ['A TRAINING', 'DUMMY. ABOUT', '5 MINUTES OF', 'LESSONS'], BLUE_INK, z);
+    else if (this.arcade) {
+      const best = loadRecords()[this.m.p1];
+      this.drawTallNote(ui, x0 + w - pw, y, pw, ph, 'THE LADDER', '4 RIVALS', ['+ YOUR SHADOW', 'EASY TO HARD', 'BEST OF 3', best ? `BEST ${clock(best.time)}` : 'NOT CLEARED'], BLUE_INK, z);
+    } else this.drawTallSlot(ui, 1, showing(1), x0 + w - pw, y, pw, ph, tick, z);
+    vsSeal(ui, UW / 2, y + 54 + frameH(z) / 2);
+
+    const status = this.statusLine();
+    if (status?.text) drawTextCentered(ui, tick % 16 < 12 || !status.blink ? status.text : '', UW / 2, statusY, status.color, status.text.length * 12 < w ? 2 : 1);
+
+    // the roster, three to a row
+    for (let n = 0; n < TILES; n++) {
+      const x = x0 + (n % cols) * (tw + GAP), ty = rosterY + Math.floor(n / cols) * (th + GAP);
+      const mine = (this.step === 0 || this.step === 2) && this.cur === n && showSel();
+      bigButton(ui, `tile:${n}`, '', x, ty, tw, th, { on: mine });
+      if (n === RANDOM) drawTextCentered(ui, '?', x + tw / 2, ty + 20, RED_INK, 7, false);
+      else drawFighterSprite(ui, getSprite(PLAYABLE[n], SKINS[PLAYABLE[n]][0].id, false), x + tw / 2, ty + th - 30, false, 'none', 3);
+      drawTextCentered(ui, n === RANDOM ? 'RANDOM' : CLASS_INFO[PLAYABLE[n]].name, x + tw / 2, ty + th - 24, INK, 2, false);
+      const tag = (label: string, color: string, right: boolean): void => {
+        const lw = label.length * 6 + 5, lx = right ? x + tw - lw - 5 : x + 5;
+        P(ui, color, lx, ty + 5, lw, 11);
+        drawText(ui, label, lx + 3, ty + 7, '#fcfcfc');
+      };
+      const theirs = net && rl && rl.step === 0 && rl.tile === n;
+      if (n === PLAYABLE.indexOf(this.m.p1) && this.step !== 0) tag(this.who(0), '#881400', false);
+      if (theirs || (net && rl && rl.step > 0 && rival && n === PLAYABLE.indexOf(rival.cls))) tag('RIVAL', '#0000a8', true);
+      else if (!net && !this.arcade && !this.tutorial && n === PLAYABLE.indexOf(this.m.cpu) && this.step >= 3) tag(this.who(1), '#0000a8', true);
+    }
+
+    // the color row for the side being picked
+    const sx = Math.round(UW / 2 - (list.length * sw + (list.length - 1) * 4) / 2);
+    const skin = cs === 0 ? this.mySkin() : this.cpuSkin();
+    this.tallRects.colors = [x0, colorY - 6, w, sw + 12];
+    list.forEach((sk, n) => {
+      const px = sx + n * (sw + 4);
+      zone(`${cs === 0 ? 'swatch' : 'cswatch'}:${n}`, px, colorY, sw, sw);
+      P(ui, '#000000', px - 1, colorY - 1, sw + 2, sw + 2);
+      P(ui, sk.id === skin ? GOLD : FRAME, px, colorY, sw, sw);
+      P(ui, FRAME, px + 4, colorY + 4, sw - 8, sw - 8);
+      P(ui, teamColor(cls, sk.id, false), px + 6, colorY + 6, sw - 12, sw - 12);
+    });
+
+    // match options (NEXT moves to the bar)
+    if (showChips) {
+      const cw = Math.floor((w - GAP * (chips.length - 1)) / chips.length);
+      chips.forEach(({ ch, i }, j) => {
+        const label = this.chipLabel(ch), [sub, val] = label.includes(': ') ? label.split(': ') : ch === 'EDIT DECK' ? ['EDIT', label.replace(/^EDIT /, '')] : ['', label];
+        bigButton(ui, `chip:${i}`, val, x0 + j * (cw + GAP), chipY, cw, TAP + 6, { sub: sub || undefined, on: this.step === 4 && this.chip === i && showSel() });
+      });
+    }
+
+    if (this.msgT > 0) { P(ui, FRAME, a.x, barTop - 30, a.w, 26); drawTextCentered(ui, this.msg, UW / 2, barTop - 24, '#f87858', 1, false); }
+    const steps = this.net || this.arcade || this.tutorial ? 2 : 3;
+    const at = this.step <= 1 ? 0 : this.step <= 3 && steps === 3 ? 1 : steps - 1;
+    actionBar(ui, { primary: { id: 'next', label: this.tutorial ? 'START →' : this.chipLabel('NEXT'), disabled: this.locked } });
+    dots(ui, steps, at, UW / 2 + 10, barTop + 37);
+
+    if (net && (net.status === 'error' || net.status === 'left' || net.status === 'lost')) {
+      fillScreen(ui, 'rgba(0,0,0,0.8)', 2);
+      drawTextCentered(ui, net.status === 'left' ? 'YOUR RIVAL LEFT' : net.status === 'lost' ? 'CONNECTION LOST' : net.error || 'CONNECTION ERROR', UW / 2, 140, '#f83800', 2);
+      drawTextCentered(ui, 'TAP: BACK TO TITLE', UW / 2, 170, '#fcfcfc', 2);
+    }
+  }
+
+  /** A side's panel in the phone layout: who it is, a 3x portrait, the class name, its deck and a hint to swipe. */
+  private drawTallSlot(ui: Ctx, s: 0 | 1, show: { cls: ClassId | null; skin: string }, x: number, y: number, w: number, h: number, tick: number, z: number): void {
+    const net = this.net, cls = show.cls, skin = cls ? show.skin || SKINS[cls][0].id : '';
+    zone(`panel:${s}`, x, y, w, h);
+    const active = s === this.slot && this.step < 4;
+    win(ui, x, y, w, h, { accent: cls ? teamColor(cls, skin, false) : undefined, edge: active && tick % 8 < 6 ? GOLD : FRAME });
+    const cx = x + w / 2, who = this.who(s);
+    if (this.local) bigButton(ui, `ctl:${s}`, who, x + 10, y + 10, w - 20, 36, { scale: 2 });
+    else drawTextCentered(ui, who, cx, y + 18, s === 0 ? RED_INK : BLUE_INK, 2, false);
+    const py = y + 54;
+    this.drawPortrait(ui, s, cls, skin, cx, py, z);
+    let ty = py + frameH(z) + 8;
+    if (!cls) {
+      drawTextCentered(ui, '?', cx, py + 26, PAPER, 8, false);
+      drawTextCentered(ui, net && s === 1 && !net.rival ? 'CONNECTING' : 'RANDOM', cx, ty, INK2, 2, false);
+      return;
+    }
+    drawTextCentered(ui, CLASS_INFO[cls].name, cx, ty, INK, 2, false);
+    ty += 20;
+    wrap(BLURB[cls][0], Math.floor((w - 16) / 6)).slice(0, 2).forEach((l, i) => drawTextCentered(ui, l, cx, ty + i * 10, INK2, 1, false));
+    const deck = `${deckLabel(cls, this.deckOf(s))}${this.deckOf(s) === 'custom' && !this.customValid(s) ? '!' : ''}`;
+    if (this.local) {
+      bigButton(ui, `deck:${s}`, deck, x + 10, y + h - 50, w - 20, 40, { sub: 'DECK', scale: deck.length * 12 < w - 30 ? 2 : 1 });
+    } else if (!(net && s === 1)) drawTextCentered(ui, `DECK: ${deck}`, cx, y + h - 26, TRIM, 1, false);
+    // a nudge that the panel swipes
+    if (!(net && s === 1) && !(s === 1 && (this.tutorial || this.arcade))) {
+      drawText(ui, '<', x + 8, py + frameH(z) / 2 - 7, TRIM, 2);
+      drawText(ui, '>', x + w - 18, py + frameH(z) / 2 - 7, TRIM, 2);
+    }
+  }
+
+  /** The right panel in the phone layout when it isn't a fighter (tutorial dummy, arcade ladder). */
+  private drawTallNote(ui: Ctx, x: number, y: number, w: number, h: number, head: string, big: string, lines: string[], color: string, z: number): void {
+    win(ui, x, y, w, h);
+    const cx = x + w / 2, fh = frameH(z);
+    drawTextCentered(ui, head, cx, y + 18, color, 2, false);
+    this.drawPortrait(ui, 1, null, '', cx, y + 54, z);
+    drawFighterSprite(ui, getSprite('mage', SKINS.mage[0].id, false), cx, y + 54 + fh - 12, true, 'ghost', 3);
+    drawTextCentered(ui, big, cx, y + 54 + fh + 8, INK2, 2, false);
+    lines.forEach((l, i) => drawTextCentered(ui, l, cx, y + 54 + fh + 30 + i * 12, TRIM, 1, false));
   }
 }

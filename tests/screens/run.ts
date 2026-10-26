@@ -82,7 +82,8 @@ async function shoot(browser: Browser, p: Profile, screen: string): Promise<Shot
         if (d[0] + d[1] + d[2] > 24) lit++;
         n++;
       }
-      return { x: r.x, y: r.y, w: r.width, h: r.height, colors: colors.size, lit: lit / n, vw: innerWidth, vh: innerHeight };
+      const tall = (window as unknown as { __test: { tall(): boolean } }).__test.tall();
+      return { x: r.x, y: r.y, w: r.width, h: r.height, colors: colors.size, lit: lit / n, vw: innerWidth, vh: innerHeight, tall };
     });
     if (facts.colors < 6) shot.problems.push(`screen looks blank (${facts.colors} colors in a 32x24 sample)`);
     if (facts.lit < 0.1) shot.problems.push(`screen is ${Math.round((1 - facts.lit) * 100)}% black`);
@@ -95,12 +96,17 @@ async function shoot(browser: Browser, p: Profile, screen: string): Promise<Shot
   return shot;
 }
 
-/** The promise of fit() in src/main.ts: the screen fills the window between 4:3 and 21:9 and letterboxes past them; phones in portrait fill the top half. */
-function layoutProblems(p: Profile, r: { x: number; y: number; w: number; h: number }): string[] {
+/**
+ * The promise of fit() in src/main.ts: the screen fills the window between 4:3 and 21:9 and letterboxes past them;
+ * phones in portrait fill the top half, or the whole screen on screens with a full-height layout (Scene.tall).
+ */
+function layoutProblems(p: Profile, r: { x: number; y: number; w: number; h: number; tall: boolean }): string[] {
   const out: string[] = [];
-  const bh = p.portrait ? p.h / 2 : p.h;
+  if (r.tall && !p.portrait) out.push('full-height layout is only for phones in portrait');
+  const tall = p.portrait && r.tall;
+  const bh = p.portrait && !tall ? p.h / 2 : p.h;
   const aspect = p.w / bh;
-  const min = p.portrait ? 3 / 4 : 4 / 3, max = 7 / 3;
+  const min = tall ? 9 / 22 : p.portrait ? 3 / 4 : 4 / 3, max = 7 / 3;
   if (r.x < -0.5 || r.y < -0.5 || r.x + r.w > p.w + 0.5 || r.y + r.h > p.h + 0.5) out.push(`screen spills out of the window (${fmt(r)})`);
   // the view keeps whole world pixels, so it can come up a little short of the window (under 2%)
   const fillsW = r.w >= p.w * 0.98, fillsH = r.h >= bh * 0.98;
