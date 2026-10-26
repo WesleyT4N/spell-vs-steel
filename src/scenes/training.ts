@@ -36,8 +36,8 @@ const ACTS: Array<[DummyAct, string]> = [['stand', 'STAND'], ['move', 'MOVE'], [
 const RES: ResMode[] = ['normal', 'full', 0, 1, 2, 3, 4, 5];
 /** Seconds without a hit before a Refill HP bar tops back up. */
 const REFILL_AFTER = 2;
-/** Hits closer together than this count as one combo. */
-const COMBO_GAP = 1.5;
+/** How long LAST HIT stays lit after a hit. */
+const HIT_GLOW = 1.5;
 
 const KEY = 'svs:training';
 function loadSettings(): Settings {
@@ -132,9 +132,6 @@ export class TrainingScene extends BattleScene {
   private dealt = 0;
   private lastDmg = 0;
   private lastDmgT = -99;
-  private combo = 0;
-  private hits = 0;
-  private best = 0;
   private menuSel = 0;
   private resetT = 0;
   /** The stats panel, opened from the pause menu over the paused fight. */
@@ -194,7 +191,6 @@ export class TrainingScene extends BattleScene {
     b.f[1].name = 'DUMMY';
     b.gauge = 0;
     this.prevHp = [b.f[0].hp, b.f[1].hp];
-    this.combo = 0; this.hits = 0;
     this.resetT = 0.8;
     this.applySettings();
     sfx('select');
@@ -237,14 +233,11 @@ export class TrainingScene extends BattleScene {
     if (this.paused && !wasPaused) this.menuSel = 0;
     if (b.phase !== 'fight') return;
     this.applySettings();
-    // damage readout: what you dealt this frame, chained into combos
+    // damage readout: what you dealt this frame (combos come from the battle's true combo counter)
     const now = b.time;
     const total = b.stats[0].basic + b.stats[0].spell + b.stats[0].other;
     const d = total - before;
     if (d > 0) {
-      if (now - this.lastDmgT > COMBO_GAP) { this.combo = 0; this.hits = 0; }
-      this.combo += d; this.hits++;
-      this.best = Math.max(this.best, this.combo);
       this.lastDmg = d; this.lastDmgT = now;
       this.dealt += d;
     }
@@ -334,11 +327,13 @@ export class TrainingScene extends BattleScene {
   private drawReadout(ui: Ctx, tick: number): void {
     const w = 208, x = Math.round(UW / 2 - w / 2), y = 34;
     win(ui, x, y, w, 26, { burn: 3 });
-    const recent = this.b.time - this.lastDmgT <= COMBO_GAP;
-    drawText(ui, `LAST HIT ${Math.round(this.lastDmg)}`, x + 7, y + 6, INK);
-    const combo = `COMBO ${Math.round(this.combo)}${this.hits > 1 ? ` (${this.hits} HITS)` : ''}`;
-    drawText(ui, combo, x + w - 7 - textWidth(combo), y + 6, recent && tick % 4 < 3 ? RED_INK : INK);
-    drawText(ui, `BEST ${Math.round(this.best)}`, x + 7, y + 15, INK2);
+    const recent = this.b.time - this.lastDmgT <= HIT_GLOW;
+    drawText(ui, `LAST HIT ${Math.round(this.lastDmg)}`, x + 7, y + 6, recent ? RED_INK : INK);
+    // true combos only: hits that land while the dummy can't act
+    const c = this.b.combo.shown(0), best = this.b.combo.best[0];
+    const combo = c ? `COMBO ${c.hits} HITS ${Math.round(c.dmg)} DMG` : 'COMBO -';
+    drawText(ui, combo, x + w - 7 - textWidth(combo), y + 6, c?.live && tick % 4 < 3 ? RED_INK : INK);
+    drawText(ui, best.hits ? `BEST ${Math.round(best.dmg)}` : 'BEST -', x + 7, y + 15, INK2);
     const keys = touchActive() ? 'PAUSE: MENU' : `R: RESET  ${k('pause')}: MENU`;
     drawText(ui, keys, x + w - 7 - textWidth(keys), y + 15, TRIM);
   }
