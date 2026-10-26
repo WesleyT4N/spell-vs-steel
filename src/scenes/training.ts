@@ -294,7 +294,7 @@ export class TrainingScene extends BattleScene {
     drawText(ui, `LAST HIT ${Math.round(this.lastDmg)}`, x + 7, y + 6, recent ? RED_INK : INK);
     // true combos only: hits that land while the dummy can't act
     const c = this.b.combo.shown(0), best = this.b.combo.best[0];
-    const combo = c ? `COMBO ${Math.round(c.dmg)} (${c.hits} HITS)` : 'COMBO -';
+    const combo = c ? `COMBO ${c.hits} HITS ${Math.round(c.dmg)} DMG` : 'COMBO -';
     drawText(ui, combo, x + w - 7 - textWidth(combo), y + 6, c?.live && tick % 4 < 3 ? RED_INK : INK);
     drawText(ui, best.hits ? `BEST ${Math.round(best.dmg)}` : 'BEST -', x + 7, y + 15, INK2);
     const keys = touchActive() ? 'PAUSE: MENU' : `R: RESET  ${k('pause')}: MENU`;
