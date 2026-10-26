@@ -203,7 +203,7 @@ export class CharSelectScene implements Scene {
     if (net) {
       net.tick();
       if (net.status === 'error' || net.status === 'left' || net.status === 'lost') {
-        if (mouse.click || wasPressed('confirm') || wasPressed('back') || mouse.rclick) { net.transport.close(); setScene(new TitleScene()); }
+        if (mouse.click || wasPressed('confirm') || wasPressed('back') || mouse.rclick) { net.close(); setScene(new TitleScene()); }
         return;
       }
       if (this.locked && net.rivalLobby?.step === 2 && net.rival) { setScene(new StageSelectScene(net)); return; }

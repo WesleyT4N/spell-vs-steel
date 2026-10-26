@@ -15,6 +15,7 @@ npm run build:prod  # player-facing build in dist-prod/: dev tools off and their
 npm run sim      # headless CPU-vs-CPU matches; prints win rates, match length, damage sources
 npm run sim -- 100 --cards   # same, with per-card casts, damage and win rate when cast
 npm run netcheck # two seeded battles fed the same inputs must stay identical (online play depends on it)
+npm run netsoak -- 440  # whole online matches between two simulated machines over lag, jitter, loss, dropouts and tabbed-out players; fails on any desync or stuck match
 ```
 
 ## Dev tools

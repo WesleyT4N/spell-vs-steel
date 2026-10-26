@@ -114,7 +114,7 @@ export class StageSelectScene implements Scene {
     if (net) {
       net.tick();
       if (net.status === 'error' || net.status === 'left' || net.status === 'lost') {
-        if (mouse.click || wasPressed('confirm') || wasPressed('back') || mouse.rclick) { net.transport.close(); setScene(new TitleScene()); }
+        if (mouse.click || wasPressed('confirm') || wasPressed('back') || mouse.rclick) { net.close(); setScene(new TitleScene()); }
         return;
       }
       const rl = net.rivalLobby;
