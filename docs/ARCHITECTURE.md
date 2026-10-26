@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at c645da5 (2026-10-26).
+How the game is put together, one section per system. Describes `main` at 36deaa9 (2026-10-26).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -95,7 +95,8 @@ Determinism rules:
 - Rule randomness comes from `b.rand()` or `shuffle(list, b.rand)`, never `Math.random`. `npm run netcheck` catches drift.
 - Observers wrap methods on one instance and only read state.
 - The CPU and voice-line choice use `Math.random`; neither feeds the rules online, but rollback will need them seeded or kept out of resimulation.
-- Rollback blocker: `timers` and `anims` hold closures (about 30 call sites in `battle.ts` and the card files), so a Battle can't be snapshotted yet.
+- Rollback blocker: `timers` and `anims` hold closures (about 30 call sites in `battle.ts` and the card files), so a Battle can't be snapshotted yet. PR #44 restores snapshots in place, which gets around this.
+- Replays (`game/replay.ts`): a match is a list of round tapes (seed, decks, per-frame inputs) plus a rules fingerprint, so playback just reruns the Battle. `npm run replaycheck` checks a replay ends with the same hash.
 
 ## Netcode
 
@@ -125,6 +126,34 @@ flowchart LR
 - Draw picks travel in `packet.picks`; there is no pause online. Each round reseeds as `seed + r × 0x9e3779b9`.
 - Bump `PROTOCOL` whenever rules or packets change. 6 s of silence ends the match.
 - Rollback (in progress): predict the rival's input, snapshot every frame, rewind and replay on a late input.
+
+### Online services
+
+Everything online rides on the artifact's `room` presence plus a small `db` for ratings; there is no game server.
+
+```mermaid
+flowchart LR
+  menu[ONLINE menu] --> lobby["Lobby + chat<br/>presence field lb"]
+  menu --> rq["Ranked queue<br/>presence field rq"]
+  menu --> tb["Tournament bracket<br/>presence fields tb / tr"]
+  menu --> room[Create / join room code]
+  lobby --> match[Lockstep match]
+  rq --> match
+  tb --> match
+  room --> match
+  match --> elo["Elo update<br/>db ratings/{user}"]
+  match --> rep["Replay saved<br/>seed + inputs"]
+```
+
+| File | Job |
+| --- | --- |
+| `scenes/lobby.ts` | Who's online, chat, challenges |
+| `scenes/ranked.ts` | Queue, pairing, Elo in the artifact db (`ratings`), pending result recovery |
+| `scenes/tournament.ts` | Bracket host and players over presence |
+| `scenes/replays.ts` | Replay list and playback |
+
+- Both links must publish with the `room`, `db` (ratings rules) and `user` (profile) capabilities, or ranked breaks.
+- `npm run rankedcheck` exercises the ranked flow by hand.
 
 ## Characters and cards
 
@@ -220,13 +249,15 @@ The Battle calls `sfx()`, `sfxFx()` and `voiceLine()` directly; sounds never fee
 
 ## UI and screens
 
-One `Scene` at a time (`scenes/scene.ts`: `update`, `draw(world, tick, ui)`, `enter?`, `pad?`). Switch with `setScene(new X())`; there is no stack.
+One `Scene` at a time (`scenes/scene.ts`: `update`, `draw(world, tick, ui)`, `enter?`, `pad?`). Switch with `setScene(new X())`; there is no stack yet (PR #50 adds one).
 
 ```mermaid
 flowchart LR
   title[Title menu]
+  title -- ARCADE --> cs0[Character select] --> ar["Arcade ladder<br/>4 rivals + Shadow Self"] --> bs
   title -- VERSUS --> cs1[Character select] --> ss1[Stage select] --> bs[BattleScene]
-  title -- ONLINE --> lobby[Online lobby] --> cs2[Character select] --> ss2[Stage vote] --> ob[OnlineBattleScene]
+  title -- ONLINE --> om["Online menu<br/>LOBBY, RANKED MATCH, TOURNAMENT,<br/>MATCH, CREATE/JOIN ROOM"] --> cs2[Character select] --> ss2[Stage vote] --> ob[OnlineBattleScene]
+  title -- REPLAYS --> rp[Replay list] --> bs
   title -- TRAINING --> cs3[Character select] --> tr[TrainingScene]
   title -- TUTORIAL --> cs4[Character select] --> tu[TutorialScene]
   title -- DECK BUILDER --> db[Deck builder]
@@ -236,7 +267,7 @@ flowchart LR
 
 - `OnlineBattleScene` and `TrainingScene` extend `BattleScene`; `TutorialScene` drives one. Card previews run their own tiny muted Battle.
 - Menus are mouse-first: scenes register click zones while drawing (`zone(...)`), the next update reads `hotZone()`. Combat is keyboard or the touch pad (`engine/touch.ts`).
-- Saved in the browser: `svs:match`, `svs:deck:<class>`, key bindings, `svs:audio`, `svs:muted`, `svs:training`, `svs:tutorial`.
+- Saved in the browser: `svs:match`, `svs:deck:<class>`, key bindings, `svs:audio`, `svs:muted`, `svs:training`, `svs:tutorial`, `svs:arcade`, `svs:replays`, `svs:rating`, `svs:ranked-pending`. The save-module thread is moving all of these into one versioned save.
 
 ## CPU AI and styles
 
@@ -268,7 +299,7 @@ PR #29 adds `npm run balance` (worker-thread grid, ~750 matches/s), a script box
 flowchart LR
   src[src on latest main] --> tsc[tsc --noEmit] --> vite["vite build<br/>singlefile, inline assets"] --> page["scripts/artifact.mjs<br/>artifact.html"]
   page --> dev["Dev link<br/>npm run build, dev tools on"]
-  page --> prod["Main link<br/>npm run build:prod, room capability"]
+  page --> prod["Main link<br/>npm run build:prod, room + db + user capabilities"]
 ```
 
 | Link | Build |
@@ -280,21 +311,36 @@ Release: PR → Wes says "lgtm" → merge → rebuild from latest main → publi
 
 ## Testing and CI
 
-No test framework and no CI yet (no `.github/workflows`).
+`.github/workflows/ci.yml` runs on every PR.
 
-| Command | Run it when | Fails on |
+```mermaid
+flowchart LR
+  pr[Pull request] --> a["Job 1<br/>typecheck, dev build, prod build"]
+  a --> m["tests/matches.ts<br/>CPU vs CPU, every class pair"]
+  m --> n["netcheck 25<br/>online determinism"]
+  n --> c[combocheck]
+  pr --> b["Job 2: screens<br/>Playwright, every screen at 7 shapes"]
+  b --> d["Pixel diff vs base branch<br/>screens-report artifact"]
+```
+
+| Command | Where | Fails on |
 | --- | --- | --- |
-| `npm run typecheck` | Every change | Type errors, unused locals |
-| `npm run netcheck` | Rules or card changes | Two seeded battles with the same inputs drifting apart |
-| `npm run sim` | Rules, card or CPU changes | Crashes, stuck matches, surprising win rates |
-| `npm run combocheck` | Status or hitstun changes | Combo counter counting escapable hits |
-| `npm run build:prod` | Before publishing | All of the above plus a broken bundle |
+| `npm run typecheck` | CI | Type errors, unused locals |
+| `npx tsx tests/matches.ts` | CI | Crashes, stuck or broken full matches |
+| `npm run netcheck` | CI | Two seeded battles with the same inputs drifting apart |
+| `npm run combocheck` | CI | Combo counter counting escapable hits |
+| `tests/screens/run.ts` | CI | Screens changing vs the base branch (report, not a hard fail) |
+| `npm run replaycheck`, `npm run rankedcheck` | By hand | Replays not reproducing, ranked flow broken |
+| `npm run fuzz`, `npm run fuzz:ui` | By hand | Random inputs crashing the sim or the menus |
+| `npm run perf` | By hand | Frame time regressions |
+| `npm run sim` | By hand | Surprising win rates |
 
+New screens go in `tests/screens/harness.ts`.
 `window.__svs.getScene()` is exposed for automated playtests.
 
 ## In flight
 
-- Modularize for modding: PR #35 adds `src/content/registry.ts` (`Registry<T>`) and moves stages to `src/content/stages/`, plus `npm run golden`; class folders follow.
-- Rollback netcode: Battle state as plain data (timers and anims as records), then prediction with rewind and replay.
-- PR #41: CI, full-match regression tests and screenshot diffs at 7 screen shapes.
-- PR #29 balance tooling and CPU styles, #32 BN indicators, #34 hit feel, #36 panel effects, fuzz and perf, arcade ladder, replays, soundtrack.
+- Modularize (#35): `src/content/registry.ts` and `src/content/stages/`, plus `npm run golden`; class folders follow.
+- Rollback netcode (#44): snapshot restore in place, prediction, rewind and replay.
+- Engine primitives: scene stack and seeded CPU (#50), gamepads and platform layer (#49), one versioned save module (#48).
+- Touch UI (#51), balance tooling and CPU styles (#29), BN indicators (#32), hit feel (#34), soundtrack.
