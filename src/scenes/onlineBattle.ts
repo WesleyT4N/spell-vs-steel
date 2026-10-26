@@ -4,7 +4,7 @@ import { BattleScene } from './battle';
 import { TitleScene } from './title';
 import { Battle, heavyChargeOf, type Side } from '../game/battle';
 import { loadMatch } from '../game/match';
-import { battleHash } from '../net/hash';
+import { Lockstep } from '../net/lockstep';
 import { NO_INPUT, type NetInput } from '../net/protocol';
 import type { NetSession } from '../net/session';
 import { roundRecord, type RoundRecord } from '../game/stats';
@@ -14,22 +14,13 @@ import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { RESULT_SONG } from '../engine/music';
 import { listMouse } from './scene';
-import { win, RED_INK } from './skin';
-
-const STEP = 1 / 60;
+import { win, RED_INK, INK2 } from './skin';
 
 /** Seed for round `r` of a match, the same on both machines. */
 const roundSeed = (seed: number, r: number): number => (seed + Math.imul(r, 0x9e3779b9)) >>> 0;
 
 export class OnlineBattleScene extends BattleScene {
-  /** Next lockstep frame to run. */
-  frame = 0;
-  /** Presses seen while waiting on the other side, merged into the next scheduled input. */
-  private pend: NetInput | null = null;
-  /** Frames in a row spent waiting for the other side's input. */
-  stall = 0;
-  /** Picks sent for this Draw screen; waiting on the rival's. */
-  locked = false;
+  ls: Lockstep;
   waitingNext = false;
 
   constructor(public net: NetSession, score: [number, number], public roundNo: number, rounds: RoundRecord[] = []) {
@@ -43,14 +34,16 @@ export class OnlineBattleScene extends BattleScene {
     this.rivalName = 'RIVAL';
     this.pauseItems = ['RESUME', 'LEAVE MATCH'];
     net.beginRound(roundNo);
+    this.ls = new Lockstep(net, this.b);
   }
+
+  get locked(): boolean { return this.ls.locked; }
 
   protected rivalDeckText(): string { return `RIVAL: ${this.net.rival?.cls.toUpperCase() ?? ''}`; }
 
   protected confirmCustom(): void {
     if (this.locked) return;
-    this.locked = true;
-    this.net.setPicks(this.b.turn, this.picks);
+    this.ls.lock(this.picks);
     sfx('confirm');
   }
 
@@ -63,13 +56,7 @@ export class OnlineBattleScene extends BattleScene {
 
     if (b.phase === 'custom') {
       if (!this.locked) this.updateCustom(dt);
-      const theirs = net.remotePicks(b.turn);
-      if (this.locked && theirs) {
-        const mine = this.picks.slice();
-        b.endCustom(this.me === 0 ? [mine, theirs] : [theirs, mine]);
-        this.locked = false;
-        this.fightBanner = 0.9;
-      }
+      if (this.ls.settle()) this.fightBanner = 0.9;
       return;
     }
     if (b.phase === 'over') { this.updateResult(dt); return; }
@@ -79,30 +66,7 @@ export class OnlineBattleScene extends BattleScene {
     else if (b.phase === 'fight' && wasPressed('pause')) { this.paused = true; this.pauseSel = 0; resetSel(); sfx('select'); }
     const live = b.phase === 'fight' && !this.paused;
     const now: NetInput = live ? { ...this.playerIntent(dt), draw: wasPressed('custom') } : NO_INPUT;
-    this.pend = this.pend ? merge(this.pend, now) : now;
-
-    // run one frame, or two when the other side is ahead of us
-    const behind = net.remoteContig - net.remoteDelay > this.frame + 2;
-    for (let n = behind ? 2 : 1; n > 0; n--) {
-      if (net.scheduled <= this.frame + net.delay) {
-        net.pushLocal(this.pend ?? held(now));
-        this.pend = null;
-      }
-      const theirs = net.remoteInput(this.frame), mine = net.localInput(this.frame);
-      if (!theirs || !mine) { this.stall++; break; }
-      this.stall = 0;
-      const ins: [NetInput, NetInput] = this.me === 0 ? [mine, theirs] : [theirs, mine];
-      this.frame++;
-      if (b.phase === 'fight' && (ins[0].draw || ins[1].draw) && b.canOpenCustom()) {
-        b.beginCustom();
-        this.openCustom();
-        this.paused = false;
-        break;
-      }
-      b.update(STEP, ins);
-      if (this.frame % 30 === 0) net.recordHash(this.frame, battleHash(b));
-      if ((b.phase as string) !== 'fight' && (b.phase as string) !== 'ko') break;
-    }
+    if (this.ls.advance(now) === 'custom') { this.openCustom(); this.paused = false; }
     for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / heavyChargeOf(f)) : null);
     if ((b.phase as string) === 'over' && !this.ended) {
       this.ended = true;
@@ -162,7 +126,7 @@ export class OnlineBattleScene extends BattleScene {
 
   private quit(): void {
     if (this.net.status !== 'left') this.net.leave();
-    else this.net.transport.close();
+    else this.net.close();
     stopMusic();
     setScene(new TitleScene());
   }
@@ -179,9 +143,15 @@ export class OnlineBattleScene extends BattleScene {
       drawTextCentered(ui, tick % 8 < 6 ? 'WAITING FOR' : '', 358, 157, RED_INK, 1, false);
       drawTextCentered(ui, 'RIVAL...', 358, 168, RED_INK, 1, false);
     }
-    if ((b.phase === 'fight' || b.phase === 'ko') && this.stall > 20) {
-      win(ui, UW / 2 - 90, 139, 180, 20, { burn: 3 });
-      drawTextCentered(ui, 'WAITING FOR RIVAL...', UW / 2, 146, RED_INK, 1, false);
+    // the other side went quiet (anywhere in the match): say why, and how long the game will wait
+    const quiet = net.status === 'reconnecting' || net.rivalAway;
+    if (quiet || ((b.phase === 'fight' || b.phase === 'ko') && this.ls.stall > 20)) {
+      const msg = net.rivalAway ? 'RIVAL SWITCHED AWAY' : net.status === 'reconnecting' ? `RECONNECTING... ${Math.ceil(net.graceLeft)}` : 'WAITING FOR RIVAL...';
+      const sub = !quiet ? '' : net.rivalAway ? 'THE MATCH WAITS FOR THEM' : 'THE MATCH PICKS UP WHERE IT WAS';
+      const w = Math.max(180, textWidth(msg), textWidth(sub)) + 24;
+      win(ui, UW / 2 - w / 2, 139, w, quiet ? 32 : 20, { burn: 3 });
+      drawTextCentered(ui, msg, UW / 2, 146, RED_INK, 1, false);
+      if (sub) drawTextCentered(ui, sub, UW / 2, 158, INK2, 1, false);
     }
     if (b.phase === 'over' && this.waitingNext) {
       win(ui, 360, 38, 112, 20, { burn: 3 });
@@ -195,12 +165,3 @@ export class OnlineBattleScene extends BattleScene {
     }
   }
 }
-
-function merge(a: NetInput, b: NetInput): NetInput {
-  return {
-    move: b.move ?? a.move, held: b.held, attackHeld: b.attackHeld,
-    attackPressed: a.attackPressed || b.attackPressed, castPressed: a.castPressed || b.castPressed, draw: a.draw || b.draw,
-  };
-}
-/** Same held keys, no new presses. */
-const held = (i: NetInput): NetInput => ({ ...NO_INPUT, held: i.held, attackHeld: i.attackHeld });

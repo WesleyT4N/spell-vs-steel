@@ -70,6 +70,8 @@ export class Cpu {
     // the Rogue's Throwing Knife flies down the whole row
     const heavyReach = f.cls === 'rogue' ? seen && aligned : inReach && (f.cls !== 'priest' || dist === TUNING.priest.smiteRange);
     const need = heavyChargeOf(f);
+    // the press that started the hold never landed (we were flinching or locked): let go, or we'd hold forever
+    if (this.holding && !f.charging && f.lock <= 0) this.holding = false;
     if (this.holding) {
       if (f.charge >= need && heavyReach) this.holding = false; // release fires the heavy
       else if (f.charge > need + 1.5) this.holding = false;
