@@ -3,6 +3,7 @@
 import type { ClassId } from '../art/sprites';
 import { CLIPS } from './voiceClips';
 
+/** grunt/hurt/hurtBig have no clips yet (TTS can't do them); those calls stay silent until recordings land. */
 export type VoiceKind = 'grunt' | 'cast' | 'castBig' | 'hurt' | 'hurtBig' | 'death' | 'win';
 
 const PRIORITY: Record<VoiceKind, number> = { grunt: 1, cast: 1, hurt: 2, castBig: 3, hurtBig: 3, win: 4, death: 5 };
