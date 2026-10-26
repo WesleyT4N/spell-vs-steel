@@ -1,23 +1,21 @@
-// Online Versus lobby: pick your fighter, then create a room (and share its code or link) or join one.
+// Online Versus lobby: create a room (and share its code or link) or join one. Fighters and the stage
+// are picked together once both players are in (see select.ts and stageSelect.ts).
 import { setScene, hint, zone, hot, listMouse, button, showSel, type Scene } from './scene';
-import { PLAYABLE } from '../game/classes';
 import { getArena } from '../game/battleView';
-import { getSprite, drawFighterSprite, teamColor, SKINS, skinOf, type ClassId } from '../art/sprites';
+import { getSprite, drawFighterSprite, teamColor, skinOf } from '../art/sprites';
 import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, captureNextKey, k, mouse } from '../engine/input';
 import { touchActive, touchCodeBox, touchText } from '../engine/touch';
 import { sfx } from '../engine/audio';
 import { loadMatch, saveMatch, playerDeck, type MatchConfig } from '../game/match';
-import { loadCustom, validate, STARTER_NAME } from '../game/deck';
 import { CODE_LEN, isCodeChar, newRoomCode } from '../net/protocol';
 import { NetSession } from '../net/session';
 import { openTransport, pickTransport, type TransportKind } from '../net/transport';
-import { OnlineBattleScene } from './onlineBattle';
+import { CharSelectScene } from './select';
 import { TitleScene } from './title';
 
-const CLASSES: ClassId[] = PLAYABLE;
-const ROWS = ['YOU', 'SKIN', 'DECK', 'MATCH', 'CREATE ROOM', 'JOIN ROOM'] as const;
+const ROWS = ['MATCH', 'CREATE ROOM', 'JOIN ROOM'] as const;
 type RowName = (typeof ROWS)[number];
 type Mode = 'menu' | 'code' | 'busy' | 'room' | 'error';
 
@@ -45,17 +43,9 @@ export class OnlineScene implements Scene {
     });
   }
 
-  private customValid(): boolean {
-    const d = loadCustom(this.m.p1);
-    return !!d && validate(d).length === 0;
-  }
-
   private change(row: RowName, d: 1 | -1): void {
     const cycle = <T>(list: readonly T[], v: T): T => list[(list.indexOf(v) + d + list.length) % list.length];
-    if (row === 'YOU') { this.m.p1 = cycle(CLASSES, this.m.p1); this.m.p1Deck = 'starter'; }
-    else if (row === 'SKIN') this.m.p1Skin[this.m.p1] = cycle(SKINS[this.m.p1].map(s => s.id), skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id);
-    else if (row === 'DECK') this.m.p1Deck = this.m.p1Deck === 'starter' ? 'custom' : 'starter';
-    else if (row === 'MATCH') this.m.bestOf = cycle([1, 3, 5] as const, this.m.bestOf);
+    if (row === 'MATCH') this.m.bestOf = cycle([1, 3, 5] as const, this.m.bestOf);
     else return;
     sfx('move');
     saveMatch(this.m);
@@ -85,7 +75,6 @@ export class OnlineScene implements Scene {
 
   private async connect(role: 'host' | 'guest'): Promise<void> {
     if (!this.kind) return;
-    if (this.m.p1Deck === 'custom' && !this.customValid()) { this.fail('YOUR CUSTOM DECK IS NOT READY'); return; }
     this.mode = 'busy';
     this.msg = role === 'host' ? 'OPENING ROOM...' : `JOINING ${this.code}...`;
     this.waitT = 0;
@@ -138,8 +127,7 @@ export class OnlineScene implements Scene {
       const net = this.net!;
       net.tick();
       if (net.status === 'error' || net.status === 'left') { this.net = null; this.fail(net.status === 'left' ? 'THE OTHER PLAYER LEFT' : net.error); return; }
-      if (net.matched && net.myReady === 0) { net.myReady = 1; sfx('confirm'); }
-      if (net.matched && net.remoteReady >= 1 && net.myReady >= 1) { setScene(new OnlineBattleScene(net, [0, 0], 1)); return; }
+      if (net.matched) { sfx('confirm'); setScene(new CharSelectScene(net)); return; }
       if (mouse.click && hot('btn') === 1) this.copy();
       if (back || (mouse.click && hot('btn') === 2)) this.cancel();
       return;
@@ -171,8 +159,6 @@ export class OnlineScene implements Scene {
     frame(ui, 16, 36, 104, 124, '#000000', teamColor(this.m.p1, skin, false));
     drawTextCentered(ui, 'YOU', 68, 42, '#fcfcfc', 1, false);
     drawFighterSprite(ui, getSprite(this.m.p1, skin, false), 68, 140 - bob * 2, false, 'none', 4);
-    const deck = this.m.p1Deck === 'starter' ? STARTER_NAME[this.m.p1].toUpperCase() : 'CUSTOM';
-    drawTextCentered(ui, deck, 68, 148, '#bcbcbc', 1, false);
 
     if (this.mode === 'menu') this.drawRows(ui, tick);
     else this.drawPanel(ui, tick);
@@ -184,9 +170,9 @@ export class OnlineScene implements Scene {
     const lines = [
       'ONE PLAYER PICKS CREATE ROOM AND SHARES THE 5-LETTER CODE.',
       'THE OTHER OPENS THIS SAME PAGE, PICKS JOIN ROOM, TYPES IT IN.',
-      'THE HOST\'S MATCH LENGTH IS USED. EITHER PLAYER CAN OPEN THE',
-      'DRAW SCREEN. THE FIGHT WAITS UNTIL BOTH HAVE PICKED.',
-      'THERE IS NO PAUSE ONLINE. ESC OPENS A MENU TO LEAVE.',
+      'THEN BOTH PICK FIGHTERS AND VOTE ON THE STAGE (SPLIT VOTES',
+      'FLIP A COIN). THE HOST\'S MATCH LENGTH IS USED. EITHER PLAYER',
+      'CAN OPEN THE DRAW SCREEN. THERE IS NO PAUSE ONLINE.',
     ];
     lines.forEach((l, i) => drawText(ui, l, 26, 198 + i * 12, '#bcbcbc'));
     drawText(ui, `NETWORK: ${this.kind ? NET_NAME[this.kind] : 'CHECKING...'}`, 26, 266, '#7c7c7c');
@@ -209,9 +195,6 @@ export class OnlineScene implements Scene {
       }
       drawText(ui, row, RX + 14, ty, on ? '#fcfcfc' : '#bcbcbc');
       let value = '';
-      if (row === 'YOU') value = this.m.p1.toUpperCase();
-      if (row === 'SKIN') value = skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id.toUpperCase();
-      if (row === 'DECK') value = this.m.p1Deck === 'starter' ? `STARTER: ${STARTER_NAME[this.m.p1].toUpperCase()}` : `CUSTOM${this.customValid() ? '' : ' (NOT READY)'}`;
       if (row === 'MATCH') value = this.m.bestOf === 1 ? 'SINGLE ROUND' : `BEST OF ${this.m.bestOf}`;
       const vx = RX + RW - 16, vw = textWidth(value);
       drawText(ui, value, vx - vw, ty, '#fcfcfc');
