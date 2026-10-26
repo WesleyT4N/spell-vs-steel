@@ -1,5 +1,6 @@
 // Character select: a roster row of fighters, your pick on the left and the CPU's (or your rival's) on the right.
 // Pick a fighter, then a skin; against the CPU you then pick its fighter the same way. Stage select comes next.
+// The tutorial uses it too, to pick the class to learn (the right side shows the training dummy).
 import { setScene, hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
 import { PLAYABLE, CLASS_INFO } from '../game/classes';
 import { getArena } from '../game/battleView';
@@ -14,6 +15,7 @@ import type { NetSession } from '../net/session';
 import { DeckBuilderScene } from './deckbuilder';
 import { StageSelectScene } from './stageSelect';
 import { TitleScene } from './title';
+import { TutorialScene, type TutorialClass } from './tutorial';
 
 /** Roster tiles: every playable class, then RANDOM. */
 const TILES = PLAYABLE.length + 1;
@@ -47,8 +49,8 @@ export class CharSelectScene implements Scene {
   locked = false;
   msg = '';
   msgT = 0;
-  /** Online: the session whose rival fills the right-hand slot. */
-  constructor(private net?: NetSession, startAt: Step = 0) {
+  /** Online: the session whose rival fills the right-hand slot. `tutorial`: pick the class to learn, then start it. */
+  constructor(private net?: NetSession, startAt: Step = 0, private tutorial = false) {
     this.step = net ? 0 : startAt;
     this.cur = this.tileOf(this.slotClass(this.step >= 2 && !net ? 1 : 0));
     if (net) this.sync();
@@ -101,6 +103,7 @@ export class CharSelectScene implements Scene {
   }
 
   private advance(): void {
+    if (this.tutorial) { sfx('select'); setScene(new TutorialScene(this.m.p1 as TutorialClass)); return; }
     if (this.step === 1 && !this.net) { this.step = 2; this.cur = this.tileOf(this.m.cpu); sfx('select'); }
     else if (this.step === 1 || this.step === 3) { this.step = 4; this.chip = this.chips.length - 1; sfx('select'); }
   }
@@ -177,7 +180,7 @@ export class CharSelectScene implements Scene {
         return;
       }
       if (chip >= 0) { this.chip = chip; this.activateChip(this.chips[chip]); this.sync(); return; }
-      if (!net && isHot('panel:1') && this.step !== 2) { this.step = 2; this.cur = this.tileOf(this.m.cpu); sfx('move'); return; }
+      if (!net && !this.tutorial && isHot('panel:1') && this.step !== 2) { this.step = 2; this.cur = this.tileOf(this.m.cpu); sfx('move'); return; }
       if (isHot('panel:0') && this.step !== 0) { this.step = 0; this.cur = this.tileOf(this.m.p1); sfx('move'); this.sync(); return; }
     }
 
@@ -205,7 +208,7 @@ export class CharSelectScene implements Scene {
     getArena().draw(c, tick, 0);
     c.fillStyle = 'rgba(0,0,24,0.6)';
     c.fillRect(0, 0, W, H);
-    drawTextCentered(ui, 'CHOOSE YOUR FIGHTER', UW / 2, 8, '#f8b800', 2);
+    drawTextCentered(ui, this.tutorial ? 'TUTORIAL' : 'CHOOSE YOUR FIGHTER', UW / 2, 8, '#f8b800', 2);
 
     const net = this.net, rl = net?.rivalLobby, rival = net?.rival;
     // what each slot shows: the hovered tile while choosing, the pick after
@@ -219,7 +222,9 @@ export class CharSelectScene implements Scene {
       if (choosing && showSel()) return { cls: this.cur === RANDOM ? null : PLAYABLE[this.cur], skin: '' };
       return { cls: this.slotClass(s), skin: s === 0 ? this.mySkin() : this.cpuSkin() };
     };
-    for (const s of [0, 1] as const) this.drawSlot(ui, s, showing(s), tick);
+    this.drawSlot(ui, 0, showing(0), tick);
+    if (this.tutorial) this.drawDummy(ui);
+    else this.drawSlot(ui, 1, showing(1), tick);
 
     // VS and the matchup
     drawTextCentered(ui, 'VS', UW / 2, 76, '#f8b800', 4);
@@ -255,7 +260,7 @@ export class CharSelectScene implements Scene {
     }
 
     // option chips
-    if (this.step === 4 || !net) {
+    if (!this.tutorial && (this.step === 4 || !net)) {
       const chips = this.chips, cw = net ? 140 : 86, gap = 6, x0 = Math.round(UW / 2 - (chips.length * cw + (chips.length - 1) * gap) / 2);
       chips.forEach((ch, i) => {
         const x = x0 + i * (cw + gap), on = this.step === 4 && this.chip === i && showSel();
@@ -276,7 +281,7 @@ export class CharSelectScene implements Scene {
       return;
     }
     const keys = `${k('left')}/${k('right')}`;
-    hint(ui, this.step === 1 || this.step === 3 ? `${keys}: SKIN   ${k('attack')} / CLICK A COLOR: OK   ${k('cast')}: BACK`
+    hint(ui, this.step === 1 || this.step === 3 ? `${keys}: SKIN   ${k('attack')} / CLICK A COLOR: ${this.tutorial ? 'START' : 'OK'}   ${k('cast')}: BACK`
       : this.locked ? `${k('cast')} / RIGHT-CLICK: LEAVE ROOM`
         : this.step === 4 ? `${keys}: MOVE   ${k('attack')}: CHANGE   ${k('cast')} / RIGHT-CLICK: BACK`
           : `${keys} OR HOVER: CHOOSE   ${k('attack')} / CLICK: PICK   ${k('cast')} / RIGHT-CLICK: BACK`);
@@ -290,10 +295,22 @@ export class CharSelectScene implements Scene {
       if (rl?.step === 2) return { text: 'RIVAL IS LOCKED IN', color: '#58d854', blink: false };
       return null;
     }
+    if (this.tutorial) return { text: this.step === 0 ? 'PICK A CLASS TO LEARN' : 'PICK A COLOR TO START', color: '#fcfcfc', blink: this.step === 0 };
     if (this.step === 0) return { text: 'PICK YOUR FIGHTER', color: '#fcfcfc', blink: true };
     if (this.step === 2) return { text: 'PICK THE CPU FIGHTER', color: '#fcfcfc', blink: true };
     if (this.step === 1 || this.step === 3) return { text: 'PICK A COLOR', color: '#fcfcfc', blink: true };
     return null;
+  }
+
+  /** Tutorial: the opponent is always the training dummy. */
+  private drawDummy(ui: Ctx): void {
+    const x = PX[1], cx = x + PW / 2;
+    frame(ui, x, PY, PW, PH, '#000000', '#7c7c7c');
+    drawTextCentered(ui, 'OPPONENT', cx, PY + 8, '#7c7c7c', 1, false);
+    drawFighterSprite(ui, getSprite('mage', SKINS.mage[0].id, false), cx, PY + 86, true, 'ghost', 3);
+    P(ui, '#3c3c3c', cx - 20, PY + 87, 40, 2);
+    drawTextCentered(ui, 'DUMMY', cx, PY + 94, '#bcbcbc', 2, false);
+    ['A TRAINING DUMMY', 'ABOUT 5 MINUTES', 'OF LESSONS'].forEach((l, i) => drawTextCentered(ui, l, cx, PY + 112 + i * 9, '#7c7c7c', 1, false));
   }
 
   private drawSlot(ui: Ctx, s: 0 | 1, show: { cls: ClassId | null; skin: string }, tick: number): void {
