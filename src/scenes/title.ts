@@ -7,7 +7,7 @@ import type { FrameId } from '../art/fighterFrames';
 import { FIRE as FIRE_RAMP, STEEL, SHADOW, HOLY } from '../game/fxView';
 import { P, W, UW, UH, view, screenRect, clamp, dith, type Ctx } from '../engine/gfx';
 import { PLAYABLE } from '../game/classes';
-import { drawText, drawTextCentered, textWidth } from '../engine/font';
+import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, navPressed, anyPressed, k, mouse, page } from '../engine/input';
 import type { PadMode } from '../engine/touch';
 import { playMusic, sfx, isMuted } from '../engine/audio';
@@ -284,8 +284,9 @@ export class TitleScene implements Scene {
       const x = scale > 1 ? UW / 2 + textWidth('TUTORIAL', scale) / 2 + 8 : UW / 2 + 40;
       drawText(ui, 'NEW!', x, MENU_Y + ITEMS.indexOf('TUTORIAL') * gap + Math.round((gap - 17) / 2), RED_INK);
     }
-    drawTextCentered(ui, `${DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2'}   -   DESIGNED BY WES   -   BUILT BY CLAUDE`, UW / 2, versionY, '#fcfcfc');
-    if (isMuted()) drawText(ui, 'MUTED', 8, 8, '#7c7c7c');
+    drawTextOutlined(ui, DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2', 8, 8, '#fcfcfc');
+    drawTextCentered(ui, 'DESIGNED BY WES   -   BUILT BY CLAUDE', UW / 2, versionY, '#fcfcfc');
+    if (isMuted()) drawTextOutlined(ui, 'MUTED', 8, 22, '#fcfcfc');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   M: MUTE`);
   }
 }
