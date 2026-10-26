@@ -16,8 +16,8 @@ export const TUNING = {
   moveCooldown: 0.1,
   /** Global cooldown: minimum seconds between two spell casts. */
   castCooldown: 1.0,
-  /** Every freeze and stun lasts at least castCooldown + this, so the attacker always gets one full follow-up cast. */
-  ccFollowUp: 0.75,
+  /** Every freeze and stun lasts at least castCooldown + this (2s), so the attacker always gets one full follow-up cast. */
+  ccFollowUp: 1.0,
 
   /** Holding the attack button this long arms the heavy attack. */
   heavyCharge: 1.0,
@@ -59,7 +59,7 @@ export const TUNING = {
     /** After a backstab the Rogue may keep acting from in front of the enemy this long before blinking home. */
     backstabWindow: 2,
     /** Vanish: the next attack spell stuns for this long. */
-    vanishStun: 1.75,
+    vanishStun: 2,
     riposteDamage: 80,
   },
 
