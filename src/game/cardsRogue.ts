@@ -59,7 +59,7 @@ export const rogue: CardDef[] = [
     id: 'evasion', name: 'Evasion', cls: 'rogue', cost: 1, rarity: 'common', element: 'shadow', damaging: false, lock: 0.15,
     dmg: '-', short: 'Dodge the next 2 hits within 3s.',
     cast: x => { x.f.st.evasion = 3; x.f.dodges = 2; x.b.addFx('smoke', x.f.side, x.f.col, x.f.row, 0.3); },
-    ai: (b, f) => b.projectiles.some(p => p.side !== f.side) || b.foe(f).charging || b.marks.length > 0,
+    ai: (b, f) => b.projectiles.some(p => p.side !== f.side) || b.foe(f).charging || b.warns.some(w => w.side !== f.side),
   },
   {
     id: 'kick', name: 'Kick', cls: 'rogue', cost: 1, rarity: 'common', element: 'steel', damaging: true, lock: 0.3,
@@ -77,6 +77,7 @@ export const rogue: CardDef[] = [
       const { b, f } = x;
       const c = f.col + 3 * x.dir, r = f.row, r2 = r < 2 ? r + 1 : r - 1;
       const cells: Array<[number, number]> = [[c, r], [c + x.dir, r], [c, r2], [c + x.dir, r2]];
+      // a lobbed shot you can see in the air, like BN's MiniBomb: no panel warning
       b.addFx('lob', f.side, f.col, r, 0.4, { to: c, color: '#b8f818' });
       b.later(0.4, () => {
         for (const [cc, rr] of cells) {
@@ -113,8 +114,11 @@ export const rogue: CardDef[] = [
     dmg: '50', short: 'Knives hit all 3 panels of the enemy front column.',
     cast: x => {
       const col = x.b.frontCol(x.foe.side);
-      for (let r = 0; r < 3; r++) x.b.addFx('stab', x.f.side, col, r, 0.25);
-      x.b.strike(x.f, [[col, 0], [col, 1], [col, 2]], 50 * x.mult, { spell: true, element: 'steel' });
+      const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
+      x.b.warn(x.f, cells, TUNING.warnTime, () => {
+        for (let r = 0; r < 3; r++) x.b.addFx('stab', x.f.side, col, r, 0.25);
+        x.b.strike(x.f, cells, 50 * x.mult, { spell: true, element: 'steel' });
+      });
     },
     ai: (b, f) => b.foe(f).col === b.frontCol(b.foe(f).side),
   },
@@ -131,7 +135,7 @@ export const rogue: CardDef[] = [
     id: 'cloak_of_shadows', name: 'Cloak of Shadows', cls: 'rogue', cost: 2, rarity: 'uncommon', element: 'shadow', damaging: false, lock: 0.15,
     dmg: '-', short: 'Immune to spells for 3s (basics still hit). Removes Poison, burning and freeze.',
     cast: x => { x.b.cleanse(x.f); x.f.st.spellImmune = 3; },
-    ai: (b, f) => f.poison >= 2 || b.marks.some(m => m.col === f.col && m.row === f.row),
+    ai: (b, f) => f.poison >= 2 || b.warned(f.col, f.row, f.side),
   },
   {
     id: 'pickpocket', name: 'Pickpocket', cls: 'rogue', cost: 0, rarity: 'uncommon', element: 'steel', damaging: true, lock: 0.25,

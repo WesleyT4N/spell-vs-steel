@@ -203,8 +203,7 @@ export const priest: CardDef[] = [
     cast: x => {
       const { b, f } = x;
       const cells = allEnemyPanels(b, f.side);
-      for (const [c, r] of cells) b.mark(c, r, 1.5, '#f8d878');
-      b.later(1.5, () => {
+      b.warn(f, cells, 1.5, () => {
         b.shake = 0.4; b.cheer = 2;
         for (const [c, r] of cells) b.addFx('holyPillar', f.side, c, r, 0.45);
         b.strike(f, cells, 80 * x.mult, { spell: true, element: 'holy' });
