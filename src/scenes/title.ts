@@ -19,7 +19,7 @@ import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
 import { RED_INK } from './skin';
 
-const ITEMS = ['VERSUS', 'ONLINE VERSUS', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
+const ITEMS = ['VERSUS MODE', 'ONLINE MODE', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
 
 // seven rows in dev builds still clear the version line
 const MENU_Y = ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 6 ? 16 : 18;
@@ -73,8 +73,8 @@ export class TitleScene implements Scene {
     if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
       sfx('select');
       const item = ITEMS[this.sel];
-      if (item === 'VERSUS') setScene(new CharSelectScene());
-      if (item === 'ONLINE VERSUS') setScene(new OnlineScene());
+      if (item === 'VERSUS MODE') setScene(new CharSelectScene());
+      if (item === 'ONLINE MODE') setScene(new OnlineScene());
       if (item === 'TRAINING') setScene(new CharSelectScene(undefined, 0, 'training'));
       if (item === 'TUTORIAL') setScene(new CharSelectScene(undefined, 0, 'tutorial'));
       if (item === 'DECK BUILDER') setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
