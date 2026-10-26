@@ -14,7 +14,7 @@ import { heavyChargeOf } from './battle';
 import type { Battle, BlessKind, Fighter, Fx, Pet, Projectile, Side, StatusKey, Trap, Wall } from './battle';
 import { CLASS_INFO } from './classes';
 
-import { ARC, FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawBurn, drawFrozen, drawFx, drawParticles, drawShot } from './fxView';
+import { ARC, FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, useParticles } from './fxView';
 
 /** Whose hidden things (traps, a stealthed fighter) are visible: one side's, or everything in the dev sandbox. */
 export type Viewer = Side | 'all';
@@ -27,6 +27,7 @@ export function useStage(id: string): void { arena = getStage(id); }
 
 export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): void {
   const a = getArena();
+  useParticles(b);
   c.save();
   if (b.shake > 0) c.translate(Math.round((Math.random() - 0.5) * 4 * Math.min(1, b.shake * 4)), Math.round((Math.random() - 0.5) * 3 * Math.min(1, b.shake * 4)));
   drawStage(c, a, tick, b.cheer);
