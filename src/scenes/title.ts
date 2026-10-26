@@ -9,11 +9,11 @@ import { wasPressed, navPressed, k } from '../engine/input';
 import type { PadMode } from '../engine/touch';
 import { playMusic, sfx, isMuted } from '../engine/audio';
 import { MENU_SONG } from '../engine/music';
-import { SetupScene } from './setup';
+import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { OptionsScene } from './options';
 import { OnlineScene } from './online';
-import { TutorialScene, tutorialDone } from './tutorial';
+import { tutorialDone } from './tutorial';
 import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
 
@@ -71,9 +71,9 @@ export class TitleScene implements Scene {
     if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
       sfx('select');
       const item = ITEMS[this.sel];
-      if (item === 'VERSUS CPU') setScene(new SetupScene());
+      if (item === 'VERSUS CPU') setScene(new CharSelectScene());
       if (item === 'ONLINE VERSUS') setScene(new OnlineScene());
-      if (item === 'TUTORIAL') setScene(new TutorialScene());
+      if (item === 'TUTORIAL') setScene(new CharSelectScene(undefined, 0, true));
       if (item === 'DECK BUILDER') setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
       if (item === 'OPTIONS') setScene(new OptionsScene(() => setScene(new TitleScene())));
       // loaded on demand, so the prod build (DEV_TOOLS off) carries none of the dev tools code

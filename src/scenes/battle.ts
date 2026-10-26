@@ -21,7 +21,7 @@ import { touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
 import { drawCardDetail, drawCardFace, resName, resColor, CARD_W, CARD_H, PICKED } from './cardView';
-import { SetupScene } from './setup';
+import { CharSelectScene } from './select';
 import { TitleScene } from './title';
 import { OptionsScene } from './options';
 
@@ -211,7 +211,7 @@ export class BattleScene implements Scene {
       const choice = this.resultItems[this.resultSel];
       if (choice === 'NEXT ROUND') setScene(new BattleScene(this.m, this.score));
       if (choice === 'REMATCH') setScene(new BattleScene(this.m));
-      if (choice === 'CHARACTER SELECT') setScene(new SetupScene());
+      if (choice === 'CHARACTER SELECT') setScene(new CharSelectScene());
       if (choice === 'TITLE') setScene(new TitleScene());
     }
   }

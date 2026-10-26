@@ -1,20 +1,21 @@
 // Interactive tutorial for players new to Battle Network: a scripted fight against a training dummy.
 // It drives a regular BattleScene (so the fight and the Draw screen look and play exactly like a match)
 // and layers lessons, goals and pointers on top. Every step can be skipped from the pause menu.
-import { setScene, dim, drawMenu, hint, listMouse, isHot, showSel, resetSel, type Scene } from './scene';
+import { setScene, dim, drawMenu, hint, listMouse, isHot, resetSel, type Scene } from './scene';
 import { BattleScene } from './battle';
 import { TitleScene } from './title';
-import { SetupScene } from './setup';
+import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { Battle, NO_INTENT, COLS, type Fighter, type Intent, type Mark, type Projectile } from '../game/battle';
-import { drawBattle, getArena } from '../game/battleView';
+import { drawBattle } from '../game/battleView';
+import { CLASS_INFO } from '../game/classes';
 import type { Cpu } from '../game/ai';
 import { CARDS } from '../game/cards';
 import { starterDeck, toList } from '../game/deck';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
-import { getSprite, drawFighterSprite, defaultSkin } from '../art/sprites';
-import { P, W, H, UW, UH, frame, type Ctx } from '../engine/gfx';
+import { defaultSkin, type ClassId } from '../art/sprites';
+import { P, UW, UH, frame, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, wrap } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
@@ -29,8 +30,6 @@ function markDone(): void {
   try { localStorage.setItem(DONE_KEY, '1'); } catch { /* storage blocked */ }
 }
 
-/** The dummy's home column: the middle of its side, in reach of the Warrior's sword from the player's front column. */
-const DUMMY_COL = 4;
 const SHOT_DAMAGE = 30;
 const FINALE_HP = 300;
 /** Index of the Draw gauge lesson; the gauge stays empty before it so the Draw screen can't open early. */
@@ -38,19 +37,147 @@ const GAUGE_STEP = 4;
 /** Basic hits dealing at least this much were heavies (light hits are 6-11 even on a frozen target). */
 const HEAVY_MIN = 18;
 
-/** Hands dealt on the tutorial's Draw screen: cheap spells that show off cost, order and aiming. */
-// The tutorial teaches the two launch classes only.
-type TutorialClass = 'warrior' | 'mage';
-const LESSON_HAND: Record<TutorialClass, string[]> = {
-  warrior: ['battle_shout', 'step_slash', 'guard', 'lunge', 'execute'],
-  mage: ['arcane_missiles', 'ignite', 'arcane_focus', 'frost_nova', 'fireball'],
-};
-const LESSON_TRY: Record<TutorialClass, string> = {
-  warrior: 'TRY BATTLE SHOUT, THEN STEP SLASH',
-  mage: 'TRY ARCANE MISSILES, THEN IGNITE',
+interface Page { title: string; body: string[] }
+
+/** Every playable class (the tutorial follows PLAYABLE; the Cleric joins once it has lessons). */
+export type TutorialClass = Exclude<ClassId, 'cleric'>;
+
+/** What changes per class: how the basics reach, how the resource works, and the spells shown off. */
+interface ClassLessons {
+  /** The dummy's home column: in reach of the class's light attack from the player's front column. */
+  dummyCol: number;
+  /** Hand dealt on the tutorial's Draw screen: cheap spells that show off cost, order and aiming. */
+  hand: string[];
+  tryText: string;
+  light: string[];
+  lightTip: string;
+  /** Heavy lesson: how this class gets its resource. */
+  resLine: string;
+  heavyTip: string;
+  /** Point at the resource meter during the heavy lesson (it fills from fighting). */
+  pointRes: boolean;
+  dodgeLine?: string;
+  spend: Page;
+  castLine: string;
+  /** Goal tip when the next spell can't be paid for. */
+  short: string;
+  /** The resource only comes back at the next Draw: a full queue can strand the player. */
+  refillsAtDraw: boolean;
+  ccLine: string;
+}
+
+const LESSONS: Record<TutorialClass, ClassLessons> = {
+  warrior: {
+    dummyCol: 4,
+    hand: ['battle_shout', 'step_slash', 'guard', 'lunge', 'execute'],
+    tryText: 'TRY BATTLE SHOUT, THEN STEP SLASH',
+    light: [
+      `TAP {attack} TO SWING YOUR SWORD. IT HITS THE 2 PANELS IN FRONT OF YOU.`,
+      'THE DUMMY STANDS IN THE MIDDLE OF ITS SIDE, SO MOVE TO YOUR FRONT COLUMN (THE ONE NEXT TO THE BLUE PANELS) AND LINE UP IN ITS ROW.',
+      'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. CHASE IT!',
+    ],
+    lightTip: 'GET IN ITS ROW, IN REACH, AND TAP {attack}',
+    resLine: 'WARRIORS RUN ON RAGE (TOP LEFT). EVERY HEAVY THAT LANDS BUILDS 1.5 RAGE. LIGHT ATTACKS BUILD NONE.',
+    heavyTip: 'HOLD {attack} UNTIL HEAVY!, THEN RELEASE. WATCH YOUR RAGE FILL',
+    pointRes: true,
+    dodgeLine: 'A SILVER LINING FOR WARRIORS: TAKING DAMAGE BUILDS RAGE TOO.',
+    spend: {
+      title: 'SPENDING RAGE',
+      body: [
+        'EVERY SPELL COSTS RAGE, PAID WHEN YOU CAST IT IN THE FIGHT. YOU HAVE THE RAGE FROM YOUR HEAVY HITS (TOP RIGHT).',
+        'CHEAP SPELLS LIKE GUARD (0) AND STEP SLASH (1) KEEP YOU BUSY. SAVE UP FOR BIG ONES LIKE EXECUTE (3).',
+        'NOT ENOUGH RAGE WHEN YOU CAST? NOTHING HAPPENS UNTIL YOU BUILD MORE, SO KEEP SWINGING.',
+      ],
+    },
+    castLine: 'BATTLE SHOUT MAKES YOUR NEXT SPELL HIT 50% HARDER. ORDER MATTERS!',
+    short: 'NEED RAGE: LAND HEAVY HITS TO BUILD IT',
+    refillsAtDraw: false,
+    ccLine: 'WARRIOR SPELLS LIKE CHAIN HOOK STUN. LAND ONE, THEN FOLLOW UP WITH YOUR HARDEST HITTER.',
+  },
+  mage: {
+    dummyCol: 4,
+    hand: ['arcane_missiles', 'ignite', 'arcane_focus', 'frost_nova', 'fireball'],
+    tryText: 'TRY ARCANE MISSILES, THEN IGNITE',
+    light: [
+      `TAP {attack} TO FIRE A BOLT FROM YOUR STAFF. IT FLIES DOWN YOUR WHOLE ROW AND HITS THE FIRST THING IN ITS WAY.`,
+      'ALL THAT MATTERS IS BEING IN THE SAME ROW AS YOUR TARGET, SO YOU CAN STAY BACK WHERE IT IS SAFE.',
+      'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. FOLLOW IT!',
+    ],
+    lightTip: 'GET IN ITS ROW AND TAP {attack}',
+    resLine: 'MAGES RUN ON MANA (TOP LEFT). ATTACKS DON\'T BUILD MANA: IT COMES FROM THE DRAW SCREEN, WHICH YOU WILL SEE SOON.',
+    heavyTip: 'HOLD {attack} UNTIL HEAVY!, THEN RELEASE',
+    pointRes: false,
+    spend: {
+      title: 'SPENDING MANA',
+      body: [
+        'EVERY SPELL COSTS MANA (TOP RIGHT). MANA REFILLS TO FULL EACH TIME YOU OPEN THIS SCREEN, AND YOUR MAX GROWS BY 1 EACH TIME, UP TO 5.',
+        'YOU HAVE 2 MANA NOW. KEEP THE TOTAL COST OF YOUR PICKS WITHIN IT: IT TURNS RED WHEN YOU GO OVER.',
+        'EARLY TURNS ARE SMALL, LATE TURNS ARE HUGE. THAT IS THE MAGE\'S GAME.',
+      ],
+    },
+    castLine: 'ARCANE MISSILES HOME IN WHEREVER THE TARGET IS. IGNITE SETS THE TARGET\'S COLUMN ON FIRE.',
+    short: 'NOT ENOUGH MANA. IT REFILLS AT THE NEXT DRAW',
+    refillsAtDraw: true,
+    ccLine: 'MAGE FROST SPELLS LIKE FROST NOVA FREEZE. FREEZE FIRST, THEN HIT HARD.',
+  },
+  rogue: {
+    // the dagger only reaches 1 panel, so the dummy waits at the front of its side
+    dummyCol: 3,
+    hand: ['shadowstep', 'shiv', 'kick', 'evasion', 'vanish'],
+    tryText: 'TRY SHADOWSTEP, THEN SHIV',
+    light: [
+      `TAP {attack} TO STAB WITH YOUR DAGGERS. IT HITS ONLY THE PANEL RIGHT IN FRONT OF YOU, SO YOU HAVE TO GET CLOSE.`,
+      'FOR NOW THE DUMMY STANDS AT THE FRONT OF ITS SIDE. MOVE TO YOUR FRONT COLUMN (THE ONE NEXT TO THE BLUE PANELS) AND LINE UP IN ITS ROW.',
+      'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. CHASE IT!',
+    ],
+    lightTip: 'GET IN ITS ROW, IN YOUR FRONT COLUMN, AND TAP {attack}',
+    resLine: 'ROGUES RUN ON ENERGY (TOP LEFT). ATTACKS DON\'T BUILD IT: IT TOPS UP TO FULL AT EVERY DRAW SCREEN, WHICH YOU WILL SEE SOON. YOUR HEAVY IS A THROWING KNIFE THAT FLIES DOWN THE ROW.',
+    heavyTip: 'HOLD {attack} UNTIL HEAVY!, THEN RELEASE',
+    pointRes: false,
+    spend: {
+      title: 'SPENDING ENERGY',
+      body: [
+        'EVERY SPELL COSTS ENERGY (TOP RIGHT). IT TOPS UP TO 5 EACH TIME YOU OPEN THIS SCREEN, SO SPEND IT ALL.',
+        'ROGUES WIN BY CHAINING CHEAP SPELLS FAST. MOST OF THESE COST 1, AND SHIV HITS TWICE AS HARD RIGHT AFTER ANOTHER SPELL.',
+        'KEEP THE TOTAL COST OF YOUR PICKS WITHIN 5: IT TURNS RED WHEN YOU GO OVER.',
+      ],
+    },
+    castLine: 'SHADOWSTEP BLINKS YOU IN FRONT OF THE DUMMY AND STABS IT. YOU GET 2 SECONDS THERE BEFORE YOU BLINK HOME, SO CAST SHIV RIGHT AWAY.',
+    short: 'NOT ENOUGH ENERGY. IT REFILLS AT THE NEXT DRAW',
+    refillsAtDraw: true,
+    ccLine: 'ROGUE SPELLS LIKE KIDNEY SHOT STUN, AND VANISH MAKES YOUR NEXT ATTACK SPELL STUN. STUN FIRST, THEN STRIKE.',
+  },
+  ranger: {
+    dummyCol: 4,
+    hand: ['steady_focus', 'hawk_strike', 'net', 'multi_shot', 'power_shot'],
+    tryText: 'TRY STEADY FOCUS, THEN HAWK STRIKE',
+    light: [
+      `TAP {attack} TO LOOSE AN ARROW. IT FLIES DOWN YOUR WHOLE ROW AND HITS THE FIRST THING IN ITS WAY.`,
+      'ALL THAT MATTERS IS BEING IN THE SAME ROW AS YOUR TARGET, SO YOU CAN STAY BACK WHERE IT IS SAFE.',
+      'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. FOLLOW IT!',
+    ],
+    lightTip: 'GET IN ITS ROW AND TAP {attack}',
+    resLine: 'RANGERS RUN ON ENERGY (TOP LEFT). STAND STILL FOR 2 SECONDS TO GAIN 1, AND EVERY DRAW SCREEN GIVES 1 MORE. A GOOD SPOT IS WORTH HOLDING.',
+    heavyTip: 'HOLD {attack} UNTIL HEAVY!, THEN RELEASE. STAND STILL TO BUILD ENERGY',
+    pointRes: true,
+    spend: {
+      title: 'SPENDING ENERGY',
+      body: [
+        'EVERY SPELL COSTS ENERGY (TOP RIGHT), PAID WHEN YOU CAST IT IN THE FIGHT. YOU KEEP BUILDING IT BY STANDING STILL, UP TO 5.',
+        'STEADY FOCUS COSTS 0: IT ROOTS YOU IN PLACE AND GIVES 2 ENERGY. HAWK STRIKE (1) DIVES ON THE ENEMY WHEREVER THEY ARE.',
+        'NOT ENOUGH ENERGY WHEN YOU CAST? NOTHING HAPPENS UNTIL YOU BUILD MORE, SO HOLD STILL.',
+      ],
+    },
+    castLine: 'STEADY FOCUS ROOTS YOU FOR 4 SECONDS AND MAKES YOUR HITS 25% STRONGER. HAWK STRIKE FINDS THE DUMMY IN ANY ROW.',
+    short: 'NEED ENERGY: STAND STILL TO BUILD IT',
+    refillsAtDraw: false,
+    ccLine: 'RANGER TRAPS LIKE FREEZING TRAP FREEZE. TRAP THEIR PATH, THEN SHOOT.',
+  },
 };
 
-interface Page { title: string; body: string[] }
+/** A lesson line with the player's current key bindings filled in. */
+const keyed = (s: string): string => s.replace(/\{(\w+)\}/g, (_m, a: string) => k(a as Parameters<typeof k>[0]));
+const L = (t: TutorialScene): ClassLessons => LESSONS[t.cls];
 interface Point { x: number; y: number; dir: '←' | '→' | '↑' | '↓' }
 
 interface Step {
@@ -80,7 +207,7 @@ const AT_RESOURCE: Point = { x: 106, y: 41, dir: '←' };
 const AT_GAUGE: Point = { x: UW / 2 + 76, y: 8, dir: '←' };
 const AT_NEXT_SPELL: Point = { x: 18, y: UH - 40, dir: '↓' };
 
-const res = (t: TutorialScene): string => (t.cls === 'warrior' ? 'RAGE' : 'MANA');
+const res = (t: TutorialScene): string => CLASS_INFO[t.cls].res;
 
 const STEPS: Step[] = [
   // 1. the grid
@@ -114,21 +241,11 @@ const STEPS: Step[] = [
     pages: t => [
       {
         title: 'LIGHT ATTACK',
-        body: t.cls === 'warrior'
-          ? [
-            `TAP ${k('attack')} TO SWING YOUR SWORD. IT HITS THE 2 PANELS IN FRONT OF YOU.`,
-            'THE DUMMY STANDS IN THE MIDDLE OF ITS SIDE, SO MOVE TO YOUR FRONT COLUMN (THE ONE NEXT TO THE BLUE PANELS) AND LINE UP IN ITS ROW.',
-            'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. CHASE IT!',
-          ]
-          : [
-            `TAP ${k('attack')} TO FIRE A BOLT FROM YOUR STAFF. IT FLIES DOWN YOUR WHOLE ROW AND HITS THE FIRST THING IN ITS WAY.`,
-            'ALL THAT MATTERS IS BEING IN THE SAME ROW AS YOUR TARGET, SO YOU CAN STAY BACK WHERE IT IS SAFE.',
-            'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. FOLLOW IT!',
-          ],
+        body: L(t).light.map(keyed),
       },
     ],
     goal: () => 'HIT THE DUMMY WITH LIGHT ATTACKS',
-    tip: t => (t.cls === 'warrior' ? `GET IN ITS ROW, IN REACH, AND TAP ${k('attack')}` : `GET IN ITS ROW AND TAP ${k('attack')}`),
+    tip: t => keyed(L(t).lightTip),
     need: 3,
     check: (t, ev) => {
       for (let i = 0; i < ev.light && t.progress < 3; i++) {
@@ -146,16 +263,14 @@ const STEPS: Step[] = [
         body: [
           `HOLD ${k('attack')}. A METER FILLS UNDER YOUR FEET, AND WHEN IT FLASHES HEAVY! LET GO.`,
           'A HEAVY HITS ABOUT 4 TIMES HARDER THAN A LIGHT ATTACK, BUT WHILE YOU CHARGE IT YOU ARE EASY TO READ. A BIG ENOUGH HIT ALSO MAKES YOU FLINCH AND LOSE THE CHARGE.',
-          ...(t.cls === 'warrior'
-            ? ['WARRIORS RUN ON RAGE (TOP LEFT). EVERY HEAVY THAT LANDS BUILDS 1.5 RAGE. LIGHT ATTACKS BUILD NONE.']
-            : ['MAGES RUN ON MANA (TOP LEFT). ATTACKS DON\'T BUILD MANA: IT COMES FROM THE DRAW SCREEN, WHICH YOU WILL SEE SOON.']),
+          L(t).resLine,
         ],
       },
     ],
     goal: () => 'LAND HEAVY ATTACKS ON THE DUMMY',
-    tip: t => `HOLD ${k('attack')} UNTIL HEAVY!, THEN RELEASE` + (t.cls === 'warrior' ? '. WATCH YOUR RAGE FILL' : ''),
+    tip: t => keyed(L(t).heavyTip),
     need: 2,
-    point: t => (t.cls === 'warrior' ? AT_RESOURCE : null),
+    point: t => (L(t).pointRes ? AT_RESOURCE : null),
     check: (t, ev) => {
       for (let i = 0; i < ev.heavy; i++) t.bump();
       return t.progress >= 2;
@@ -169,7 +284,7 @@ const STEPS: Step[] = [
         body: [
           'ENEMIES FIGHT BACK. MOST ATTACKS TRAVEL STRAIGHT DOWN A ROW, SO THE ROW YOU STAND IN IS THE ROW YOU GET HIT IN.',
           'THE DUMMY WILL LINE UP WITH YOU AND SHOOT. ITS ROW FLASHES RED JUST BEFORE THE SHOT. STEP UP OR DOWN TO GET OUT OF THE WAY.',
-          ...(t.cls === 'warrior' ? ['A SILVER LINING FOR WARRIORS: TAKING DAMAGE BUILDS RAGE TOO.'] : []),
+          ...(L(t).dodgeLine ? [L(t).dodgeLine!] : []),
         ],
       },
     ],
@@ -219,35 +334,19 @@ const STEPS: Step[] = [
           'EVERY ROUND STARTS ON THIS SCREEN, AND YOU COME BACK EACH TIME THE GAUGE FILLS. IN A MATCH YOU HAVE 20 SECONDS TO CHOOSE. HERE THE CLOCK IS STOPPED.',
         ],
       },
-      t.cls === 'warrior'
-        ? {
-          title: 'SPENDING RAGE',
-          body: [
-            'EVERY SPELL COSTS RAGE, PAID WHEN YOU CAST IT IN THE FIGHT. YOU HAVE THE RAGE FROM YOUR HEAVY HITS (TOP RIGHT).',
-            'CHEAP SPELLS LIKE GUARD (0) AND STEP SLASH (1) KEEP YOU BUSY. SAVE UP FOR BIG ONES LIKE EXECUTE (3).',
-            'NOT ENOUGH RAGE WHEN YOU CAST? NOTHING HAPPENS UNTIL YOU BUILD MORE, SO KEEP SWINGING.',
-          ],
-        }
-        : {
-          title: 'SPENDING MANA',
-          body: [
-            'EVERY SPELL COSTS MANA (TOP RIGHT). MANA REFILLS TO FULL EACH TIME YOU OPEN THIS SCREEN, AND YOUR MAX GROWS BY 1 EACH TIME, UP TO 5.',
-            'YOU HAVE 2 MANA NOW. KEEP THE TOTAL COST OF YOUR PICKS WITHIN IT: IT TURNS RED WHEN YOU GO OVER.',
-            'EARLY TURNS ARE SMALL, LATE TURNS ARE HUGE. THAT IS THE MAGE\'S GAME.',
-          ],
-        },
+      L(t).spend,
       {
         title: 'PICK YOUR SPELLS',
         body: [
           'CLICK CARDS TO QUEUE THEM. YOU CAST THEM IN THE ORDER YOU PICK THEM (CAST ORDER, RIGHT). RIGHT-CLICK UNDOES A PICK.',
           'SPELLS YOU SKIP GO BACK INTO YOUR GRIMOIRE. SPELLS YOU PICK BUT NEVER CAST ARE THROWN AWAY AT THE NEXT DRAW, SO DON\'T TAKE MORE THAN YOU CAN USE.',
-          `${LESSON_TRY[t.cls]}. THEN CLICK FIGHT! OR PRESS ${k('custom')}.`,
+          `${L(t).tryText}. THEN CLICK FIGHT! OR PRESS ${k('custom')}.`,
         ],
       },
     ],
-    goal: t => `PICK SPELLS, THEN FIGHT!   ${LESSON_TRY[t.cls]}`,
+    goal: t => `PICK SPELLS, THEN FIGHT!   ${L(t).tryText}`,
     start: t => {
-      t.b.offer[0] = [...LESSON_HAND[t.cls]];
+      t.b.offer[0] = [...L(t).hand];
       t.b.offer[1] = [];
     },
     check: t => t.b.phase === 'fight',
@@ -260,29 +359,27 @@ const STEPS: Step[] = [
         body: [
           `PRESS ${k('cast')} TO CAST THE NEXT SPELL IN YOUR QUEUE. IT IS SHOWN BOTTOM LEFT, WITH HOW MANY MORE ARE WAITING.`,
           'MOST SPELLS FIRE DOWN YOUR ROW OR HIT THE PANELS IN FRONT OF YOU, SO LINE UP WITH THE DUMMY FIRST.',
-          ...(t.cls === 'warrior'
-            ? ['BATTLE SHOUT MAKES YOUR NEXT SPELL HIT 50% HARDER. ORDER MATTERS!']
-            : ['ARCANE MISSILES HOME IN WHEREVER THE TARGET IS. IGNITE SETS THE TARGET\'S COLUMN ON FIRE.']),
+          L(t).castLine,
         ],
       },
     ],
     goal: t => (t.me.queue.length ? `CAST YOUR SPELLS WITH ${k('cast')}` : 'CAST YOUR SPELLS'),
     tip: t => {
       const top = t.me.queue[0] ? CARDS[t.me.queue[0]] : null;
-      if (top && !t.b.canAfford(t.me, top)) return t.cls === 'warrior' ? 'NEED RAGE: LAND HEAVY HITS TO BUILD IT' : 'NOT ENOUGH MANA. IT REFILLS AT THE NEXT DRAW';
+      if (top && !t.b.canAfford(t.me, top)) return L(t).short;
       return 'LINE UP WITH THE DUMMY FIRST';
     },
     point: t => (t.me.queue.length ? AT_NEXT_SPELL : null),
     start: t => {
       t.castCount = 0;
       t.stuckT = 0;
-      if (!t.me.queue.length) t.me.queue = [LESSON_HAND[t.cls][1]];
+      if (!t.me.queue.length) t.me.queue = [L(t).hand[1]];
     },
     check: (t, ev) => {
       t.castCount += ev.casts;
-      // a Mage who queued more than their Mana can pay for is stuck until the next draw: count what they did
+      // a Mage or Rogue who queued more than they can pay for is stuck until the next draw: count what they did
       const top = t.me.queue[0] ? CARDS[t.me.queue[0]] : null;
-      if (top && t.cls === 'mage' && !t.b.canAfford(t.me, top) && t.castCount > 0) t.stuckT += 1 / 60;
+      if (top && L(t).refillsAtDraw && !t.b.canAfford(t.me, top) && t.castCount > 0) t.stuckT += 1 / 60;
       return t.me.queue.length === 0 || t.stuckT > 2.5;
     },
   },
@@ -293,9 +390,7 @@ const STEPS: Step[] = [
         title: 'FREEZE AND STUN',
         body: [
           'SOME SPELLS FREEZE OR STUN. A FROZEN OR STUNNED FIGHTER CAN\'T MOVE OR ACT, AND TAKES 50% MORE DAMAGE FROM EVERYTHING.',
-          t.cls === 'warrior'
-            ? 'WARRIOR SPELLS LIKE CHAIN HOOK STUN. LAND ONE, THEN FOLLOW UP WITH YOUR HARDEST HITTER.'
-            : 'MAGE FROST SPELLS LIKE FROST NOVA FREEZE. FREEZE FIRST, THEN HIT HARD.',
+          L(t).ccLine,
           'GUARDS AND SHIELDS ARE THE OTHER SIDE OF IT: THEY SOAK UP HITS FOR A FEW SECONDS.',
         ],
       },
@@ -338,6 +433,8 @@ class Dummy {
   /** Seconds left on the red warning before a shot, or -1 when not warning. */
   warn = -1;
   shots: Shot[] = [];
+  /** Home column, set per class (see ClassLessons.dummyCol). */
+  col = 4;
 
   /** Hop to a random other row (light attack lesson). */
   hop(t: TutorialScene): void {
@@ -396,7 +493,8 @@ class Dummy {
     this.moveT -= dt;
     let move: Intent['move'] = null;
     if (this.moveT <= 0 && f.lock <= 0) {
-      if (f.col !== DUMMY_COL && b.canStand(f, f.col + Math.sign(DUMMY_COL - f.col), f.row)) move = f.col > DUMMY_COL ? 'left' : 'right';
+      const home = this.col;
+      if (f.col !== home && b.canStand(f, f.col + Math.sign(home - f.col), f.row)) move = f.col > home ? 'left' : 'right';
       else if (this.targetRow !== null && f.row !== this.targetRow) move = f.row < this.targetRow ? 'down' : 'up';
       if (move) this.moveT = 0.22;
     }
@@ -406,10 +504,6 @@ class Dummy {
 }
 
 export class TutorialScene implements Scene {
-  cls: TutorialClass = 'warrior';
-  /** Picking a class before the lessons start. */
-  choosing = true;
-  chooseSel = 0;
   inner!: BattleScene;
   dummy = new Dummy();
   step = 0;
@@ -431,6 +525,9 @@ export class TutorialScene implements Scene {
   private flashes: Array<[number, number, string]> = [];
   private myMarks: Mark[] = [];
 
+  /** The class is picked on the character select (see CharSelectScene's tutorial mode). */
+  constructor(public cls: TutorialClass) { this.begin(cls); }
+
   get b(): Battle { return this.inner.b; }
   get me(): Fighter { return this.b.f[0]; }
   get dummyF(): Fighter { return this.b.f[1]; }
@@ -439,14 +536,12 @@ export class TutorialScene implements Scene {
   enter(): void { playMusic('battle', BATTLE_SONG); }
 
   pad(): PadMode {
-    if (this.choosing || this.paused) return 'back';
+    if (this.paused) return 'back';
     if (this.done) return 'none';
     return this.b.phase === 'custom' ? 'none' : this.inner.pad();
   }
 
   private begin(cls: TutorialClass): void {
-    this.cls = cls;
-    this.choosing = false;
     const saved = loadMatch();
     const m: MatchConfig = { ...saved, p1: cls, p1Deck: 'starter', cpu: 'mage', difficulty: 'easy', bestOf: 1 };
     this.inner = new BattleScene(m);
@@ -457,7 +552,7 @@ export class TutorialScene implements Scene {
     this.inner.cpu = this.dummy as unknown as Cpu;
     // matches open on the Draw screen; the tutorial starts straight in the fight and gets there later
     this.b.endCustom([[], []]);
-    this.dummyF.col = DUMMY_COL;
+    this.dummy.col = this.dummyF.col = LESSONS[cls].dummyCol;
     this.startStep(0);
   }
 
@@ -510,7 +605,6 @@ export class TutorialScene implements Scene {
   private quiet(): void { chargeHum(0, null); chargeHum(1, null); }
 
   update(dt: number): void {
-    if (this.choosing) { this.updateChoose(dt); return; }
     if (this.done) { this.updateDone(dt); return; }
     if (this.paused) { this.updatePause(dt); return; }
     const b = this.b;
@@ -582,20 +676,6 @@ export class TutorialScene implements Scene {
       (mouse.click && isHot('fight')) || (wasPressed('confirm') && this.inner.cursor === offer.length);
   }
 
-  private updateChoose(dt: number): void {
-    const items = 3;
-    if (navPressed('up', dt)) { this.chooseSel = (this.chooseSel + items - 1) % items; sfx('move'); }
-    if (navPressed('down', dt)) { this.chooseSel = (this.chooseSel + 1) % items; sfx('move'); }
-    const clicked = listMouse('menu', this.chooseSel, i => { this.chooseSel = i; sfx('move'); });
-    if (clicked >= 0) this.chooseSel = clicked;
-    if (wasPressed('back') || mouse.rclick) { sfx('back'); stopMusic(); setScene(new TitleScene()); return; }
-    if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
-      sfx('select');
-      if (this.chooseSel === 2) { stopMusic(); setScene(new TitleScene()); return; }
-      this.begin(this.chooseSel === 0 ? 'warrior' : 'mage');
-    }
-  }
-
   private static PAUSE = ['RESUME', 'SKIP THIS STEP', 'RESTART TUTORIAL', 'QUIT TO TITLE'];
   private updatePause(dt: number): void {
     const items = TutorialScene.PAUSE.length;
@@ -608,12 +688,12 @@ export class TutorialScene implements Scene {
       sfx('select');
       this.paused = false;
       if (this.pauseSel === 1) { this.dummy.shooting = false; this.dummy.warn = -1; this.next(); }
-      if (this.pauseSel === 2) setScene(new TutorialScene());
+      if (this.pauseSel === 2) setScene(new TutorialScene(this.cls));
       if (this.pauseSel === 3) { stopMusic(); setScene(new TitleScene()); }
     }
   }
 
-  private static DONE = ['VERSUS CPU', 'DECK BUILDER', 'TRY THE OTHER CLASS', 'TITLE'];
+  private static DONE = ['VERSUS CPU', 'DECK BUILDER', 'TRY ANOTHER CLASS', 'TITLE'];
   private updateDone(dt: number): void {
     const items = TutorialScene.DONE.length;
     const clicked = listMouse('menu', this.doneSel, i => { this.doneSel = i; sfx('move'); });
@@ -624,16 +704,15 @@ export class TutorialScene implements Scene {
       sfx('select');
       stopMusic();
       const choice = TutorialScene.DONE[this.doneSel];
-      if (choice === 'VERSUS CPU') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); setScene(new SetupScene()); }
+      if (choice === 'VERSUS CPU') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); setScene(new CharSelectScene()); }
       if (choice === 'DECK BUILDER') setScene(new DeckBuilderScene(this.cls, () => setScene(new TitleScene())));
-      if (choice === 'TRY THE OTHER CLASS') { const t = new TutorialScene(); setScene(t); t.begin(this.cls === 'warrior' ? 'mage' : 'warrior'); }
+      if (choice === 'TRY ANOTHER CLASS') setScene(new CharSelectScene(undefined, 0, true));
       if (choice === 'TITLE') setScene(new TitleScene());
     }
   }
 
   // ---------- drawing ----------
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    if (this.choosing) { this.drawChoose(c, tick, ui); return; }
     const b = this.b;
     // past the knockout the match's own results screen stays hidden behind ours
     if (this.done) { drawBattle(c, b, tick); this.drawDone(ui, tick); return; }
@@ -705,30 +784,6 @@ export class TutorialScene implements Scene {
     const more = last ? (this.cur.draw ? 'PICK SPELLS' : 'GO!') : 'NEXT';
     if (tick % 8 < 6) drawText(ui, `→ ${more}`, x + w - 14 - (more.length + 2) * 6, y + h - 14, '#f8b800');
     hint(ui, `CLICK OR ${k('attack')}: ${last ? 'START' : 'NEXT'}${this.page > 0 ? `   ${k('cast')}: BACK` : ''}   ESC: MENU`);
-  }
-
-  private drawChoose(c: Ctx, tick: number, ui: Ctx): void {
-    getArena().draw(c, tick, 0);
-    c.fillStyle = 'rgba(0,0,24,0.55)';
-    c.fillRect(0, 0, W, H);
-    const bob = Math.floor(performance.now() / 400) % 2;
-    drawFighterSprite(c, getSprite('warrior', defaultSkin('warrior'), false), 36, 130 - (this.chooseSel === 0 && showSel() ? bob : 0), false, 'none', 2);
-    drawFighterSprite(c, getSprite('mage', defaultSkin('mage'), false), 204, 130 - (this.chooseSel === 1 && showSel() ? bob : 0), true, 'none', 2);
-    drawTextCentered(ui, 'TUTORIAL', UW / 2, 28, '#f8b800', 3);
-    drawTextCentered(ui, 'LEARN TO FIGHT AGAINST A TRAINING DUMMY. ABOUT 5 MINUTES.', UW / 2, 60, '#bcbcbc', 1, false);
-    drawTextCentered(ui, 'WHICH CLASS DO YOU WANT TO LEARN?', UW / 2, 74, '#fcfcfc', 1, false);
-    drawMenu(ui, ['WARRIOR', 'MAGE', 'BACK'], this.chooseSel, UW / 2, 112, tick, { width: 160, gap: 24 });
-    const blurb = !showSel() ? '' : this.chooseSel === 0
-      ? 'SWORD AND SHIELD. FIGHTS UP CLOSE AND BUILDS RAGE BY LANDING HEAVY HITS AND TAKING DAMAGE.'
-      : this.chooseSel === 1
-        ? 'STAFF AND SPELLBOOK. FIGHTS FROM RANGE, WITH MANA THAT GROWS EVERY DRAW UNTIL MAGES HIT HARDEST OF ALL.'
-        : '';
-    if (blurb) {
-      const lines = wrap(blurb, 34);
-      frame(ui, UW / 2 - 110, 196, 220, 12 + lines.length * 10, '#000000', '#7c7c7c');
-      lines.forEach((l, i) => drawTextCentered(ui, l, UW / 2, 203 + i * 10, '#bcbcbc', 1, false));
-    }
-    hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   ${k('cast')}: BACK`);
   }
 
   private drawDone(ui: Ctx, tick: number): void {

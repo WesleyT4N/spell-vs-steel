@@ -1,6 +1,8 @@
 // Draws a Battle: arena, panels, fighters, spell effects and the HUD.
 import { k } from '../engine/input';
-import { Colosseum, drawPanel, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState } from '../art/arena';
+import { drawPanel, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState } from '../art/arena';
+import { getStage } from '../art/stages';
+import type { Stage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, type Tint } from '../art/sprites';
 import { P, UW, UH, blob, frame, glow, type Ctx } from '../engine/gfx';
 import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '../engine/font';
@@ -16,8 +18,11 @@ import { ARC, HOLY, TOX, drawBurn, drawFrozen, drawFx, drawParticles, drawShot }
 /** Whose hidden things (traps, a stealthed fighter) are visible: one side's, or everything in the dev sandbox. */
 export type Viewer = Side | 'all';
 
-let arena: Colosseum | null = null;
-export const getArena = (): Colosseum => (arena ??= new Colosseum());
+let arena: Stage | null = null;
+/** The current stage: the one picked for the latest match, which the menus show behind them too. */
+export const getArena = (): Stage => (arena ??= getStage('colosseum'));
+/** Switch the stage that fights (and menus) are drawn on. */
+export function useStage(id: string): void { arena = getStage(id); }
 
 export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): void {
   const a = getArena();
@@ -38,7 +43,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): voi
         if (f.st.frostNova > 0 && !f.frostNovaUsed && p.owner !== f.side && Math.abs(col - f.col) <= TUNING.frostNovaRange) hl = '#a4e4fc';
       }
     }
-    drawPanel(c, col, r, state, tick, p.owner, hl);
+    drawPanel(c, col, r, state, tick, p.owner, hl, a);
   }
   // Frost Nova / Glacial zones get a frosty tint on the trigger columns
   for (const f of b.f) {
