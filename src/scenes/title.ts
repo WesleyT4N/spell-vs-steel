@@ -22,7 +22,7 @@ import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
 import { RED_INK } from './skin';
 
-const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'DECK BUILDER', 'REPLAYS', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
+const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'SPELL DECK BUILDER', 'REPLAYS', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
 
 // eight rows (nine in dev builds) still clear the version line
 const MENU_Y = ITEMS.length > 8 ? 156 : ITEMS.length > 7 ? 162 : ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 8 ? 14 : ITEMS.length > 7 ? 15 : ITEMS.length > 6 ? 16 : 18;
@@ -186,7 +186,7 @@ export class TitleScene implements Scene {
       if (item === 'ONLINE MODE') pushScene(new OnlineScene());
       if (item === 'TRAINING MODE') pushScene(new CharSelectScene(undefined, 0, 'training'));
       if (item === 'TUTORIAL') pushScene(new CharSelectScene(undefined, 0, 'tutorial'));
-      if (item === 'DECK BUILDER') pushScene(new DeckBuilderScene(loadMatch().p1));
+      if (item === 'SPELL DECK BUILDER') pushScene(new DeckBuilderScene(loadMatch().p1));
       if (item === 'REPLAYS') pushScene(new ReplaysScene());
       if (item === 'OPTIONS') pushScene(new OptionsScene());
       // loaded on demand, so the prod build (DEV_TOOLS off) carries none of the dev tools code
