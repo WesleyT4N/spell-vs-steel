@@ -15,9 +15,9 @@ export const TUNING = {
   /** Minimum seconds between any two steps, taps included, so nobody can jitter back and forth. A tap during it is buffered. */
   moveCooldown: 0.1,
   /** Global cooldown: minimum seconds between two spell casts. */
-  castCooldown: 1.0,
-  /** Every freeze and stun lasts at least castCooldown + this (2s), so the attacker always gets one full follow-up cast. */
-  ccFollowUp: 1.0,
+  castCooldown: 0.5,
+  /** Shortest freeze or stun in seconds, so the attacker always gets a follow-up cast in. */
+  ccMin: 2,
 
   /** Holding the attack button this long arms the heavy attack. */
   heavyCharge: 1.0,

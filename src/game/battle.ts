@@ -969,7 +969,7 @@ export class Battle {
 
   freeze(f: Fighter, t: number): void {
     if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
-    f.st.frozen = Math.max(f.st.frozen, t, ccMin());
+    f.st.frozen = Math.max(f.st.frozen, t, TUNING.ccMin);
     f.charging = false;
     this.text(f, 'FROZEN', '#3cbcfc');
     sfx('freeze', { pan: panOf(f.col) });
@@ -977,7 +977,7 @@ export class Battle {
 
   stun(f: Fighter, t: number): void {
     if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
-    f.st.stunned = Math.max(f.st.stunned, t, ccMin());
+    f.st.stunned = Math.max(f.st.stunned, t, TUNING.ccMin);
     f.charging = false;
     this.text(f, 'STUN', '#f8b800');
   }
@@ -1291,9 +1291,6 @@ export interface CastCtx {
   /** How many other spells this fighter cast in the last `secs` seconds (Shiv, Kidney Shot). */
   castsWithin: (secs: number) => number;
 }
-
-/** Shortest freeze or stun: one global cooldown plus time to land the follow-up. */
-const ccMin = (): number => TUNING.castCooldown + TUNING.ccFollowUp;
 
 /** Seconds to arm a fighter's heavy attack. */
 export function heavyChargeOf(f: Fighter): number {
