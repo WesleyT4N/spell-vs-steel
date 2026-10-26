@@ -1196,7 +1196,8 @@ export class Battle {
     f.poseT = 0.3;
     f.lock = Math.max(f.lock, card.lock ?? 0.3);
     const big = card.rarity === 'legendary' || card.rarity === 'mythic' || card.cost === 'all' || card.cost >= 4;
-    voiceLine(f.cls, big ? 'castBig' : 'cast', panOf(f.col), f.side);
+    // big spells always get a line; everyday casts only some of the time so it doesn't get chatty
+    if (big || Math.random() < 0.6) voiceLine(f.cls, big ? 'castBig' : 'cast', panOf(f.col), f.side, card.element);
 
     if (foe.st.counterspell > 0 && card.id !== 'counterspell') {
       foe.st.counterspell = 0;

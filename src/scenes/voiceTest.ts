@@ -5,7 +5,7 @@ import { drawStage } from '../art/arena';
 import { UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
-import { sfx, voiceLine, announce, stopSpeech } from '../engine/audio';
+import { sfx, voiceLine, announce } from '../engine/audio';
 import { CLASS_IDS, CLASS_INFO } from '../game/classes';
 import type { VoiceKind } from '../engine/voice';
 import type { Call } from '../engine/announcer';
@@ -23,8 +23,8 @@ export class VoiceTestScene implements Scene {
   constructor(private back: () => void) {}
 
   private play(): void {
-    if (this.row < CLASS_IDS.length) voiceLine(CLASS_IDS[this.row], KINDS[this.col], 0, 0);
-    else { stopSpeech(); announce(CALLS[this.col], { n: 2, who: CLASS_INFO[CLASS_IDS[Math.floor(Math.random() * 4)]].name }); }
+    if (this.row < CLASS_IDS.length) voiceLine(CLASS_IDS[this.row], KINDS[this.col], 0, 0, this.row === 1 && this.col === 1 ? ['fire', 'frost', 'arcane'][Math.floor(Math.random() * 3)] : undefined);
+    else { announce(CALLS[this.col], { n: 2, who: CLASS_INFO[CLASS_IDS[Math.floor(Math.random() * 4)]].name }); }
   }
 
   update(dt: number): void {
@@ -36,7 +36,7 @@ export class VoiceTestScene implements Scene {
     const h = hot('cell');
     if (h >= 0 && mouse.click) { this.row = Math.floor(h / 10); this.col = h % 10; this.play(); return; }
     if (wasPressed('confirm')) this.play();
-    if (wasPressed('back') || mouse.rclick) { sfx('back'); stopSpeech(); this.back(); }
+    if (wasPressed('back') || mouse.rclick) { sfx('back'); this.back(); }
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {

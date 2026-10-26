@@ -1,58 +1,8 @@
-// Fighting-game announcer: the browser's own speech voice, pitched low and slowed down, over synthesized
-// stingers (drum hits, a crash, a crowd roar) in a big stone hall. No audio files.
-// If the browser has no speech voice the stingers still play, and the banners on screen carry the words.
+// Fighting-game announcer: recorded lines (voiceClips, from scripts/voices) over synthesized stingers
+// (drum hits, a crash, a crowd roar) in a big stone hall.
+import { playAnnouncerLine } from './voice';
 
 export type Call = 'round' | 'final' | 'fight' | 'ko' | 'perfect' | 'wins' | 'match';
-
-/** Words for each call. `{n}` is the round number, `{who}` the winner's class. */
-const WORDS: Record<Call, string> = {
-  round: 'Round {n}!',
-  final: 'Final round!',
-  fight: 'Fight!',
-  ko: 'K. O.!',
-  perfect: 'Perfect!',
-  wins: '{who} wins!',
-  match: '{who} wins the match!',
-};
-const NUM = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
-
-// ---------- speech ----------
-// Deep, clear English voices first; any English voice after that.
-const PREFER = [/daniel/i, /google uk english male/i, /microsoft (guy|ryan|davis|andrew|christopher|eric|george|david)/i, /arthur/i, /aaron/i, /gordon/i, /fred/i, /alex\b/i, /male/i];
-let chosen: SpeechSynthesisVoice | null | undefined;
-
-function voiceFor(): SpeechSynthesisVoice | null {
-  if (chosen !== undefined) return chosen;
-  const all = typeof speechSynthesis !== 'undefined' ? speechSynthesis.getVoices() : [];
-  if (!all.length) return null; // not loaded yet: try again next call
-  const en = all.filter(v => /^en/i.test(v.lang));
-  chosen = null;
-  for (const re of PREFER) { const v = en.find(x => re.test(x.name)); if (v) { chosen = v; break; } }
-  chosen ??= en[0] ?? all[0] ?? null;
-  return chosen;
-}
-if (typeof speechSynthesis !== 'undefined') speechSynthesis.addEventListener?.('voiceschanged', () => { chosen = undefined; });
-
-/** Warm the speech engine up inside a user gesture so the first real call isn't late. */
-export function warmSpeech(): void {
-  if (typeof speechSynthesis === 'undefined') return;
-  try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch { /* no speech */ }
-}
-
-export function stopSpeech(): void {
-  if (typeof speechSynthesis !== 'undefined') try { speechSynthesis.cancel(); } catch { /* no speech */ }
-}
-
-function say(text: string, volume: number, rate: number, pitch: number): void {
-  if (typeof speechSynthesis === 'undefined' || volume <= 0) return;
-  try {
-    const u = new SpeechSynthesisUtterance(text);
-    const v = voiceFor();
-    if (v) { u.voice = v; u.lang = v.lang; }
-    u.volume = Math.min(1, volume); u.rate = rate; u.pitch = pitch;
-    speechSynthesis.speak(u);
-  } catch { /* no speech */ }
-}
 
 // ---------- stingers ----------
 interface Rig { c: AudioContext; inp: AudioNode; hall: AudioNode; pink: AudioBuffer; white: AudioBuffer }
@@ -147,16 +97,13 @@ const STINGER: Record<Call, (t: number) => void> = {
 
 /** Delay from the stinger's start to the words, so a hit lands under the voice. */
 const SAY_AT: Partial<Record<Call, number>> = { round: 0.3, final: 0.4 };
-const SPEECH: Record<Call, { rate: number; pitch: number }> = {
-  round: { rate: 0.85, pitch: 0.55 }, final: { rate: 0.8, pitch: 0.5 }, fight: { rate: 1, pitch: 0.5 }, ko: { rate: 0.75, pitch: 0.45 },
-  perfect: { rate: 0.85, pitch: 0.55 }, wins: { rate: 0.9, pitch: 0.55 }, match: { rate: 0.9, pitch: 0.55 },
-};
 
-/** Make a call: stinger into `out`, words through the browser's speech voice at `speechVolume` (0-1). */
-export function playCall(c: AudioContext | null, out: AudioNode | null, call: Call, speechVolume: number, args: { n?: number; who?: string } = {}): void {
-  if (c && out && c.state !== 'closed') { rig(c, out); STINGER[call](c.currentTime + 0.01); }
-  const text = WORDS[call].replace('{n}', NUM[args.n ?? 1] ?? String(args.n)).replace('{who}', (args.who ?? '').toLowerCase());
-  const s = SPEECH[call], wait = SAY_AT[call] ?? 0;
-  if (wait) window.setTimeout(() => say(text, speechVolume, s.rate, s.pitch), wait * 1000);
-  else say(text, speechVolume, s.rate, s.pitch);
+/** Make a call: its stinger and its line. `who` is the winner's class name as shown (WARRIOR, PRIEST...). */
+export function playCall(c: BaseAudioContext, out: AudioNode, call: Call, args: { n?: number; who?: string } = {}): void {
+  if (c.state === 'closed') return;
+  rig(c as AudioContext, out);
+  STINGER[call](c.currentTime + 0.01);
+  const who = (args.who ?? '').toLowerCase();
+  const key = call === 'round' ? `round${Math.min(5, Math.max(1, args.n ?? 1))}` : call === 'wins' || call === 'match' ? `${call}_${who}` : call;
+  playAnnouncerLine(c, out, key, SAY_AT[call] ?? 0);
 }

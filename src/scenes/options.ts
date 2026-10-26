@@ -4,7 +4,7 @@ import { drawStage } from '../art/arena';
 import { P, UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
-import { sfx, getAudioSettings, setAudioSettings, isMuted, toggleMute, voiceLine, announce, stopSpeech } from '../engine/audio';
+import { sfx, getAudioSettings, setAudioSettings, isMuted, toggleMute, voiceLine, announce } from '../engine/audio';
 import { PLAYABLE } from '../game/classes';
 import { ControlsScene } from './controls';
 import { win, selRow, PAPER, BURN, INK, INK2, RED_INK, TRIM } from './skin';
@@ -34,7 +34,7 @@ function preview(row: Row): void {
   window.clearTimeout(previewTimer);
   previewTimer = window.setTimeout(() => {
     if (row === 'voice') voiceLine(PLAYABLE[Math.floor(Math.random() * PLAYABLE.length)], 'castBig');
-    else { stopSpeech(); announce('fight'); }
+    else { announce('fight'); }
   }, 300);
 }
 
