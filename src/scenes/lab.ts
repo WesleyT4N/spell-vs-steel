@@ -6,7 +6,7 @@ import { drawStage } from '../art/arena';
 import { screenRect, type Ctx } from '../engine/gfx';
 import { withoutSfx } from '../engine/audio';
 import { CARDS, RARITY_COLOR, cardsFor } from '../game/cards';
-import { loadCustom, starterDeck, validate, STARTER_NAME, type DeckCounts } from '../game/deck';
+import { loadCustom, presetDeck, presetsFor, validate, type DeckCounts } from '../game/deck';
 import type { Difficulty } from '../game/tuning';
 import type { ClassId } from '../art/sprites';
 import { addMatch, classIds, emptyStats, runMatch, wilson, type SeriesStats, type SideSpec } from '../dev/simulate';
@@ -29,7 +29,8 @@ const showBadge = (): void => {
 };
 
 interface Task { specs: [SideSpec, SideSpec]; n: number; stats: SeriesStats }
-type DeckChoice = 'starter' | 'custom';
+/** 'custom' or a ready-made deck id. */
+type DeckChoice = string;
 interface SideCfg { cls: ClassId; deck: DeckChoice; cpu: Difficulty }
 
 const cap = (s: string): string => s[0].toUpperCase() + s.slice(1);
@@ -111,7 +112,7 @@ export class LabScene implements Scene {
 
   // ---------- running ----------
   private spec(s: SideCfg): SideSpec {
-    let deck: DeckCounts = starterDeck(s.cls);
+    let deck: DeckCounts = presetDeck(s.cls, s.deck);
     if (s.deck === 'custom') { const d = loadCustom(s.cls); if (d && !validate(d).length) deck = d; }
     return { cls: s.cls, deck, cpu: s.cpu };
   }
@@ -183,8 +184,12 @@ export class LabScene implements Scene {
       const fillDecks = (): void => {
         const custom = loadCustom(s.cls);
         const ok = !!custom && !validate(custom).length;
-        deckSel.replaceChildren(h('option', { value: 'starter' }, `Starter (${STARTER_NAME[s.cls] ?? 'starter'})`), h('option', { value: 'custom', disabled: !ok }, ok ? 'Your custom deck' : 'Custom deck (not ready)'));
-        if (s.deck === 'custom' && !ok) s.deck = 'starter';
+        const presets = presetsFor(s.cls);
+        deckSel.replaceChildren(
+          ...presets.map(p => h('option', { value: p.id }, p.id === 'starter' ? `Starter (${p.name})` : p.name)),
+          h('option', { value: 'custom', disabled: !ok }, ok ? 'Your custom deck' : 'Custom deck (not ready)'),
+        );
+        if ((s.deck === 'custom' && !ok) || (s.deck !== 'custom' && !presets.some(p => p.id === s.deck))) s.deck = 'starter';
         deckSel.value = s.deck;
       };
       deckSel.addEventListener('change', () => { s.deck = deckSel.value as DeckChoice; });

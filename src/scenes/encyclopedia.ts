@@ -4,13 +4,13 @@ import { hint, zone, hot, isHot, button, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import type { ClassId } from '../art/sprites';
-import { P, UW, frame, screenRect, type Ctx } from '../engine/gfx';
+import { P, UW, frame, screenRect, vy, vspan, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { PLAYABLE } from '../game/classes';
 import { ALL_CARDS, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef, type Element, type Rarity } from '../game/cards';
-import { starterDeck, STARTER_NAME } from '../game/deck';
+import { presetsFor } from '../game/deck';
 import { drawCardDetail, drawCardFace, CARD_W, CARD_H } from './cardView';
 import { win, INK2, RED_INK, TRIM } from './skin';
 import { CardPreview } from './cardPreview';
@@ -20,7 +20,9 @@ const RANK: Record<Rarity, number> = { common: 0, uncommon: 1, legendary: 2, myt
 
 // layout (UI pixels)
 const GX = 8, GY = 54, COLS = 3, PX = 80, PY = 112;
-const CLIP_Y = 50, CLIP_H = 252;
+const CLIP_TOP = 50, CLIP_SIZE = 252;
+// the grid window; phone portrait grows it into the spare height
+const clipY = (): number => vy(CLIP_TOP), clipH = (): number => vspan(CLIP_TOP, CLIP_SIZE);
 const DX = 252, DW = UW - DX - 8;
 /** The looping clip of the selected card, at the top of the detail window. */
 const CLIP_BOX = 84;
@@ -60,12 +62,12 @@ export class EncyclopediaScene implements Scene {
     if (this.element && !this.elements().includes(this.element)) this.element = null;
   }
 
-  private maxScroll(n: number): number { return Math.max(0, Math.ceil(n / COLS) * PY - CLIP_H + 6); }
+  private maxScroll(n: number): number { return Math.max(0, Math.ceil(n / COLS) * PY - clipH() + 6); }
 
   private follow(): void {
     const top = Math.floor(this.sel / COLS) * PY;
     if (top < this.scroll) this.scroll = top;
-    if (top + CARD_H + 8 > this.scroll + CLIP_H) this.scroll = top + CARD_H + 8 - CLIP_H;
+    if (top + CARD_H + 8 > this.scroll + clipH()) this.scroll = top + CARD_H + 8 - clipH();
   }
 
   update(dt: number): void {
@@ -116,32 +118,33 @@ export class EncyclopediaScene implements Scene {
     const cards = this.list();
     if (this.sel >= cards.length) this.sel = Math.max(0, cards.length - 1);
 
-    // header: class tabs, then rarity and element filters
-    frame(ui, 8, 4, UW - 16, 42, '#000000', '#7c7c7c');
+    // header: class tabs, then rarity and element filters (phone portrait moves it up)
+    const hy = vy(4) - 4;
+    frame(ui, 8, 4 + hy, UW - 16, 42, '#000000', '#7c7c7c');
     let x = 14;
     this.tabs.forEach((t, i) => {
       const label = t ? t.toUpperCase() : 'ALL';
       const w = Math.max(44, textWidth(label) + 14);
-      button(ui, `tab:${i}`, label, x, 9, w, 14, t === this.cls, t === this.cls ? '#f8b800' : '#bcbcbc');
+      button(ui, `tab:${i}`, label, x, 9 + hy, w, 14, t === this.cls, t === this.cls ? '#f8b800' : '#bcbcbc');
       x += w + 4;
     });
-    drawText(ui, `${cards.length} SPELL${cards.length === 1 ? '' : 'S'}`, x + 8, 13, '#7c7c7c');
-    button(ui, 'done', 'DONE', UW - 64, 9, 50, 14, false, '#f8b800');
+    drawText(ui, `${cards.length} SPELL${cards.length === 1 ? '' : 'S'}`, x + 8, 13 + hy, '#7c7c7c');
+    button(ui, 'done', 'DONE', UW - 64, 9 + hy, 50, 14, false, '#f8b800');
     x = 14;
     RARITIES.forEach((r, i) => {
       const label = r.toUpperCase(), w = textWidth(label) + 10, on = this.rarity === r;
-      zone(`rar:${i}`, x, 27, w, 14);
-      frame(ui, x, 27, w, 14, on ? RARITY_COLOR[r] : '#000000', isHot(`rar:${i}`) || on ? '#fcfcfc' : RARITY_COLOR[r]);
-      drawText(ui, label, x + 5, 31, on ? '#000000' : RARITY_COLOR[r]);
+      zone(`rar:${i}`, x, 27 + hy, w, 14);
+      frame(ui, x, 27 + hy, w, 14, on ? RARITY_COLOR[r] : '#000000', isHot(`rar:${i}`) || on ? '#fcfcfc' : RARITY_COLOR[r]);
+      drawText(ui, label, x + 5, 31 + hy, on ? '#000000' : RARITY_COLOR[r]);
       x += w + 3;
     });
     x += 10;
     this.elements().forEach((el, i) => {
       const label = el.toUpperCase(), w = textWidth(label) + 10, on = this.element === el;
       if (x + w > UW - 12) return; // with every class shown, the last elements don't fit: pick a class tab to filter them
-      zone(`el:${i}`, x, 27, w, 14);
-      frame(ui, x, 27, w, 14, on ? ELEMENT_COLOR[el] : '#000000', isHot(`el:${i}`) || on ? '#fcfcfc' : ELEMENT_COLOR[el]);
-      drawText(ui, label, x + 5, 31, on ? '#000000' : ELEMENT_COLOR[el]);
+      zone(`el:${i}`, x, 27 + hy, w, 14);
+      frame(ui, x, 27 + hy, w, 14, on ? ELEMENT_COLOR[el] : '#000000', isHot(`el:${i}`) || on ? '#fcfcfc' : ELEMENT_COLOR[el]);
+      drawText(ui, label, x + 5, 31 + hy, on ? '#000000' : ELEMENT_COLOR[el]);
       x += w + 3;
     });
 
@@ -149,12 +152,12 @@ export class EncyclopediaScene implements Scene {
     this.scroll = Math.min(this.scroll, this.maxScroll(cards.length));
     ui.save();
     ui.beginPath();
-    ui.rect(0, CLIP_Y, DX - 4, CLIP_H);
+    ui.rect(0, clipY(), DX - 4, clipH());
     ui.clip();
     cards.forEach((card, i) => {
-      const cx = GX + (i % COLS) * PX, cy = GY + Math.floor(i / COLS) * PY - this.scroll;
-      if (cy + CARD_H < CLIP_Y || cy > CLIP_Y + CLIP_H) return;
-      const top = Math.max(cy, CLIP_Y), bot = Math.min(cy + CARD_H, CLIP_Y + CLIP_H);
+      const cx = GX + (i % COLS) * PX, cy = clipY() + GY - CLIP_TOP + Math.floor(i / COLS) * PY - this.scroll;
+      if (cy + CARD_H < clipY() || cy > clipY() + clipH()) return;
+      const top = Math.max(cy, clipY()), bot = Math.min(cy + CARD_H, clipY() + clipH());
       zone(`card:${i}`, cx, top, CARD_W, bot - top);
       drawCardFace(ui, card, cx, cy, { lit: i === this.sel });
     });
@@ -163,24 +166,24 @@ export class EncyclopediaScene implements Scene {
     // scrollbar
     const max = this.maxScroll(cards.length);
     if (max > 0) {
-      const bh = Math.max(16, Math.round(CLIP_H * CLIP_H / (CLIP_H + max)));
-      const by = CLIP_Y + Math.round((this.scroll / max) * (CLIP_H - bh));
-      P(ui, '#3c3c3c', DX - 6, CLIP_Y, 2, CLIP_H);
+      const bh = Math.max(16, Math.round(clipH() * clipH() / (clipH() + max)));
+      const by = clipY() + Math.round((this.scroll / max) * (clipH() - bh));
+      P(ui, '#3c3c3c', DX - 6, clipY(), 2, clipH());
       P(ui, '#bcbcbc', DX - 6, by, 2, bh);
     }
 
     // detail
     const card = cards[this.sel];
-    win(ui, DX, CLIP_Y, DW, CLIP_H, { accent: card ? ELEMENT_COLOR[card.element] : undefined });
+    win(ui, DX, clipY(), DW, clipH(), { accent: card ? ELEMENT_COLOR[card.element] : undefined });
     if (card) {
-      this.preview.draw(ui, DX + 8, CLIP_Y + 8, DW - 16, CLIP_BOX);
-      let y = drawCardDetail(ui, card, DX + 6, CLIP_Y + CLIP_BOX + 16, DW - 12) + 4;
+      this.preview.draw(ui, DX + 8, clipY() + 8, DW - 16, CLIP_BOX);
+      let y = drawCardDetail(ui, card, DX + 6, clipY() + CLIP_BOX + 16, DW - 12) + 4;
       const line = (s: string, col: string): void => { drawText(ui, s, DX + 6, y, col); y += 11; };
       line(`${card.cls.toUpperCase()}   MAX ${MAX_COPIES[card.rarity]} PER DECK`, INK2);
-      const inStarter = starterDeck(card.cls)[card.id] ?? 0;
-      line(inStarter ? `${STARTER_NAME[card.cls].toUpperCase()}: ${inStarter}` : 'NOT IN STARTER', inStarter ? '#007800' : TRIM);
+      const presets = presetsFor(card.cls), inDecks = presets.filter(p => p.cards[card.id]).length;
+      line(inDecks ? `IN ${inDecks} OF ${presets.length} READY DECKS` : 'IN NO READY DECK', inDecks ? '#007800' : TRIM);
       line(`CAST LOCK ${(card.lock ?? 0.3).toFixed(2)}S`, TRIM);
-      if (this.test) button(ui, 'test', `${k('attack')}: TEST IN SANDBOX`, DX + 6, CLIP_Y + CLIP_H - 22, DW - 12, 16, false, RED_INK);
+      if (this.test) button(ui, 'test', `${k('attack')}: TEST IN SANDBOX`, DX + 6, clipY() + clipH() - 22, DW - 12, 16, false, RED_INK);
     }
     hint(ui, `HOVER TO READ   WHEEL: SCROLL   Q/E: CLASS   ${k('attack')}: TEST   ${k('cast')}: BACK`);
   }
