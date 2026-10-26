@@ -6,7 +6,7 @@ import type { ClassId } from '../art/sprites';
 import type { Dir, Intent } from '../game/battle';
 
 /** Bump when the rules or the protocol change, so mismatched builds refuse to play each other. */
-export const PROTOCOL = 3;
+export const PROTOCOL = 4;
 
 export interface Hello { cls: ClassId; skin: string; deck: string[] }
 
@@ -42,6 +42,8 @@ export interface Packet {
   round: number;
   /** This side's input delay in frames. */
   delay: number;
+  /** This side's current battle frame, so the faster machine can ease off (rollback time sync). */
+  fr?: number;
   /** Inputs for frames base, base+1, ... (two characters per frame). */
   base: number;
   inp: string;
