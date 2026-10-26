@@ -1,6 +1,6 @@
 // Local Versus: runs a Battle, the custom screen, pause and results. Either side can be a player at this
 // keyboard or the CPU, so it covers you vs the CPU (on either side), two players on one keyboard, and CPU vs CPU.
-import { setScene, dim, drawMenu, hint, zone, hot, isHot, listMouse, showSel, resetSel, type Scene } from './scene';
+import { setScene, dim, drawMenu, hint, zone, zoneAt, hot, isHot, listMouse, showSel, resetSel, type Scene } from './scene';
 import { CLASS_INFO } from '../game/classes';
 import { Battle, NO_INTENT, heavyChargeOf, type Dir, type Intent, type Side } from '../game/battle';
 import { drawBattle, drawBattleUi } from '../game/battleView';
@@ -14,15 +14,16 @@ const handX = (i: number, n: number): number => Math.round(UW / 2 - (HAND_GAP * 
 const LIFT = 12;
 import { deckLabel, rollDeck, sideDeck, sideName, type Ctl, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
-import { P, UW, screenRect, type Ctx } from '../engine/gfx';
+import { P, UW, screenRect, spread, view, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
-import { wasPressed, isDown, heldDir, navPressed, k, mouse, localDir, localDown, localPressed, localNav, localKey } from '../engine/input';
+import { wasPressed, isDown, heldDir, navPressed, k, mouse, gesture, localDir, localDown, localPressed, localNav, localKey } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx, chargeHum, announce, voiceLine } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
 import { drawCardDetail, drawCardFace, resName, resInk, RES_INK, CARD_W, CARD_H, PICKED } from './cardView';
 import { CardPreview } from './cardPreview';
-import { win, plaque, pip, disc, banner, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, BLUE_INK, WAX_HI, GOLD } from './skin';
+import { win, plaque, pip, disc, banner, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, BLUE_INK, WAX_HI, GOLD, FRAME } from './skin';
+import { bigButton, actionBar, barTapped, swipeIn, tallArea, TAP, GAP, PAD } from './touchUi';
 import { CharSelectScene } from './select';
 import { StatsPanel, type StatsData } from './statsView';
 import { trackStats, roundRecord, setTotals, topSpell, type BattleStats, type RoundRecord } from '../game/stats';
@@ -104,10 +105,17 @@ export class BattleScene implements Scene {
   protected keyOf(s: Side, a: 'left' | 'right' | 'attack' | 'cast' | 'custom'): string { return this.twoPlayer ? localKey(s, a) : k(a); }
 
   enter(): void { playMusic('battle', BATTLE_SONG); }
+  // phones in portrait: the fight on top at its usual size, the pad, Draw screen, pause and results below it
+  tall(): boolean { return true; }
+  split(): boolean { return true; }
+  /** False when a subclass draws its own pause menu. */
+  protected tallPause(): boolean { return true; }
+  /** Where the bottom part of a split phone screen starts (full-screen UI coordinates). */
+  protected get splitTop(): number { return -view.oy * 2 + spread.halfH * 2; }
 
   pad(): PadMode {
     const b = this.b;
-    if (this.paused) return 'back';
+    if (this.paused) return spread.tall ? 'none' : 'back';
     // the Draw screen and results are all taps (tap a picked card again to undo it)
     if (b.phase === 'custom' || b.phase === 'over') return 'none';
     // watching CPU vs CPU: a tap anywhere pauses
@@ -236,6 +244,19 @@ export class BattleScene implements Scene {
       this.timer -= dt;
       if (this.timer <= 0) { this.confirmCustom(); return; }
     }
+    if (spread.tall) {
+      if (barTapped('back')) { if (this.picks.length) { this.picks = []; sfx('back'); } return; }
+      if (barTapped('primary')) { this.confirmCustom(); return; }
+      // flick a card up to queue it, down to take it back out
+      const sw = gesture.swipe;
+      const at = sw === 'up' || sw === 'down' ? zoneAt(gesture.sx, gesture.sy) : null;
+      if (at?.startsWith('card:')) {
+        const i = Number(at.slice(5)), p = this.picks.indexOf(i);
+        if (sw === 'up' && p < 0) { this.picks.push(i); sfx('select'); }
+        if (sw === 'down' && p >= 0) { this.picks.splice(p, 1); sfx('back'); }
+        return;
+      }
+    }
     // mouse: hover a card to read it, click to pick or unpick, right-click to undo
     const over = isHot('fight') ? offer.length : hot('card');
     if (mouse.moved) this.mouseMode = true;
@@ -323,6 +344,7 @@ export class BattleScene implements Scene {
 
   protected updateResult(dt: number): void {
     this.statsPanel.update(this.statsData());
+    this.swipeStats();
     const items = this.resultItems.length;
     const clicked = listMouse('menu', this.resultSel, i => { this.resultSel = i; sfx('move'); });
     if (clicked >= 0) this.resultSel = clicked;
@@ -334,6 +356,17 @@ export class BattleScene implements Scene {
       this.onResult(this.resultItems[this.resultSel]);
     }
   }
+
+  /** Phone layout: swiping the stats steps through their tabs. */
+  protected swipeStats(): void {
+    const d = spread.tall ? swipeIn(...this.statsRect) : 0;
+    if (!d) return;
+    const n = this.statsPanel.tabs(this.statsData()).length;
+    this.statsPanel.tab = (this.statsPanel.tab + d + n) % n;
+    sfx('move');
+  }
+  /** Where the phone layout drew the stats panel. */
+  protected statsRect: [number, number, number, number] = [0, 0, 0, 0];
 
   /** A results menu item was picked. */
   protected onResult(choice: string): void {
@@ -358,12 +391,16 @@ export class BattleScene implements Scene {
       const round = this.score[0] + this.score[1] + 1;
       drawTextCentered(ui, `ROUND ${round}   ${this.score[this.me]}-${this.score[1 - this.me]}`, UW / 2, 36, '#fcfcfc');
     }
-    if (b.phase === 'custom') this.drawCustom(c, tick, ui);
+    if (b.phase === 'custom') {
+      if (spread.tall) this.drawCustomTop(c, ui);
+      else this.drawCustom(c, tick, ui);
+    }
     if (this.fightBanner > 0 && b.phase === 'fight') {
       const s = this.fightBanner > 0.45 ? 'READY' : 'FIGHT!';
       drawTextCentered(ui, s, UW / 2, 124, s === 'FIGHT!' ? '#f8b800' : '#fcfcfc', 6);
     }
     if (b.phase === 'ko' && b.koT > 0.4) drawTextCentered(ui, 'K.O.', UW / 2, 116, '#f83800', 6);
+    if (spread.tall) return;
     if (b.phase === 'over') this.drawResult(ui, tick);
     if (this.paused) {
       dim(ui, 0.55);
@@ -484,6 +521,142 @@ export class BattleScene implements Scene {
     });
     const s = this.me, done = this.twoPlayer && s === 0 ? 'DONE' : 'FIGHT';
     hint(ui, `CLICK: PICK  RIGHT-CLICK: UNDO   KEYS: ${this.keyOf(s, 'left')}/${this.keyOf(s, 'right')} + ${this.keyOf(s, 'attack')}  ${this.keyOf(s, 'cast')} UNDO  ${this.keyOf(s, 'custom')} ${done}`);
+  }
+
+  // ---------- phones in portrait ----------
+
+  /** The bottom of the screen under the fight: wood under the pad, or the Draw screen, results and pause. */
+  drawBelow(ui: Ctx, tick: number): void {
+    const b = this.b, a = tallArea(), top = this.splitTop;
+    const [sx, sy, sw, sh] = screenRect(2);
+    P(ui, '#000000', sx, top, sw, sy + sh - top);
+    P(ui, FRAME, sx, top + 2, sw, sy + sh - top - 2);
+    P(ui, mix(FRAME, '#000000', 0.35), sx, top + 2, sw, 4);
+    P(ui, TRIM, sx, top, sw, 2);
+    if (b.phase === 'custom' && !this.watching) this.drawCustomBelow(ui, tick, top, a);
+    if (b.phase === 'over') this.drawResultTall(ui, tick);
+    else if (this.paused && this.tallPause()) this.drawPauseTall(ui, tick);
+  }
+
+  /** The Draw screen's top part: the arena dims and the card being read shows over it, with its clip. */
+  private drawCustomTop(c: Ctx, ui: Ctx): void {
+    dim(c, 0.45);
+    const offer = this.b.offer[this.me], i = this.reading();
+    const [sx, sy, sw, sh] = screenRect(2);
+    const x = sx + PAD, w = sw - PAD * 2;
+    const card = i >= 0 ? CARDS[offer[i]] : null;
+    if (!card) {
+      // a short note at the bottom, so the dimmed fight still shows above it
+      const h = 150, y = sy + sh - h - 12;
+      win(ui, x, y, w, h);
+      drawText(ui, this.twoPlayer ? `${this.b.f[this.me].name}: YOUR HAND` : 'YOUR HAND', x + 14, y + 14, this.me === 0 ? RED_INK : BLUE_INK, 3);
+      ['HOLD A CARD TO READ IT', 'TAP OR FLICK UP TO QUEUE', 'FLICK DOWN TO TAKE IT BACK'].forEach((l, n) => drawText(ui, l, x + 14, y + 46 + n * 22, n ? INK2 : INK, 2));
+      drawText(ui, this.rivalDeckText(), x + 14, y + h - 18, TRIM);
+      return;
+    }
+    const y = sy + 12, h = sh - 24;
+    win(ui, x, y, w, h, { accent: ELEMENT_COLOR[card.element] });
+    const clipH = Math.min(150, Math.floor(h * 0.42));
+    this.preview.draw(ui, x + 10, y + 10, w - 20, clipH);
+    drawCardDetail(ui, card, x + 14, y + clipH + 20, w - 28, h - clipH > 200 ? 2 : 1);
+    const need = this.shortfalls()[i];
+    if (need > 0) drawText(ui, this.b.f[this.me].cls === 'warrior' ? `BUILD ${need} MORE ${resName(card)} IN THE FIGHT` : `NEED ${need} MORE ${resName(card)}`, x + 14, y + h - 20, this.b.f[this.me].cls === 'warrior' ? resInk(card) : RED_INK);
+  }
+
+  /** The Draw screen under the fight: timer and resource, the cast order, the hand and FIGHT. */
+  private drawCustomBelow(ui: Ctx, tick: number, top: number, a: { x: number; w: number }): void {
+    const b = this.b, f = b.f[this.me], offer = b.offer[this.me];
+    const x0 = a.x + PAD, w = a.w - PAD * 2;
+    const short = this.shortfalls(), builds = f.cls === 'warrior';
+    // header: turn, a big timer, the resource
+    win(ui, x0 - 8, top + 12, w + 16, 40, { burn: 3 });
+    drawText(ui, `TURN ${b.turn}`, x0 + 4, top + 26, this.twoPlayer ? (this.me === 0 ? RED_INK : BLUE_INK) : INK, 2);
+    const secs = Math.ceil(this.timer);
+    if (this.timed) drawTextCentered(ui, String(secs).padStart(2, '0'), UW / 2 - 40, top + 22, secs <= 5 && tick % 4 < 2 ? WAX_HI : RED_INK, 3, false);
+    ui.save();
+    ui.translate(0, top + 16);
+    this.drawResourcePreview(ui, tick);
+    ui.restore();
+
+    const barTop = actionBar(ui, { back: 'CLEAR', primary: { id: 'fight', label: this.twoPlayer && this.me === 0 ? 'DONE' : 'FIGHT!' } });
+    // the hand, resting just above the bar; picked cards rise
+    const handY = barTop - 14 - CARD_H;
+    offer.forEach((id, i) => {
+      const x = handX(i, offer.length);
+      const order = this.picks.indexOf(i), lvl = this.level(i);
+      zone(`card:${i}`, x - 4, handY - 2 * LIFT, CARD_W + 8, CARD_H + 2 * LIFT + 10);
+      const y = handY - Math.round(this.lift[i] ?? 0);
+      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1, short: short[i], builds });
+    });
+    // the cast order: five slots
+    const slotY = handY - 2 * LIFT - 14 - 44, n = 5, slw = Math.floor((w - GAP * (n - 1)) / n);
+    for (let s = 0; s < n; s++) {
+      const x = x0 + s * (slw + GAP), pick = this.picks[s];
+      const cd = pick !== undefined ? CARDS[offer[pick]] : null;
+      if (cd) {
+        plaque(ui, x, slotY, slw, 44, false, PICKED);
+        P(ui, ELEMENT_COLOR[cd.element], x + 3, slotY + 3, slw - 6, 3);
+        drawText(ui, String(s + 1), x + 6, slotY + 12, PICKED, 2);
+        const name = cd.name.toUpperCase(), lines = name.length > Math.floor((slw - 26) / 6) ? name.split(' ') : [name];
+        lines.slice(0, 2).forEach((l, j) => drawText(ui, l.slice(0, Math.floor((slw - 26) / 6)), x + 22, slotY + (lines.length > 1 ? 10 + j * 12 : 16), INK));
+      } else {
+        P(ui, mix(FRAME, '#000000', 0.3), x, slotY, slw, 44);
+        drawTextCentered(ui, String(s + 1), x + slw / 2, slotY + 15, TRIM, 2, false);
+      }
+    }
+    drawText(ui, 'CAST ORDER', x0, slotY - 14, PAPER);
+    const total = this.picks.reduce((acc, i) => { const cc = CARDS[offer[i]].cost; return acc + (cc === 'all' ? 1 : cc); }, 0);
+    const over = !builds && this.picks.some(i => short[i] > 0);
+    const cost = `TOTAL COST ${total}`;
+    drawText(ui, cost, x0 + w - textWidth(cost), slotY - 14, over ? '#f87858' : PAPER2);
+  }
+
+  /** Pause on phones: big buttons over the whole screen. */
+  private drawPauseTall(ui: Ctx, tick: number): void {
+    dim(ui, 0.6);
+    const a = tallArea(), items = this.pauseItems, x0 = a.x + PAD, w = a.w - PAD * 2, bh = TAP + 14;
+    const y0 = Math.round(a.y + a.h / 2 - (items.length * (bh + GAP)) / 2);
+    drawTextCentered(ui, 'PAUSED', UW / 2, y0 - 60, '#fcfcfc', 4);
+    items.forEach((it, i) => bigButton(ui, `menu:${i}`, it, x0, y0 + i * (bh + GAP), w, bh, { primary: i === 0, on: i === this.pauseSel && showSel() && i > 0 }));
+    void tick;
+  }
+
+  /** Results on phones: the banner, the stats filling the screen, and the choices as big buttons in the thumb zone. */
+  private drawResultTall(ui: Ctx, tick: number): void {
+    const b = this.b, a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
+    dim(ui, 0.6);
+    const won = b.winner === this.me, setWon = this.score[this.me] >= this.need;
+    let title = this.m.bestOf === 1 ? (b.winner === null ? 'DRAW' : won ? 'YOU WIN!' : 'YOU LOSE')
+      : this.setOver ? (setWon ? 'SET WON!' : 'SET LOST') : won ? 'ROUND WON' : 'ROUND LOST';
+    let score = `YOU ${this.score[this.me]} - ${this.score[1 - this.me]} ${this.rivalName}`;
+    if (this.humans.length !== 1) {
+      const topSide: Side = this.setOver ? (this.score[0] >= this.need ? 0 : 1) : (b.winner ?? 0);
+      const who = b.f[topSide].name;
+      title = b.winner === null && !this.setOver ? 'DRAW' : this.m.bestOf === 1 ? `${who} WINS!` : this.setOver ? `${who} WINS THE SET` : `${who} WINS THE ROUND`;
+      score = `${b.f[0].name} ${this.score[0]} - ${this.score[1]} ${b.f[1].name}`;
+    }
+    let y = a.y + 12;
+    banner(ui, title, UW / 2, y, title.length > 14 ? 2 : 3);
+    y += 48;
+    if (this.m.bestOf > 1) { drawTextCentered(ui, score, UW / 2, y, '#fcfcfc', 2); y += 26; }
+    const items = this.resultItems, bh = TAP + 8;
+    const btnY = a.y + a.h - PAD - items.length * (bh + GAP) + GAP;
+    const data = this.statsData();
+    const best = topSpell(data.shown[this.me]);
+    const bestH = best ? 64 : 0;
+    const ph = btnY - 16 - bestH - y;
+    this.statsRect = [x0, y, w, ph];
+    this.statsPanel.draw(ui, data, x0, y, w, ph);
+    if (best) {
+      const by = y + ph + 8;
+      win(ui, x0, by, w, 56, { burn: 3 });
+      drawText(ui, 'BEST SPELL', x0 + 12, by + 10, RED_INK);
+      drawText(ui, CARDS[best[0]].name.toUpperCase(), x0 + 12, by + 24, INK, 2);
+      const done = best[1].heal > best[1].dmg ? `+${Math.round(best[1].heal)} HEALED` : `${Math.round(best[1].dmg)} DAMAGE`;
+      drawText(ui, done, x0 + w - 12 - textWidth(done, 2), by + 24, INK2, 2);
+    }
+    items.forEach((it, i) => bigButton(ui, `menu:${i}`, it, x0, btnY + i * (bh + GAP), w, bh, { primary: i === 0, on: i === this.resultSel && showSel() && i > 0 }));
+    void tick;
   }
 
   private drawCastOrder(ui: Ctx, short: number[], builds: boolean, total: number): void {
