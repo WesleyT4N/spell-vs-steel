@@ -2,6 +2,8 @@
 
 A fantasy, class-based take on Mega Man Battle Network: real-time fights on a 6x3 grid, broken up by a paused Draw screen where you draft spells from your grimoire.
 
+How the code fits together: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 This is the **Warrior vs Mage prototype**: title screen, an interactive tutorial, Versus CPU, match setup, a deck builder, all Warrior and Mage spells from the design doc, a CPU opponent (Easy and Normal), chiptune sound effects and two original 16-bit tracks.
 
 ## Play
