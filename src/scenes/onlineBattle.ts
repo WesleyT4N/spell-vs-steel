@@ -1,7 +1,6 @@
 // An online round: the Versus scene, driven by rollback netcode (src/net/netplay.ts) instead of a CPU.
-import { setScene, dim, hint, resetSel } from './scene';
+import { replaceScene, goHome, dim, hint, resetSel } from './scene';
 import { BattleScene } from './battle';
-import { TitleScene } from './title';
 import { Battle, heavyChargeOf, type Side } from '../game/battle';
 import { loadMatch } from '../game/match';
 import { Netplay } from '../net/netplay';
@@ -128,7 +127,7 @@ export class OnlineBattleScene extends BattleScene {
     const net = this.net, next = this.roundNo + 1;
     if (this.waitingNext && net.remoteReady >= next) {
       stopMusic();
-      setScene(new OnlineBattleScene(net, this.setOver ? [0, 0] : this.score, next, this.setOver ? [] : this.rounds));
+      replaceScene(new OnlineBattleScene(net, this.setOver ? [0, 0] : this.score, next, this.setOver ? [] : this.rounds));
       return;
     }
     if (this.waitingNext) return;
@@ -155,7 +154,7 @@ export class OnlineBattleScene extends BattleScene {
     if (this.net.status !== 'left') this.net.leave();
     else this.net.close();
     stopMusic();
-    setScene(new TitleScene());
+    goHome();
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {

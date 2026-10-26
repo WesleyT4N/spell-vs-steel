@@ -18,7 +18,7 @@ for (let m = 0; m < N; m++) {
   const make = (): Battle => new Battle({ cls: a, deck: toList(starterDeck(a)), name: 'A' }, { cls: bc, deck: toList(starterDeck(bc)), name: 'B' }, seed);
   const x = make(), y = make(), z = make();
   const ys = trackStats(y), zs = trackStats(z);
-  // inputs come from CPUs driving battle x (their own Math.random is fine: the intents are what get shared)
+  // inputs come from CPUs driving battle x (seeded from battle x; only their intents are shared)
   const cpus = [new Cpu('normal'), new Cpu('normal')];
   const pickRng = seeded(seed * 7);
   const dt = 1 / 60;

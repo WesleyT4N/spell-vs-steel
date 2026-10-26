@@ -1,5 +1,5 @@
 // Dev tool: audition every class voice line and announcer call.
-import { hint, zone, hot, type Scene } from './scene';
+import { popScene, hint, zone, hot, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { UW, screenRect, type Ctx } from '../engine/gfx';
@@ -21,7 +21,7 @@ const X0 = 96, COL = 52, Y0 = 70, RH = 24;
 export class VoiceTestScene implements Scene {
   row = 0;
   col = 0;
-  constructor(private back: () => void) {}
+  constructor(private back: () => void = popScene) {}
 
   private play(): void {
     if (this.row < CLASS_IDS.length) voiceLine(CLASS_IDS[this.row], KINDS[this.col], 0, 0, this.row === 1 && this.col === 0 ? ['fire', 'frost', 'arcane'][Math.floor(Math.random() * 3)] : undefined);

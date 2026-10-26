@@ -4,7 +4,7 @@
 // each side picks its own deck. Online the right side is your rival. Stage select comes next.
 // The tutorial uses it too, to pick the class to learn (the right side shows the training dummy),
 // and so does training mode, where the right side picks the dummy's class, and arcade mode, where you only pick yourself.
-import { setScene, hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
+import { pushScene, popScene, goHome, hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
 import { PLAYABLE, CLASS_INFO } from '../game/classes';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
@@ -19,7 +19,6 @@ import { loadCustom, validate } from '../game/deck';
 import type { NetSession } from '../net/session';
 import { DeckBuilderScene } from './deckbuilder';
 import { StageSelectScene } from './stageSelect';
-import { TitleScene } from './title';
 import { TutorialScene, type TutorialClass } from './tutorial';
 import { TrainingScene } from './training';
 import { ArcadeLadderScene } from './arcade';
@@ -86,6 +85,9 @@ export class CharSelectScene implements Scene {
     if (net) this.sync();
   }
 
+  /** Back from the deck builder, the stage select or a fight: pick up what they saved (decks, stage). */
+  resume(): void { this.m = loadMatch(); this.msgT = 0; }
+
   private get tutorial(): boolean { return this.mode === 'tutorial'; }
   private get training(): boolean { return this.mode === 'training'; }
   /** Arcade: you pick only your own fighter and deck; the ladder picks the rivals. */
@@ -123,7 +125,7 @@ export class CharSelectScene implements Scene {
   private editDeck(s: 0 | 1): void {
     sfx('select');
     saveMatch(this.m);
-    setScene(new DeckBuilderScene(this.slotClass(s), () => { const back = new CharSelectScene(undefined, 4, this.mode); back.focus = s; setScene(back); }));
+    pushScene(new DeckBuilderScene(this.slotClass(s)));
   }
   private mySkin(): string { return skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id; }
   private cpuSkin(): string {
@@ -165,7 +167,7 @@ export class CharSelectScene implements Scene {
   }
 
   private advance(): void {
-    if (this.tutorial) { sfx('select'); setScene(new TutorialScene(this.m.p1 as TutorialClass)); return; }
+    if (this.tutorial) { sfx('select'); pushScene(new TutorialScene(this.m.p1 as TutorialClass)); return; }
     if (this.step === 1 && !this.net && !this.arcade) { this.step = 2; this.cur = this.tileOf(this.m.cpu); sfx('select'); }
     else if (this.step === 1 || this.step === 3) { this.step = 4; this.chip = this.chips.length - 1; sfx('select'); }
   }
@@ -177,10 +179,10 @@ export class CharSelectScene implements Scene {
       if (this.step === 1) { this.step = 0; return; }
       // locked in is final online; backing out leaves the room
       this.net.leave();
-      setScene(new TitleScene());
+      goHome();
       return;
     }
-    if (this.step === 0) { setScene(new TitleScene()); return; }
+    if (this.step === 0) { popScene(); return; }
     this.step = (this.step === 4 && (this.net || this.arcade) ? 1 : this.step - 1) as Step;
     if (this.step === 0 || this.step === 2) this.cur = this.tileOf(this.slotClass(this.slot));
   }
@@ -206,14 +208,14 @@ export class CharSelectScene implements Scene {
     saveMatch(this.m);
     if (this.net) { this.locked = true; sfx('confirm'); this.sync(); return; }
     sfx('select');
-    if (this.arcade) { setScene(new ArcadeLadderScene(newRun(this.m))); return; }
+    if (this.arcade) { pushScene(new ArcadeLadderScene(newRun(this.m))); return; }
     if (this.training) {
       // training skips the stage select and uses the last stage picked
       useStage(this.m.stage === 'random' || !STAGE_IDS.includes(this.m.stage) ? STAGE_IDS[Math.floor(Math.random() * STAGE_IDS.length)] : this.m.stage);
-      setScene(new TrainingScene(this.m));
+      pushScene(new TrainingScene(this.m));
       return;
     }
-    setScene(new StageSelectScene());
+    pushScene(new StageSelectScene());
   }
 
   update(dt: number): void {
@@ -223,10 +225,10 @@ export class CharSelectScene implements Scene {
     if (net) {
       net.tick();
       if (net.status === 'error' || net.status === 'left' || net.status === 'lost') {
-        if (mouse.click || wasPressed('confirm') || wasPressed('back') || mouse.rclick) { net.close(); setScene(new TitleScene()); }
+        if (mouse.click || wasPressed('confirm') || wasPressed('back') || mouse.rclick) { net.close(); goHome(); }
         return;
       }
-      if (this.locked && net.rivalLobby?.step === 2 && net.rival) { setScene(new StageSelectScene(net)); return; }
+      if (this.locked && net.rivalLobby?.step === 2 && net.rival) { pushScene(new StageSelectScene(net)); return; }
       if (this.locked) { if (wasPressed('back') || mouse.rclick) this.back(); return; }
     }
     if (wasPressed('back') || mouse.rclick) { this.back(); return; }

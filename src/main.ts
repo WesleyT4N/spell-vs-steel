@@ -2,7 +2,7 @@ import { W, H, UW, UH, P, view, setView, screenRect, spread, MIN_ASPECT, PORTRAI
 import { drawTextCentered } from './engine/font';
 import { initInput, endFrame, wasPressed, page } from './engine/input';
 import { toggleMute } from './engine/audio';
-import { setScene, getScene, commitZones, hotZone, noteTouch, liveZones } from './scenes/scene';
+import { setScene, setHome, goHome, getScene, commitZones, hotZone, noteTouch, liveZones } from './scenes/scene';
 import { TitleScene } from './scenes/title';
 import { OnlineScene } from './scenes/online';
 import { DEV_TOOLS } from './flags';
@@ -70,9 +70,11 @@ window.addEventListener('pointerdown', engage);
 window.addEventListener('keydown', () => { engaged = page.engaged = true; });
 // a shared online link (?room=CODE) goes straight to joining that room
 const room = new URLSearchParams(location.search).get('room');
-setScene(room ? new OnlineScene(room) : new TitleScene());
+// the title is always the bottom of the scene stack: BACK from the first screen lands there
+setHome(() => new TitleScene());
+if (room) setScene(new OnlineScene(room)); else goHome();
 // dev builds can open a dev tool straight from the URL (#cards, #sandbox, #lab, #dev)
-if (DEV_TOOLS && !room && location.hash.length > 1) void import('./scenes/devMenu').then(m => m.devFromHash(() => setScene(new TitleScene())));
+if (DEV_TOOLS && !room && location.hash.length > 1) void import('./scenes/devMenu').then(m => m.devFromHash());
 
 const STEP = 1 / 60;
 let acc = 0;

@@ -1,6 +1,6 @@
 // Balance lab: run CPU-vs-CPU matches in the browser, read per-card stats, and tweak numbers live.
 // Tuning edits apply to the whole game (Versus and the sandbox too) until the page reloads.
-import type { Scene } from './scene';
+import { popScene, type Scene } from './scene';
 import { getSave, setSave } from '../engine/save';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
@@ -74,7 +74,7 @@ export class LabScene implements Scene {
     if (e.code === 'Escape' && !(e.target instanceof Element && e.target.closest('input, select, textarea'))) this.leaving = true;
   };
 
-  constructor(private back: () => void) {}
+  constructor(private back: () => void = popScene) {}
 
   enter(): void {
     hookBadge();

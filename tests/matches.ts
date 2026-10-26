@@ -55,10 +55,14 @@ function checkFighter(f: Fighter): string | null {
   return null;
 }
 
-/** Plays one match. Math.random is seeded too (the CPUs use it), so the whole match replays from `seed`. */
+/**
+ * Plays one match. The CPUs seed their rolls from the battle, so the whole match replays from `seed`.
+ * Math.random gets a different stream on every play, so a rule or CPU roll that still leans on it shows up as a failed replay.
+ */
+let plays = 0;
 function play(c: Case): { b: Battle; hashes: number[] } | null {
   const real = Math.random;
-  Math.random = seeded(c.seed * 31 + 7);
+  Math.random = seeded(++plays * 7919);
   try {
     const b = new Battle({ cls: c.a.cls, deck: toList(c.a.deck), name: 'A' }, { cls: c.b.cls, deck: toList(c.b.deck), name: 'B' }, c.seed);
     const cpus = [new Cpu(c.cpu[0]), new Cpu(c.cpu[1])];
@@ -66,7 +70,7 @@ function play(c: Case): { b: Battle; hashes: number[] } | null {
     let frame = 0;
     while (b.phase !== 'over') {
       if (b.phase === 'custom') b.endCustom([cpus[0].pick(b, b.f[0]), cpus[1].pick(b, b.f[1])]);
-      else if (b.canOpenCustom() && Math.random() < 0.02) b.beginCustom();
+      else if (cpus[0].wantsDraw(b, b.f[0], DT)) b.beginCustom();
       b.update(DT, [cpus[0].intent(b, b.f[0], DT), cpus[1].intent(b, b.f[1], DT)]);
       frame++;
       if (frame % 30 === 0) hashes.push(battleHash(b));
