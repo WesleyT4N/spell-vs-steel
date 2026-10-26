@@ -14,7 +14,9 @@ here = os.path.dirname(os.path.abspath(__file__))
 root = os.path.dirname(os.path.dirname(here))
 models = sys.argv[1] if len(sys.argv) > 1 else '.'
 script = json.load(open(os.path.join(here, 'lines.json')))
-k = Kokoro(os.path.join(models, 'kokoro.onnx'), os.path.join(models, 'voices.bin'))
+# the full-precision model sounds noticeably less robotic than the int8 one
+model = next(m for m in ('kokoro-fp32.onnx', 'kokoro-v1.0.onnx', 'kokoro.onnx') if os.path.exists(os.path.join(models, m)))
+k = Kokoro(os.path.join(models, model), os.path.join(models, 'voices.bin'))
 
 def style(v):
     """A voice name, or a blend {name: weight} of several."""
@@ -23,15 +25,15 @@ def style(v):
     return sum(k.get_voice_style(n) * w for n, w in v['voice'].items())
 
 def render(text, v):
-    samples, sr = k.create(text, voice=style(v), speed=v['speed'], lang=v['lang'])
+    rate = 2 ** (v['semitones'] / 12)
+    # spoken faster by the same factor the tape-style pitch drop below slows it down
+    samples, sr = k.create(text, voice=style(v), speed=v['speed'] / rate, lang=v['lang'])
     with tempfile.TemporaryDirectory() as d:
         wav, mp3 = os.path.join(d, 'a.wav'), os.path.join(d, 'a.mp3')
         sf.write(wav, samples, sr)
-        rate = 2 ** (v['semitones'] / 12)
-        # pitch down without slowing, trim silence at both ends, tighten dynamics
-        # 'keepFormants' drops the pitch but not the throat (deep but not a giant); otherwise both move together
-        shift = (f'rubberband=pitch={rate:.5f}:formant=preserved,' if v.get('keepFormants')
-                 else f'asetrate={sr}*{rate:.5f},aresample={sr},atempo={1 / rate:.5f},')
+        # tape-style pitch drop (resample only, no time-stretch or formant processing, which sound robotic),
+        # then trim silence at both ends and tighten dynamics
+        shift = f'asetrate={sr}*{rate:.5f},aresample={sr},'
         # 'grit' (dB of drive) roughens the voice through a soft clipper, with a little chest
         grit = (f",lowshelf=f=220:g=3,volume={v['grit']}dB,asoftclip=type=tanh,volume=-{v['grit']}dB" if v.get('grit') else '')
         af = (shift +
@@ -46,7 +48,7 @@ def render(text, v):
         n = min(len(x) // 4, 192)
         x[:n] *= np.linspace(0, 1, n); x[-n:] *= np.linspace(1, 0, n)
         sf.write(mid, x, 24000, subtype='FLOAT')
-        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', mid, '-c:a', 'libmp3lame', '-b:a', '32k', mp3], check=True)
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', mid, '-c:a', 'libmp3lame', '-b:a', '40k', mp3], check=True)
         return open(mp3, 'rb').read()
 
 out = {}
