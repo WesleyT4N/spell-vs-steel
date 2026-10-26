@@ -149,6 +149,8 @@ export class OnlineScene implements Scene {
     if (wasPressed('confirm')) this.activate(ROWS[this.sel]);
   }
 
+  tall(): boolean { return true; }
+
   draw(c: Ctx, tick: number, ui: Ctx): void {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.35)';

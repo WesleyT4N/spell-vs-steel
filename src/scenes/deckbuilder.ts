@@ -134,6 +134,8 @@ export class DeckBuilderScene implements Scene {
     this.back();
   }
 
+  tall(): boolean { return true; }
+
   draw(c: Ctx, tick: number, ui: Ctx): void {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.5)';

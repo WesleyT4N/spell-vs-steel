@@ -1,6 +1,6 @@
 // Keyboard input with per-frame "pressed" edges and rebindable keys (saved in the browser).
 import { unlockAudio } from './audio';
-import { view } from './gfx';
+import { view, stretch, UH } from './gfx';
 
 export type Action = 'up' | 'down' | 'left' | 'right' | 'attack' | 'cast' | 'custom' | 'confirm' | 'back' | 'pause' | 'mute' | 'lb' | 'rb' | 'reset';
 
@@ -243,7 +243,9 @@ function initMouse(canvas: HTMLCanvasElement): void {
     const r = canvas.getBoundingClientRect();
     // map to UI-layer pixels; the 480×320 game sits centered on a screen that may show more around it
     mouse.x = Math.floor((e.clientX - r.left) * view.w * 2 / r.width) - view.ox * 2;
-    mouse.y = Math.floor((e.clientY - r.top) * view.h * 2 / r.height) - view.oy * 2;
+    // undo the phone-portrait stretch of menu screens about the middle (see stretch in gfx.ts)
+    const y = (e.clientY - r.top) * view.h * 2 / r.height - view.oy * 2;
+    mouse.y = Math.floor(UH / 2 + (y - UH / 2) / stretch.k);
   };
   canvas.addEventListener('mousemove', e => { at(e); mouse.moved = true; });
   canvas.addEventListener('mousedown', e => {

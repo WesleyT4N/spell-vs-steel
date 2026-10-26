@@ -73,6 +73,8 @@ export class ControlsScene implements Scene {
 
   private flash(s: string): void { this.msg = s; this.msgT = 2; }
 
+  tall(): boolean { return true; }
+
   draw(c: Ctx, tick: number, ui: Ctx): void {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.35)';

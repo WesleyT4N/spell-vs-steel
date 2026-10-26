@@ -1,4 +1,5 @@
-import { W, H, UW, UH, P, view, setView, screenRect, MIN_ASPECT, PORTRAIT_MIN_ASPECT } from './engine/gfx';
+import { W, H, UW, UH, P, view, setView, screenRect, stretch, MIN_ASPECT, PORTRAIT_MIN_ASPECT } from './engine/gfx';
+import { FOOTER_H } from './scenes/skin';
 import { drawTextCentered } from './engine/font';
 import { initInput, endFrame, wasPressed } from './engine/input';
 import { toggleMute } from './engine/audio';
@@ -30,6 +31,7 @@ const ui = offscreen(UW, UH);
 function fit(): void {
   const [vw, vh] = touchActive() ? viewport() : [window.innerWidth, window.innerHeight];
   const portrait = touchActive() && vh > vw;
+  stretch.portrait = portrait;
   // phones in portrait keep the bottom half for the touch pad; in landscape the pad sits over the margins
   // dev tools can dock a panel on the right and reserve its width
   const bw = vw - Number(document.body.dataset.reserveRight ?? 0);
@@ -70,6 +72,9 @@ setScene(room ? new OnlineScene(room) : new TitleScene());
 // dev builds can open a dev tool straight from the URL (#cards, #sandbox, #lab, #dev)
 if (DEV_TOOLS && !room && location.hash.length > 1) void import('./scenes/devMenu').then(m => m.devFromHash(() => setScene(new TitleScene())));
 
+// how much taller menu screens get in phone portrait, at most (they also never outgrow the screen)
+const MAX_STRETCH = 1.5;
+
 const STEP = 1 / 60;
 let acc = 0;
 let last = performance.now();
@@ -88,6 +93,8 @@ function frame(now: number): void {
     tickAcc += STEP;
     if (tickAcc >= 1 / 8) { tickAcc -= 1 / 8; tick++; }
   }
+  const tall = stretch.portrait && getScene()?.tall?.();
+  stretch.k = tall ? Math.max(1, Math.min(MAX_STRETCH, (view.h * 2 - 2 * FOOTER_H) / UH)) : 1;
   // scenes draw in W×H / UW×UH coordinates, centered on the screen; margins start black
   world.setTransform(1, 0, 0, 1, 0, 0);
   world.fillStyle = '#000000';
@@ -104,7 +111,13 @@ function frame(now: number): void {
     drawTextCentered(ui, touchActive() ? 'TAP MENUS, USE THE PAD TO FIGHT' : 'MOUSE FOR MENUS, KEYBOARD TO FIGHT  (M TO MUTE)', UW / 2, 145, '#bcbcbc', 1, false);
   }
   c.drawImage(world.canvas, 0, 0, canvas.width, canvas.height);
-  c.drawImage(ui.canvas, 0, 0, canvas.width, canvas.height);
+  if (stretch.k > 1) {
+    // menu screen in phone portrait: the UI layer stretched taller about the middle, then the footer strip
+    // pasted back along the bottom edge unstretched
+    const dh = canvas.height * stretch.k, sy = canvas.height / (view.h * 2), fy = view.h * 2 - FOOTER_H;
+    c.drawImage(ui.canvas, 0, (canvas.height - dh) / 2, canvas.width, dh);
+    c.drawImage(ui.canvas, 0, fy, view.w * 2, FOOTER_H, 0, Math.round(fy * sy), canvas.width, canvas.height - Math.round(fy * sy));
+  } else c.drawImage(ui.canvas, 0, 0, canvas.width, canvas.height);
   commitZones();
   syncPad(getScene()?.pad?.() ?? 'back');
   canvas.style.cursor = hotZone() ? 'pointer' : 'default';

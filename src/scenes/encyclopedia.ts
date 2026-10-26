@@ -109,6 +109,8 @@ export class EncyclopediaScene implements Scene {
     this.test(card);
   }
 
+  tall(): boolean { return true; }
+
   draw(c: Ctx, tick: number, ui: Ctx): void {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(0,0,24,0.8)';
