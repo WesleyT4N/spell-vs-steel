@@ -565,6 +565,8 @@ export class Battle {
       // Energy comes from standing still; any change of panel restarts the count
       // (Light Footed keeps the count through moves; Deadeye doubles the rate)
       if ((f.col !== f.lastCol || f.row !== f.lastRow) && f.st.lightFoot <= 0) f.stillT = 0;
+      // a cursed panel gives no stand-still Energy
+      else if (TUNING.priest.curseStopsEnergy && this.onCurse(f)) f.stillT = 0;
       else f.stillT += dt * (f.st.deadeye > 0 ? 2 : 1);
       const R = TUNING.ranger;
       while (f.stillT >= R.stillSeconds) {
