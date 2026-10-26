@@ -4,6 +4,7 @@ import { BUFF_KEYS } from './battle';
 import type { CardDef } from './cards';
 import { sfx } from '../engine/audio';
 import { allEnemyPanels, lowHp, sameRow } from './cardUtil';
+import { TUNING } from './tuning';
 
 /** Run `fn` every `step` seconds for `secs` seconds. */
 function overTime(b: Battle, secs: number, step: number, fn: (i: number) => void): void {
@@ -244,7 +245,7 @@ export const cleric: CardDef[] = [
       b.cheer = 2;
       for (let i = 0; i < 10; i++) b.later(i * 0.4, () => {
         const c = foe.col, r = foe.row;
-        b.warn(f, [[c, r]], 0.4, () => {
+        b.warn(f, [[c, r]], TUNING.warnTime, () => {
           b.addFx('holyPillar', f.side, c, r, 0.35);
           if (b.strike(f, [[c, r]], 40 * x.mult, { spell: true, element: 'holy', noFlinch: true }).dealt > 0) b.heal(f, 20);
         });
