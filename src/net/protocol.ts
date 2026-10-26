@@ -6,7 +6,7 @@ import type { ClassId } from '../art/sprites';
 import type { Dir, Intent } from '../game/battle';
 
 /** Bump when the rules or the protocol change, so mismatched builds refuse to play each other. */
-export const PROTOCOL = 4;
+export const PROTOCOL = 5;
 
 export interface Hello { cls: ClassId; skin: string; deck: string[] }
 
@@ -54,6 +54,8 @@ export interface Packet {
   /** [frame, checksum] of a recent frame, for desync detection. */
   hash?: [number, number];
   bye?: boolean;
+  /** The sender's tab is in the background: it only pings, so wait for it instead of timing out. */
+  away?: boolean;
 }
 
 /** One frame of a player's controls, packed into 10 bits. */

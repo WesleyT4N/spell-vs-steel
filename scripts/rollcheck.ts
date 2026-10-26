@@ -63,7 +63,7 @@ for (let m = 0; m < N; m++) {
       remote: f => f < remoteKnown && f < ins.length ? ins[f][1 - me] : null,
     }, statsRollbackRoots(ys), (f, h) => { if (h !== hashes[f] && !bad) bad = `checksum differs at frame ${f}`; });
     const w = new TapeWriter(y);
-    rb.onConfirmed = (kind, i) => { if (kind === 'draw') w.beginCustom(); else w.update(i); };
+    rb.onConfirmed = (_f, i, kind) => { if (kind === 'draw') w.beginCustom(); else w.update(i); };
     let ticks = 0, spike = 0;
     while (!(y.phase === 'over' && rb.settled) && rb.confirmed < ins.length && ticks < 60 * 600 && !bad) {
       ticks++;

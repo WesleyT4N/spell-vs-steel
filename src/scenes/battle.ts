@@ -5,6 +5,7 @@ import { CLASS_INFO } from '../game/classes';
 import { Battle, NO_INTENT, heavyChargeOf, type Dir, type Intent, type Side } from '../game/battle';
 import { drawBattle, drawBattleUi, getArena } from '../game/battleView';
 import { Cpu } from '../game/ai';
+import { styleFor } from '../game/playstyles';
 import { CARDS, ELEMENT_COLOR } from '../game/cards';
 
 // Draw screen layout (UI pixels): the hand fans along the bottom, details and cast order above it.
@@ -83,10 +84,10 @@ export class BattleScene implements Scene {
       { cls: m.p1, deck: sideDeck(m, 0, this.decks[0]), name: sideName(ctl, 0), skin: m.p1Skin[m.p1] },
       { cls: m.cpu, deck: sideDeck(m, 1, this.decks[1]), name: sideName(ctl, 1), skin: m.cpuSkin[m.cpu] },
     );
-    this.cpu = new Cpu(m.difficulty);
+    this.cpu = new Cpu(m.difficulty, styleFor(m.cpu, m.difficulty, m.p1));
     this.stats = trackStats(this.b);
     if (this.keepsReplays) recordRound(this.b, t => this.keepRound(t));
-    if (ctl[0] === 'cpu') this.cpu0 = new Cpu(m.difficulty);
+    if (ctl[0] === 'cpu') this.cpu0 = new Cpu(m.difficulty, styleFor(m.p1, m.difficulty, m.cpu));
     this.me = this.home;
     this.rivalName = sideName(ctl, this.home === 0 ? 1 : 0);
   }

@@ -4,6 +4,7 @@
 // same deterministic set, so they agree on who won.
 //
 // Where the database is missing (a hosted build, local tests) ratings stay in this browser.
+import { getSave, setSave, flushSave } from '../engine/save';
 import type { Side } from '../game/battle';
 
 export const START_RATING = 1000;
@@ -69,13 +70,12 @@ class DbStore implements RatingStore {
   }
 }
 
-const LOCAL_KEY = 'svs:rating';
 class LocalStore implements RatingStore {
   readonly kind = 'local';
   async mine(): Promise<Rating> {
-    try { return toRating(JSON.parse(localStorage.getItem(LOCAL_KEY) ?? 'null') ?? undefined); } catch { return blankRating(); }
+    return toRating(getSave('rating') ?? undefined);
   }
-  async save(r: Rating): Promise<void> { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(r)); } catch { /* storage blocked */ } }
+  async save(r: Rating): Promise<void> { setSave('rating', { ...r }); }
   async ladder(): Promise<LadderRow[]> { return [{ ...(await this.mine()), id: 'me', name: 'YOU', you: true }]; }
 }
 
@@ -93,18 +93,18 @@ export function ratingStore(): Promise<RatingStore> {
 // ---------- leaving a ranked set early counts as a loss ----------
 // A loss is written down when a ranked set starts and cleared when it is scored, so closing the page
 // mid-set still costs the rating the next time ranked is opened.
-const PENDING_KEY = 'svs:ranked-pending';
 interface Pending { them: number; at: number }
 
 export function armPending(them: number): void {
-  try { localStorage.setItem(PENDING_KEY, JSON.stringify({ them, at: Date.now() } satisfies Pending)); } catch { /* storage blocked */ }
+  setSave('rankedPending', { them, at: Date.now() } satisfies Pending);
+  void flushSave(); // a page closed mid-set must still find it
 }
-export function clearPending(): void { try { localStorage.removeItem(PENDING_KEY); } catch { /* storage blocked */ } }
+export function clearPending(): void { setSave('rankedPending', null); }
 
 /** Score any ranked set this browser walked out of. Returns the rating after it. */
 export async function settlePending(store: RatingStore): Promise<Rating> {
   let p: Pending | null = null;
-  try { p = JSON.parse(localStorage.getItem(PENDING_KEY) ?? 'null') as Pending | null; } catch { /* none */ }
+  p = getSave('rankedPending') as Pending | null;
   const mine = await store.mine();
   if (!p || typeof p.them !== 'number') return mine;
   clearPending();

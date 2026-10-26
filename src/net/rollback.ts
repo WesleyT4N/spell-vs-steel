@@ -50,7 +50,7 @@ export class Rollback {
    * on `ins`, or opening the Draw screen). Each frame is confirmed exactly once, so this is where
    * replays get recorded.
    */
-  onConfirmed?: (kind: 'update' | 'draw', ins: [NetInput, NetInput]) => void;
+  onConfirmed?: (frame: number, ins: [NetInput, NetInput], kind: 'update' | 'draw') => void;
   private snap: Snapshot;
   /** The remote input each guessed frame ran on (index = frame). */
   private guessed: NetInput[] = [];
@@ -137,8 +137,8 @@ export class Rollback {
   private runFrame(mine: NetInput, theirs: NetInput, real: boolean): void {
     const ins: [NetInput, NetInput] = this.me === 0 ? [mine, theirs] : [theirs, mine];
     const b = this.b;
-    if (real && (ins[0].draw || ins[1].draw) && b.canOpenCustom()) { this.onConfirmed?.('draw', ins); b.beginCustom(); return; }
-    if (real) this.onConfirmed?.('update', ins);
+    if (real && (ins[0].draw || ins[1].draw) && b.canOpenCustom()) { this.onConfirmed?.(this.confirmed, ins, 'draw'); b.beginCustom(); return; }
+    if (real) this.onConfirmed?.(this.confirmed, ins, 'update');
     b.update(STEP, ins);
   }
 

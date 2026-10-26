@@ -5,6 +5,7 @@
 //
 // Playback skips the Draw screens, as Battle Network replays do: the picks are applied the moment the
 // screen opens and the fight carries straight on.
+import { getReplays, setReplays, MAX_KEPT_REPLAYS } from '../engine/save';
 import { Battle, NO_INTENT, type FighterSpec, type Intent, type Side } from './battle';
 import { CARDS } from './cards';
 import { TUNING } from './tuning';
@@ -152,31 +153,12 @@ export const RULES_VERSION = ((): number => {
 })();
 
 // ---------- saved replays (this browser only) ----------
-const KEY = 'svs:replays';
-/** Newest replays kept, not counting kept ones. */
-const RECENT = 20;
-const MAX_KEPT = 20;
-
+// kept in the save module, which applies the caps: 20 newest + up to 20 kept, newest first
 export function loadReplays(): Replay[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? '[]') as Replay[];
-    return Array.isArray(v) ? v.filter(r => r && Array.isArray(r.rounds)) : [];
-  } catch { return []; }
+  return getReplays<Replay>().filter(r => Array.isArray(r.rounds)).map(r => ({ ...r }));
 }
 
-function store(list: Replay[]): void {
-  // newest first; drop old unkept ones past the limit, and more if the browser runs out of room
-  list.sort((a, b) => b.at - a.at);
-  let recent = 0;
-  let out = list.filter(r => r.keep || recent++ < RECENT);
-  for (;;) {
-    try { localStorage.setItem(KEY, JSON.stringify(out)); return; } catch {
-      const drop = out.map(r => !r.keep).lastIndexOf(true);
-      if (drop < 0 || out.length <= 1) return;
-      out = out.filter((_, i) => i !== drop);
-    }
-  }
-}
+function store(list: Replay[]): void { setReplays(list); }
 
 /** Add or update a replay (by id). */
 export function saveReplay(r: Replay): void {
@@ -192,7 +174,7 @@ export function toggleKeep(id: string): boolean {
   const list = loadReplays();
   const r = list.find(x => x.id === id);
   if (!r) return false;
-  if (!r.keep && list.filter(x => x.keep).length >= MAX_KEPT) return false;
+  if (!r.keep && list.filter(x => x.keep).length >= MAX_KEPT_REPLAYS) return false;
   r.keep = !r.keep;
   store(list);
   return true;
