@@ -94,8 +94,8 @@ export const TUNING = {
     /** Cursed panels: damage per second to an enemy standing on one. Cursed or Hexed fighters deal this multiplier. */
     curseDps: 10,
     /** Each further second on the same cursed panel adds this much, up to curseMax per tick. */
-    curseRamp: 0,
-    curseMax: 10,
+    curseRamp: 3,
+    curseMax: 22,
     weakened: 0.75,
     /** Blessed panels (all last until the next Draw screen): Hallowed Ground damage, Aegis Field shield, Wellspring Mana. */
     hallowedBonus: 1.35,
