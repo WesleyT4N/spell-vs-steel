@@ -230,7 +230,11 @@ export class Cpu {
     const builders = idx.filter(i => cost(i) === 0);
     const spenders = idx.filter(i => cost(i) > 0).sort((a, c) => cost(a) - cost(c));
     const chosen = [...builders];
-    for (const i of spenders) if (cost(i) <= budget) { chosen.push(i); budget -= cost(i); }
+    // a 4-5 Rage finisher is worth banking for: queue it last and keep only what still leaves room for it
+    const big = spenders.filter(i => cost(i) >= 4).pop();
+    if (big !== undefined) budget -= cost(big);
+    for (const i of spenders) if (i !== big && cost(i) <= budget) { chosen.push(i); budget -= cost(i); }
+    if (big !== undefined) chosen.push(big);
     return chosen;
   }
 }

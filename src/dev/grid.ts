@@ -31,8 +31,8 @@ export interface GridReport {
 export const WHEEL: Record<string, string[]> = {
   warrior: ['rogue', 'ranger'], mage: ['warrior', 'priest'], rogue: ['mage', 'priest'], ranger: ['mage', 'rogue'], priest: ['warrior', 'ranger'],
 };
-/** Win rate bands (Wes): favorable from 53%, a counter should sit near 60-40, past 67-33 is too lopsided. */
-export const FAV = 0.53, LOPSIDED = 0.67;
+/** Win rate bands (Wes): favorable is over 50% (under 53% is flagged as thin), a counter should sit near 60-40, past 67-33 is too lopsided. */
+export const FAV = 0.5, THIN = 0.53, LOPSIDED = 0.67;
 
 export interface GridPlan { kind: PoolKind; decks: PoolDeck[]; pairs: Array<[PoolDeck, PoolDeck]>; jobs: GridJob[] }
 
@@ -109,7 +109,7 @@ export function classTotal(r: GridReport, cls: string): Cell {
   return Object.values(r.grid[cls] ?? {}).reduce((s, c) => ({ wins: s.wins + c.wins, losses: s.losses + c.losses, draws: s.draws + c.draws }), { wins: 0, losses: 0, draws: 0 });
 }
 
-export const favorable = (r: GridReport, a: string, classes: string[]): string[] => classes.filter(b => b !== a && cellRate(r.grid[a]?.[b]) >= FAV);
+export const favorable = (r: GridReport, a: string, classes: string[]): string[] => classes.filter(b => b !== a && cellRate(r.grid[a]?.[b]) > FAV);
 
 /** Wes's rules: at least 2 favorable matchups, nothing past 67-33, and the intended wheel holds. */
 export function ruleChecks(r: GridReport, a: string, classes: string[]): string[] {
@@ -117,6 +117,7 @@ export function ruleChecks(r: GridReport, a: string, classes: string[]): string[
   const pc = (v: number): string => `${Math.round(v * 100)}%`;
   const fav = favorable(r, a, classes);
   if (fav.length < 2) out.push(`only ${fav.length} favorable`);
+  for (const b of fav) if (cellRate(r.grid[a]?.[b]) < THIN) out.push(`thin vs ${b} ${pc(cellRate(r.grid[a]?.[b]))}`);
   for (const b of classes) {
     if (a === b) continue;
     const v = cellRate(r.grid[a]?.[b]);

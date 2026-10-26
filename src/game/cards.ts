@@ -204,14 +204,14 @@ const warrior: CardDef[] = [
   },
   {
     id: 'rampage', name: 'Rampage', cls: 'warrior', cost: 5, rarity: 'legendary', element: 'steel', damaging: true, lock: 1.3,
-    dmg: '70x3', short: 'Charge the enemy wherever they are: 3 heavy slashes. Cannot be interrupted.',
+    dmg: '50x3', short: 'Charge the enemy wherever they are: 3 heavy slashes. Cannot be interrupted.',
     cast: x => {
       const { b, f, foe } = x;
       f.st.noKnock = 1.4;
       lunge(x, foe.col - x.dir, foe.row, 0.18, 0.85, 0.2);
       for (let i = 0; i < 3; i++) b.later(0.22 + i * 0.25, () => {
         b.addFx('cleaveHeavy', f.side, foe.col, foe.row, 0.18);
-        b.damage(foe, 70 * x.mult, f, { spell: true, element: 'steel', targeted: true });
+        b.damage(foe, 50 * x.mult, f, { spell: true, element: 'steel', targeted: true });
       });
     },
   },
@@ -288,7 +288,7 @@ const warrior: CardDef[] = [
   },
   {
     id: 'titans_fall', name: "Titan's Fall", cls: 'warrior', cost: 5, rarity: 'mythic', element: 'steel', damaging: true, lock: 1.1,
-    dmg: '200', short: 'Leap into the enemy area and smash all their panels, cracking them. Only blockable.',
+    dmg: '140', short: 'Leap into the enemy area and smash all their panels, cracking them. Only blockable.',
     cast: x => {
       const { b, f, foe } = x;
       const mid = b.frontCol(foe.side) + x.dir;
@@ -298,7 +298,7 @@ const warrior: CardDef[] = [
         b.cheer = 2;
         const cells = allEnemyPanels(b, f.side);
         for (const [c, r] of cells) { b.addFx('quake', f.side, c, r, 0.4); b.panels[c][r].cracked = true; }
-        b.strike(f, cells, 200 * x.mult, { spell: true, element: 'steel' });
+        b.strike(f, cells, 140 * x.mult, { spell: true, element: 'steel' });
       });
       void foe;
     },

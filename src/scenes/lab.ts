@@ -13,7 +13,7 @@ import { addMatch, classIds, emptyStats, runMatch, wilson, type SeriesStats, typ
 import { cardPower } from '../dev/instrument';
 import { defaultTuning, getTuning, isModified, onTuningChange, overrideCount, overrides, replaceOverrides, resetAll, setPower, setTuning, tuningPaths } from '../dev/tuningEdit';
 import { parseScript, toScript } from '../dev/script';
-import { planGrid, foldGrid, cellRate, cellRange, classTotal, favorable, ruleChecks, FAV, LOPSIDED, type GridPlan, type GridReport } from '../dev/grid';
+import { planGrid, foldGrid, cellRate, cellRange, classTotal, favorable, ruleChecks, FAV, THIN, LOPSIDED, type GridPlan, type GridReport } from '../dev/grid';
 import { runGrid, type GridRun } from '../dev/gridRunner';
 import { archetypesFor, mythicOf, type PoolKind } from '../dev/archetypes';
 import { h, btn, choice, setBadge } from '../dev/dom';
@@ -220,7 +220,7 @@ export class LabScene implements Scene {
       h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Decks per class (random) / builds per archetype (variants)'), gk.el),
       h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Steps per second'), hz.el),
       h('div', { class: 'row' }, grid),
-      h('div', { class: 'muted' }, `Every deck plays every other class's decks, sides alternating, on all cores. Checks Wes's rules: 2+ favorable matchups (>= ${FAV * 100}%), nothing past ${LOPSIDED * 100}-${100 - LOPSIDED * 100}, and the counter wheel. Uses the script and tuning below.`),
+      h('div', { class: 'muted' }, `Every deck plays every other class's decks, sides alternating, on all cores. Checks Wes's rules: 2+ favorable matchups (over ${FAV * 100}%, thin under ${THIN * 100}%), nothing past ${LOPSIDED * 100}-${100 - LOPSIDED * 100}, and the counter wheel. Uses the script and tuning below.`),
       h('h2', {}, 'Script'),
       this.scriptEl,
       h('h2', {}, 'Tuning'),
@@ -310,7 +310,7 @@ export class LabScene implements Scene {
 
   private gridView(r: GridReport): HTMLElement {
     const ids = classIds();
-    const color = (v: number): string => (v >= 0.6 ? '#58d854' : v >= FAV ? '#b8f818' : v > 1 - FAV ? '#fcfcfc' : v > 0.4 ? '#fca044' : '#f83800');
+    const color = (v: number): string => (v >= 0.6 ? '#58d854' : v > THIN ? '#b8f818' : v > 1 - THIN ? '#fcfcfc' : v > 0.4 ? '#fca044' : '#f83800');
     const cell = (a: string, b: string): HTMLElement => {
       if (a === b) return h('td', { class: 'muted' }, '-');
       const c = r.grid[a]?.[b], v = cellRate(c);

@@ -18,7 +18,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { classIds, cardName } from '../src/dev/simulate';
 import { archetypesFor, mythicOf, type PoolKind } from '../src/dev/archetypes';
-import { planGrid, runJob, foldGrid, cellRate, cellRange, classTotal, favorable, ruleChecks, WHEEL, FAV, LOPSIDED, type GridJob, type GridJobResult, type GridReport } from '../src/dev/grid';
+import { planGrid, runJob, foldGrid, cellRate, cellRange, classTotal, favorable, ruleChecks, WHEEL, FAV, THIN, LOPSIDED, type GridJob, type GridJobResult, type GridReport } from '../src/dev/grid';
 import { applyOverrides, overrideCount, type Overrides } from '../src/dev/tuningEdit';
 import { parseScript, toScript } from '../src/dev/script';
 import { CARDS } from '../src/game/cards';
@@ -169,7 +169,7 @@ async function main(): Promise<void> {
 
   const md: string[] = [`# Balance grid`, '', `Classes: ${classes.join(', ')}. ${o.n} matches per deck pair (sides alternate), Normal CPU on both sides, ${o.hz} steps per second, seed ${o.seed}.`, ''];
   if (overrideCount(ov)) md.push('Script for this run:', '', '```', toScript(ov), '```', '');
-  md.push(`Rules checked: every class has at least 2 favorable matchups (>= ${FAV * 100}%), nothing at or past ${LOPSIDED * 100}-${100 - LOPSIDED * 100}, and each class beats its two intended counters (${Object.entries(WHEEL).map(([a, bs]) => `${a} > ${bs.join(', ')}`).join('; ')}).`, '');
+  md.push(`Rules checked: every class has at least 2 favorable matchups (over ${FAV * 100}%, flagged thin under ${THIN * 100}%), nothing at or past ${LOPSIDED * 100}-${100 - LOPSIDED * 100}, and each class beats its two intended counters (${Object.entries(WHEEL).map(([a, bs]) => `${a} > ${bs.join(', ')}`).join('; ')}).`, '');
   for (const r of reports) {
     const text = classGridText(r, classes);
     console.log(`\n== ${r.kind} decks (${r.decks.length} decks, ${r.matches} matches, avg match ${r.avgTime.toFixed(0)}s) ==`);
