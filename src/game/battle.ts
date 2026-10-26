@@ -2,7 +2,7 @@
 import { TUNING } from './tuning';
 import { CARDS, type CardDef, type Element } from './cards';
 import { defaultSkin, mirrorSkin, type ClassId } from '../art/sprites';
-import { sfx, sfxFx } from '../engine/audio';
+import { sfx, sfxFx, voiceLine } from '../engine/audio';
 
 /** Sound a shot makes leaving the caster (the light Arrow plays its own). */
 const SHOT_SOUND: Partial<Record<string, string>> = { fireball: 'shot_fireball', hook: 'shot_chain', gust: 'shot_wind', knife: 'shot_knife', arrow: 'shot_arrow', sting: 'shot_arrow', net: 'shot_net', wolf: 'shot_beast', hammer: 'shot_spin', vial: 'shot_net' };
@@ -229,6 +229,8 @@ export class Battle {
   noKo = false;
   turn = 0;
   time = 0;
+  /** When each side last let out a hurt voice. */
+  hurtT: [number, number] = [-9, -9];
   koT = 0;
   winner: Side | null = null;
   /** Offered cards on the current custom screen, per side. */
@@ -419,6 +421,7 @@ export class Battle {
         this.winner = (1 - f.side) as Side;
         this.cheer = 3;
         sfx('ko', { pan: panOf(f.col) });
+        voiceLine(f.cls, 'death', panOf(f.col), f.side);
       }
     }
   }
@@ -764,6 +767,7 @@ export class Battle {
     const d = this.dir(f);
     f.pose = kind === 'light' ? 'attack' : 'heavy';
     f.poseT = kind === 'light' ? 0.2 : 0.32;
+    if (kind === 'heavy') voiceLine(f.cls, 'grunt', panOf(f.col), f.side);
     if (f.cls === 'warrior') {
       const T = TUNING.warrior;
       const dmg = kind === 'light' ? T.lightDamage : T.heavyDamage;
@@ -1148,6 +1152,11 @@ export class Battle {
     if (opts.freeze) this.freeze(target, opts.freeze);
     if (opts.knockback) this.knockback(target, 1);
     sfx(opts.basic === 'heavy' ? 'heavyImpact' : 'hit', { pan: panOf(target.col), amt, element: opts.element });
+    // hurt voice: not for damage over time or chip hits, not from inside a block of ice, and not every hit of a flurry
+    if (target.hp > 0 && !opts.dot && amt >= 8 && target.st.frozen <= 0 && target.st.iceBlock <= 0 && this.time - this.hurtT[target.side] > 0.35) {
+      this.hurtT[target.side] = this.time;
+      voiceLine(target.cls, amt >= 60 ? 'hurtBig' : 'hurt', panOf(target.col), target.side);
+    }
     return out;
   }
 
@@ -1186,6 +1195,8 @@ export class Battle {
     f.pose = 'cast';
     f.poseT = 0.3;
     f.lock = Math.max(f.lock, card.lock ?? 0.3);
+    const big = card.rarity === 'legendary' || card.rarity === 'mythic' || card.cost === 'all' || card.cost >= 4;
+    voiceLine(f.cls, big ? 'castBig' : 'cast', panOf(f.col), f.side);
 
     if (foe.st.counterspell > 0 && card.id !== 'counterspell') {
       foe.st.counterspell = 0;

@@ -18,7 +18,7 @@ import { P, UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
-import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
+import { playMusic, stopMusic, sfx, chargeHum, announce, voiceLine } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
 import { drawCardDetail, drawCardFace, resName, resInk, RES_INK, CARD_W, CARD_H, PICKED } from './cardView';
 import { win, plaque, pip, disc, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, WAX_HI, GOLD } from './skin';
@@ -47,6 +47,12 @@ export class BattleScene implements Scene {
   me: Side = 0;
   /** False in training: the Draw screen waits for you. */
   protected timed = true;
+  /** The announcer calls the round, FIGHT, K.O. and the winner. Off in training and the tutorial. */
+  announce = true;
+  private callPhase = '';
+  private called = false;
+  /** When the round call started, so FIGHT never talks over it. */
+  private roundAt = -1e9;
 
   /** Rounds won in the current set, by side. `battle` lets online play hand in a seeded battle. */
   constructor(public m: MatchConfig, public score: [number, number] = [0, 0], battle?: Battle) {
@@ -84,6 +90,7 @@ export class BattleScene implements Scene {
 
   update(dt: number): void {
     const b = this.b;
+    this.callouts();
     this.fightBanner = Math.max(0, this.fightBanner - dt);
 
     if (b.phase === 'custom') { this.updateCustom(dt); b.update(dt, [NO_INTENT, NO_INTENT]); return; }
@@ -109,6 +116,35 @@ export class BattleScene implements Scene {
       stopMusic();
       if (b.winner === this.me) sfx('win');
       playMusic('result', RESULT_SONG);
+    }
+  }
+
+  /** Announcer calls on phase changes: the round as it opens, FIGHT as the first Draw screen closes, K.O., the winner. */
+  protected callouts(): void {
+    const b = this.b, ph = b.phase, prev = this.callPhase;
+    this.callPhase = ph;
+    if (!this.announce || ph === prev) return;
+    if (!prev) {
+      if (this.m.bestOf > 1) {
+        const last = this.score[0] === this.need - 1 && this.score[1] === this.need - 1;
+        announce(last ? 'final' : 'round', { n: this.score[0] + this.score[1] + 1 });
+        this.roundAt = performance.now();
+      }
+      return;
+    }
+    if (ph === 'fight' && prev === 'custom' && !this.called) {
+      this.called = true;
+      const wait = this.roundAt + 1400 - performance.now();
+      if (wait > 0) window.setTimeout(() => announce('fight'), wait); else announce('fight');
+    }
+    if (ph === 'ko') announce('ko');
+    if (ph === 'over' && b.winner !== null) {
+      const w = b.f[b.winner], who = CLASS_INFO[w.cls].name;
+      const perfect = w.hp >= w.maxHp;
+      const call = (): void => announce(this.setOver && this.m.bestOf > 1 ? 'match' : 'wins', { who });
+      if (perfect) { announce('perfect'); window.setTimeout(call, 900); } else call();
+      // the winner's victory line once the announcer is done
+      window.setTimeout(() => voiceLine(w.cls, 'win', 0, w.side), perfect ? 2300 : 1400);
     }
   }
 
