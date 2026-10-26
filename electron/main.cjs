@@ -1,7 +1,7 @@
 // Desktop shell: one window around the player build (dist-prod/index.html). Saves land in Electron's
 // own storage for the app (localStorage under the user's app-data folder), so they survive updates.
 // Online room codes go over PeerJS like any hosted build; the lobby, ranked and tournaments still need
-// the claude.ai page and say so.
+// the hosted page and say "not supported yet".
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('node:path');
 

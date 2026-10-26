@@ -130,7 +130,6 @@ export class RankedScene implements Scene {
     if (this.mode === 'loading') drawTextCentered(ui, 'LOADING YOUR RATING...', cx, 90 + dy, INK, 1, false);
     if (this.mode === 'error') {
       drawTextCentered(ui, this.msg, cx, 76 + dy, RED_INK, 1, false);
-      drawTextCentered(ui, 'FOR NOW, PLAY RANKED ON THE CLAUDE.AI PAGE.', cx, 92 + dy, INK2, 1, false);
       drawTextCentered(ui, touchText('CLICK TO GO BACK'), cx, 112 + dy, TRIM, 1, false);
     }
     if (this.mode === 'search' && this.search) {
