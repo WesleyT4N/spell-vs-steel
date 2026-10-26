@@ -12,6 +12,8 @@ export interface Scene {
   enter?(): void;
   /** Which touch controls this screen shows on phones (a BACK button when left out). */
   pad?(): PadMode;
+  /** The game went to the background (tab hidden, app switched away): pause if it makes sense. */
+  suspend?(): void;
 }
 
 let current: Scene | null = null;

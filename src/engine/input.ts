@@ -1,6 +1,7 @@
-// Keyboard input with per-frame "pressed" edges and rebindable keys (saved in the browser).
+// Keyboard and gamepad input with per-frame "pressed" edges and rebindable keys and buttons (saved in the browser).
 import { unlockAudio } from './audio';
 import { view } from './gfx';
+import { pollPads, clearPads, padCode, parsePad, padName, PAD_BUTTONS, PAD_SLOTS, type PadButton } from './gamepad';
 
 export type Action = 'up' | 'down' | 'left' | 'right' | 'attack' | 'cast' | 'custom' | 'confirm' | 'back' | 'pause' | 'mute' | 'lb' | 'rb' | 'reset';
 
@@ -12,6 +13,11 @@ export const DEFAULT_KEYS: Record<Bindable, string> = {
   up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD',
   attack: 'KeyJ', cast: 'KeyK', custom: 'Space', pause: 'Enter',
 };
+
+/** Actions each player has in two-player local Versus. */
+type Dir4 = 'up' | 'down' | 'left' | 'right';
+export type LocalAct = 'up' | 'down' | 'left' | 'right' | 'attack' | 'cast' | 'custom';
+export const LOCAL_ACTS = ['up', 'down', 'left', 'right', 'attack', 'cast', 'custom'] as const;
 
 // Keys that always work regardless of bindings. Menus confirm with the attack key and go back with the cast key.
 const FIXED: Record<string, Action[]> = {
@@ -30,6 +36,54 @@ try {
   if (raw) keys = { ...DEFAULT_KEYS, ...(JSON.parse(raw) as Partial<Record<Bindable, string>>) };
 } catch { /* storage blocked */ }
 
+// ---------- gamepad buttons ----------
+// Player 1's buttons work on every pad outside two-player Versus; there pad 1 plays player 1 and pad 2 player 2.
+export const DEFAULT_PAD: Record<Bindable, PadButton> = {
+  up: 'Up', down: 'Down', left: 'Left', right: 'Right', attack: 'A', cast: 'B', custom: 'RB', pause: 'Start',
+};
+export const DEFAULT_P2_PAD: Record<LocalAct, PadButton> = {
+  up: 'Up', down: 'Down', left: 'Left', right: 'Right', attack: 'A', cast: 'B', custom: 'RB',
+};
+/** Buttons that always work on every pad, like the arrows and Esc on the keyboard (the stick presses Up/Down/Left/Right). */
+const PAD_FIXED: Partial<Record<PadButton, Action[]>> = {
+  Up: ['up'], Down: ['down'], Left: ['left'], Right: ['right'],
+  A: ['confirm'], B: ['back'], Back: ['back'], Start: ['pause'], LB: ['lb'], RB: ['rb'], Y: ['reset'],
+};
+/** Buttons the rebinding screen refuses: SELECT always backs out, and START is only for pausing. */
+export const padReserved = (b: PadButton, a: Bindable | LocalAct): boolean => b === 'Back' || b === 'Home' || (b === 'Start' && a !== 'pause');
+const PAD_STORE = 'svs:pads';
+let pads: { p1: Record<Bindable, PadButton>; p2: Record<LocalAct, PadButton> } = { p1: { ...DEFAULT_PAD }, p2: { ...DEFAULT_P2_PAD } };
+try {
+  const raw = localStorage.getItem(PAD_STORE);
+  if (raw) {
+    const saved = JSON.parse(raw) as { p1?: Record<string, unknown>; p2?: Record<string, unknown> };
+    // only real button names for real actions survive a hand-edited save
+    const pick = <A extends string>(m: Record<string, unknown> | undefined, acts: readonly A[]): Partial<Record<A, PadButton>> =>
+      Object.fromEntries(acts.filter(a => (PAD_BUTTONS as readonly unknown[]).includes(m?.[a])).map(a => [a, m![a]])) as Partial<Record<A, PadButton>>;
+    pads = { p1: { ...DEFAULT_PAD, ...pick(saved.p1, BINDABLE) }, p2: { ...DEFAULT_P2_PAD, ...pick(saved.p2, LOCAL_ACTS) } };
+  }
+} catch { /* storage blocked */ }
+
+export const getPadButton = (a: Bindable): PadButton => pads.p1[a];
+export const getP2PadButton = (a: LocalAct): PadButton => pads.p2[a];
+/** Bind pad button `b` to player `p`'s action `a`; an action already on that button takes `a`'s old one. */
+export function setPadButton(p: 0 | 1, a: Bindable | LocalAct, b: PadButton): void {
+  const map = (p === 0 ? pads.p1 : pads.p2) as Record<string, PadButton>;
+  const other = Object.keys(map).find(o => o !== a && map[o] === b);
+  if (other) map[other] = map[a];
+  map[a] = b;
+  savePads();
+}
+export function resetPads(p: 0 | 1): void {
+  if (p === 0) pads.p1 = { ...DEFAULT_PAD }; else pads.p2 = { ...DEFAULT_P2_PAD };
+  savePads();
+}
+function savePads(): void {
+  rebuild();
+  rebuildLocal();
+  try { localStorage.setItem(PAD_STORE, JSON.stringify(pads)); } catch { /* storage blocked */ }
+}
+
 let BINDINGS: Record<string, Action[]> = {};
 function rebuild(): void {
   BINDINGS = {};
@@ -38,7 +92,14 @@ function rebuild(): void {
   for (const a of BINDABLE) add(keys[a], a);
   add(keys.attack, 'confirm');
   add(keys.cast, 'back');
+  for (let s = 0; s < PAD_SLOTS; s++) {
+    for (const [b, acts] of Object.entries(PAD_FIXED)) for (const a of acts) add(padCode(s, b as PadButton), a);
+    for (const a of BINDABLE) add(padCode(s, pads.p1[a]), a);
+    add(padCode(s, pads.p1.attack), 'confirm');
+    add(padCode(s, pads.p1.cast), 'back');
+  }
 }
+
 rebuild();
 
 export const getKey = (a: Bindable): string => keys[a];
@@ -73,15 +134,15 @@ export function keyName(code: string): string {
   };
   return map[code] ?? code.toUpperCase().slice(0, 6);
 }
-/** Name of the key bound to an action, for hints. */
-export const k = (a: Bindable): string => keyName(keys[a]);
+/** Whether the last button pressed was on a pad, so hints name pad buttons instead of keys. */
+let onPad = false;
+/** Name of the key (or pad button, when playing on a pad) bound to an action, for hints. */
+export const k = (a: Bindable): string => (onPad ? padName(pads.p1[a]) : keyName(keys[a]));
 
 // Keys the rebinding screen refuses (they are reserved for menus and muting).
 export const RESERVED = new Set(['Escape', 'KeyM', 'KeyQ', 'KeyE', 'KeyR', 'Backspace']);
 
 // ---------- local versus: two players on one keyboard ----------
-export type LocalAct = 'up' | 'down' | 'left' | 'right' | 'attack' | 'cast' | 'custom';
-export const LOCAL_ACTS = ['up', 'down', 'left', 'right', 'attack', 'cast', 'custom'] as const;
 /**
  * When two players share a keyboard, player 1 plays on the usual bindings (without the arrow keys, which
  * are player 2's) and player 2 on their own, rebindable on the controls screen: by default the arrows
@@ -105,7 +166,15 @@ let LOCAL_KEYS: [Record<LocalAct, string[]>, Record<LocalAct, string[]>] = [{} a
 let LOCAL_CODES = new Set<string>();
 function rebuildLocal(): void {
   const mine = [keys, p2Keys] as const;
-  LOCAL_KEYS = [0, 1].map(p => Object.fromEntries(LOCAL_ACTS.map(a => [a, [mine[p][a], LOCAL_EXTRA[p][a]]]))) as typeof LOCAL_KEYS;
+  const pad = [pads.p1, pads.p2] as const;
+  const dirs: readonly LocalAct[] = ['up', 'down', 'left', 'right'];
+  const DIR_BUTTON: Record<Dir4, PadButton> = { up: 'Up', down: 'Down', left: 'Left', right: 'Right' };
+  LOCAL_KEYS = [0, 1].map(p => Object.fromEntries(LOCAL_ACTS.map(a => {
+    const codes = [mine[p][a], LOCAL_EXTRA[p][a], padCode(p, pad[p][a])];
+    // the d-pad and stick always move, whatever the move buttons are bound to
+    if (dirs.includes(a)) codes.push(padCode(p, DIR_BUTTON[a as Dir4]));
+    return [a, codes];
+  }))) as typeof LOCAL_KEYS;
   LOCAL_CODES = new Set(LOCAL_KEYS.flatMap(l => Object.values(l).flat()));
 }
 rebuildLocal();
@@ -129,7 +198,13 @@ const rawHeld = new Set<string>();
 const rawPressed = new Set<string>();
 /** Held local-versus codes in the order they went down, so each player's latest direction wins. */
 const rawOrder: string[] = [];
+/** Whether each local player last pressed a pad button rather than a key (for their hints). */
+const localOnPad = [false, false];
 function pressRaw(code: string, isDown: boolean): void {
+  if (isDown) {
+    const pad = parsePad(code);
+    for (const p of [0, 1] as const) if (pad ? pad.slot === p : Object.values(LOCAL_KEYS[p]).some(l => l.includes(code))) localOnPad[p] = !!pad;
+  }
   const i = rawOrder.indexOf(code);
   if (i >= 0) rawOrder.splice(i, 1);
   if (isDown) { if (!rawHeld.has(code)) rawPressed.add(code); rawHeld.add(code); rawOrder.push(code); }
@@ -160,7 +235,8 @@ export function localNav(p: 0 | 1, a: 'up' | 'down' | 'left' | 'right', dt: numb
   return false;
 }
 /** On-screen name of local player `p`'s key for an action. */
-export const localKey = (p: 0 | 1, a: LocalAct): string => keyName(p === 0 ? keys[a] : p2Keys[a]);
+export const localKey = (p: 0 | 1, a: LocalAct): string =>
+  localOnPad[p] ? padName((p === 0 ? pads.p1 : pads.p2)[a]) : keyName(p === 0 ? keys[a] : p2Keys[a]);
 
 const down = new Set<Action>();
 const pressed = new Set<Action>();
@@ -170,13 +246,14 @@ const heldCodes = new Set<string>();
 const dirOrder: Action[] = [];
 let capture: ((code: string) => void) | null = null;
 
-/** The next key press goes to `cb` instead of the game (used by the rebinding screen). null cancels. */
+/** The next key or pad button press goes to `cb` instead of the game (used by the rebinding screen); pad buttons arrive as pad codes. null cancels. */
 export function captureNextKey(cb: ((code: string) => void) | null): void { capture = cb; }
 
 function onKey(e: KeyboardEvent, isDown: boolean): void {
   // typing into a dev tools field is not game input
   if (e.target instanceof Element && e.target.closest('input, select, textarea')) return;
   unlockAudio();
+  if (isDown) onPad = false;
   if (capture && isDown) {
     e.preventDefault();
     const cb = capture;
@@ -291,9 +368,29 @@ export function initInput(canvas?: HTMLCanvasElement): void {
   if (canvas) initMouse(canvas);
   window.addEventListener('keydown', e => onKey(e, true));
   window.addEventListener('keyup', e => onKey(e, false));
-  window.addEventListener('blur', () => { down.clear(); heldCodes.clear(); dirOrder.length = 0; rawHeld.clear(); rawOrder.length = 0; });
+  window.addEventListener('blur', releaseAll);
   // iOS only lets sound start from the end of a touch
   for (const ev of ['pointerdown', 'pointerup', 'touchend']) window.addEventListener(ev, () => unlockAudio());
+}
+
+/** Let go of everything (the window lost focus or the game went to the background, so key-ups would be lost). */
+export function releaseAll(): void {
+  down.clear(); heldCodes.clear(); dirOrder.length = 0; rawHeld.clear(); rawOrder.length = 0;
+  clearPads();
+}
+
+/** Read the gamepads. The main loop calls this before each fixed step, so pad presses land on step boundaries like keys. */
+export function pollInput(): void {
+  pollPads((code, isDown) => {
+    if (isDown) { onPad = true; page.engaged = true; }
+    if (capture && isDown) {
+      const cb = capture;
+      capture = null;
+      cb(code);
+      return;
+    }
+    press(code, isDown);
+  });
 }
 
 export const isDown = (a: Action): boolean => down.has(a);
