@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "netcheck": "tsx scripts/netcheck.ts",
     "combocheck": "tsx scripts/combo-check.ts",
-    "peerserver": "peerjs --port 9000 --host 127.0.0.1"
+    "peerserver": "peerjs --port 9000 --host 127.0.0.1",
+    "rollcheck": "tsx scripts/rollcheck.ts"
   },
   "devDependencies": {
     "peer": "^1.0.2",
