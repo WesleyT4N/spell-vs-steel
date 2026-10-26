@@ -296,4 +296,5 @@ No test framework and no CI yet (no `.github/workflows`).
 
 - Modularize for modding: PR #35 adds `src/content/registry.ts` (`Registry<T>`) and moves stages to `src/content/stages/`, plus `npm run golden`; class folders follow.
 - Rollback netcode: Battle state as plain data (timers and anims as records), then prediction with rewind and replay.
-- PR #29 balance tooling and CPU styles, #32 BN indicators, #34 hit feel, #36 panel effects, regression tests, fuzz and perf, arcade ladder, replays, soundtrack.
+- PR #41: CI, full-match regression tests and screenshot diffs at 7 screen shapes.
+- PR #29 balance tooling and CPU styles, #32 BN indicators, #34 hit feel, #36 panel effects, fuzz and perf, arcade ladder, replays, soundtrack.
