@@ -22,7 +22,8 @@ for (let m = 0; m < N; m++) {
   while (!tape && frames < 60 * 400) {
     if (b.phase === 'custom') {
       // the Draw screen stays up a random while, and the battle keeps ticking under it
-      if ((customT += dt) > 0.5 + Math.random()) { customT = 0; b.endCustom([cpus[0].pick(b, b.f[0]), Math.random() < 0.2 ? [] : cpus[1].pick(b, b.f[1])]); }
+      // online play closes it the moment both picks are in, with no ticks in between
+      if ((customT += dt) > (m % 2 ? 0 : 0.5 + Math.random())) { customT = 0; b.endCustom([cpus[0].pick(b, b.f[0]), Math.random() < 0.2 ? [] : cpus[1].pick(b, b.f[1])]); }
       else { b.update(dt, [NO_INTENT, NO_INTENT]); hashes.push(battleHash(b)); frames++; continue; }
     }
     if (b.canOpenCustom() && Math.random() < 0.02) { b.beginCustom(); continue; }
