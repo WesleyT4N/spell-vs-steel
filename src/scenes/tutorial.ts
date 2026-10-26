@@ -706,7 +706,7 @@ export class TutorialScene implements Scene {
       const choice = TutorialScene.DONE[this.doneSel];
       if (choice === 'VERSUS CPU') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); setScene(new CharSelectScene()); }
       if (choice === 'DECK BUILDER') setScene(new DeckBuilderScene(this.cls, () => setScene(new TitleScene())));
-      if (choice === 'TRY ANOTHER CLASS') setScene(new CharSelectScene(undefined, 0, true));
+      if (choice === 'TRY ANOTHER CLASS') setScene(new CharSelectScene(undefined, 0, 'tutorial'));
       if (choice === 'TITLE') setScene(new TitleScene());
     }
   }
