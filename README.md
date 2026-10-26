@@ -6,7 +6,7 @@
   <img src="docs/media/hero.gif" alt="A Mage and a Warrior trading fire, ice and steel on a snowy mountain pass" width="720">
 </p>
 
-<p align="center"><i>Sword or sorcery? Settle it on the grid.</i></p>
+<p align="center"><i>Choose your class, build your deck, and outplay your opponent in real-time tactical combat.</i></p>
 
 ## About this game
 
