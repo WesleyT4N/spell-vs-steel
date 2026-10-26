@@ -14,8 +14,8 @@ import { drawText, drawTextCentered } from '../engine/font';
 import { win, plaque, banner, vsSeal, FRAME, GOLD, INK, INK2, TRIM, BURN, RED_INK, BLUE_INK } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
-import { loadMatch, saveMatch, playerDeck, sideName, type MatchConfig } from '../game/match';
-import { loadCustom, validate, STARTER_NAME } from '../game/deck';
+import { loadMatch, saveMatch, playerDeck, sideName, cycleDeck, deckLabel, type MatchConfig } from '../game/match';
+import { loadCustom, validate } from '../game/deck';
 import type { NetSession } from '../net/session';
 import { DeckBuilderScene } from './deckbuilder';
 import { StageSelectScene } from './stageSelect';
@@ -86,16 +86,17 @@ export class CharSelectScene implements Scene {
     const d = loadCustom(this.slotClass(s));
     return !!d && validate(d).length === 0;
   }
-  private deckOf(s: 0 | 1): 'starter' | 'custom' { return s === 0 ? this.m.p1Deck : this.m.cpuDeck; }
+  private deckOf(s: 0 | 1): string { return s === 0 ? this.m.p1Deck : this.m.cpuDeck; }
 
   private toggleCtl(s: 0 | 1): void {
     this.m.sides[s] = this.m.sides[s] === 'player' ? 'cpu' : 'player';
     sfx('move');
     saveMatch(this.m);
   }
-  private toggleDeck(s: 0 | 1): void {
-    if (s === 0) this.m.p1Deck = this.m.p1Deck === 'starter' ? 'custom' : 'starter';
-    else this.m.cpuDeck = this.m.cpuDeck === 'starter' ? 'custom' : 'starter';
+  /** Steps a side's deck through the ready-made decks (starter, then one per Mythic), the custom deck and RANDOM. */
+  private toggleDeck(s: 0 | 1, d: 1 | -1 = 1): void {
+    if (s === 0) this.m.p1Deck = cycleDeck(this.m.p1, this.m.p1Deck, d);
+    else this.m.cpuDeck = cycleDeck(this.m.cpu, this.m.cpuDeck, d);
     sfx('move');
     saveMatch(this.m);
   }
@@ -119,8 +120,9 @@ export class CharSelectScene implements Scene {
   }
 
   private setClass(s: 0 | 1, cls: ClassId): void {
-    if (s === 0) { if (cls !== this.m.p1) this.m.p1Deck = 'starter'; this.m.p1 = cls; }
-    else { if (cls !== this.m.cpu) this.m.cpuDeck = 'starter'; this.m.cpu = cls; }
+    // a new class starts on its starter (RANDOM stays RANDOM)
+    if (s === 0) { if (cls !== this.m.p1 && this.m.p1Deck !== 'random') this.m.p1Deck = 'starter'; this.m.p1 = cls; }
+    else { if (cls !== this.m.cpu && this.m.cpuDeck !== 'random') this.m.cpuDeck = 'starter'; this.m.cpu = cls; }
     this.focus = s;
     saveMatch(this.m);
   }
@@ -164,7 +166,7 @@ export class CharSelectScene implements Scene {
   }
 
   private activateChip(c: Chip): void {
-    if (c === 'DECK') { this.m.p1Deck = this.m.p1Deck === 'starter' ? 'custom' : 'starter'; sfx('move'); }
+    if (c === 'DECK') { this.toggleDeck(0); return; }
     else if (c === 'EDIT DECK') { this.editDeck(this.local ? this.focus : 0); return; }
     else if (c === 'CPU LEVEL') { this.m.difficulty = this.m.difficulty === 'easy' ? 'normal' : 'easy'; sfx('move'); }
     else if (c === 'MATCH') { const o = [1, 3, 5] as const; this.m.bestOf = o[(o.indexOf(this.m.bestOf) + 1) % o.length]; sfx('move'); }
@@ -242,7 +244,7 @@ export class CharSelectScene implements Scene {
     const l = navPressed('left', dt), r = navPressed('right', dt), d: 1 | -1 = r ? 1 : -1;
     const ok = wasPressed('confirm') || wasPressed('custom');
     // local Versus: up/down flips the side being picked between player and CPU, or (on the skin step) its deck
-    const flip = this.local && (navPressed('up', dt) || navPressed('down', dt));
+    const up = this.local && navPressed('up', dt), down = this.local && navPressed('down', dt), flip = up || down;
     if (this.step === 0 || this.step === 2) {
       const h = hot('tile');
       if (mouse.moved && h >= 0 && h !== this.cur) { this.cur = h; sfx('move'); }
@@ -251,7 +253,7 @@ export class CharSelectScene implements Scene {
       if (ok) this.pickTile(this.cur);
     } else if (this.step === 1 || this.step === 3) {
       if (l || r) this.stepSkin(this.slot, d);
-      if (flip) this.toggleDeck(this.slot);
+      if (flip) this.toggleDeck(this.slot, up ? -1 : 1);
       if (ok) this.advance();
     } else {
       const n = this.chips.length, h = hot('chip');
@@ -325,7 +327,7 @@ export class CharSelectScene implements Scene {
       chips.forEach((ch, i) => {
         const x = x0 + i * (cw + gap), on = this.step === 4 && this.chip === i && showSel();
         let label: string = ch;
-        if (ch === 'DECK') label = this.m.p1Deck === 'starter' ? 'STARTER DECK' : `CUSTOM DECK${this.customValid() ? '' : '!'}`;
+        if (ch === 'DECK') label = this.m.p1Deck === 'custom' ? `CUSTOM DECK${this.customValid() ? '' : '!'}` : deckLabel(this.m.p1, this.m.p1Deck);
         if (ch === 'EDIT DECK' && this.local) label = `EDIT ${this.focus === 0 ? 'LEFT' : 'RIGHT'} DECK`;
         if (ch === 'CPU LEVEL') label = `CPU: ${this.m.difficulty.toUpperCase()}`;
         if (ch === 'MATCH') label = this.m.bestOf === 1 ? '1 ROUND' : `BEST OF ${this.m.bestOf}`;
@@ -409,9 +411,9 @@ export class CharSelectScene implements Scene {
     // skins: clickable swatches for your slot (and the CPU's)
     const list = SKINS[cls], sw = 14, sx = Math.round(cx - (list.length * sw) / 2);
     const editable = s === 0 || !net;
-    const deck = s === 0 || this.local ? (this.deckOf(s) === 'starter' ? STARTER_NAME[cls].toUpperCase() : `CUSTOM${this.customValid(s) ? '' : '!'}`) : STARTER_NAME[cls].toUpperCase();
+    const deck = `${deckLabel(cls, this.deckOf(s))}${this.deckOf(s) === 'custom' && !this.customValid(s) ? '!' : ''}`;
     if (this.local) {
-      // the deck toggles between the starter and this class's custom deck; EDIT opens the deck builder
+      // the deck steps through the ready-made decks, custom and RANDOM; EDIT opens the deck builder
       button(ui, `deck:${s}`, `DECK: ${deck}`.length * 6 <= 84 ? `DECK: ${deck}` : deck, x + 8, PY + 130, PW - 52, 12, false, TRIM);
       button(ui, `edit:${s}`, 'EDIT', x + PW - 40, PY + 130, 32, 12, false, TRIM);
     } else if (!(net && s === 1)) drawTextCentered(ui, `DECK: ${deck}`, cx, PY + 132, TRIM, 1, false);
