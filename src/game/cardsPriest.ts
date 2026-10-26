@@ -3,6 +3,7 @@
 import type { Battle, BlessKind, CastCtx, Fighter } from './battle';
 import type { CardDef } from './cards';
 import { allEnemyPanels, lowHp } from './cardUtil';
+import { TUNING } from './tuning';
 
 /** Run `fn` every `step` seconds for `secs` seconds. */
 function overTime(b: Battle, secs: number, step: number, fn: (i: number) => void): void {
@@ -128,7 +129,7 @@ export const priest: CardDef[] = [
   {
     id: 'holy_wall', name: 'Holy Wall', cls: 'priest', cost: 2, rarity: 'uncommon', element: 'holy', damaging: false, lock: 0.3,
     dmg: '-', short: 'Wall of light (100 HP) in front of you blocks shots in your row for 6s.',
-    cast: x => { if (!x.b.placeWall(x.f, x.f.col + x.dir, x.f.row, 100, 'holy', 6)) x.b.text(x.f, 'BLOCKED', '#bcbcbc'); },
+    cast: x => { if (!x.b.placeWall(x.f, x.f.col + x.dir, x.f.row, TUNING.priest.holyWallHp, 'holy', TUNING.priest.holyWallTime)) x.b.text(x.f, 'BLOCKED', '#bcbcbc'); },
     ai: (b, f) => b.foe(f).row === f.row,
   },
   {

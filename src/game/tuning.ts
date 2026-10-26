@@ -84,14 +84,18 @@ export const TUNING = {
     heavyLock: 0.5,
     /** Smite lands this many panels ahead and heals the Priest on a hit. */
     smiteRange: 3,
+    holyWallHp: 100,
+    holyWallTime: 6,
     smiteHeal: 10,
+    smiteKnock: 0,
     manaStart: 3,
     manaPerDraw: 3,
     manaCap: 5,
     /** Cursed panels: damage per second to an enemy standing on one. Cursed or Hexed fighters deal this multiplier. */
     curseDps: 10,
-    // the Ranger gets no stand-still Energy on a cursed panel (the Priest's edge in that matchup)
-    curseStopsEnergy: true,
+    /** Each further second on the same cursed panel adds this much, up to curseMax per tick. */
+    curseRamp: 0,
+    curseMax: 10,
     weakened: 0.75,
     /** Blessed panels (all last until the next Draw screen): Hallowed Ground damage, Aegis Field shield, Wellspring Mana. */
     hallowedBonus: 1.35,

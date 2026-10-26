@@ -9,7 +9,7 @@ export const MYTHICS_REQUIRED = 1;
 /** Card id -> copies. */
 export type DeckCounts = Record<string, number>;
 
-const STARTERS: Record<ClassId, DeckCounts> = {
+export const STARTERS: Record<ClassId, DeckCounts> = {
   warrior: {
     step_slash: 4, guard: 3, lunge: 3, iron_skin: 2, shield_wall: 2, execute: 3, chain_hook: 3, shieldbreaker: 2, battle_shout: 2,
     leap_strike: 1, wide_cleave: 1,

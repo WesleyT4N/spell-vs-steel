@@ -146,6 +146,8 @@ export interface Panel {
   curse: number;
   curseSide: Side;
   curseAcc: number;
+  /** Curse ticks the current victim has taken without stepping off (damage ramps). */
+  curseTicks: number;
   /** Smokescreen: the owner's side is stealthed while standing in it. */
   smoke: number;
   smokeSide: Side;
@@ -242,7 +244,7 @@ export class Battle {
       this.panels[c] = [];
       for (let r = 0; r < ROWS; r++) {
         const owner: Side = c < 3 ? 0 : 1;
-        this.panels[c][r] = { owner, baseOwner: owner, ownerT: 0, burn: 0, burnDps: 0, burnAcc: 0, cracked: false, hole: 0, toxic: 0, toxicSide: 0, toxicAcc: 0, bless: 0, blessKind: 'heal', blessAcc: 0, manaAcc: 0, curse: 0, curseSide: 0, curseAcc: 0, smoke: 0, smokeSide: 0 };
+        this.panels[c][r] = { owner, baseOwner: owner, ownerT: 0, burn: 0, burnDps: 0, burnAcc: 0, cracked: false, hole: 0, toxic: 0, toxicSide: 0, toxicAcc: 0, bless: 0, blessKind: 'heal', blessAcc: 0, manaAcc: 0, curse: 0, curseSide: 0, curseAcc: 0, curseTicks: 0, smoke: 0, smokeSide: 0 };
       }
     }
     this.beginCustom();
@@ -416,8 +418,14 @@ export class Battle {
         const v = this.fighterAt(c, r);
         if (v && v.side !== p.curseSide) {
           p.curseAcc += dt;
-          if (p.curseAcc >= 1) { p.curseAcc -= 1; this.damage(v, TUNING.priest.curseDps, this.f[p.curseSide], { element: 'shadow', noFlinch: true, dot: true }); }
-        } else p.curseAcc = 0;
+          if (p.curseAcc >= 1) {
+            // each second spent on the same curse hurts more, so standing still is punished
+            p.curseAcc -= 1;
+            const P = TUNING.priest, dmg = Math.min(P.curseDps + P.curseRamp * p.curseTicks, P.curseMax);
+            p.curseTicks++;
+            this.damage(v, dmg, this.f[p.curseSide], { element: 'shadow', noFlinch: true, dot: true });
+          }
+        } else { p.curseAcc = 0; p.curseTicks = 0; }
       }
       if (p.toxic > 0) {
         p.toxic -= dt;
@@ -565,8 +573,6 @@ export class Battle {
       // Energy comes from standing still; any change of panel restarts the count
       // (Light Footed keeps the count through moves; Deadeye doubles the rate)
       if ((f.col !== f.lastCol || f.row !== f.lastRow) && f.st.lightFoot <= 0) f.stillT = 0;
-      // a cursed panel gives no stand-still Energy
-      else if (TUNING.priest.curseStopsEnergy && this.onCurse(f)) f.stillT = 0;
       else f.stillT += dt * (f.st.deadeye > 0 ? 2 : 1);
       const R = TUNING.ranger;
       while (f.stillT >= R.stillSeconds) {
@@ -814,7 +820,7 @@ export class Battle {
         sfx('boltHeavy');
         const c = f.col + T.smiteRange * d;
         this.addFx('holyPillar', f.side, c, f.row, 0.4);
-        const res = this.strike(f, [[c, f.row]], T.heavyDamage, { basic: kind, element: 'holy' });
+        const res = this.strike(f, [[c, f.row]], T.heavyDamage, { basic: kind, element: 'holy', knockback: T.smiteKnock > 0 });
         if (res.fighter && res.dealt > 0) this.heal(f, T.smiteHeal);
       }
     }
