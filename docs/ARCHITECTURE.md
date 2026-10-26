@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at 0915c83 (2026-10-26).
+How the game is put together, one section per system. Describes `main` at fdafc4e (2026-10-26).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -56,7 +56,7 @@ flowchart LR
 | `src/scenes/` | Every screen: title, select, stage select, battle, online, training, tutorial, deck builder, options, dev tools |
 | `src/art/` | Generated sprites and frames, Inked stages, logo |
 | `src/engine/` | Pixel gfx, bitmap font, input, touch pad, audio, music, voice |
-| `src/net/` | Lockstep session, packet protocol, transports, desync hash |
+| `src/net/` | Rollback netplay, snapshots, session, packet protocol, transports, desync hash |
 | `src/dev/` | Instrumentation, headless sims, live tuning edits (dev builds only) |
 | `scripts/` | `sim`, `netcheck`, `combo-check`, artifact packer, TTS voice generator |
 
@@ -94,41 +94,47 @@ Determinism rules:
 
 - Rule randomness comes from `b.rand()` or `shuffle(list, b.rand)`, never `Math.random`. `npm run netcheck` catches drift.
 - Observers wrap methods on one instance and only read state.
-- The CPU and voice-line choice use `Math.random`; neither feeds the rules online, but rollback will need them seeded or kept out of resimulation.
-- Rollback blocker: `timers` and `anims` hold closures (about 30 call sites in `battle.ts` and the card files), so a Battle can't be snapshotted yet. PR #44 restores snapshots in place, which gets around this.
+- The CPU and voice-line choice use `Math.random`; neither feeds the rules online.
+- `timers` and `anims` still hold closures. Rollback works anyway because `net/snapshot.ts` restores the Battle in place, so the closures keep pointing at live objects. Delayed effects must keep their mutable state in `b.keep({...})`, and the RNG state is saved with `rand.setState`.
 - Replays (`game/replay.ts`): a match is a list of round tapes (seed, decks, per-frame inputs) plus a rules fingerprint, so playback just reruns the Battle. `npm run replaycheck` checks a replay ends with the same hash.
 
 ## Netcode
 
-Delay-based lockstep: both machines run the same seeded Battle and only trade controls.
+Rollback (GGPO style, #44): both machines run the same seeded Battle and only trade controls. The rival's missing input is guessed; a wrong guess is fixed by rewinding to the last confirmed frame and replaying.
 
 ```mermaid
 flowchart LR
-  read["Read input<br/>playerIntent + Draw"] --> sched["Schedule at frame + delay<br/>delay = RTT/2 + 2 (2..15),<br/>retuned from jitter while playing"]
-  sched --> send["Send packet every frame<br/>unacked inputs, picks, ready, hash, ack"]
+  read["Read local input"] --> sched["Schedule at frame + delay<br/>delay 2..8 from ping, +1 on room"]
+  sched --> send["Send packet every frame<br/>inputs, picks, hash, frame fr"]
   send --> tr{{"Transport<br/>room / peer / local"}}
-  tr --> recv["Receive<br/>store by frame, track contiguous, RTT"]
-  recv --> ready{"Both inputs<br/>for frame N?"}
-  ready -- no --> stall["Stall a frame<br/>(run two if behind)"]
-  ready -- yes --> step["Battle.update(1/60)"]
-  step --> hash["battleHash every 30 frames<br/>compared with the rival"]
+  tr --> recv["Rival input arrives"]
+  recv --> known{"Rival input<br/>for frame N?"}
+  known -- yes --> run["Run frame N"]
+  known -- "no, under 10 guessed" --> guess["Guess: held keys,<br/>no new presses"] --> run
+  known -- "no, 10 guessed" --> stall[Stall]
+  recv --> wrong{"Guess was wrong?"}
+  wrong -- yes --> rb["Restore confirmed snapshot,<br/>replay silently, re-save,<br/>guess forward again"]
+  run --> conf["Confirmed frames only:<br/>Draw screen, round end,<br/>hash every 30, replay tape"]
 ```
 
 | File | Job |
 | --- | --- |
-| `net/session.ts` | `NetSession`: handshake, readiness, input buffers, RTT, delay, status (waiting / connected / reconnecting / lost), desync flag |
-| `net/lockstep.ts` | `Lockstep`: one online round, scheduling, stalls, Draw screen in step, checksums, delay retuning. No screen, so the online scene and the soak test run the same code |
-| `net/protocol.ts` | `Packet`, `PROTOCOL = 4`, 10-bit input packing (2 chars per frame), room codes |
+| `net/netplay.ts` | `Netplay`: drives one online round for the scene and `netsoak`; input delay, pacing against the rival's frame `fr` (runs 2 frames when behind, skips a tick when ahead) |
+| `net/rollback.ts` | `Rollback`: one confirmed snapshot, guesses up to `MAX_ROLLBACK = 10` frames, rewind and replay, `onConfirmed` feeds the replay `TapeWriter` |
+| `net/snapshot.ts` | Snapshots the Battle object graph and restores it in place; watchers (post-match stats) pass extra roots |
+| `net/session.ts` | `NetSession`: handshake, readiness, input buffers, RTT, status (waiting / connected / reconnecting / lost), desync flag |
+| `net/protocol.ts` | `Packet`, `PROTOCOL = 5`, 10-bit input packing (2 chars per frame), room codes |
 | `net/transport.ts` | `room` (claude.ai artifact presence), `peer` (WebRTC via PeerJS), `local` (BroadcastChannel, fake lag) |
 | `net/hash.ts` | `battleHash(b)`, FNV-1a over everything the rules read |
-| `scenes/online.ts`, `scenes/onlineBattle.ts` | Lobby and the lockstep-driven Versus scene |
+| `scenes/online.ts`, `scenes/onlineBattle.ts` | Online menu and the Versus scene driven by `Netplay` |
 
 - Every packet is the sender's whole current state, never a one-off event, so drops and merges lose nothing (this is what lets it ride on room presence, which keeps only the latest value).
 - Draw picks travel in `packet.picks`; there is no pause online. Each round reseeds as `seed + r × 0x9e3779b9`.
 - Bump `PROTOCOL` whenever rules or packets change.
 - Silence: after 1.5 s the screen says RECONNECTING and holds; after 30 s the match counts as dropped. A backgrounded tab sends `away` and only pings, so the rival waits longer instead of timing out.
 - `npm run netsoak` plays whole headless online matches over a fake bad network (lag, jitter, loss, duplicates, outages, latest-value-only delivery, hitches, background tabs) and compares every checksum.
-- Rollback (in progress): predict the rival's input, snapshot every frame, rewind and replay on a late input.
+- `npm run rollcheck` (in CI) proves rollback play ends exactly like straight play.
+- Next: a `BattleEvent` sink so the sim emits hit / cast / KO / sound events and `engine/battleAudio.ts` plays them.
 
 ### Online services
 
@@ -140,7 +146,7 @@ flowchart LR
   menu --> rq["Ranked queue<br/>presence field rq"]
   menu --> tb["Tournament bracket<br/>presence fields tb / tr"]
   menu --> room[Create / join room code]
-  lobby --> match[Lockstep match]
+  lobby --> match[Rollback match]
   rq --> match
   tb --> match
   room --> match
@@ -228,7 +234,7 @@ flowchart LR
 ```
 
 - Fighters stay 24×24 and are never stretched in menus; spell effects keep a 24×24 footprint and take their element's colour.
-- Visual state never goes into the Battle, so lockstep and the hash never see it.
+- Visual state never goes into the Battle, so rollback and the hash never see it.
 - The canvas fits the window between 4:3 and 21:9 (shows more stage, no letterbox); phones in portrait give the bottom half to the touch pad.
 - UI skin: Parchment (`scenes/skin.ts`). Cards: `scenes/cardView.ts`. Font: `engine/font.ts` (5×7).
 
@@ -364,7 +370,7 @@ flowchart LR
   pr[Pull request] --> a["Job 1<br/>typecheck, dev build, prod build"]
   a --> sv["tests/saves.ts<br/>migrations, legacy import"] --> m["tests/matches.ts<br/>CPU vs CPU, every class pair"]
   m --> n["netcheck 25<br/>online determinism"]
-  n --> c[combocheck]
+  n --> c[combocheck] --> rc["rollcheck 25<br/>rollback = straight play"]
   pr --> b["Job 2: screens<br/>Playwright, every screen at 7 shapes"]
   b --> d["Pixel diff vs base branch<br/>screens-report artifact"]
 ```
@@ -372,6 +378,7 @@ flowchart LR
 | Command | Where | Fails on |
 | --- | --- | --- |
 | `npm run typecheck` | CI | Type errors, unused locals |
+| `npm run rollcheck` | CI | Rollback play ending differently from straight play |
 | `npx tsx tests/saves.ts` | CI | Save migrations, legacy import, caps |
 | `npx tsx tests/matches.ts` | CI | Crashes, stuck or broken full matches |
 | `npm run netcheck` | CI | Two seeded battles with the same inputs drifting apart |
@@ -389,6 +396,6 @@ New screens go in `tests/screens/harness.ts`.
 ## In flight
 
 - Modularize (#35): `src/content/registry.ts` and `src/content/stages/`, plus `npm run golden`; class folders follow.
-- Rollback netcode (#44): snapshot restore in place, prediction, rewind and replay.
+- Sim events: `BattleEvent` sink feeding `engine/battleAudio.ts` (rollback thread).
 - Engine primitives: scene stack and seeded CPU (#50), gamepads and platform layer (#49).
 - Touch UI (#51), BN indicators (#32), hit feel (#34), soundtrack, card pass on the outliers the balance sweep found.
