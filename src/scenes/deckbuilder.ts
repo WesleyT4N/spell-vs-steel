@@ -15,6 +15,8 @@ import { loadMatch, saveMatch } from '../game/match';
 import { PLAYABLE } from '../game/classes';
 import { drawCardDetail, drawCardFace, resInk, CARD_W, CARD_H } from './cardView';
 import { CardPreview } from './cardPreview';
+import { openGrimoirePanel } from './grimoirePanel';
+import type { Grimoire } from '../game/grimoireYaml';
 import { win, selRow, plaque, ink, PAPER, BURN, INK, INK2, RED_INK, GOLD, TRIM } from './skin';
 
 const RARITY_ORDER = { common: 0, uncommon: 1, legendary: 2, mythic: 3 };
@@ -38,6 +40,8 @@ export class DeckBuilderScene implements Scene {
   msgT = 0;
 
   private preview = new CardPreview();
+  /** Closes the YAML panel while it is open. */
+  private closeYaml: (() => void) | null = null;
   /** The start-from picker: its choices ('custom', a ready-made deck id, 'empty'), or null once a start is picked. */
   private picks: string[] | null = null;
   private pickSel = 0;
@@ -51,22 +55,48 @@ export class DeckBuilderScene implements Scene {
   }
 
   private load(): void {
-    this.cards = cardsFor(this.cls).sort((a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity] || costNum(a) - costNum(b));
+    this.loadCards();
     this.deck = loadCustom(this.cls) ?? presetDeck(this.cls, 'starter');
-    this.sel = this.top; this.scroll = 0; this.tscroll = 0;
     this.openPicker();
+  }
+
+  private loadCards(): void {
+    this.cards = cardsFor(this.cls).sort((a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity] || costNum(a) - costNum(b));
+    this.sel = this.top; this.scroll = 0; this.tscroll = 0;
+  }
+
+  /** The YAML import/export panel (a DOM overlay); while it is open the builder ignores input. */
+  private openYaml(): void {
+    sfx('select');
+    this.closeYaml = openGrimoirePanel({
+      current: { cls: this.cls, deck: this.deck },
+      onImport: g => this.applyImport(g),
+      onClose: () => { this.closeYaml = null; },
+    });
+  }
+
+  /** A legal imported grimoire replaces the saved deck of its class (switching to that class if needed). */
+  private applyImport(g: Grimoire): void {
+    if (g.cls !== this.cls) { this.cls = g.cls; this.loadCards(); }
+    this.deck = { ...g.deck };
+    saveCustom(this.cls, this.deck);
+    this.picks = null;
+    this.sel = this.top; this.scroll = 0; this.tscroll = 0;
+    this.flash(`IMPORTED ${(g.name ?? 'GRIMOIRE').toUpperCase()}`);
+    sfx('confirm');
   }
 
   /** Show the start-from picker, on your saved deck if there is one, else the deck picked on the character select. */
   private openPicker(): void {
     const saved = loadCustom(this.cls), hasSaved = !!saved && deckSize(saved) > 0;
-    this.picks = [...(hasSaved ? ['custom'] : []), ...this.presets.map(p => p.id), 'empty'];
+    this.picks = [...(hasSaved ? ['custom'] : []), ...this.presets.map(p => p.id), 'empty', 'import'];
     const m = loadMatch(), picked = m.p1 === this.cls ? m.p1Deck : m.cpu === this.cls ? m.cpuDeck : 'starter';
     const want = hasSaved ? 'custom' : picked;
     this.pickSel = Math.max(0, this.picks.indexOf(want));
   }
 
   private choosePick(id: string): void {
+    if (id === 'import') { this.openYaml(); return; }
     const p = this.presets.find(x => x.id === id);
     if (id === 'custom') this.deck = loadCustom(this.cls) ?? {};
     else { this.deck = p ? { ...p.cards } : {}; saveCustom(this.cls, this.deck); }
@@ -153,6 +183,8 @@ export class DeckBuilderScene implements Scene {
     this.msgT = Math.max(0, this.msgT - dt);
     this.preview.show(!this.picks && showSel() ? this.cardAt(this.sel) ?? null : null);
     this.preview.update(dt);
+    if (this.closeYaml) return;
+    if (isHot('yaml') && mouse.click) { this.openYaml(); return; }
     if (this.picks) {
       // class tabs still switch class (and reopen the picker for it)
       const tab = hot('tab');
@@ -231,7 +263,8 @@ export class DeckBuilderScene implements Scene {
     drawText(ui, `MYTHIC ${myth}/1`, 212, 31 + hy, myth === 1 ? ink(RARITY_COLOR.mythic) : RED_INK);
     const ok = validate(this.deck).length === 0;
     drawText(ui, ok ? 'READY' : 'NOT READY', 300, 23 + hy, ok ? '#007800' : RED_INK);
-    button(ui, 'done', 'DONE', UW - 86, 13 + hy, 70, 24, false, RED_INK);
+    button(ui, 'yaml', 'YAML', UW - 112, 13 + hy, 46, 24, false, INK2);
+    button(ui, 'done', 'DONE', UW - 60, 13 + hy, 46, 24, false, RED_INK);
 
     // list
     const ly = vy(LY), rh = Math.round(RH * spread.k), off = Math.round((rh - RH) / 2);
@@ -352,19 +385,21 @@ export class DeckBuilderScene implements Scene {
       zone(`pick:${i}`, x + 4, ry - 2, colW, rh);
       if (on) selRow(ui, x + 4, ry - 2, colW, rh);
       const p = this.presets.find(q => q.id === id);
-      const name = id === 'custom' ? 'YOUR DECK' : id === 'empty' ? 'EMPTY DECK' : p!.name.toUpperCase() + (id === 'starter' ? ' (STARTER)' : '');
+      const name = id === 'custom' ? 'YOUR DECK' : id === 'empty' ? 'EMPTY DECK' : id === 'import' ? 'IMPORT YAML...' : p!.name.toUpperCase() + (id === 'starter' ? ' (STARTER)' : '');
       const sub = id === 'custom' ? (saved && !validate(saved).length ? 'SAVED, READY' : `SAVED, ${deckSize(saved ?? {})}/${DECK_SIZE} SPELLS`)
-        : id === 'empty' ? 'BUILD FROM SCRATCH' : `MYTHIC: ${(this.cards.find(c => c.id === p!.mythic)?.name ?? '').toUpperCase()}`;
+        : id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE OR PICK A FILE'
+          : `MYTHIC: ${(this.cards.find(c => c.id === p!.mythic)?.name ?? '').toUpperCase()}`;
       drawText(ui, name, x + 22, ry + 2 + ro, on ? INK : INK2);
-      drawText(ui, sub, x + 22, ry + 11 + ro, id === 'custom' || id === 'empty' ? TRIM : ink(RARITY_COLOR.mythic));
+      drawText(ui, sub, x + 22, ry + 11 + ro, p ? ink(RARITY_COLOR.mythic) : TRIM);
     });
     // the hovered choice's list
     const lx = x + colW + 16, id = showSel() ? picks[this.pickSel] : undefined;
     P(ui, BURN, lx - 8, y + 22, 1, hgt - 30);
-    const list = id === 'custom' ? saved ?? {} : id && id !== 'empty' ? this.presets.find(q => q.id === id)!.cards : {};
+    const list = id === 'custom' ? saved ?? {} : this.presets.find(q => q.id === id)?.cards ?? {};
     const cards = this.cards.filter(c => list[c.id]);
     if (!id) drawText(ui, 'TOUCH A DECK TO SEE IT', lx, y + 24, INK2);
-    else if (!cards.length) drawText(ui, id === 'empty' ? 'NO SPELLS YET' : 'YOUR DECK IS EMPTY', lx, y + 24, INK2);
+    else if (id === 'import') ['PASTE A GRIMOIRE OR PICK A', '.YAML FILE. IMPORTS THAT', 'BREAK A DECK RULE ARE', 'REFUSED. YAML IN THE', 'HEADER EXPORTS YOUR DECK.'].forEach((l, i) => drawText(ui, l, lx, y + 24 + i * 11, INK2));
+    else if (!cards.length && id !== 'import') drawText(ui, id === 'empty' ? 'NO SPELLS YET' : 'YOUR DECK IS EMPTY', lx, y + 24, INK2);
     cards.forEach((c, i) => drawText(ui, `${list[c.id]}X ${c.name.toUpperCase()}`, lx, y + 24 + i * 11, c.rarity === 'common' ? INK2 : ink(RARITY_COLOR[c.rarity])));
     if (id && id !== 'custom' && picks[0] === 'custom') drawText(ui, 'REPLACES YOUR SAVED DECK', lx, y + hgt - 14, RED_INK);
     hint(ui, `HOVER TO SEE A DECK   CLICK: START FROM IT   RIGHT-CLICK: BACK`);
