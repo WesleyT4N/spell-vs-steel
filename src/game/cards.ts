@@ -461,7 +461,8 @@ const mage: CardDef[] = [
     id: 'flamestrike', name: 'Flamestrike', cls: 'mage', cost: 3, rarity: 'uncommon', element: 'fire', damaging: true, lock: 0.35,
     dmg: '155', short: 'After 1s, a fire pillar hits their panel and sets that whole column burning.',
     cast: x => {
-      x.b.warn(x.f, [[x.foe.col, x.foe.row]], 1);
+      // BN Canodumb style: a crosshair locks onto their panel, then the pillar comes down
+      x.b.warn(x.f, [[x.foe.col, x.foe.row]], 1, undefined, 'reticle');
       targeted(x, 1, (c, r) => {
         x.b.addFx('pillar', x.f.side, c, r, 0.45);
         sfx('explode');

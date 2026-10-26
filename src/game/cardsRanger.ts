@@ -170,6 +170,7 @@ export const ranger: CardDef[] = [
     cast: x => {
       const { b, f, foe } = x;
       b.addFx('laser', f.side, f.col, f.row, 1);
+      b.reticle(f, foe, 1);
       b.later(1, () => {
         b.addFx('aimed', f.side, f.col, f.row, 0.35, { to: foe.col, toRow: foe.row });
         b.shake = 0.3;
