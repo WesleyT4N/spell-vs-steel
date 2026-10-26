@@ -6,6 +6,8 @@
 //        [--kinds hp,power,light,heavy] [--lambda 3] [--h 0.1] [--max 0.2]
 //        [--decks]  also keep each ready-made deck within 4 points of its class, with each Mythic's own power as extra knobs
 //        [--start dir/tune.json]  start from the best patch of an earlier run
+//        [--blocks preset-style:normal,preset-style:hard,starter:normal]  score each pool/level on its own and add the scores
+//                 (instead of averaging --cpu levels); a starter block runs 100x the matches per deck pair, it has only 10 pairs
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { classIds } from '../src/dev/simulate';
@@ -16,7 +18,7 @@ import { presetsFor } from '../src/game/deck';
 import { SimPool } from './simpool';
 import { BAND, DECK_SLACK, PAIRS, cardKnob, classRates, deckGaps, describeKnob, evaluate, knobsFor, loss, pairLabel, patchOverrides, roundPatch, type EvalSpec, type Knob, type Patch, type Rates } from './balancelib';
 
-const o = { out: '', pool: 'preset-style' as PoolKind, cpu: ['normal', 'hard'] as Difficulty[], n: 6, checkN: 24, iters: 3, kinds: ['hp', 'power', 'light', 'heavy'] as Knob['kind'][], lambda: 3, h: 0.1, max: 0.2, decks: false, start: '' };
+const o = { out: '', pool: 'preset-style' as PoolKind, cpu: ['normal', 'hard'] as Difficulty[], n: 6, checkN: 24, iters: 3, kinds: ['hp', 'power', 'light', 'heavy'] as Knob['kind'][], lambda: 3, h: 0.1, max: 0.2, decks: false, start: '', blocks: [] as Array<{ kind: PoolKind; cpu: Difficulty }> };
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i], v = (): string => argv[++i] ?? '';
@@ -32,6 +34,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--max') o.max = Number(v());
   else if (a === '--decks') o.decks = true;
   else if (a === '--start') o.start = v();
+  else if (a === '--blocks') o.blocks = v().split(',').map(b => { const [kind, cpu] = b.split(':'); return { kind: kind as PoolKind, cpu: cpu as Difficulty }; });
   else throw new Error(`unknown option ${a}`);
 }
 if (!o.out) throw new Error('--out dir is required');
@@ -46,31 +49,41 @@ const DECK_W = 0.5;
 const pool = new SimPool();
 const log: string[] = [];
 const say = (s: string): void => { console.log(s); log.push(s); };
-const fmt = (r: Rates): string => PAIRS.map((p, i) => `${pairLabel(p)} ${(r[i] * 100).toFixed(1)}`).join(' | ')
-  + (deckKeys.length ? `\n  decks vs class: ${deckKeys.map((k, i) => `${k.split(':')[1]} ${r[PAIRS.length + i] >= 0 ? '+' : ''}${(r[PAIRS.length + i] * 100).toFixed(1)}`).join(', ')}` : '');
+const fmt = (r: Rates): string => blockNames.map((bn, b) => `${blockNames.length > 1 ? `[${bn}] ` : ''}${PAIRS.map((p, i) => `${pairLabel(p)} ${(r[b * PAIRS.length + i] * 100).toFixed(1)}`).join(' | ')}`).join('\n  ')
+  + (deckKeys.length ? `\n  decks vs class: ${deckKeys.map((k, i) => `${k.split(':')[1]} ${r[W + i] >= 0 ? '+' : ''}${(r[W + i] * 100).toFixed(1)}`).join(', ')}` : '');
 const fmtPatch = (p: Patch): string => knobs.filter(k => p[k.id]).map(k => describeKnob(k, p[k.id])).join('; ') || '(no change)';
 const l1 = (p: Patch): number => Object.values(p).reduce((s, v) => s + Math.abs(v), 0);
 
+/** Wheel metrics: 10 per block (one block of averaged --cpu levels unless --blocks is given). */
+const blockNames = o.blocks.length ? o.blocks.map(b => `${b.kind}@${b.cpu}`) : [`${o.pool}@${o.cpu.join('+')}`];
+const W = PAIRS.length * blockNames.length;
+
+async function poolRates(kind: PoolKind, cpu: Difficulty, n: number, p: Patch, rep: number): Promise<{ wheel: Rates; gaps: Rates | null }> {
+  const spec: EvalSpec = { kind, cpu, n: kind === 'starter' ? n * 100 : n, classes };
+  const { plan, res } = await evaluate(pool, spec, patchOverrides(p, knobs), rep);
+  const gaps = deckKeys.length && kind === 'preset-style' ? deckGaps(plan, res) : null;
+  return { wheel: classRates(plan, res).rates, gaps: gaps ? deckKeys.map(k => gaps[k] ?? 0) : null };
+}
+
 async function rates(p: Patch, n: number, rep = 0): Promise<Rates> {
-  // every CPU level at once, averaged: the matchups should hold for careful and sloppy play alike
-  const each = await Promise.all(o.cpu.map(async cpu => {
-    const spec: EvalSpec = { kind: o.pool, cpu, n, classes };
-    const { plan, res } = await evaluate(pool, spec, patchOverrides(p, knobs), rep);
-    const gaps = deckKeys.length ? deckGaps(plan, res) : {};
-    return [...classRates(plan, res).rates, ...deckKeys.map(k => gaps[k] ?? 0)];
-  }));
-  return each[0].map((_, i) => each.reduce((s, r) => s + r[i], 0) / each.length);
+  const avg = (rs: Rates[]): Rates => rs[0].map((_, i) => rs.reduce((s, r) => s + r[i], 0) / rs.length);
+  // default: every CPU level at once, averaged, so the matchups hold for careful and sloppy play alike
+  const parts = o.blocks.length
+    ? await Promise.all(o.blocks.map(b => poolRates(b.kind, b.cpu, n, p, rep)))
+    : [await Promise.all(o.cpu.map(cpu => poolRates(o.pool, cpu, n, p, rep)))].map(each => ({ wheel: avg(each.map(e => e.wheel)), gaps: each[0].gaps ? avg(each.map(e => e.gaps!)) : null }));
+  const gaps = parts.map(x => x.gaps).filter((g): g is Rates => !!g);
+  return [...parts.flatMap(x => x.wheel), ...(deckKeys.length ? (gaps.length ? avg(gaps) : deckKeys.map(() => 0)) : [])];
 }
 
 /** Metrics: the 10 wheel rates, then (with --decks) each deck's gap to its class. */
-const deckLoss = (m: Rates): number => m.slice(PAIRS.length).reduce((s, g) => s + DECK_W * (Math.max(0, Math.abs(g) - DECK_SLACK) * 100) ** 2, 0);
-const total = (m: Rates): number => loss(m.slice(0, PAIRS.length)) + deckLoss(m);
+const deckLoss = (m: Rates): number => m.slice(W).reduce((s, g) => s + DECK_W * (Math.max(0, Math.abs(g) - DECK_SLACK) * 100) ** 2, 0);
+const total = (m: Rates): number => blockNames.reduce((t, _, b) => t + loss(m.slice(b * PAIRS.length, (b + 1) * PAIRS.length)), 0) + deckLoss(m);
 
 /** d loss / d metric (the loss is piecewise quadratic, so this is exact). */
 function grad(r: Rates): number[] {
   return r.map((v, i) => {
     let g = 0;
-    if (i >= PAIRS.length) {
+    if (i >= W) {
       const over = Math.abs(v) - DECK_SLACK;
       return over > 0 ? Math.sign(v) * 2 * DECK_W * over * 1e4 : 0;
     }
@@ -126,7 +139,7 @@ for (let iter = 1; iter <= o.iters; iter++) {
   say(`iter ${iter} (${elapsed()}): slopes measured; biggest per knob (pts per +10%):`);
   for (let k = 0; k < knobs.length; k++) {
     const top = J.map((row, i) => [i, row[k]] as const).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 3);
-    say(`  ${knobs[k].id.padEnd(22)} ${top.map(([i, v]) => `${i < PAIRS.length ? pairLabel(PAIRS[i]) : deckKeys[i - PAIRS.length]} ${(v * 10).toFixed(1)}`).join(', ')}`);
+    say(`  ${knobs[k].id.padEnd(22)} ${top.map(([i, v]) => `${i < W ? `${pairLabel(PAIRS[i % PAIRS.length])}${blockNames.length > 1 ? ` (${blockNames[Math.floor(i / PAIRS.length)]})` : ''}` : deckKeys[i - W]} ${(v * 10).toFixed(1)}`).join(', ')}`);
   }
   const x0 = toVec(cur);
   const xNew = solve(curRates, J, x0, o.lambda);
