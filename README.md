@@ -6,7 +6,7 @@
   <img src="docs/media/hero.gif" alt="A Mage and a Warrior trading fire, ice and steel on a snowy mountain pass" width="720">
 </p>
 
-<p align="center"><i>Draw your spells. Hold your ground. Break theirs.</i></p>
+<p align="center"><i>Sword or sorcery? Settle it on the grid.</i></p>
 
 ## About this game
 
