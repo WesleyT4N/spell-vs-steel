@@ -40,6 +40,8 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): voi
     const state: PanelState = p.burn > 0 ? 'burning' : p.cracked ? 'cracked' : 'clean';
     const mark = b.marks.find(m => m.col === col && m.row === r);
     let hl = mark && Math.floor(b.time * 10) % 2 ? mark.color : undefined;
+    const warn = warnFlash(b, col, r);
+    if (warn) hl = warn;
     // an armed Frost Nova blinks the enemy panels it covers
     if (!hl && Math.floor(b.time * 5) % 2 === 0) {
       for (const f of b.f) {
@@ -60,6 +62,8 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): voi
 
   // toxic, blessed and holy-fire panels
   for (let col = 0; col < 6; col++) for (let r = 0; r < 3; r++) drawPanelEffects(c, b, col, r, tick);
+  // warned panels keep a lit rim over flames and toxic clouds, so the danger zone never disappears between flashes
+  for (const w of b.warns) drawWarnEdge(c, w.col, w.row);
   for (const t of b.traps) if (me === 'all' || t.side === me) drawTrap(c, t, tick);
 
   // entities, back row first
@@ -72,6 +76,29 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): voi
   for (const e of b.fx) drawFx(c, b, e);
   drawParticles(c, b);
   c.restore();
+}
+
+/** Area-spell telegraph colors: the whole panel flashes, and a rim stays lit between flashes. */
+const WARN_FILL = '#f8e000', WARN_RIM = '#f8b800';
+
+/**
+ * The standard BN-style warning flash for a panel an area spell is about to hit, or undefined.
+ * It blinks steadily, speeds up over the last half and goes solid just before impact, so how close the hit is reads at a glance.
+ */
+function warnFlash(b: Battle, col: number, row: number): string | undefined {
+  let w: Battle['warns'][number] | undefined;
+  for (const x of b.warns) if (x.col === col && x.row === row && (!w || x.t < w.t)) w = x;
+  if (!w) return undefined;
+  const left = w.t, gone = w.dur - w.t;
+  if (left < 0.1) return WARN_FILL;
+  const period = left / w.dur > 0.5 ? 0.12 : 0.06;
+  return Math.floor(gone / period) % 2 === 0 ? WARN_FILL : undefined;
+}
+
+function drawWarnEdge(c: Ctx, col: number, row: number): void {
+  const x = X0 + col * PW + 2, y = Y0 + row * (FACE + LIP) + 1, w = PW - 4, h = FACE - 2;
+  P(c, WARN_RIM, x, y, w, 2); P(c, WARN_RIM, x, y + h - 2, w, 2);
+  P(c, WARN_RIM, x, y, 2, h); P(c, WARN_RIM, x + w - 2, y, 2, h);
 }
 
 function drawPanelEffects(c: Ctx, b: Battle, col: number, row: number, tick: number): void {

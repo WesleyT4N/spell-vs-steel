@@ -2,7 +2,7 @@
 import { TUNING } from './tuning';
 import { CARDS, type CardDef, type Element } from './cards';
 import { defaultSkin, mirrorSkin, type ClassId } from '../art/sprites';
-import { sfx, sfxFx } from '../engine/audio';
+import { sfx, sfxFx, voiceLine } from '../engine/audio';
 
 /** Sound a shot makes leaving the caster (the light Arrow plays its own). */
 const SHOT_SOUND: Partial<Record<string, string>> = { fireball: 'shot_fireball', hook: 'shot_chain', gust: 'shot_wind', knife: 'shot_knife', arrow: 'shot_arrow', sting: 'shot_arrow', net: 'shot_net', wolf: 'shot_beast', hammer: 'shot_spin', vial: 'shot_net' };
@@ -186,7 +186,10 @@ export interface Projectile {
   dead?: boolean;
 }
 
+/** A tutorial highlight on a panel (lesson guidance, not danger). */
 export interface Mark { col: number; row: number; t: number; color: string }
+/** A danger telegraph: a panel an area spell is about to hit. Every class's area spells use the same flash (BN style). */
+export interface Warn { col: number; row: number; t: number; dur: number; side: Side }
 /** A hidden Ranger trap. Only its owner sees it. */
 /** Traps last until the next Draw screen. A Tripwire is one trap per panel of a column, sharing a `group`. */
 export interface Trap { side: Side; col: number; row: number; arm: number; kind: 'freeze' | 'explode' | 'mine' | 'blast' | 'wire'; group?: number; fired?: boolean }
@@ -225,6 +228,7 @@ export class Battle {
   walls: Wall[] = [];
   projectiles: Projectile[] = [];
   marks: Mark[] = [];
+  warns: Warn[] = [];
   traps: Trap[] = [];
   pets: Pet[] = [];
   texts: FloatText[] = [];
@@ -237,6 +241,8 @@ export class Battle {
   noKo = false;
   turn = 0;
   time = 0;
+  /** When each side last let out a hurt voice. */
+  hurtT: [number, number] = [-9, -9];
   koT = 0;
   winner: Side | null = null;
   /** Offered cards on the current custom screen, per side. */
@@ -280,7 +286,7 @@ export class Battle {
       const fresh = makeFighter(f.side, { cls: f.cls, deck: [], name: f.name, skin: f.skin }, f.alt, this.rand);
       return { ...fresh, deck: f.deck, discard: f.discard, resMax: f.resMax };
     }) as [Fighter, Fighter];
-    this.walls = []; this.projectiles = []; this.marks = []; this.traps = []; this.pets = [];
+    this.walls = []; this.projectiles = []; this.marks = []; this.warns = []; this.traps = []; this.pets = [];
     this.texts = []; this.fx = []; this.timers = []; this.anims = [];
     this.clearPanels();
     this.shake = 0; this.cheer = 0;
@@ -320,7 +326,17 @@ export class Battle {
     this.fx.push({ t: 0, dur, kind, side, col, row, data });
     sfxFx(kind, { pan: panOf(col), dur, data: { ...data, d: side === 0 ? 1 : -1 } });
   }
-  mark(col: number, row: number, dur: number, color: string): void { if (this.inGrid(col, row)) this.marks.push({ col, row, t: dur, color }); }
+  /**
+   * The standard area-spell telegraph: `cells` flash for `delay` seconds, then `hit` runs. Pass TUNING.warnTime unless the
+   * spell has a longer telegraph of its own. Everything here runs on the battle clock, so it stays in lockstep online.
+   */
+  warn(att: Fighter | Side, cells: Array<[number, number]>, delay: number, hit?: () => void): void {
+    const side = typeof att === 'number' ? att : att.side;
+    for (const [col, row] of cells) if (this.inGrid(col, row)) this.warns.push({ col, row, t: delay, dur: delay, side });
+    if (hit) this.later(delay, hit);
+  }
+  /** Is this panel about to be hit by `side`'s enemy? */
+  warned(col: number, row: number, side?: Side): boolean { return this.warns.some(w => w.col === col && w.row === row && w.side !== side); }
   text(f: Fighter, s: string, color: string): void {
     this.texts.push({ x: f.col, y: f.row, text: s, color, t: 0 });
   }
@@ -413,6 +429,8 @@ export class Battle {
     this.anims = this.anims.filter(a => a.t < a.dur);
     for (const m of this.marks) m.t -= dt;
     this.marks = this.marks.filter(m => m.t > 0);
+    for (const w of this.warns) w.t -= dt;
+    this.warns = this.warns.filter(w => w.t > 0);
 
     this.updatePanels(dt);
     this.updateWalls(dt);
@@ -434,6 +452,7 @@ export class Battle {
         this.winner = (1 - f.side) as Side;
         this.cheer = 3;
         sfx('ko', { pan: panOf(f.col) });
+        voiceLine(f.cls, 'death', panOf(f.col), f.side);
       }
     }
   }
@@ -789,6 +808,7 @@ export class Battle {
     const d = this.dir(f);
     f.pose = kind === 'light' ? 'attack' : 'heavy';
     f.poseT = kind === 'light' ? 0.2 : 0.32;
+    if (kind === 'heavy') voiceLine(f.cls, 'grunt', panOf(f.col), f.side);
     if (f.cls === 'warrior') {
       const T = TUNING.warrior;
       const dmg = kind === 'light' ? T.lightDamage : T.heavyDamage;
@@ -1202,6 +1222,11 @@ export class Battle {
     if (opts.freeze) this.freeze(target, opts.freeze);
     if (opts.knockback) this.knockback(target, 1);
     sfx(opts.basic === 'heavy' ? 'heavyImpact' : 'hit', { pan: panOf(target.col), amt, element: opts.element });
+    // hurt voice: not for damage over time or chip hits, not from inside a block of ice, and not every hit of a flurry
+    if (target.hp > 0 && !opts.dot && amt >= 8 && target.st.frozen <= 0 && target.st.iceBlock <= 0 && this.time - this.hurtT[target.side] > 0.35) {
+      this.hurtT[target.side] = this.time;
+      voiceLine(target.cls, amt >= 60 ? 'hurtBig' : 'hurt', panOf(target.col), target.side);
+    }
     return out;
   }
 
@@ -1240,6 +1265,9 @@ export class Battle {
     f.pose = 'cast';
     f.poseT = 0.3;
     f.lock = Math.max(f.lock, card.lock ?? 0.3);
+    const big = card.rarity === 'legendary' || card.rarity === 'mythic' || card.cost === 'all' || card.cost >= 4;
+    // big spells always get a line; everyday casts only some of the time so it doesn't get chatty
+    if (big || Math.random() < 0.6) voiceLine(f.cls, big ? 'castBig' : 'cast', panOf(f.col), f.side, card.element);
 
     if (foe.st.counterspell > 0 && card.id !== 'counterspell') {
       foe.st.counterspell = 0;
