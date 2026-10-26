@@ -7,6 +7,8 @@ import { TitleScene } from './scenes/title';
 import { OnlineScene } from './scenes/online';
 import { DEV_TOOLS } from './flags';
 import { endTextFields } from './engine/textField';
+import { setDefaultSink } from './game/events';
+import { playBattleEvent } from './engine/battleAudio';
 import { touchActive, onTouchChange, layout as layoutPad, syncPad, touchText, viewport } from './engine/touch';
 
 // The game screen is the sharp UI resolution. The world draws at 240×160 offscreen and is scaled up 2×
@@ -63,6 +65,8 @@ onTouchChange(fit);
 fit();
 
 initInput(canvas);
+// battles speak through events; the game plays them
+setDefaultSink(playBattleEvent);
 // Inside an embedded frame, keys only arrive after the page gets focus.
 let engaged = false;
 const engage = (): void => { engaged = page.engaged = true; canvas.focus(); };
