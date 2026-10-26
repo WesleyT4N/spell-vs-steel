@@ -4,7 +4,7 @@ import { drawStage } from '../art/arena';
 import { UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, BINDABLE, getKey, setKey, resetKeys, keyName, k, captureNextKey, RESERVED, mouse, type Bindable,
-  LOCAL_ACTS, getLocalKey, setLocalKey, resetLocalKeys, type LocalAct } from '../engine/input';
+  LOCAL_ACTS, getP2Key, setP2Key, resetP2Keys, type LocalAct } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { win, selRow, plaque, PAPER, INK, INK2, RED_INK, BLUE_INK, TRIM } from './skin';
 
@@ -12,13 +12,13 @@ const LABELS: Record<Bindable, string> = {
   up: 'MOVE UP', down: 'MOVE DOWN', left: 'MOVE LEFT', right: 'MOVE RIGHT',
   attack: 'ATTACK / OK', cast: 'CAST / BACK', custom: 'OPEN DRAW SCREEN', pause: 'PAUSE',
 };
-/** Tabs: the single-player keys, then each side's keys when two people share the keyboard in Versus. */
-const TABS = ['1 PLAYER', 'VERSUS P1', 'VERSUS P2'] as const;
+/** Tabs: player 1's keys (used everywhere), then player 2's for two players on one keyboard in Versus. */
+const TABS = ['PLAYER 1', 'PLAYER 2'] as const;
 type Row = Bindable | 'reset' | 'back';
 const PX = 64, PW = UW - 128, Y0 = 64, RH = 18;
 const TY = 40, TW = 104, TGAP = 8, TX0 = Math.round(UW / 2 - (TABS.length * TW + (TABS.length - 1) * TGAP) / 2);
 
-/** Rebinding screen: pick an action, press the new key. Tabs switch between the 1-player keys and P1/P2's Versus keys. */
+/** Rebinding screen: pick an action, press the new key. Tabs switch between player 1's and player 2's keys. */
 export class ControlsScene implements Scene {
   sel = 0;
   tab = 0;
@@ -29,8 +29,6 @@ export class ControlsScene implements Scene {
 
   private get rows(): Row[] { return this.tab === 0 ? [...BINDABLE, 'reset', 'back'] : [...LOCAL_ACTS, 'reset', 'back']; }
   private rowY(i: number): number { return Y0 + i * RH + (i >= this.rows.length - 2 ? 8 : 0); }
-  /** The Versus player a tab binds. */
-  private get player(): 0 | 1 { return this.tab === 2 ? 1 : 0; }
 
   private setTab(t: number): void {
     this.tab = (t + TABS.length) % TABS.length;
@@ -55,7 +53,7 @@ export class ControlsScene implements Scene {
     const row = rows[this.sel];
     if (row === 'back') { sfx('back'); this.back(); return; }
     if (row === 'reset') {
-      if (this.tab === 0) resetKeys(); else resetLocalKeys(this.player);
+      if (this.tab === 0) resetKeys(); else resetP2Keys();
       sfx('select'); this.flash('DEFAULTS RESTORED');
       return;
     }
@@ -65,10 +63,10 @@ export class ControlsScene implements Scene {
     captureNextKey(code => {
       this.waiting = false;
       if (code === 'Escape') { sfx('back'); return; }
-      // Enter pauses for both players in Versus, so it can't be one player's key
-      if (RESERVED.has(code) || (tabAt > 0 && code === 'Enter')) { sfx('deny'); this.flash(`${keyName(code)} IS RESERVED`); return; }
+      // player 1's pause key pauses for both players in Versus, so player 2 can't take it
+      if (RESERVED.has(code) || (tabAt === 1 && code === getKey('pause'))) { sfx('deny'); this.flash(`${keyName(code)} IS RESERVED`); return; }
       if (tabAt === 0) setKey(row as Bindable, code);
-      else setLocalKey(tabAt === 2 ? 1 : 0, row as LocalAct, code);
+      else setP2Key(row as LocalAct, code);
       sfx('select');
     });
   }
@@ -85,7 +83,7 @@ export class ControlsScene implements Scene {
       const x = TX0 + i * (TW + TGAP), on = i === this.tab;
       zone(`tab:${i}`, x, TY, TW, 14);
       const text = plaque(ui, x, TY, TW, 14, on);
-      drawTextCentered(ui, t, x + TW / 2, TY + 4, on ? text : i === 2 ? BLUE_INK : i === 1 ? RED_INK : INK, 1, false);
+      drawTextCentered(ui, t, x + TW / 2, TY + 4, on ? text : i === 1 ? BLUE_INK : RED_INK, 1, false);
     });
     this.rows.forEach((row, i) => {
       const y = this.rowY(i), ty = y + 5;
@@ -98,16 +96,16 @@ export class ControlsScene implements Scene {
         return;
       }
       drawText(ui, LABELS[row], PX + 10, ty, on ? INK : INK2);
-      const key = this.tab === 0 ? getKey(row) : getLocalKey(this.player, row as LocalAct);
+      const key = this.tab === 0 ? getKey(row) : getP2Key(row as LocalAct);
       const v = on && this.waiting ? (tick % 4 < 3 ? 'PRESS A KEY' : '') : keyName(key);
       drawText(ui, v, 240, ty, on && this.waiting ? RED_INK : BLUE_INK);
     });
     if (this.tab === 0) {
       drawText(ui, `HOLD ${k('attack')}: HEAVY ATTACK    ${k('cast')} + DIRECTION: AIM SPELL`, PX, 262, TRIM);
-      drawText(ui, 'ARROW KEYS ALSO MOVE    ESC: PAUSE    M: MUTE', PX, 274, TRIM);
+      drawText(ui, 'ARROWS ALSO MOVE (NOT IN 2P VERSUS)   ESC: PAUSE   M: MUTE', PX, 274, TRIM);
     } else {
-      drawText(ui, 'TWO PLAYERS ON ONE KEYBOARD IN VERSUS.  ENTER/ESC: PAUSE', PX, 262, TRIM);
-      drawText(ui, this.tab === 1 ? 'THE TOUCH PAD ALSO PLAYS AS P1' : 'THE NUMPAD ALSO WORKS: 8456 MOVE, 1 2 3', PX, 274, TRIM);
+      drawText(ui, 'FOR TWO PLAYERS ON ONE KEYBOARD IN VERSUS', PX, 262, TRIM);
+      drawText(ui, `NUMPAD ALSO WORKS: 8456 MOVE, 1 2 3   ${keyName(getKey('pause'))}/ESC: PAUSE`, PX, 274, TRIM);
     }
     if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, 288, RED_INK, 1, false);
     hint(ui, this.waiting ? 'PRESS A KEY   ESC: CANCEL' : `CLICK A ROW OR ${k('attack')}: REBIND   ←/→: TAB   ${k('cast')} / RIGHT-CLICK: BACK`);

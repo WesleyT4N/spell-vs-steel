@@ -43,16 +43,20 @@ rebuild();
 
 export const getKey = (a: Bindable): string => keys[a];
 
-/** Bind `code` to `a`. If another action used that key, the two swap keys. */
+/** Bind `code` to `a`. If another action (or player 2) used that key, the two swap keys. */
 export function setKey(a: Bindable, code: string): void {
   const other = BINDABLE.find(b => b !== a && keys[b] === code);
   if (other) keys[other] = keys[a];
+  // a key player 2 uses goes to them in exchange
+  const p2 = LOCAL_ACTS.find(b => p2Keys[b] === code);
+  if (p2) { p2Keys[p2] = keys[a]; saveP2(); }
   keys[a] = code;
   save();
 }
 export function resetKeys(): void { keys = { ...DEFAULT_KEYS }; save(); }
 function save(): void {
   rebuild();
+  rebuildLocal();
   try { localStorage.setItem(STORE, JSON.stringify(keys)); } catch { /* storage blocked */ }
 }
 
@@ -79,50 +83,47 @@ export const RESERVED = new Set(['Escape', 'KeyM', 'KeyQ', 'KeyE', 'KeyR', 'Back
 export type LocalAct = 'up' | 'down' | 'left' | 'right' | 'attack' | 'cast' | 'custom';
 export const LOCAL_ACTS = ['up', 'down', 'left', 'right', 'attack', 'cast', 'custom'] as const;
 /**
- * Two players sharing a keyboard each get their own keys, rebindable apart from the single-player ones:
- * by default the left player on WASD with F/G/H under the right hand, the right player on the arrows
+ * When two players share a keyboard, player 1 plays on the usual bindings (without the arrow keys, which
+ * are player 2's) and player 2 on their own, rebindable on the controls screen: by default the arrows
  * with . / and right Shift just above them. Pause stays on Enter/Esc for both.
  */
-export const DEFAULT_LOCAL_KEYS: [Record<LocalAct, string>, Record<LocalAct, string>] = [
-  { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', attack: 'KeyF', cast: 'KeyG', custom: 'KeyH' },
-  { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', attack: 'Period', cast: 'Slash', custom: 'ShiftRight' },
-];
-/** Fixed extras on top of the bindings: the touch pad plays as the left player, the numpad as the right. */
+export const DEFAULT_P2_KEYS: Record<LocalAct, string> = {
+  up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', attack: 'Period', cast: 'Slash', custom: 'ShiftRight',
+};
+/** Fixed extras on top of the bindings: the touch pad plays as player 1, the numpad as player 2. */
 const LOCAL_EXTRA: [Record<LocalAct, string>, Record<LocalAct, string>] = [
   { up: 'PadUp', down: 'PadDown', left: 'PadLeft', right: 'PadRight', attack: 'PadAttack', cast: 'PadCast', custom: 'PadDraw' },
   { up: 'Numpad8', down: 'Numpad5', left: 'Numpad4', right: 'Numpad6', attack: 'Numpad1', cast: 'Numpad2', custom: 'Numpad3' },
 ];
-const LOCAL_STORE = 'svs:localkeys';
-let localKeys: [Record<LocalAct, string>, Record<LocalAct, string>] = [{ ...DEFAULT_LOCAL_KEYS[0] }, { ...DEFAULT_LOCAL_KEYS[1] }];
+const P2_STORE = 'svs:p2keys';
+let p2Keys: Record<LocalAct, string> = { ...DEFAULT_P2_KEYS };
 try {
-  const raw = localStorage.getItem(LOCAL_STORE);
-  if (raw) {
-    const saved = JSON.parse(raw) as Array<Partial<Record<LocalAct, string>>>;
-    localKeys = [{ ...DEFAULT_LOCAL_KEYS[0], ...saved[0] }, { ...DEFAULT_LOCAL_KEYS[1], ...saved[1] }];
-  }
+  const raw = localStorage.getItem(P2_STORE);
+  if (raw) p2Keys = { ...DEFAULT_P2_KEYS, ...(JSON.parse(raw) as Partial<Record<LocalAct, string>>) };
 } catch { /* storage blocked */ }
 let LOCAL_KEYS: [Record<LocalAct, string[]>, Record<LocalAct, string[]>] = [{} as Record<LocalAct, string[]>, {} as Record<LocalAct, string[]>];
 let LOCAL_CODES = new Set<string>();
 function rebuildLocal(): void {
-  LOCAL_KEYS = [0, 1].map(p => Object.fromEntries(LOCAL_ACTS.map(a => [a, [localKeys[p][a], LOCAL_EXTRA[p][a]]]))) as typeof LOCAL_KEYS;
+  const mine = [keys, p2Keys] as const;
+  LOCAL_KEYS = [0, 1].map(p => Object.fromEntries(LOCAL_ACTS.map(a => [a, [mine[p][a], LOCAL_EXTRA[p][a]]]))) as typeof LOCAL_KEYS;
   LOCAL_CODES = new Set(LOCAL_KEYS.flatMap(l => Object.values(l).flat()));
 }
 rebuildLocal();
 
-export const getLocalKey = (p: 0 | 1, a: LocalAct): string => localKeys[p][a];
-/** Bind `code` to player `p`'s action `a`. If another local action (either player's) used it, the two swap keys. */
-export function setLocalKey(p: 0 | 1, a: LocalAct, code: string): void {
-  for (const q of [0, 1] as const) {
-    const other = LOCAL_ACTS.find(b => (q !== p || b !== a) && localKeys[q][b] === code);
-    if (other) { localKeys[q][other] = localKeys[p][a]; break; }
-  }
-  localKeys[p][a] = code;
-  saveLocal();
+export const getP2Key = (a: LocalAct): string => p2Keys[a];
+/** Bind `code` to player 2's action `a`. If one of player 1's actions used it, the two players swap keys. */
+export function setP2Key(a: LocalAct, code: string): void {
+  const mine = LOCAL_ACTS.find(b => b !== a && p2Keys[b] === code);
+  if (mine) p2Keys[mine] = p2Keys[a];
+  const theirs = BINDABLE.find(b => keys[b] === code);
+  if (theirs) { keys[theirs] = p2Keys[a]; save(); }
+  p2Keys[a] = code;
+  saveP2();
 }
-export function resetLocalKeys(p: 0 | 1): void { localKeys[p] = { ...DEFAULT_LOCAL_KEYS[p] }; saveLocal(); }
-function saveLocal(): void {
+export function resetP2Keys(): void { p2Keys = { ...DEFAULT_P2_KEYS }; saveP2(); }
+function saveP2(): void {
   rebuildLocal();
-  try { localStorage.setItem(LOCAL_STORE, JSON.stringify(localKeys)); } catch { /* storage blocked */ }
+  try { localStorage.setItem(P2_STORE, JSON.stringify(p2Keys)); } catch { /* storage blocked */ }
 }
 const rawHeld = new Set<string>();
 const rawPressed = new Set<string>();
@@ -155,7 +156,7 @@ export function localNav(p: 0 | 1, a: 'up' | 'down' | 'left' | 'right', dt: numb
   return false;
 }
 /** On-screen name of local player `p`'s key for an action. */
-export const localKey = (p: 0 | 1, a: LocalAct): string => keyName(localKeys[p][a]);
+export const localKey = (p: 0 | 1, a: LocalAct): string => keyName(p === 0 ? keys[a] : p2Keys[a]);
 
 const down = new Set<Action>();
 const pressed = new Set<Action>();
