@@ -52,6 +52,8 @@ export interface Fighter {
   stepCd: number;
   /** A step tapped during stepCd, taken as soon as it ends. */
   moveBuf: Dir | null;
+  /** Seconds left on the global cooldown between spell casts (TUNING.castCooldown). */
+  castCd: number;
   charging: boolean;
   charge: number;
   /** Rage pips (Warrior) or current Mana (Mage). */
@@ -554,6 +556,7 @@ export class Battle {
     f.lock = Math.max(0, f.lock - dt);
     f.moveCd = Math.max(0, f.moveCd - dt);
     f.stepCd = Math.max(0, f.stepCd - dt);
+    f.castCd = Math.max(0, f.castCd - dt);
     f.flash = Math.max(0, f.flash - dt);
     f.poseT = Math.max(0, f.poseT - dt);
     if (f.poseT === 0) f.pose = 'idle';
@@ -1126,7 +1129,7 @@ export class Battle {
 
   // ---------- spells ----------
   castTop(f: Fighter, held: Dir | null): void {
-    if (!f.queue.length) return;
+    if (!f.queue.length || f.castCd > 0) return;
     const card = CARDS[f.queue[0]];
     if (f.st.evoLock > 0) { this.text(f, 'CAN\'T CAST', '#bcbcbc'); return; }
     if (f.st.silenced > 0) { this.text(f, 'SILENCED', '#9878f8'); sfx('deny'); f.lock = 0.15; return; }
@@ -1139,6 +1142,7 @@ export class Battle {
     }
     f.queue.shift();
     f.discard.push(card.id);
+    f.castCd = TUNING.castCooldown;
     const cost = this.costOf(f, card);
     const spent = card.cost === 'all' ? (f.st.ascendance > 0 ? Math.max(1, f.resMax) : f.res) : cost;
     if (!(f.st.avatar > 0 || f.st.ascendance > 0)) f.res -= card.cost === 'all' ? f.res : cost;
@@ -1306,7 +1310,7 @@ function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => nu
   return {
     side, cls, skin: spec.skin ?? defaultSkin(cls), alt, name, hp: maxHp, maxHp,
     col: side === 0 ? 1 : 4, row: 1, dx: 0, dy: 0,
-    lock: 0, moveCd: 0, stepCd: 0, moveBuf: null, charging: false, charge: 0,
+    lock: 0, moveCd: 0, stepCd: 0, moveBuf: null, castCd: 0, charging: false, charge: 0,
     res: START_RES[cls],
     resMax: cls === 'mage' ? TUNING.mage.manaStart : cls === 'warrior' ? TUNING.warrior.rageMax : 5,
     bonusManaNext: 0,
