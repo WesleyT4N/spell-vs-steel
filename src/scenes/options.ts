@@ -1,6 +1,7 @@
 import { setScene, hint, zone, hot, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
-import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
+import { drawStage } from '../art/arena';
+import { P, UW, frame, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx, getAudioSettings, setAudioSettings, isMuted, toggleMute } from '../engine/audio';
@@ -72,9 +73,9 @@ export class OptionsScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    getArena().draw(c, tick, 0);
+    drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(0,0,24,0.6)';
-    c.fillRect(0, 0, W, H);
+    c.fillRect(...screenRect());
     frame(ui, PX - 16, 18, PW + 32, 262, '#000000', '#fcfcfc');
     drawTextCentered(ui, 'OPTIONS', UW / 2, 30, '#f8b800', 2, false);
     const s = getAudioSettings();

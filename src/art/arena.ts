@@ -1,6 +1,6 @@
 // Grand Colosseum, ported from art/arenas.html. 16-bit backdrop, 8-bit NES panels.
 // The other stages live in stages.ts and share the panel grid drawn here.
-import { P, W, H, rng, shade, vgrad, vnoise, sphere, glow, mix, layer, type Ctx } from '../engine/gfx';
+import { P, W, H, view, rng, shade, vgrad, vnoise, sphere, glow, mix, layer, type Ctx } from '../engine/gfx';
 
 export const COLS = 6, ROWS = 3, PW = 38, FACE = 15, LIP = 4, X0 = 6, Y0 = 98;
 export const LEFT_EDGE = '#f83800', RIGHT_EDGE = '#3cbcfc';
@@ -80,6 +80,39 @@ export interface Stage {
   tex(c: Ctx, x: number, y: number, w: number, h: number, r: () => number): void;
   /** Draw the full backdrop. `t` is an animation tick (about 8 per second); `cheer` livens up any crowd. */
   draw(c: Ctx, t: number, cheer?: number): void;
+}
+
+// Stages are painted for a 3:2 screen. Wider or taller screens get the edges mirrored outward,
+// so the scenery (sky, walls, crowd, sand) carries on into the margins without seams.
+let flat: Ctx | null = null, wide: Ctx | null = null;
+const buffer = (w: number, h: number, old: Ctx | null): Ctx => {
+  if (old && old.canvas.width === w && old.canvas.height === h) return old;
+  const o = document.createElement('canvas');
+  o.width = w; o.height = h;
+  const x = o.getContext('2d')!;
+  x.imageSmoothingEnabled = false;
+  return x;
+};
+/** Draw a stage's backdrop over the whole visible screen. */
+export function drawStage(c: Ctx, st: Stage, t: number, cheer = 0): void {
+  const { w, h, ox, oy } = view;
+  if (!ox && !oy) { st.draw(c, t, cheer); return; }
+  flat = buffer(W, H, flat);
+  flat.clearRect(0, 0, W, H);
+  st.draw(flat, t, cheer);
+  wide = buffer(w, h, wide);
+  const f = flat.canvas, x = wide;
+  x.drawImage(f, ox, oy);
+  if (ox) {
+    x.save(); x.translate(2 * ox, 0); x.scale(-1, 1); x.drawImage(f, 0, 0, ox, H, ox, oy, ox, H); x.restore();
+    x.save(); x.translate(2 * (ox + W), 0); x.scale(-1, 1); x.drawImage(f, W - ox, 0, ox, H, ox + W - ox, oy, ox, H); x.restore();
+  }
+  if (oy) {
+    const g = x.canvas;
+    x.save(); x.translate(0, 2 * oy); x.scale(1, -1); x.drawImage(g, 0, oy, w, oy, 0, oy, w, oy); x.restore();
+    x.save(); x.translate(0, 2 * (oy + H)); x.scale(1, -1); x.drawImage(g, 0, oy + H - oy, w, oy, 0, oy + H - oy, w, oy); x.restore();
+  }
+  c.drawImage(x.canvas, -ox, -oy);
 }
 
 const STONE: PanelLook = { face: '#bcbcbc', hi: '#fcfcfc', lo: '#7c7c7c', lip: '#7c7c7c', lipLo: '#000000' };

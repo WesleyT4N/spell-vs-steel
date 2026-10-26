@@ -1,8 +1,9 @@
 import { setScene, drawMenu, hint, listMouse, type Scene } from './scene';
 import { getArena } from '../game/battleView';
+import { drawStage } from '../art/arena';
 import { drawLogo } from '../art/logo';
 import { getSprite, drawFighterSprite, defaultSkin, type ClassId } from '../art/sprites';
-import { P, W, H, UW, type Ctx } from '../engine/gfx';
+import { P, W, UW, screenRect, type Ctx } from '../engine/gfx';
 import { PLAYABLE } from '../game/classes';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k } from '../engine/input';
@@ -82,9 +83,9 @@ export class TitleScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    getArena().draw(c, tick, 0);
+    drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(0,0,24,0.45)';
-    c.fillRect(0, 0, W, H);
+    c.fillRect(...screenRect());
     // fighters flanking the menu, the Mage under SPELL and the Warrior under STEEL to start, facing each other
     const bob = Math.floor(this.t * 2.5) % 2;
     for (const side of [0, 1] as const) {

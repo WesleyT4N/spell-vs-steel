@@ -2,8 +2,9 @@
 // are picked together once both players are in (see select.ts and stageSelect.ts).
 import { setScene, hint, zone, hot, listMouse, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
+import { drawStage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, skinOf } from '../art/sprites';
-import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
+import { P, UW, frame, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, captureNextKey, k, mouse } from '../engine/input';
 import { touchActive, touchCodeBox, touchText } from '../engine/touch';
@@ -148,9 +149,9 @@ export class OnlineScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    getArena().draw(c, tick, 0);
+    drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(0,0,24,0.6)';
-    c.fillRect(0, 0, W, H);
+    c.fillRect(...screenRect());
     drawTextCentered(ui, 'ONLINE VERSUS', UW / 2, 8, '#f8b800', 2);
 
     // your fighter
