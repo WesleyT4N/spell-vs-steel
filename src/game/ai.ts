@@ -1,6 +1,6 @@
 // CPU opponent. Produces the same Intent a keyboard player would, so the battle can't tell the difference.
 // Every roll comes from a generator seeded by the battle's seed and the CPU's side, so a CPU match replays
-// exactly from its seed (sims, tests, the balance grid) without touching Math.random or the rules' own rolls.
+// exactly from its seed (sims, tests, the balance lab) without touching Math.random or the rules' own rolls.
 import { NO_INTENT, heavyChargeOf, type Battle, type BlessKind, type Dir, type Fighter, type Intent } from './battle';
 import { CARDS } from './cards';
 import { TUNING, type Difficulty } from './tuning';
