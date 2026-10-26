@@ -136,15 +136,12 @@ export function pip(c: Ctx, x: number, y: number, fill: string | null, empty = B
   if (fill) P(c, mix(fill, '#fcfcfc', 0.5), x + 2, y + 2, 2, 1);
 }
 
-/** Height of the footer strip on the UI layer; a stretched menu screen pastes it back unstretched (main.ts). */
-export const FOOTER_H = 14;
-
 /** Control hints along the bottom of the visible screen: an ink-brown strip with parchment text, full width. */
 export function footer(c: Ctx, text: string): void {
   const [x, y, w, h] = screenRect(2);
   // tall screens (phone portrait) put it at the real bottom edge instead of under the 480x320 area
-  const top = y + h - FOOTER_H;
-  P(c, FRAME, x, top, w, FOOTER_H); P(c, TRIM, x, top, w, 1);
+  const top = y + h - 14;
+  P(c, FRAME, x, top, w, 14); P(c, TRIM, x, top, w, 1);
   drawText(c, text, Math.round(UW / 2 - textWidth(text) / 2), top + 4, PAPER);
 }
 

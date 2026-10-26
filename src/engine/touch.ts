@@ -2,7 +2,7 @@
 // button for menus, a text box for typing room codes, and tap-friendly wording for the hints.
 // Menus themselves take taps on the canvas (see the finger handling in input.ts).
 import { virtualKey, releaseVirtual, getKey, keyName, type Bindable } from './input';
-import { view, stretch, stretchY } from './gfx';
+import { view } from './gfx';
 
 /** What the current screen needs: nothing, a back button, or the fight pad (`fight-ready` lights DRAW). */
 export type PadMode = 'none' | 'back' | 'fight' | 'fight-ready';
@@ -173,7 +173,7 @@ export function touchCodeBox(x: number, y: number, w: number, h: number, value: 
   codeHandlers = { filter, change, enter };
   if (code.value !== value) code.value = value;
   const moved = !codeRect || codeRect[0] !== x || codeRect[1] !== y;
-  codeRect = [x, stretchY(y), w, h * stretch.k];
+  codeRect = [x, y, w, h];
   if (moved) layout();
 }
 

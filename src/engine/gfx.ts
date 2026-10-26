@@ -26,13 +26,13 @@ export function setView(aspect: number, min = MIN_ASPECT): boolean {
   return true;
 }
 /**
- * Phone portrait: `portrait` is set while the screen sits on top of the touch pad. Menu screens there stretch the
- * UI layer vertically by `k` about the middle when it is shown (main.ts), so rows and buttons grow into the spare height.
- * Scenes keep drawing in 480×320; only the final blit and the pointer mapping use `k`.
+ * Phone portrait leaves spare height above and below the 480×320 UI area, and menus spread their layout into it:
+ * `vy` moves a UI-layer y away from the middle by `k` (up to 1.5×), and `vspan` is a box's height once both its
+ * edges move. Only positions and box heights change; sprites and text keep their size. `k` is 1 everywhere else.
  */
-export const stretch = { portrait: false, k: 1 };
-/** Where a UI-layer y lands on screen once stretched (still in UI-layer coordinates). */
-export const stretchY = (y: number): number => UH / 2 + (y - UH / 2) * stretch.k;
+export const spread = { portrait: false, k: 1 };
+export const vy = (y: number): number => Math.round(UH / 2 + (y - UH / 2) * spread.k);
+export const vspan = (y: number, h: number): number => vy(y + h) - vy(y);
 /** The whole visible screen as [x, y, w, h] in layer coordinates (`s` = 2 for the UI layer). */
 export const screenRect = (s = 1): [number, number, number, number] => [-view.ox * s, -view.oy * s, view.w * s, view.h * s];
 /** Fill the whole visible screen, margins included. */
