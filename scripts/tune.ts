@@ -5,6 +5,7 @@
 // Usage: npx tsx scripts/tune.ts --out dir [--pool preset-style] [--cpu normal,hard (averaged)] [--n 6] [--check-n 24] [--iters 3]
 //        [--kinds hp,power,light,heavy] [--lambda 3] [--h 0.1] [--max 0.2]
 //        [--decks]  also keep each ready-made deck within 4 points of its class, with each Mythic's own power as extra knobs
+//        [--check]  only score the current numbers (with --check-n) and stop
 //        [--start dir/tune.json]  start from the best patch of an earlier run
 //        [--blocks preset-style:normal,preset-style:hard,starter:normal]  score each pool/level on its own and add the scores
 //                 (instead of averaging --cpu levels); a starter block runs 100x the matches per deck pair, it has only 10 pairs
@@ -18,7 +19,7 @@ import { presetsFor } from '../src/game/deck';
 import { SimPool } from './simpool';
 import { BAND, DECK_SLACK, PAIRS, cardKnob, classRates, deckGaps, describeKnob, evaluate, knobsFor, loss, pairLabel, patchOverrides, roundPatch, type EvalSpec, type Knob, type Patch, type Rates } from './balancelib';
 
-const o = { out: '', pool: 'preset-style' as PoolKind, cpu: ['normal', 'hard'] as Difficulty[], n: 6, checkN: 24, iters: 3, kinds: ['hp', 'power', 'light', 'heavy'] as Knob['kind'][], lambda: 3, h: 0.1, max: 0.2, decks: false, start: '', blocks: [] as Array<{ kind: PoolKind; cpu: Difficulty }> };
+const o = { out: '', pool: 'preset-style' as PoolKind, cpu: ['normal', 'hard'] as Difficulty[], n: 6, checkN: 24, iters: 3, kinds: ['hp', 'power', 'light', 'heavy'] as Knob['kind'][], lambda: 3, h: 0.1, max: 0.2, decks: false, start: '', blocks: [] as Array<{ kind: PoolKind; cpu: Difficulty }>, check: false };
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i], v = (): string => argv[++i] ?? '';
@@ -33,6 +34,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--h') o.h = Number(v());
   else if (a === '--max') o.max = Number(v());
   else if (a === '--decks') o.decks = true;
+  else if (a === '--check') o.check = true;
   else if (a === '--start') o.start = v();
   else if (a === '--blocks') o.blocks = v().split(',').map(b => { const [kind, cpu] = b.split(':'); return { kind: kind as PoolKind, cpu: cpu as Difficulty }; });
   else throw new Error(`unknown option ${a}`);
@@ -127,6 +129,7 @@ say(`tune: ${o.pool} @ ${o.cpu}, ${knobs.length} knobs (${o.kinds.join(', ')}), 
 let cur: Patch = o.start ? (JSON.parse(readFileSync(o.start, 'utf8')) as { history: Array<{ patch: Patch }> }).history.at(-1)!.patch : {};
 let curRates = await rates(cur, o.checkN, 99);
 say(`start: ${fmtPatch(cur)}, loss ${total(curRates).toFixed(0)}\n  ${fmt(curRates)}`);
+if (o.check) { pool.close(); process.exit(0); }
 const history: unknown[] = [{ iter: 0, patch: cur, rates: curRates, loss: total(curRates) }];
 let J: number[][] = [];
 
