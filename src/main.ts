@@ -1,6 +1,6 @@
 import { W, H, UW, UH, P, view, setView, screenRect, spread, MIN_ASPECT, PORTRAIT_MIN_ASPECT } from './engine/gfx';
 import { drawTextCentered } from './engine/font';
-import { initInput, endFrame, wasPressed } from './engine/input';
+import { initInput, endFrame, wasPressed, page } from './engine/input';
 import { toggleMute } from './engine/audio';
 import { setScene, getScene, commitZones, hotZone, noteTouch } from './scenes/scene';
 import { TitleScene } from './scenes/title';
@@ -65,9 +65,9 @@ fit();
 initInput(canvas);
 // Inside an embedded frame, keys only arrive after the page gets focus.
 let engaged = false;
-const engage = (): void => { engaged = true; canvas.focus(); };
+const engage = (): void => { engaged = page.engaged = true; canvas.focus(); };
 window.addEventListener('pointerdown', engage);
-window.addEventListener('keydown', () => { engaged = true; });
+window.addEventListener('keydown', () => { engaged = page.engaged = true; });
 // a shared online link (?room=CODE) goes straight to joining that room
 const room = new URLSearchParams(location.search).get('room');
 setScene(room ? new OnlineScene(room) : new TitleScene());

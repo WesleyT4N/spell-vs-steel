@@ -16,6 +16,9 @@ for (let m = 0; m < N; m++) {
   const b = new Battle({ cls: a, deck: toList(starterDeck(a)), name: 'A' }, { cls: c, deck: toList(starterDeck(c)), name: 'B' });
   let tape: RoundTape | null = null;
   recordRound(b, t => { tape = t; });
+  // some rounds change a fighter after the battle is made, as arcade's boss does
+  const boss = m % 5 === 3;
+  if (boss) { b.f[1].name = 'SHADOW'; b.f[1].maxHp = b.f[1].hp = Math.round(b.f[1].maxHp * 1.5); }
   const cpus = [new Cpu('normal'), new Cpu('normal')];
   const hashes: number[] = [];
   let customT = 0, frames = 0;
@@ -35,6 +38,7 @@ for (let m = 0; m < N; m++) {
   const t = tape as RoundTape | null;
   // CPUs can stall a round for minutes; that says nothing about replays
   if (!t) { console.log(`round ${m}: ${a} vs ${c} still going after 400s, skipped`); continue; }
+  if (!!t.fx !== boss) { console.log(`round ${m}: fighter changes ${boss ? 'not ' : ''}recorded`); failures++; }
   const p = new TapePlayer(JSON.parse(JSON.stringify(t)) as RoundTape);
   let bad = -1;
   while (p.step()) if (battleHash(p.b) !== hashes[p.i - 1]) { bad = p.i; break; }

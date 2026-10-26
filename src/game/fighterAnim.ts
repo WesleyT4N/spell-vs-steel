@@ -179,22 +179,24 @@ function deathLook(b: Battle, f: Fighter, s: State, L: Look): Look {
       if (t >= 0.54 && t < 0.6) L.oy = -1;
       break;
     case 'mage':
-      // reels, sinks to his knees, then unravels into arcane motes from the hat down
-      if (t < 0.3) { L.frame = 'hit'; L.oy = -Math.round(Math.sin((t / 0.3) * Math.PI) * 3); }
-      else { const p = clamp01((t - 0.45) / 0.9); L.frame = 'kneel'; L.pose.cut = 4 + Math.floor(p * 22); L.hide = p >= 1; }
+      // reels, staggers back on his staff, sinks to a knee leaning on it, then unravels into arcane motes from the hat down
+      if (t < 0.15) { L.frame = 'hit'; L.oy = -Math.round(Math.sin((t / 0.15) * Math.PI) * 3); }
+      else if (t < 0.3) L.frame = 'stagger';
+      else { const p = clamp01((t - 0.45) / 0.9); L.frame = 'slump'; L.pose.cut = 4 + Math.floor(p * 22); L.hide = p >= 1; }
       break;
     case 'rogue':
       // doubles over, then vanishes in a burst of smoke, leaving her dagger behind
-      if (t < 0.2) L.frame = 'hit';
-      else if (t < 0.4) L.frame = 'kneel';
-      else if (t < 0.5) { L.frame = 'kneel'; L.alpha = 0.4; }
+      if (t < 0.12) L.frame = 'hit';
+      else if (t < 0.25) L.frame = 'stagger';
+      else if (t < 0.42) L.frame = 'slump';
+      else if (t < 0.5) { L.frame = 'slump'; L.alpha = 0.4; }
       else L.hide = true;
       break;
     case 'priest':
-      // kneels, light falls on him, and he rises into it
-      L.frame = 'kneel';
+      // staggers, kneels in prayer on his staff, light falls on him, and he rises into it with the staff raised
+      L.frame = t < 0.12 ? 'hit' : t < 0.22 ? 'stagger' : 'slump';
       if (t >= 0.35 && t < 0.55) L.white = Math.floor(t * 20) % 2 === 0;
-      else if (t >= 0.55) { const p = clamp01((t - 0.55) / 0.9); L.frame = 'cast1'; L.white = true; L.oy = -Math.round(ease(p) * 26); L.alpha = 1 - p; L.pose.scan = p > 0.3 ? Math.floor(t * 30) % 2 : undefined; L.hide = p >= 1; }
+      else if (t >= 0.55) { const p = clamp01((t - 0.55) / 0.9); L.frame = 'cast0'; L.white = true; L.oy = -Math.round(ease(p) * 26); L.alpha = 1 - p; L.pose.scan = p > 0.3 ? Math.floor(t * 30) % 2 : undefined; L.hide = p >= 1; }
       break;
   }
   return L;

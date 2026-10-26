@@ -344,7 +344,7 @@ export class TrainingScene extends BattleScene {
   private drawMenu(ui: Ctx, tick: number): void {
     dim(ui, 0.6);
     const rows = this.rows, x = 92, w = UW - 184, rh = Math.round(17 * spread.k), y0 = 46;
-    banner(ui, 'TRAINING', UW / 2, 8);
+    banner(ui, 'TRAINING MODE', UW / 2, 8);
     win(ui, x, y0 - 8, w, rows.length * rh + 14);
     rows.forEach((r, i) => {
       // a gap between the settings and the actions below them

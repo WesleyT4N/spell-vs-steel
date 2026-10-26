@@ -19,7 +19,7 @@ import { sfx, playMusic, stopMusic, chargeHum } from '../engine/audio';
 import { RESULT_SONG } from '../engine/music';
 import { win, selRow, banner, PAPER, BURN, INK, INK2, RED_INK, TRIM } from './skin';
 
-const MODE_NAME: Record<ReplayMode, string> = { cpu: 'VS CPU', versus: '2 PLAYERS', watch: 'CPU VS CPU', online: 'ONLINE', ranked: 'RANKED' };
+const MODE_NAME: Record<ReplayMode, string> = { cpu: 'VS CPU', arcade: 'ARCADE', versus: '2 PLAYERS', watch: 'CPU VS CPU', online: 'ONLINE', ranked: 'RANKED' };
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const when = (at: number): string => {
   const d = new Date(at), p = (n: number): string => String(n).padStart(2, '0');
