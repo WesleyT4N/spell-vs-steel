@@ -115,10 +115,9 @@ export const rogue: CardDef[] = [
     cast: x => {
       const col = x.b.frontCol(x.foe.side);
       const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
-      x.b.warn(x.f, cells, TUNING.warnTime, () => {
-        for (let r = 0; r < 3; r++) x.b.addFx('stab', x.f.side, col, r, 0.25);
-        x.b.strike(x.f, cells, 50 * x.mult, { spell: true, element: 'steel' });
-      });
+      // thrown blades, instant like BN's sword-type chips
+      for (let r = 0; r < 3; r++) x.b.addFx('stab', x.f.side, col, r, 0.25);
+      x.b.strike(x.f, cells, 50 * x.mult, { spell: true, element: 'steel' });
     },
     ai: (b, f) => b.foe(f).col === b.frontCol(b.foe(f).side),
   },

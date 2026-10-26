@@ -176,10 +176,9 @@ const warrior: CardDef[] = [
     cast: x => {
       const col = x.b.frontCol(x.foe.side);
       const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
-      x.b.warn(x.f, cells, TUNING.warnTime, () => {
-        x.b.addFx('wide', x.f.side, col, 1, 0.3);
-        x.b.strike(x.f, cells, 90 * x.mult, { spell: true, element: 'steel' });
-      });
+      // BN WideSword: a sword swing lands instantly, no warning
+      x.b.addFx('wide', x.f.side, col, 1, 0.3);
+      x.b.strike(x.f, cells, 90 * x.mult, { spell: true, element: 'steel' });
     },
     ai: (b, f) => b.foe(f).col === b.frontCol(b.foe(f).side),
   },
@@ -549,10 +548,9 @@ const mage: CardDef[] = [
       const c1 = b.frontCol(foe.side), c2 = c1 + x.dir;
       const cells: Array<[number, number]> = [];
       for (const c of [c1, c2]) for (let r = 0; r < 3; r++) cells.push([c, r]);
-      b.warn(f, cells, TUNING.warnTime, () => {
-        for (const [c, r] of cells) { b.addFx('explode', f.side, c, r, 0.4); b.burn(c, r, 5, 15); }
-        b.strike(f, cells, 120 * x.mult, { spell: true, element: 'fire' });
-      });
+      // like BN's fire arms, the breath is instant; the burning panels it leaves are the warning
+      for (const [c, r] of cells) { b.addFx('explode', f.side, c, r, 0.4); b.burn(c, r, 5, 15); }
+      b.strike(f, cells, 120 * x.mult, { spell: true, element: 'fire' });
     },
     ai: (b, f) => { const foe = b.foe(f); return Math.abs(foe.col - b.frontCol(foe.side)) <= 1; },
   },
