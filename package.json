@@ -13,6 +13,7 @@
     "netcheck": "tsx scripts/netcheck.ts",
     "combocheck": "tsx scripts/combo-check.ts",
     "replaycheck": "tsx scripts/replay-check.ts",
+    "rankedcheck": "tsx scripts/ranked-check.ts",
     "peerserver": "peerjs --port 9000 --host 127.0.0.1"
   },
   "devDependencies": {

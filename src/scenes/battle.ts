@@ -15,7 +15,7 @@ const LIFT = 12;
 import { deckLabel, rollDeck, sideDeck, sideName, type Ctl, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
 import { P, UW, screenRect, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered, textWidth } from '../engine/font';
+import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse, localDir, localDown, localPressed, localNav, localKey } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx, chargeHum, announce, voiceLine } from '../engine/audio';
@@ -321,7 +321,15 @@ export class BattleScene implements Scene {
     r.rounds.push(t);
     r.at = Date.now();
     saveReplay(r);
+    this.afterRound(r);
   }
+
+  /** The set's replay so far, once a round of it has ended. */
+  protected get setReplay(): Replay | null { return SET_REPLAYS.get(this.rounds) ?? null; }
+  /** Called as each round ends, with the set's replay so far. */
+  protected afterRound(_r: Replay): void { /* online play scores ranked sets here */ }
+  /** An extra line on the results screen, under the score. */
+  protected resultNote(): string { return ''; }
 
   /** Hooks the online scene overrides. */
   protected rivalName = 'CPU';
@@ -411,7 +419,11 @@ export class BattleScene implements Scene {
       score = `${b.f[0].name} ${this.score[0]} - ${this.score[1]} ${b.f[1].name}`;
     }
     banner(ui, title, UW / 2, 6);
-    if (this.m.bestOf > 1) drawTextCentered(ui, score, UW / 2, 34, '#fcfcfc');
+    // the score, and any note (online ranked: the rating change) after it on the same line
+    const note = this.resultNote(), line = this.m.bestOf > 1 ? score : '';
+    const gap = line && note ? '   ' : '', x0 = Math.round(UW / 2 - textWidth(line + gap + note) / 2);
+    if (line) drawTextOutlined(ui, line, x0, 34, '#fcfcfc');
+    if (note) drawTextOutlined(ui, note, x0 + textWidth(line + gap), 34, '#f8b800');
     const data = this.statsData();
     this.statsPanel.draw(ui, data, 8, 46, 344, 254);
     const items = this.resultItems;

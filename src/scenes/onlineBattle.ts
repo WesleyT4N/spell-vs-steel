@@ -8,7 +8,8 @@ import { battleHash } from '../net/hash';
 import { NO_INPUT, type NetInput } from '../net/protocol';
 import type { NetSession } from '../net/session';
 import { roundRecord, type RoundRecord } from '../game/stats';
-import type { ReplayMode } from '../game/replay';
+import { replayScore, type Replay, type ReplayMode } from '../game/replay';
+import { rankedOf, rankedRound, rankedNote } from '../net/rating';
 import { UW, type Ctx } from '../engine/gfx';
 import { drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
@@ -46,7 +47,9 @@ export class OnlineBattleScene extends BattleScene {
     net.beginRound(roundNo);
   }
 
-  protected get replayMode(): ReplayMode { return 'online'; }
+  protected get replayMode(): ReplayMode { return rankedOf(this.net) ? 'ranked' : 'online'; }
+  protected afterRound(r: Replay): void { void rankedRound(this.net, this.net.side, r.id, replayScore(r), this.need); }
+  protected resultNote(): string { return rankedNote(this.net, this.setReplay?.id); }
 
   protected rivalDeckText(): string { return `RIVAL: ${this.net.rival?.cls.toUpperCase() ?? ''}`; }
 

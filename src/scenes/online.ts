@@ -14,10 +14,11 @@ import { CODE_LEN, isCodeChar, newRoomCode } from '../net/protocol';
 import { NetSession } from '../net/session';
 import { openTransport, pickTransport, type TransportKind } from '../net/transport';
 import { CharSelectScene } from './select';
+import { RankedScene } from './ranked';
 import { TitleScene } from './title';
 import { win, selRow, banner, PAPER, BURN, INK, INK2, RED_INK, TRIM } from './skin';
 
-const ROWS = ['MATCH', 'CREATE ROOM', 'JOIN ROOM'] as const;
+const ROWS = ['RANKED MATCH', 'MATCH', 'CREATE ROOM', 'JOIN ROOM'] as const;
 type RowName = (typeof ROWS)[number];
 type Mode = 'menu' | 'code' | 'busy' | 'room' | 'error';
 
@@ -56,6 +57,7 @@ export class OnlineScene implements Scene {
   }
 
   private activate(row: RowName): void {
+    if (row === 'RANKED MATCH') { sfx('select'); saveMatch(this.m); setScene(new RankedScene()); return; }
     if (row === 'CREATE ROOM') { this.code = newRoomCode(); this.connect('host'); return; }
     if (row === 'JOIN ROOM') { this.mode = 'code'; this.code = ''; this.typeCode(); sfx('select'); return; }
     this.change(row, 1);
@@ -173,11 +175,11 @@ export class OnlineScene implements Scene {
     win(ui, 16, 176 + db, UW - 32, 112);
     drawText(ui, 'HOW IT WORKS', 26, 184 + db, RED_INK);
     const lines = [
-      'ONE PLAYER PICKS CREATE ROOM AND SHARES THE 5-LETTER CODE.',
+      'RANKED MATCH FINDS A RIVAL NEAR YOUR RATING (BEST OF 3).',
+      'FOR A FRIENDLY, ONE PLAYER PICKS CREATE ROOM AND SHARES THE CODE.',
       'THE OTHER OPENS THIS SAME PAGE, PICKS JOIN ROOM, TYPES IT IN.',
       'THEN BOTH PICK FIGHTERS AND VOTE ON THE STAGE (SPLIT VOTES',
-      'FLIP A COIN). THE HOST\'S MATCH LENGTH IS USED. EITHER PLAYER',
-      'CAN OPEN THE DRAW SCREEN. THERE IS NO PAUSE ONLINE.',
+      'FLIP A COIN). THE HOST\'S MATCH LENGTH IS USED. NO PAUSE ONLINE.',
     ];
     lines.forEach((l, i) => drawText(ui, l, 26, 198 + db + i * 12, INK2));
     drawText(ui, `NETWORK: ${this.kind ? NET_NAME[this.kind] : 'CHECKING...'}`, 26, 266 + db, TRIM);
@@ -195,7 +197,7 @@ export class OnlineScene implements Scene {
       zone(`row:${i}`, RX - 6, y - 1, RW + 12, rh - 1);
       if (on) selRow(ui, RX - 6, y - 1, RW + 12, rh - 2);
       if (on && tick % 8 < 6) drawText(ui, '→', RX, ty, PAPER);
-      if (row === 'CREATE ROOM' || row === 'JOIN ROOM') {
+      if (row === 'RANKED MATCH' || row === 'CREATE ROOM' || row === 'JOIN ROOM') {
         drawTextCentered(ui, row, RX + RW / 2, ty, RED_INK, 1, false);
         return;
       }
