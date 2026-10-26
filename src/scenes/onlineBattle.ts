@@ -1,10 +1,11 @@
-// An online round: the Versus scene, driven by the lockstep session instead of a CPU.
+// An online round: the Versus scene, driven by rollback netcode (src/net/rollback.ts) instead of a CPU.
 import { setScene, dim, hint, resetSel } from './scene';
 import { BattleScene } from './battle';
 import { TitleScene } from './title';
 import { Battle, heavyChargeOf, type Side } from '../game/battle';
 import { loadMatch } from '../game/match';
-import { battleHash } from '../net/hash';
+import { Rollback, MAX_ROLLBACK } from '../net/rollback';
+import { statsRollbackRoots } from '../game/stats';
 import { NO_INPUT, type NetInput } from '../net/protocol';
 import type { NetSession } from '../net/session';
 import { roundRecord, type RoundRecord } from '../game/stats';
@@ -16,18 +17,21 @@ import { RESULT_SONG } from '../engine/music';
 import { listMouse } from './scene';
 import { win, RED_INK } from './skin';
 
-const STEP = 1 / 60;
-
 /** Seed for round `r` of a match, the same on both machines. */
 const roundSeed = (seed: number, r: number): number => (seed + Math.imul(r, 0x9e3779b9)) >>> 0;
 
 export class OnlineBattleScene extends BattleScene {
-  /** Next lockstep frame to run. */
-  frame = 0;
-  /** Presses seen while waiting on the other side, merged into the next scheduled input. */
+  rb: Rollback;
+  /** Presses seen since the last scheduled input, merged into the next one. */
   private pend: NetInput | null = null;
-  /** Frames in a row spent waiting for the other side's input. */
+  /** Frames in a row spent waiting because we got too far ahead of the other side. */
   stall = 0;
+  /** Smoothed frames we run ahead of the other side's clock (positive: we are ahead). */
+  private lead = 0;
+  private tickN = 0;
+  /** Longest correction in about the last second, for the connection readout. */
+  private shownRollback = 0;
+  private shownRollbackT = 0;
   /** Picks sent for this Draw screen; waiting on the rival's. */
   locked = false;
   waitingNext = false;
@@ -43,6 +47,8 @@ export class OnlineBattleScene extends BattleScene {
     this.rivalName = 'RIVAL';
     this.pauseItems = ['RESUME', 'LEAVE MATCH'];
     net.beginRound(roundNo);
+    this.rb = new Rollback(this.b, me, { local: f => net.localInput(f), remote: f => net.remoteInput(f) },
+      statsRollbackRoots(this.stats), (f, h) => net.recordHash(f, h));
   }
 
   protected rivalDeckText(): string { return `RIVAL: ${this.net.rival?.cls.toUpperCase() ?? ''}`; }
@@ -67,12 +73,13 @@ export class OnlineBattleScene extends BattleScene {
       if (this.locked && theirs) {
         const mine = this.picks.slice();
         b.endCustom(this.me === 0 ? [mine, theirs] : [theirs, mine]);
+        this.rb.resave();
         this.locked = false;
         this.fightBanner = 0.9;
       }
       return;
     }
-    if (b.phase === 'over') { this.updateResult(dt); return; }
+    if (b.phase === 'over' && this.ended) { this.updateResult(dt); return; }
 
     // the fight keeps running under the pause menu: there is no pausing an online match
     if (this.paused) this.updatePause(dt);
@@ -81,30 +88,23 @@ export class OnlineBattleScene extends BattleScene {
     const now: NetInput = live ? { ...this.playerIntent(dt), draw: wasPressed('custom') } : NO_INPUT;
     this.pend = this.pend ? merge(this.pend, now) : now;
 
-    // run one frame, or two when the other side is ahead of us
-    const behind = net.remoteContig - net.remoteDelay > this.frame + 2;
-    for (let n = behind ? 2 : 1; n > 0; n--) {
-      if (net.scheduled <= this.frame + net.delay) {
-        net.pushLocal(this.pend ?? held(now));
-        this.pend = null;
-      }
-      const theirs = net.remoteInput(this.frame), mine = net.localInput(this.frame);
-      if (!theirs || !mine) { this.stall++; break; }
-      this.stall = 0;
-      const ins: [NetInput, NetInput] = this.me === 0 ? [mine, theirs] : [theirs, mine];
-      this.frame++;
-      if (b.phase === 'fight' && (ins[0].draw || ins[1].draw) && b.canOpenCustom()) {
-        b.beginCustom();
-        this.openCustom();
-        this.paused = false;
-        break;
-      }
-      b.update(STEP, ins);
-      if (this.frame % 30 === 0) net.recordHash(this.frame, battleHash(b));
-      if ((b.phase as string) !== 'fight' && (b.phase as string) !== 'ko') break;
+    // our input goes in a couple of frames ahead (net.delay), which hides most small hiccups
+    if (net.scheduled <= this.rb.frame + net.delay) {
+      net.pushLocal(this.pend ?? held(now));
+      this.pend = null;
+    }
+    const ran = this.rb.advance(this.framesToRun());
+    net.frame = this.rb.frame;
+    if (this.rb.lastRollback >= this.shownRollback || ++this.shownRollbackT > 60) { this.shownRollback = this.rb.lastRollback; this.shownRollbackT = 0; }
+    this.stall = ran === 0 && this.rb.ahead >= MAX_ROLLBACK ? this.stall + 1 : 0;
+    if ((b.phase as string) === 'custom') {
+      // the Draw screen only ever opens on a frame both sides agree on
+      this.openCustom();
+      this.paused = false;
+      return;
     }
     for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / heavyChargeOf(f)) : null);
-    if ((b.phase as string) === 'over' && !this.ended) {
+    if ((b.phase as string) === 'over' && this.rb.settled && !this.ended) {
       this.ended = true;
       resetSel();
       if (b.winner !== null) this.score[b.winner]++;
@@ -114,6 +114,22 @@ export class OnlineBattleScene extends BattleScene {
       if (b.winner === this.me) sfx('win');
       playMusic('result', RESULT_SONG);
     }
+  }
+
+  /**
+   * Frames to run this tick: one normally, two to catch up when the other side's clock is ahead,
+   * none now and then when ours is ahead, so neither side keeps guessing further than it must.
+   */
+  private framesToRun(): number {
+    const net = this.net, r = net.remote;
+    this.tickN++;
+    if (!r || r.fr === undefined || !net.rtt) return 1;
+    // where the other side's clock is now: its last report, plus the trip and the time since
+    const theirs = r.fr + (net.rtt / 2 + (performance.now() - net.heardAt)) / (1000 / 60);
+    this.lead = this.lead * 0.9 + (this.rb.frame - theirs) * 0.1;
+    if (this.lead < -2) return 2;
+    if (this.lead > 2 && this.tickN % 6 === 0) return 0;
+    return 1;
   }
 
   protected updatePause(dt: number): void {
@@ -171,7 +187,7 @@ export class OnlineBattleScene extends BattleScene {
     super.draw(c, tick, ui);
     const b = this.b, net = this.net;
     // connection readout, top corner under the HUD
-    const ping = net.rtt ? `PING ${Math.round(net.rtt)}MS  DELAY ${net.delay}F` : '';
+    const ping = net.rtt ? `PING ${Math.round(net.rtt)}MS  DELAY ${net.delay}F  ROLLBACK ${this.shownRollback}F` : '';
     if (b.phase === 'fight') drawTextOutlined(ui, ping, Math.round(UW / 2 - textWidth(ping) / 2), 48, '#bcbcbc');
     if (net.desync) drawTextCentered(ui, 'DESYNC: THE TWO GAMES DISAGREE', UW / 2, 270, '#f83800', 1);
     if (b.phase === 'custom' && this.locked) {
