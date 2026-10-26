@@ -1,7 +1,7 @@
 // Every number worth tweaking after a playtest lives here.
 
 export const TUNING = {
-  hp: { warrior: 870, mage: 690, rogue: 650, ranger: 740, priest: 700 },
+  hp: { warrior: 815, mage: 690, rogue: 650, ranger: 740, priest: 700 },
 
   /** Seconds for the shared custom gauge to fill. */
   gaugeSeconds: 10,
@@ -100,8 +100,8 @@ export const TUNING = {
     /** Cursed panels: damage per second to an enemy standing on one. Cursed or Hexed fighters deal this multiplier. */
     curseDps: 10,
     /** Each further second on the same cursed panel adds this much, up to curseMax per tick. */
-    curseRamp: 3,
-    curseMax: 22,
+    curseRamp: 4,
+    curseMax: 26,
     weakened: 0.75,
     /** Blessed panels (all last until the next Draw screen): Hallowed Ground damage, Aegis Field shield, Wellspring Mana. */
     hallowedBonus: 1.35,
@@ -112,7 +112,7 @@ export const TUNING = {
   },
 
   /** Each Poison stack deals this per second for poisonSeconds. */
-  poisonDps: 4,
+  poisonDps: 5,
   poisonSeconds: 6,
   poisonMaxStacks: 3,
   /** Healing blessed panels (Sanctuary, Sacred Ground) heal their owner this much per second. */
