@@ -25,6 +25,14 @@ export function setView(aspect: number, min = MIN_ASPECT): boolean {
   Object.assign(view, { w, h, ox: (w - W) / 2, oy: (h - H) / 2 });
   return true;
 }
+/**
+ * Phone portrait leaves spare height above and below the 480×320 UI area, and menus spread their layout into it:
+ * `vy` moves a UI-layer y away from the middle by `k` (up to 1.5×), and `vspan` is a box's height once both its
+ * edges move. Only positions and box heights change; sprites and text keep their size. `k` is 1 everywhere else.
+ */
+export const spread = { portrait: false, k: 1 };
+export const vy = (y: number): number => Math.round(UH / 2 + (y - UH / 2) * spread.k);
+export const vspan = (y: number, h: number): number => vy(y + h) - vy(y);
 /** The whole visible screen as [x, y, w, h] in layer coordinates (`s` = 2 for the UI layer). */
 export const screenRect = (s = 1): [number, number, number, number] => [-view.ox * s, -view.oy * s, view.w * s, view.h * s];
 /** Fill the whole visible screen, margins included. */

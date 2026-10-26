@@ -1,4 +1,4 @@
-import { W, H, UW, UH, P, view, setView, screenRect, MIN_ASPECT, PORTRAIT_MIN_ASPECT } from './engine/gfx';
+import { W, H, UW, UH, P, view, setView, screenRect, spread, MIN_ASPECT, PORTRAIT_MIN_ASPECT } from './engine/gfx';
 import { drawTextCentered } from './engine/font';
 import { initInput, endFrame, wasPressed } from './engine/input';
 import { toggleMute } from './engine/audio';
@@ -39,6 +39,9 @@ function fit(): void {
     ui.canvas.width = view.w * 2; ui.canvas.height = view.h * 2;
     world.imageSmoothingEnabled = ui.imageSmoothingEnabled = false; // resizing resets context state
   }
+  // menus spread into the spare height in portrait, at most 1.5x and clear of the footer strip
+  spread.portrait = portrait;
+  spread.k = portrait ? Math.max(1, Math.min(1.5, (view.h * 2 - 28) / UH)) : 1;
   const s = Math.max(0.5, Math.min(bw / view.w, bh / view.h));
   document.body.classList.toggle('svs-portrait', portrait);
   const cw = Math.floor(view.w * s), ch = Math.floor(view.h * s);
