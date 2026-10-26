@@ -1,7 +1,7 @@
 // Grand Colosseum and the panel grid every stage shares. Stages are drawn "Inked" like the 24px fighters:
 // outlined pieces, flat cel shading, no dithering (toolkit in ink.ts). The other stages live in stages.ts.
 import { P, view, rng, mix, type Ctx } from '../engine/gfx';
-import { inked, wide, put, sky, mod, disc, blocks, inkBanner, inkTorch, inkCloud, MX, MY, BW, BH, XL, XR, YT, YB } from './ink';
+import { inked, wide, put, sky, mod, disc, blocks, inkBanner, inkTorch, inkCloud, bird, MX, MY, LIFT, BW, BH, XL, XR, YT, YB } from './ink';
 
 export const COLS = 6, ROWS = 3, PW = 38, FACE = 15, LIP = 4, X0 = 6, Y0 = 98;
 /** Panel rims per side, [light, dark], from the fighters' red and blue. */
@@ -55,8 +55,8 @@ export function drawStage(c: Ctx, st: Stage, t: number, cheer = 0): void {
   }
   big.clearRect(XL, YT, BW, BH);
   st.draw(big, t, cheer);
-  const sx = Math.max(0, MX - ox), sy = Math.max(0, MY - oy);
-  c.drawImage(big.canvas, sx, sy, Math.min(w, BW - sx), Math.min(h, BH - sy), sx - MX, sy - MY, Math.min(w, BW - sx), Math.min(h, BH - sy));
+  const sx = Math.max(0, MX - ox), sy = Math.max(0, MY - oy), cw = Math.min(w, BW - sx), ch = Math.min(h, BH - LIFT - sy);
+  c.drawImage(big.canvas, sx, sy + LIFT, cw, ch, sx - MX, sy - MY, cw, ch);
 }
 
 const STONE: PanelLook = { face: '#bdb7cc', hi: '#eee9e7', lo: '#7e7890', lip: '#5c566c', lipLo: '#000000' };
@@ -191,11 +191,29 @@ export class Colosseum implements Stage {
     [[30, 1], [150, -1], [230, 3], [-40, -24], [300, -14], [100, -46]].forEach(([cx, cy], i) => c.drawImage(this.clouds[i % 3], Math.round(XL - 44 + mod(cx - XL + t * 0.2 * (1 + (i % 3) * 0.3), BW + 88)), cy));
     put(c, this.front);
     const hopEvery = cheer > 0 ? 4 : 16;
+    // a stadium wave rolls around the stands every few seconds
+    const wave = XL - 30 + mod(t * 6, BW + 160);
     for (const [x, y, body, skin, ph] of this.crowd) {
-      const hop = (t + ph) % hopEvery < 2 ? 1 : 0;
+      const inWave = Math.abs(x - wave) < 8;
+      const hop = inWave ? 2 : (t + ph) % hopEvery < 2 ? 1 : 0;
       P(c, skin[1], x, y - hop - 1, 2, 1); P(c, skin[0], x + 1, y - hop - 1, 1, 1);
       P(c, body[1], x, y - hop, 1, 2); P(c, body[0], x + 1, y - hop, 1, 2);
-      if (hop && cheer > 0) P(c, skin[1], x + 2, y - 3, 1, 1);
+      if (inWave || (hop && cheer > 0)) { P(c, skin[1], x, y - hop - 3, 1, 2); P(c, skin[1], x + 1, y - hop - 3, 1, 1); }
+    }
+    // pigeons circling over the stands
+    for (let i = 0; i < 5; i++) {
+      const a = t * 0.05 + i * 1.26, rx = 90 + i * 14;
+      bird(c, Math.round(120 + Math.cos(a) * rx), Math.round(-14 - i * 6 + Math.sin(a * 2) * 6), Math.floor(t / 2 + i) % 2 === 0, '#3a3450');
+    }
+    // dust blowing along the sand
+    for (let i = 0; i < 6; i++) {
+      const x = XL - 20 + mod(i * 71 + t * (1.2 + i * 0.2), BW + 40), y = 100 + ((i * 37) % 120), f = mod(t + i * 3, 12);
+      if (f < 8) { P(c, SAND[3], x, y, 3 - (f >> 2), 1); P(c, SAND[3], x - 2, y + 1, 2, 1); }
+    }
+    // confetti when the crowd cheers
+    if (cheer > 0) for (let i = 0; i < 40; i++) {
+      const x = XL + mod(i * 53 + Math.sin(t * 0.3 + i) * 6, BW), y = YT + mod(i * 29 + t * (2 + (i % 3)), 120 - YT);
+      P(c, CROWD[i % CROWD.length][1], x, y, 1 + (mod(t + i, 4) >> 1), 1);
     }
     // the emperor
     P(c, SKIN[0][1], 119, 49, 3, 2); P(c, GOLD[2], 118, 47, 5, 1);
