@@ -19,6 +19,7 @@ import { playMusic, stopMusic, sfx } from '../engine/audio';
 import { MENU_SONG, RESULT_SONG } from '../engine/music';
 import { win, plaque, banner, FRAME, GOLD, INK, INK2, TRIM, RED_INK, BLUE_INK } from './skin';
 import { BattleScene } from './battle';
+import type { ReplayMode } from '../game/replay';
 
 const LEVEL: Record<string, string> = { easy: 'EASY', normal: 'NORMAL', hard: 'HARD' };
 const BOSS_NAME = 'SHADOW';
@@ -120,6 +121,7 @@ export class ArcadeBattleScene extends BattleScene {
     }
   }
 
+  protected get replayMode(): ReplayMode { return 'arcade'; }
   protected again(score: [number, number], rounds: RoundRecord[]): Scene { return new ArcadeBattleScene(this.run, score, rounds); }
 
   update(dt: number): void {
