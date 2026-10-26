@@ -6,9 +6,13 @@ import { Battle, heavyChargeOf, type Side } from '../game/battle';
 import { loadMatch } from '../game/match';
 import { Rollback, MAX_ROLLBACK } from '../net/rollback';
 import { statsRollbackRoots } from '../game/stats';
+import { TapeWriter } from '../game/replay';
 import { NO_INPUT, type NetInput } from '../net/protocol';
 import type { NetSession } from '../net/session';
 import { roundRecord, type RoundRecord } from '../game/stats';
+import { replayScore, type Replay, type ReplayMode } from '../game/replay';
+import { rankedOf, rankedRound, rankedNote } from '../net/rating';
+import { tournamentRound, tournamentNote } from './tournament';
 import { UW, type Ctx } from '../engine/gfx';
 import { drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
@@ -22,6 +26,7 @@ const roundSeed = (seed: number, r: number): number => (seed + Math.imul(r, 0x9e
 
 export class OnlineBattleScene extends BattleScene {
   rb: Rollback;
+  private tape: TapeWriter;
   /** Presses seen since the last scheduled input, merged into the next one. */
   private pend: NetInput | null = null;
   /** Frames in a row spent waiting because we got too far ahead of the other side. */
@@ -49,7 +54,19 @@ export class OnlineBattleScene extends BattleScene {
     net.beginRound(roundNo);
     this.rb = new Rollback(this.b, me, { local: f => net.localInput(f), remote: f => net.remoteInput(f) },
       statsRollbackRoots(this.stats), (f, h) => net.recordHash(f, h));
+    // the replay records agreed frames only (a guessed frame may be undone)
+    this.tape = new TapeWriter(this.b);
+    this.rb.onConfirmed = (kind, ins) => { if (kind === 'draw') this.tape.beginCustom(); else this.tape.update(ins); };
   }
+
+  protected get replayMode(): ReplayMode { return rankedOf(this.net) ? 'ranked' : 'online'; }
+  /** Recorded from rollback's confirmed frames instead (see the constructor). */
+  protected get keepsReplays(): boolean { return false; }
+  protected afterRound(r: Replay): void {
+    void rankedRound(this.net, this.net.side, r.id, replayScore(r), this.need);
+    tournamentRound(this.net, replayScore(r), this.need);
+  }
+  protected resultNote(): string { return tournamentNote(this.net) || rankedNote(this.net, this.setReplay?.id); }
 
   protected rivalDeckText(): string { return `RIVAL: ${this.net.rival?.cls.toUpperCase() ?? ''}`; }
 
@@ -72,7 +89,9 @@ export class OnlineBattleScene extends BattleScene {
       const theirs = net.remotePicks(b.turn);
       if (this.locked && theirs) {
         const mine = this.picks.slice();
-        b.endCustom(this.me === 0 ? [mine, theirs] : [theirs, mine]);
+        const picks: [number[], number[]] = this.me === 0 ? [mine, theirs] : [theirs, mine];
+        this.tape.endCustom(picks);
+        b.endCustom(picks);
         this.rb.resave();
         this.locked = false;
         this.fightBanner = 0.9;
@@ -106,6 +125,7 @@ export class OnlineBattleScene extends BattleScene {
     for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / heavyChargeOf(f)) : null);
     if ((b.phase as string) === 'over' && this.rb.settled && !this.ended) {
       this.ended = true;
+      this.keepRound(this.tape.finish());
       resetSel();
       if (b.winner !== null) this.score[b.winner]++;
       this.rounds.push(roundRecord(b, this.stats));

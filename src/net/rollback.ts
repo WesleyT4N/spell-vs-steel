@@ -45,6 +45,12 @@ export class Rollback {
   maxRollback = 0;
   /** Corrections that changed a guess, this round. */
   rollbacks = 0;
+  /**
+   * Called once for each confirmed frame, just before it runs: what the agreed battle did (an update
+   * on `ins`, or opening the Draw screen). Each frame is confirmed exactly once, so this is where
+   * replays get recorded.
+   */
+  onConfirmed?: (kind: 'update' | 'draw', ins: [NetInput, NetInput]) => void;
   private snap: Snapshot;
   /** The remote input each guessed frame ran on (index = frame). */
   private guessed: NetInput[] = [];
@@ -131,7 +137,8 @@ export class Rollback {
   private runFrame(mine: NetInput, theirs: NetInput, real: boolean): void {
     const ins: [NetInput, NetInput] = this.me === 0 ? [mine, theirs] : [theirs, mine];
     const b = this.b;
-    if (real && (ins[0].draw || ins[1].draw) && b.canOpenCustom()) { b.beginCustom(); return; }
+    if (real && (ins[0].draw || ins[1].draw) && b.canOpenCustom()) { this.onConfirmed?.('draw', ins); b.beginCustom(); return; }
+    if (real) this.onConfirmed?.('update', ins);
     b.update(STEP, ins);
   }
 

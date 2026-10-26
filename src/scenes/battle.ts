@@ -3,7 +3,7 @@
 import { setScene, dim, drawMenu, hint, zone, hot, isHot, listMouse, showSel, resetSel, type Scene } from './scene';
 import { CLASS_INFO } from '../game/classes';
 import { Battle, NO_INTENT, heavyChargeOf, type Dir, type Intent, type Side } from '../game/battle';
-import { drawBattle, drawBattleUi } from '../game/battleView';
+import { drawBattle, drawBattleUi, getArena } from '../game/battleView';
 import { Cpu } from '../game/ai';
 import { CARDS, ELEMENT_COLOR } from '../game/cards';
 
@@ -15,7 +15,7 @@ const LIFT = 12;
 import { deckLabel, rollDeck, sideDeck, sideName, type Ctl, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
 import { P, UW, screenRect, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered, textWidth } from '../engine/font';
+import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse, localDir, localDown, localPressed, localNav, localKey } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx, chargeHum, announce, voiceLine } from '../engine/audio';
@@ -28,6 +28,10 @@ import { StatsPanel, type StatsData } from './statsView';
 import { trackStats, roundRecord, setTotals, topSpell, type BattleStats, type RoundRecord } from '../game/stats';
 import { TitleScene } from './title';
 import { OptionsScene } from './options';
+import { recordRound, saveReplay, newReplayId, RULES_VERSION, type Replay, type ReplayMode, type RoundTape } from '../game/replay';
+
+/** The replay being recorded for each set, keyed by the set's list of rounds (a new set starts a new list). */
+const SET_REPLAYS = new WeakMap<RoundRecord[], Replay>();
 
 export class BattleScene implements Scene {
   b: Battle;
@@ -81,6 +85,7 @@ export class BattleScene implements Scene {
     );
     this.cpu = new Cpu(m.difficulty);
     this.stats = trackStats(this.b);
+    if (this.keepsReplays) recordRound(this.b, t => this.keepRound(t));
     if (ctl[0] === 'cpu') this.cpu0 = new Cpu(m.difficulty);
     this.me = this.home;
     this.rivalName = sideName(ctl, this.home === 0 ? 1 : 0);
@@ -302,6 +307,30 @@ export class BattleScene implements Scene {
     }
   }
 
+  /** False where a round is not a real match (training, replays): nothing gets recorded. */
+  protected get keepsReplays(): boolean { return true; }
+  protected get replayMode(): ReplayMode { return this.watching ? 'watch' : this.twoPlayer ? 'versus' : 'cpu'; }
+
+  /** A round just ended: add it to this set's replay and save it, so even an unfinished set keeps its rounds. */
+  protected keepRound(t: RoundTape): void {
+    let r = SET_REPLAYS.get(this.rounds);
+    if (!r) {
+      r = { id: newReplayId(), v: RULES_VERSION, at: Date.now(), mode: this.replayMode, me: this.humans.length === 1 ? this.me : null, bestOf: this.m.bestOf, stage: getArena().id, rounds: [] };
+      SET_REPLAYS.set(this.rounds, r);
+    }
+    r.rounds.push(t);
+    r.at = Date.now();
+    saveReplay(r);
+    this.afterRound(r);
+  }
+
+  /** The set's replay so far, once a round of it has ended. */
+  protected get setReplay(): Replay | null { return SET_REPLAYS.get(this.rounds) ?? null; }
+  /** Called as each round ends, with the set's replay so far. */
+  protected afterRound(_r: Replay): void { /* online play scores ranked sets here */ }
+  /** An extra line on the results screen, under the score. */
+  protected resultNote(): string { return ''; }
+
   /** Hooks the online scene overrides. */
   protected rivalName = 'CPU';
   protected pauseItems = ['RESUME', 'OPTIONS', 'RESTART', 'QUIT TO TITLE'];
@@ -399,7 +428,11 @@ export class BattleScene implements Scene {
       score = `${b.f[0].name} ${this.score[0]} - ${this.score[1]} ${b.f[1].name}`;
     }
     banner(ui, title, UW / 2, 6);
-    if (this.m.bestOf > 1) drawTextCentered(ui, score, UW / 2, 34, '#fcfcfc');
+    // the score, and any note (online ranked: the rating change) after it on the same line
+    const note = this.resultNote(), line = this.m.bestOf > 1 ? score : '';
+    const gap = line && note ? '   ' : '', x0 = Math.round(UW / 2 - textWidth(line + gap + note) / 2);
+    if (line) drawTextOutlined(ui, line, x0, 34, '#fcfcfc');
+    if (note) drawTextOutlined(ui, note, x0 + textWidth(line + gap), 34, '#f8b800');
     const data = this.statsData();
     this.statsPanel.draw(ui, data, 8, 46, 344, 254);
     const items = this.resultItems;
