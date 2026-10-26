@@ -1,6 +1,6 @@
 // Online Versus lobby: create a room (and share its code or link) or join one. Fighters and the stage
 // are picked together once both players are in (see select.ts and stageSelect.ts).
-import { setScene, hint, zone, hot, listMouse, button, showSel, type Scene } from './scene';
+import { replaceScene, popScene, hint, zone, hot, listMouse, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, skinOf } from '../art/sprites';
@@ -14,7 +14,6 @@ import { CODE_LEN, isCodeChar, newRoomCode } from '../net/protocol';
 import { NetSession } from '../net/session';
 import { openTransport, pickTransport, type TransportKind } from '../net/transport';
 import { CharSelectScene } from './select';
-import { TitleScene } from './title';
 import { win, selRow, banner, PAPER, BURN, INK, INK2, RED_INK, TRIM } from './skin';
 
 const ROWS = ['MATCH', 'CREATE ROOM', 'JOIN ROOM'] as const;
@@ -131,13 +130,13 @@ export class OnlineScene implements Scene {
       const net = this.net!;
       net.tick();
       if (net.status === 'error' || net.status === 'left') { this.net = null; this.fail(net.status === 'left' ? 'THE OTHER PLAYER LEFT' : net.error); return; }
-      if (net.matched) { sfx('confirm'); setScene(new CharSelectScene(net)); return; }
+      if (net.matched) { sfx('confirm'); replaceScene(new CharSelectScene(net)); return; }
       if (mouse.click && hot('btn') === 1) this.copy();
       if (back || (mouse.click && hot('btn') === 2)) this.cancel();
       return;
     }
 
-    if (back) { sfx('back'); setScene(new TitleScene()); return; }
+    if (back) { sfx('back'); popScene(); return; }
     if (mouse.click) {
       const arrow = hot('arrow');
       if (arrow >= 0) { this.sel = arrow >> 1; this.change(ROWS[this.sel], arrow & 1 ? 1 : -1); return; }

@@ -1,6 +1,6 @@
 // Arcade mode: the ladder screen between fights, the fights themselves (best of 3, CONTINUE on a loss),
 // and the clear screen. You pick your fighter and deck on the shared character select first.
-import { setScene, drawMenu, hint, listMouse, type Scene } from './scene';
+import { replaceScene, goHome, drawMenu, hint, listMouse, type Scene } from './scene';
 import { getArena, useStage } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getStage } from '../art/stages';
@@ -19,7 +19,6 @@ import { playMusic, stopMusic, sfx } from '../engine/audio';
 import { MENU_SONG, RESULT_SONG } from '../engine/music';
 import { win, plaque, banner, FRAME, GOLD, INK, INK2, TRIM, RED_INK, BLUE_INK } from './skin';
 import { BattleScene } from './battle';
-import { TitleScene } from './title';
 
 const LEVEL: Record<string, string> = { easy: 'EASY', normal: 'NORMAL', hard: 'HARD' };
 const BOSS_NAME = 'SHADOW';
@@ -48,8 +47,8 @@ export class ArcadeLadderScene implements Scene {
     if (wasPressed('back') || mouse.rclick) { this.sel = 1; sfx('move'); return; }
     if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
       sfx('select');
-      if (this.sel === 1) { stopMusic(); setScene(new TitleScene()); return; }
-      setScene(arcadeFight(this.run));
+      if (this.sel === 1) { stopMusic(); goHome(); return; }
+      replaceScene(arcadeFight(this.run));
     }
   }
 
@@ -138,12 +137,12 @@ export class ArcadeBattleScene extends BattleScene {
 
   protected onResult(choice: string): void {
     const run = this.run;
-    if (choice === 'NEXT ROUND') setScene(this.again(this.score, this.rounds));
-    if (choice === 'CONTINUE') { run.continues++; run.tries++; setScene(this.again([0, 0], [])); }
-    if (choice === 'GIVE UP') setScene(new TitleScene());
+    if (choice === 'NEXT ROUND') replaceScene(this.again(this.score, this.rounds));
+    if (choice === 'CONTINUE') { run.continues++; run.tries++; replaceScene(this.again([0, 0], [])); }
+    if (choice === 'GIVE UP') goHome();
     if (choice === 'NEXT FIGHT' || choice === 'CLAIM VICTORY') run.fights.push(this.record());
-    if (choice === 'NEXT FIGHT') { run.at++; run.tries = 1; setScene(new ArcadeLadderScene(run)); }
-    if (choice === 'CLAIM VICTORY') setScene(new ArcadeClearScene(run));
+    if (choice === 'NEXT FIGHT') { run.at++; run.tries = 1; replaceScene(new ArcadeLadderScene(run)); }
+    if (choice === 'CLAIM VICTORY') replaceScene(new ArcadeClearScene(run));
   }
 
   /** The won set, summed up for the clear screen. */
@@ -174,7 +173,7 @@ export class ArcadeClearScene implements Scene {
   update(dt: number): void {
     this.t += dt;
     if (this.t > 1 && (wasPressed('confirm') || wasPressed('custom') || wasPressed('back') || mouse.click)) {
-      sfx('select'); stopMusic(); setScene(new TitleScene());
+      sfx('select'); stopMusic(); goHome();
     }
   }
 
