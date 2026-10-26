@@ -3,7 +3,8 @@ import { k } from '../engine/input';
 import { drawPanel, drawStage, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, TEAM_RIM, type PanelState } from '../art/arena';
 import { getStage } from '../art/stages';
 import type { Stage } from '../art/arena';
-import { getSprite, drawFighterSprite, teamColor, type Tint } from '../art/sprites';
+import { getSprite, getFrame, drawFighterSprite, drawFighterPosed, teamColor, type Tint } from '../art/sprites';
+import type { FrameId } from '../art/fighterFrames';
 import { P, UW, UH, blob, frame, glow, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '../engine/font';
 import { drawCardIcon, RES_INK } from '../scenes/cardView';
@@ -14,6 +15,7 @@ import { TUNING } from './tuning';
 import { heavyChargeOf } from './battle';
 import type { Battle, BlessKind, Fighter, Fx, Pet, Projectile, Side, StatusKey, Trap, Wall } from './battle';
 import { CLASS_INFO } from './classes';
+import { drawOver, drawUnder, lookOf, observe } from './fighterAnim';
 
 import { ARC, FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, useParticles } from './fxView';
 
@@ -401,13 +403,23 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
   }
   const { x, y } = fighterPos(b, f);
   const flip = f.side === 1;
-  // heavy: a short wind-back, then a deep lunge into the swing
-  const lean = f.pose === 'attack' ? 2 : f.pose === 'heavy' ? (f.poseT > 0.26 ? -2 : 4) : f.pose === 'hurt' ? -2 : 0;
-  const fx = x + lean * b.dir(f);
-  // shadow
-  P(c, '#000000', x - 5, y, 10, 1); P(c, '#000000', x - 4, y + 1, 8, 1);
+  const held = f.st.frozen > 0 || f.st.iceBlock > 0 || f.st.stunned > 0 || f.st.sleep > 0;
+  const as = observe(b, f), look = lookOf(b, f, as, held);
+  // heavy: a short wind-back, then a deep lunge into the swing (the frames draw the swing itself)
+  const lean = f.pose === 'attack' ? 1 : f.pose === 'heavy' ? (f.poseT > 0.26 ? -1 : 2) : 0;
+  const fx = Math.round(x + lean * b.dir(f) + look.ox), fy = Math.round(y + look.oy);
+  const fs = getFrame(f.cls, f.skin, f.alt, look.frame);
+  const ghost = (gx: number, gy: number, fr: FrameId): void => drawFighterPosed(c, getFrame(f.cls, f.skin, f.alt, fr), gx, gy + 2, flip, 'ghost');
+  drawUnder(c, b, f, as, fs, x, y, flip, ghost);
+  // shadow (stays on the floor while the fighter hops; gone once they've left the field)
+  if (!(f.dead && look.hide)) { P(c, '#000000', fx - 5, y, 10, 1); P(c, '#000000', fx - 4, y + 1, 8, 1); }
   if (f.dead) {
-    if (b.phase === 'ko' && Math.floor(b.koT * 8) % 2 === 0) drawFighterSprite(c, s, fx, y + 2, flip, 'ghost');
+    if (!look.hide) {
+      c.globalAlpha = look.alpha;
+      drawFighterPosed(c, fs, fx, fy + 2, flip, look.white ? 'flash' : 'none', look.pose);
+      c.globalAlpha = 1;
+    }
+    drawOver(c, b, f, as, fs, look, fx, fy, flip);
     return;
   }
   // charge aura: sparks spiral in toward the fighter, then a bright ring pulses once the heavy is ready
@@ -437,16 +449,15 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
   let tint: Tint = 'none';
   if (f.flash > 0 || (ready && tick % 4 === 0)) tint = 'flash';
   else if ((f.st.stunned > 0 || f.st.sleep > 0) && tick % 2) tint = 'stun';
-  const bob = f.pose === 'idle' && Math.floor(b.time * 2.5) % 2 ? 1 : 0;
-  const castLift = f.pose === 'cast' ? 1 : 0;
-  drawFighterSprite(c, s, fx, y + 2 - bob - castLift, flip, tint);
+  drawFighterPosed(c, fs, fx, fy + 2, flip, tint, look.pose);
+  drawOver(c, b, f, as, fs, look, fx, fy, flip);
 
   // transform glows
   if (f.st.avatar > 0 || f.st.ascendance > 0) {
     const col = f.st.avatar > 0 ? '#f8b800' : '#f878f8';
     for (let i = 0; i < 4; i++) P(c, col, fx - 8 + ((tick * 3 + i * 5) % 16), y - 4 - ((tick * 2 + i * 7) % 20), 1, 2);
   }
-  drawFrozen(c, b, f, s, fx, y, flip);
+  drawFrozen(c, b, f, fs, fx, y, flip);
   // shields
   for (const sh of f.shields) {
     if (sh.hp <= 0) continue;
