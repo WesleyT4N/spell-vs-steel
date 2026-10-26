@@ -1,6 +1,9 @@
 // Dev tools menu: card encyclopedia, debug sandbox and balance lab.
 import { setScene, drawMenu, hint, listMouse, showSel, type Scene } from './scene';
-import { getArena } from '../game/battleView';
+import { getArena, useStage } from '../game/battleView';
+import { BattleScene } from './battle';
+import { loadMatch } from '../game/match';
+import type { ClassId } from '../art/sprites';
 import { drawStage } from '../art/arena';
 import { UW, screenRect, spread, type Ctx } from '../engine/gfx';
 import { drawTextCentered } from '../engine/font';
@@ -60,7 +63,8 @@ export class DevMenuScene implements Scene {
   }
 }
 
-/** Open a dev tool straight from the URL hash (#cards, #sandbox, #lab), for local work. */
+/** Open a dev tool straight from the URL hash (#cards, #sandbox, #lab), for local work.
+ *  #bench=stage[,classA,classB] starts a CPU vs CPU match to watch, for frame-rate profiling. */
 export function devFromHash(home: () => void): boolean {
   const tag = location.hash.slice(1);
   const menu = (): void => setScene(new DevMenuScene(home));
@@ -69,6 +73,11 @@ export function devFromHash(home: () => void): boolean {
   else if (tag === 'lab') setScene(new LabScene(menu));
   else if (tag === 'voices') setScene(new VoiceTestScene(menu));
   else if (tag === 'dev') menu();
+  else if (tag.startsWith('bench')) {
+    const [stage = 'colosseum', a = 'mage', b = 'priest'] = tag.split('=')[1]?.split(',') ?? [];
+    useStage(stage);
+    setScene(new BattleScene({ ...loadMatch(), p1: a as ClassId, cpu: b as ClassId, p1Deck: 'starter', cpuDeck: 'starter', stage, bestOf: 5 }, [0, 0], undefined, [], ['cpu', 'cpu']));
+  }
   else return false;
   return true;
 }

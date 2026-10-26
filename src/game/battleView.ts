@@ -713,13 +713,13 @@ function drawCastCallout(ui: Ctx, e: Fx): void {
   ui.save();
   ui.globalAlpha = Math.max(0, fade);
   win(ui, x, y, w, h, { accent: ELEMENT_COLOR[card.element], burn: 4 });
-  drawCardIcon(ui, card, x + 7, y + 10, 32);
-  const tx = x + 45;
+  drawCardIcon(ui, card, x + 7, y + 11, 40);
+  const tx = x + 52;
   drawText(ui, card.name.toUpperCase(), tx, y + 9, INK);
   const info = CLASS_INFO[card.cls];
   const meta = `${card.cost === 'all' ? 'ALL' : card.cost} ${info.res}${card.dmg !== '-' ? `  DMG ${card.dmg.toUpperCase()}` : ''}`;
   drawText(ui, meta, tx, y + 19, RES_INK[info.res]);
-  wrap(card.short.toUpperCase(), Math.floor((w - 52) / 6)).slice(0, 3).forEach((l, i) => drawText(ui, l, tx, y + 30 + i * 9, INK2));
+  wrap(card.short.toUpperCase(), Math.floor((w - 58) / 6)).slice(0, 3).forEach((l, i) => drawText(ui, l, tx, y + 30 + i * 9, INK2));
   if (e.data?.countered) {
     ui.fillStyle = 'rgba(40,20,0,0.6)'; ui.fillRect(x, y, w, h);
     drawTextCentered(ui, 'COUNTERED', x + w / 2, y + h / 2 - 7, '#f878f8', 2);
