@@ -137,6 +137,10 @@ function pressRaw(code: string, isDown: boolean): void {
 }
 export const localDown = (p: 0 | 1, a: LocalAct): boolean => LOCAL_KEYS[p][a].some(c => rawHeld.has(c));
 export const localPressed = (p: 0 | 1, a: LocalAct): boolean => LOCAL_KEYS[p][a].some(c => rawPressed.has(c));
+/** The player has clicked or pressed a key on the page (set by main), so keys arrive and audio can play. */
+export const page = { engaged: false };
+/** Any key went down this frame (skipping an intro). */
+export const anyPressed = (): boolean => rawPressed.size > 0;
 /** Player `p`'s most recently pressed direction that is still held. */
 export function localDir(p: 0 | 1): 'up' | 'down' | 'left' | 'right' | null {
   const l = LOCAL_KEYS[p];
