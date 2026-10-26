@@ -2,6 +2,7 @@
 import { PLAYABLE } from '../game/classes';
 import { Battle, type Side } from '../game/battle';
 import { Cpu } from '../game/ai';
+import { randomSeed } from '../game/rng';
 import { CARDS } from '../game/cards';
 import { starterDeck, toList, type DeckCounts } from '../game/deck';
 import type { Difficulty } from '../game/tuning';
@@ -27,8 +28,9 @@ const DT = 1 / 60;
 /** Matches that run longer than this are called a draw. */
 export const TIME_LIMIT = 600;
 
-export function runMatch(a: SideSpec, bSpec: SideSpec): MatchResult {
-  const b = new Battle({ cls: a.cls, deck: toList(a.deck), name: 'A' }, { cls: bSpec.cls, deck: toList(bSpec.deck), name: 'B' });
+export function runMatch(a: SideSpec, bSpec: SideSpec, seed: number = randomSeed()): MatchResult {
+  // the CPUs seed their rolls from the battle, so the same seed plays the same match
+  const b = new Battle({ cls: a.cls, deck: toList(a.deck), name: 'A' }, { cls: bSpec.cls, deck: toList(bSpec.deck), name: 'B' }, seed);
   const probe = instrument(b);
   const dmg: MatchResult['dmg'] = [{}, {}];
   probe.onHit = h => {
@@ -39,8 +41,8 @@ export function runMatch(a: SideSpec, bSpec: SideSpec): MatchResult {
   let t = 0;
   while (b.phase !== 'over' && t < TIME_LIMIT) {
     if (b.phase === 'custom') b.endCustom([cpus[0].pick(b, b.f[0]), cpus[1].pick(b, b.f[1])]);
-    // the player opens the Draw screen whenever they like; this opens it a little after it fills
-    else if (b.canOpenCustom() && Math.random() < 0.02) b.beginCustom();
+    // the player opens the Draw screen whenever they like; side A's CPU opens it a little after it fills
+    else if (cpus[0].wantsDraw(b, b.f[0], DT)) b.beginCustom();
     b.update(DT, [cpus[0].intent(b, b.f[0], DT), cpus[1].intent(b, b.f[1], DT)]);
     t += DT;
   }

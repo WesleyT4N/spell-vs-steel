@@ -1,7 +1,10 @@
 // CPU opponent. Produces the same Intent a keyboard player would, so the battle can't tell the difference.
+// Every roll comes from a generator seeded by the battle's seed and the CPU's side, so a CPU match replays
+// exactly from its seed (sims, tests, the balance grid) without touching Math.random or the rules' own rolls.
 import { NO_INTENT, heavyChargeOf, type Battle, type BlessKind, type Dir, type Fighter, type Intent } from './battle';
 import { CARDS } from './cards';
 import { TUNING, type Difficulty } from './tuning';
+import { shuffle, substream, type Rng } from './rng';
 
 export class Cpu {
   private think = 0;
@@ -11,17 +14,37 @@ export class Cpu {
   private wantCast = false;
   private wantTap = false;
   private cfg: (typeof TUNING.cpu)[Difficulty];
+  /** The battle this CPU's rolls are seeded from; a new battle (next round, rematch) reseeds it. */
+  private seededFor: Battle | null = null;
+  private side = -1;
+  private rand: Rng = Math.random;
 
   constructor(public difficulty: Difficulty) {
     this.cfg = TUNING.cpu[difficulty];
   }
 
+  /** Seed this CPU's rolls from the battle it is playing (once per battle and side). */
+  private bind(b: Battle, f: Fighter): void {
+    if (this.seededFor === b && this.side === f.side) return;
+    this.seededFor = b;
+    this.side = f.side;
+    this.rand = substream(b.seed, 0xc0 + f.side);
+  }
+
+  /** Whether to open the Draw screen now that it can be opened (a little after it fills, like a player would). */
+  wantsDraw(b: Battle, f: Fighter, dt: number): boolean {
+    this.bind(b, f);
+    // 2% a frame at 60fps, the same per second at any step
+    return b.canOpenCustom() && this.rand() < 1 - Math.pow(0.98, dt * 60);
+  }
+
   intent(b: Battle, f: Fighter, dt: number): Intent {
+    this.bind(b, f);
     if (b.phase !== 'fight' || f.dead) { this.holding = false; return NO_INTENT; }
     this.think -= dt;
     this.waitedOnTop += dt;
     if (this.think <= 0) {
-      this.think = this.cfg.think * (0.7 + Math.random() * 0.6);
+      this.think = this.cfg.think * (0.7 + this.rand() * 0.6);
       this.decide(b, f);
     }
     const out: Intent = {
@@ -41,7 +64,7 @@ export class Cpu {
     const aligned = foe.row === f.row;
 
     // 1. Dodge telegraphs and incoming projectiles.
-    if (Math.random() < this.cfg.dodge && this.inDanger(b, f)) {
+    if (this.rand() < this.cfg.dodge && this.inDanger(b, f)) {
       const step = this.safeStep(b, f);
       if (step) { this.pendingMove = step; return; }
     }
@@ -50,8 +73,8 @@ export class Cpu {
     const top = f.queue[0] ? CARDS[f.queue[0]] : null;
     if (top) {
       if (b.canAfford(f, top) && f.st.evoLock <= 0 && f.castCd <= 0) {
-        const good = top.ai ? top.ai(b, f) : true;
-        if (good || this.waitedOnTop > this.cfg.castPatience * 3 || (this.difficulty === 'easy' && Math.random() < 0.25)) {
+        const good = top.ai ? top.ai(b, f, this.rand) : true;
+        if (good || this.waitedOnTop > this.cfg.castPatience * 3 || (this.difficulty === 'easy' && this.rand() < 0.25)) {
           this.wantCast = true;
           this.waitedOnTop = 0;
           return;
@@ -75,18 +98,18 @@ export class Cpu {
       else if (f.charge > need + 1.5) this.holding = false;
     } else if (f.cls === 'rogue' && heavyReach && !inReach && f.lock <= 0) {
       // out of stab range: wind up a Throwing Knife instead
-      if (Math.random() < 0.08) { this.wantTap = true; this.holding = true; }
+      if (this.rand() < 0.08) { this.wantTap = true; this.holding = true; }
     } else if (inReach && f.lock <= 0) {
       this.wantTap = true;
-      this.holding = Math.random() < (this.difficulty === 'normal' ? 0.35 : 0.15);
-      if (Math.random() < 0.5) return;
+      this.holding = this.rand() < (this.difficulty === 'normal' ? 0.35 : 0.15);
+      if (this.rand() < 0.5) return;
     }
     // a Rogue in a backstab window holds its panel: any move would blink it home
     if (f.st.backstab > 0) return;
     // the Ranger earns Energy by standing still, so it repositions less
-    if (f.cls === 'ranger' && (aligned || !seen) && Math.random() < 0.85) return;
+    if (f.cls === 'ranger' && (aligned || !seen) && this.rand() < 0.85) return;
     // the Priest's blessings only work while it stands on them
-    if (f.cls === 'priest' && b.blessUnder(f) && Math.random() < 0.9) return;
+    if (f.cls === 'priest' && b.blessUnder(f) && this.rand() < 0.9) return;
 
     // 4. Positioning.
     const target = this.goal(b, f);
@@ -96,9 +119,9 @@ export class Cpu {
 
   private goal(b: Battle, f: Fighter): [number, number] {
     const foe = b.foe(f);
-    const aim = Math.random() < this.cfg.aim;
+    const aim = this.rand() < this.cfg.aim;
     // a stealthed enemy can't be tracked: hold the current row
-    const row = foe.st.stealth > 0 ? f.row : aim ? foe.row : Math.floor(Math.random() * 3);
+    const row = foe.st.stealth > 0 ? f.row : aim ? foe.row : Math.floor(this.rand() * 3);
     if (f.cls === 'warrior' || f.cls === 'rogue') return [b.frontCol(f.side), row];
     if (f.cls === 'priest') {
       // go stand on the most useful blessing we have
@@ -169,7 +192,7 @@ export class Cpu {
       return dr !== 0 || !b.projectiles.some(p => p.side !== f.side && p.row === r);
     });
     if (!safe.length) return null;
-    return safe[Math.floor(Math.random() * safe.length)][0];
+    return safe[Math.floor(this.rand() * safe.length)][0];
   }
 
   /** Rogue: spend the full Energy bar on a chain. Setup first, then a blink, then the finishers that want to be up close.
@@ -199,11 +222,12 @@ export class Cpu {
 
   /** Choose spells from the offer, in cast order. */
   pick(b: Battle, f: Fighter): number[] {
+    this.bind(b, f);
     const offer = b.offer[f.side];
     const idx = offer.map((_, i) => i);
     if (this.difficulty === 'easy') {
-      const n = 1 + Math.floor(Math.random() * 3);
-      return idx.sort(() => Math.random() - 0.5).slice(0, n);
+      const n = 1 + Math.floor(this.rand() * 3);
+      return shuffle(idx, this.rand).slice(0, n);
     }
     const cost = (i: number): number => { const c = CARDS[offer[i]].cost; return c === 'all' ? Math.max(1, f.res) : c; };
     if (f.cls === 'rogue') return this.pickRogue(offer, f.res, cost);
