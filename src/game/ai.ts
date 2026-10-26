@@ -46,6 +46,7 @@ export class Cpu {
 
     // 1. Dodge telegraphs and incoming projectiles.
     const st = this.style;
+    const hard = this.difficulty === 'hard';
     if (Math.random() < this.cfg.dodge * st.dodge && this.inDanger(b, f)) {
       const step = this.safeStep(b, f);
       if (step) { this.pendingMove = step; return; }
@@ -83,20 +84,27 @@ export class Cpu {
       if (Math.random() < 0.08) { this.wantTap = true; this.holding = true; }
     } else if (inReach && f.lock <= 0 && Math.random() < st.attack) {
       this.wantTap = true;
-      this.holding = Math.random() < (this.difficulty === 'hard' ? 0.6 : this.difficulty === 'normal' ? 0.35 : 0.15) * st.attack;
+      // Hard charges more heavies, except for the Ranger and Rogue, whose damage and Energy come from steady taps
+      this.holding = Math.random() < (hard && f.cls !== 'ranger' && f.cls !== 'rogue' ? 0.6 : this.difficulty === 'easy' ? 0.15 : 0.35) * st.attack;
       if (Math.random() < 0.5) return;
+    }
+    // Hard doesn't stand in the enemy's row when it can't hit back
+    if (hard && aligned && seen && !inReach && f.lock <= 0 && Math.random() < 0.3) {
+      const side = this.sideSteps(b, f);
+      if (side.length) { this.pendingMove = side[Math.floor(Math.random() * side.length)]; return; }
     }
     // defensive styles get out of the enemy's row rather than trade hits
     if (st.evade && aligned && seen && (Math.abs(dist) <= 3 || foe.charging) && Math.random() < st.evade) {
-      const side = ([['up', -1], ['down', 1]] as Array<[Dir, number]>).filter(([, dr]) => b.canStand(f, f.col, f.row + dr) && !this.cursed(b, f, f.col, f.row + dr));
-      if (side.length) { this.pendingMove = side[Math.floor(Math.random() * side.length)][0]; return; }
+      const side = this.sideSteps(b, f);
+      if (side.length) { this.pendingMove = side[Math.floor(Math.random() * side.length)]; return; }
     }
     // a Rogue in a backstab window holds its panel: any move would blink it home
     if (f.st.backstab > 0) return;
-    // the Ranger earns Energy by standing still, so it repositions less
-    if (f.cls === 'ranger' && (aligned || !seen) && Math.random() < 0.85) return;
+    // the Ranger earns Energy by standing still, so it repositions less (per second, however often this CPU thinks)
+    const stay = (p: number): boolean => Math.random() < p ** (this.cfg.think / TUNING.cpu.normal.think);
+    if (f.cls === 'ranger' && (aligned || !seen) && stay(0.85)) return;
     // the Priest's blessings only work while it stands on them
-    if (f.cls === 'priest' && b.blessUnder(f) && Math.random() < 0.9) return;
+    if (f.cls === 'priest' && b.blessUnder(f) && stay(0.9)) return;
 
     // 4. Positioning.
     const target = this.goal(b, f);
@@ -145,6 +153,12 @@ export class Cpu {
       if (v > bestV) { bestV = v; best = [c, r]; }
     }
     return best;
+  }
+
+  /** Up or down moves that are safe to take. */
+  private sideSteps(b: Battle, f: Fighter): Dir[] {
+    return ([['up', -1], ['down', 1]] as Array<[Dir, number]>)
+      .filter(([, dr]) => b.canStand(f, f.col, f.row + dr) && !this.cursed(b, f, f.col, f.row + dr)).map(([d]) => d);
   }
 
   /** Would stepping here put us on a panel the enemy cursed? */
