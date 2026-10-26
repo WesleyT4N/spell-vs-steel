@@ -30,6 +30,8 @@ jobs:
         run: npm run build
       - name: Player build
         run: npm run build:prod
+      - name: Saves and migrations
+        run: npx tsx tests/saves.ts
       - name: CPU vs CPU matches, every class pair
         run: npx tsx tests/matches.ts
       - name: Scene stack (BACK)
@@ -38,6 +40,8 @@ jobs:
         run: npx tsx scripts/netcheck.ts 25
       - name: Combo counter
         run: npx tsx scripts/combo-check.ts
+      - name: Rollback matches straight play
+        run: npx tsx scripts/rollcheck.ts 25
 
   screens:
     name: Screens at every aspect ratio
