@@ -43,7 +43,7 @@ export class RankedScene implements Scene {
     if (this.gone) return;
     const s = await Search.start(this.rating.rating);
     if (this.gone) { s?.cancel(); return; }
-    if (!s) { this.fail('RANKED NEEDS THE CLAUDE.AI PAGE'); return; }
+    if (!s) { this.fail('RANKED IS NOT SUPPORTED YET HERE'); return; }
     this.search = s;
     this.mode = 'search';
     this.t = 0;
@@ -130,7 +130,7 @@ export class RankedScene implements Scene {
     if (this.mode === 'loading') drawTextCentered(ui, 'LOADING YOUR RATING...', cx, 90 + dy, INK, 1, false);
     if (this.mode === 'error') {
       drawTextCentered(ui, this.msg, cx, 76 + dy, RED_INK, 1, false);
-      drawTextCentered(ui, 'OPEN THE PROTOTYPE ON CLAUDE.AI TO PLAY RANKED.', cx, 92 + dy, INK2, 1, false);
+      drawTextCentered(ui, 'FOR NOW, PLAY RANKED ON THE CLAUDE.AI PAGE.', cx, 92 + dy, INK2, 1, false);
       drawTextCentered(ui, touchText('CLICK TO GO BACK'), cx, 112 + dy, TRIM, 1, false);
     }
     if (this.mode === 'search' && this.search) {
