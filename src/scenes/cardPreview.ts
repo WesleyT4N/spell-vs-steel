@@ -16,7 +16,7 @@ const LEAD = 0.45, MAX_RUN = 3.2, MIN_RUN = 1.1, HOLD = 0.5;
 const CROP_Y = 70, CROP_H = 88;
 
 /** Who stands in for the enemy: a class the caster doesn't share, so the two never look alike. */
-const DUMMY: Record<ClassId, ClassId> = { warrior: 'mage', mage: 'warrior', rogue: 'warrior', ranger: 'warrior', cleric: 'warrior' };
+const dummyFor = (cls: ClassId): ClassId => (cls === 'warrior' ? 'mage' : 'warrior');
 
 export class CardPreview {
   private b: Battle | null = null;
@@ -39,7 +39,7 @@ export class CardPreview {
     const card = CARDS[this.id];
     withoutSfx(() => {
       // a fixed seed: the same card plays the same clip every loop
-      const b = new Battle({ cls: card.cls, deck: [], name: 'YOU' }, { cls: DUMMY[card.cls], deck: [], name: 'DUMMY' }, 0x5eed);
+      const b = new Battle({ cls: card.cls, deck: [], name: 'YOU' }, { cls: dummyFor(card.cls), deck: [], name: 'DUMMY' }, 0x5eed);
       b.endCustom([[], []]);
       b.noKo = true;
       // free spells and no Draw screen, like the sandbox
