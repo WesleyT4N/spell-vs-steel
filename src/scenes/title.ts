@@ -1,11 +1,11 @@
-import { setScene, drawMenu, hint, listMouse, type Scene } from './scene';
+import { setScene, drawMenu, hint, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { drawLogo } from '../art/logo';
 import { getFrame, drawFighterSprite, defaultSkin, type ClassId } from '../art/sprites';
 import type { FrameId } from '../art/fighterFrames';
 import { FIRE as FIRE_RAMP, STEEL, SHADOW, HOLY } from '../game/fxView';
-import { P, W, UW, UH, view, screenRect, clamp, dith, type Ctx } from '../engine/gfx';
+import { P, W, UW, UH, view, screenRect, spread, clamp, dith, type Ctx } from '../engine/gfx';
 import { PLAYABLE } from '../game/classes';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, anyPressed, k, mouse, page } from '../engine/input';
@@ -20,6 +20,7 @@ import { tutorialDone } from './tutorial';
 import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
 import { RED_INK } from './skin';
+import { bigButton, tallArea, panel, TAP, GAP, PAD } from './touchUi';
 
 const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
 
@@ -130,6 +131,7 @@ export class TitleScene implements Scene {
 
   enter(): void { playMusic('menu', MENU_SONG); }
   pad(): PadMode { return 'none'; }
+  tall(): boolean { return true; }
 
   /** The side about to be knocked out, and the one knocking it. */
   private get target(): 0 | 1 { return (1 - this.swapSide) as 0 | 1; }
@@ -206,7 +208,12 @@ export class TitleScene implements Scene {
   draw(c: Ctx, tick: number, ui: Ctx): void {
     const intro = this.intro, sx = this.shake > 0 ? Math.round(Math.sin(this.t * 90) * 2) : 0;
     c.save();
-    c.translate(sx, 0);
+    // the full-height phone layout lifts the duel to the top of the screen; the menu fills the bottom
+    const lift = spread.tall ? tallLift() : 0;
+    c.translate(sx, -lift);
+    // the stage is painted to fill the screen; lifting it bares a strip along the bottom, under the menu
+    if (lift) { const [rx, ry, rw, rh] = screenRect(); P(c, '#2a1a08', rx, ry + rh, rw, lift); }
+    // and the sky above the logo carries on up past the top of the painted stage
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.25)';
     c.fillRect(...screenRect());
@@ -267,9 +274,10 @@ export class TitleScene implements Scene {
     const dark = 1 - clamp(intro / LOGO_DROP[0]);
     if (dark > 0) { const [rx, ry, rw, rh] = screenRect(); for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) if (dith(x, y) < dark) P(c, '#000000', rx + x, ry + y); }
 
-    const { gap, scale, width, versionY } = menuLayout();
     const rise = span(intro, MENU_IN);
     if (rise <= 0) return;
+    if (spread.tall) { this.drawTall(ui, rise); return; }
+    const { gap, scale, width, versionY } = menuLayout();
     ui.save();
     ui.translate(0, Math.round((1 - rise) ** 2 * 80) & ~1);
     drawMenu(ui, ITEMS, this.sel, UW / 2, MENU_Y, tick, { width, gap, scale, grow: false });
@@ -284,4 +292,47 @@ export class TitleScene implements Scene {
     if (isMuted()) drawText(ui, 'MUTED', 8, 8, '#7c7c7c');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   M: MUTE`);
   }
+
+  /** The full-height phone menu: one big ARCADE button, then the modes two to a row, all in the thumb zone. */
+  private drawTall(ui: Ctx, rise: number): void {
+    const a = tallArea();
+    const rows = tallRows();
+    const w = a.w - PAD * 2, half = (w - GAP) / 2;
+    const y0 = tallMenuTop(), h = a.y + a.h - PAD - y0;
+    ui.save();
+    ui.translate(0, Math.round((1 - rise) ** 2 * 160) & ~1);
+    panel(ui, a.x + PAD - 6, y0, w + 12, h);
+    let y = y0 + 14;
+    for (const r of rows) {
+      r.items.forEach((item, j) => {
+        const i = ITEMS.indexOf(item);
+        const x = a.x + PAD + (r.items.length > 1 ? j * (half + GAP) : 0);
+        bigButton(ui, `menu:${i}`, TALL_LABEL[item] ?? item, x, y, r.items.length > 1 ? half : w, r.h, { primary: item === 'ARCADE MODE', on: i === this.sel && showSel() && item !== 'ARCADE MODE' });
+        if (item === 'TUTORIAL' && !tutorialDone() && this.t % 1 < 0.75) drawText(ui, 'NEW!', x + half - 34, y + 6, RED_INK);
+      });
+      y += r.h + GAP;
+    }
+    ui.restore();
+    drawTextCentered(ui, DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2', UW / 2, y0 - 16, '#bcbcbc', 1, true);
+    if (isMuted()) drawText(ui, 'MUTED', a.x + 8, a.y + 8, '#7c7c7c');
+  }
+}
+
+/** Shorter names for the two-column phone menu. */
+const TALL_LABEL: Record<string, string> = { 'ARCADE MODE': 'ARCADE', 'VERSUS MODE': 'VERSUS', 'ONLINE MODE': 'ONLINE', 'DECK BUILDER': 'DECKS' };
+/** The phone menu's rows: ARCADE alone and tall, the rest in pairs. */
+function tallRows(): Array<{ items: string[]; h: number }> {
+  const rest = ITEMS.filter(i => i !== 'ARCADE MODE');
+  const rows = [{ items: ['ARCADE MODE'], h: 76 }];
+  for (let i = 0; i < rest.length; i += 2) rows.push({ items: rest.slice(i, i + 2), h: TAP + 8 });
+  return rows;
+}
+/** Top of the phone menu panel on the UI layer: it sits on the bottom of the screen. */
+function tallMenuTop(): number {
+  const a = tallArea();
+  return a.y + a.h - PAD - (tallRows().reduce((n, r) => n + r.h + GAP, 0) - GAP + 28);
+}
+/** How far (world pixels) the full-height layout lifts the duel so the fighters stand just above the menu. */
+function tallLift(): number {
+  return Math.max(0, Math.min(view.oy, FOOT + 4 - (Math.floor(tallMenuTop() / 2) - 18)));
 }

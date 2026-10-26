@@ -12,6 +12,11 @@ export interface Scene {
   enter?(): void;
   /** Which touch controls this screen shows on phones (a BACK button when left out). */
   pad?(): PadMode;
+  /**
+   * True when this screen has a full-height phone layout: in phone portrait it then takes the whole screen
+   * (`spread.tall`) instead of the top half, and draws its own touch controls (see touchUi.ts).
+   */
+  tall?(): boolean;
 }
 
 let current: Scene | null = null;

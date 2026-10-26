@@ -1,4 +1,4 @@
-import { W, H, UW, UH, P, view, setView, screenRect, spread, MIN_ASPECT, PORTRAIT_MIN_ASPECT } from './engine/gfx';
+import { W, H, UW, UH, P, view, setView, screenRect, spread, MIN_ASPECT, PORTRAIT_MIN_ASPECT, TALL_MIN_ASPECT } from './engine/gfx';
 import { drawTextCentered } from './engine/font';
 import { initInput, endFrame, wasPressed, page } from './engine/input';
 import { toggleMute } from './engine/audio';
@@ -27,23 +27,29 @@ const ui = offscreen(UW, UH);
 // The screen takes the window's shape (between 4:3 and 21:9) and shows more of the stage instead of
 // black bars. The canvas backing store matches the real screen pixels and every blit is
 // nearest-neighbour, so the art stays crisp at any zoom.
+/** True when the current screen should take the whole phone screen in portrait (see Scene.tall). */
+const wantTall = (): boolean => touchActive() && !!getScene()?.tall?.();
 function fit(): void {
   const [vw, vh] = touchActive() ? viewport() : [window.innerWidth, window.innerHeight];
   const portrait = touchActive() && vh > vw;
-  // phones in portrait keep the bottom half for the touch pad; in landscape the pad sits over the margins
+  // phones in portrait keep the bottom half for the touch pad, unless the screen has a full-height layout;
+  // in landscape the pad sits over the margins
+  const tall = portrait && wantTall();
   // dev tools can dock a panel on the right and reserve its width
   const bw = vw - Number(document.body.dataset.reserveRight ?? 0);
-  const bh = portrait ? vh * 0.5 : vh;
-  if (setView(bw / bh, portrait ? PORTRAIT_MIN_ASPECT : MIN_ASPECT)) {
+  const bh = portrait && !tall ? vh * 0.5 : vh;
+  if (setView(bw / bh, tall ? TALL_MIN_ASPECT : portrait ? PORTRAIT_MIN_ASPECT : MIN_ASPECT)) {
     world.canvas.width = view.w; world.canvas.height = view.h;
     ui.canvas.width = view.w * 2; ui.canvas.height = view.h * 2;
     world.imageSmoothingEnabled = ui.imageSmoothingEnabled = false; // resizing resets context state
   }
   // menus spread into the spare height in portrait, at most 1.5x and clear of the footer strip
   spread.portrait = portrait;
-  spread.k = portrait ? Math.max(1, Math.min(1.5, (view.h * 2 - 28) / UH)) : 1;
+  spread.tall = tall;
+  spread.k = portrait && !tall ? Math.max(1, Math.min(1.5, (view.h * 2 - 28) / UH)) : 1;
   const s = Math.max(0.5, Math.min(bw / view.w, bh / view.h));
   document.body.classList.toggle('svs-portrait', portrait);
+  document.body.classList.toggle('svs-tall', tall);
   const cw = Math.floor(view.w * s), ch = Math.floor(view.h * s);
   canvas.style.width = `${cw}px`;
   canvas.style.height = `${ch}px`;
@@ -87,6 +93,8 @@ function frame(now: number): void {
     if (wasPressed('mute')) toggleMute();
     noteTouch();
     getScene()?.update(STEP);
+    // a screen change can switch between the full-height phone layout and the half-screen one
+    if (spread.portrait && wantTall() !== spread.tall) fit();
     endFrame();
     tickAcc += STEP;
     if (tickAcc >= 1 / 8) { tickAcc -= 1 / 8; tick++; }

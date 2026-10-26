@@ -189,6 +189,16 @@ const place = (e: HTMLElement, x: number, y: number, w: number, h: number, canva
 };
 
 
+// the notch and home bar: phones report them as CSS env() values, read back through a hidden probe
+const safeProbe = el('div', '');
+safeProbe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
+document.body.appendChild(safeProbe);
+/** Screen space under the notch (top) and the home bar (bottom), in CSS pixels. 0 on most screens. */
+export function safeInsets(): { top: number; bottom: number } {
+  const st = getComputedStyle(safeProbe);
+  return { top: parseFloat(st.paddingTop) || 0, bottom: parseFloat(st.paddingBottom) || 0 };
+}
+
 /** Visible screen size. Phones can grow the layout viewport past the screen when anything overflows, so trust the visual one. */
 export function viewport(): [number, number] {
   const v = window.visualViewport;

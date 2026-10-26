@@ -238,9 +238,24 @@ export const hover = (x: number, y: number, w: number, h: number): boolean =>
   mouse.x >= x && mouse.x < x + w && mouse.y >= y && mouse.y < y + h;
 
 // A finger acts like the mouse: touching hovers (so holding a card reads it), a quick tap clicks,
-// a long hold only reads, and dragging up or down scrolls like the wheel.
+// a long hold only reads, and dragging up or down scrolls like the wheel. A quick stroke is also a
+// swipe (see `gesture`), a flick keeps scrolling for a moment, and a swipe in from the left edge is BACK.
 const LONG_PRESS = 0.4, DRAG = 8, WHEEL_STEP = 14;
-let finger: { id: number; x0: number; y0: number; t0: number; wy: number; drag: boolean } | null = null;
+/** Swipes: at least this far (UI pixels), this quick, and mostly along one axis. */
+const SWIPE_MIN = 44, SWIPE_TIME = 0.45, SWIPE_AXIS = 1.6;
+/** A swipe that starts this close to the left edge of the screen is BACK. */
+const EDGE = 22;
+let finger: { id: number; x0: number; y0: number; t0: number; wy: number; drag: boolean; edge: boolean; trail: Array<[number, number]> } | null = null;
+
+export type SwipeDir = 'left' | 'right' | 'up' | 'down';
+/**
+ * Finger gestures, per frame like `mouse`. `swipe` is the direction of a quick stroke that just ended, with
+ * `sx`/`sy` where it started (UI pixels). `dy` is how far a finger dragged (or a flick coasted) up or down
+ * this frame, for lists that scroll smoothly; `dx` the same sideways while a finger is down.
+ * `held` is true while a finger rests on the screen.
+ */
+export const gesture = { swipe: null as SwipeDir | null, sx: 0, sy: 0, dx: 0, dy: 0, held: false, fling: 0 };
+let releaseBack = false;
 
 function initMouse(canvas: HTMLCanvasElement): void {
   const at = (e: MouseEvent): void => {
@@ -261,13 +276,21 @@ function initMouse(canvas: HTMLCanvasElement): void {
     e.preventDefault();
     canvas.setPointerCapture(e.pointerId);
     at(e);
-    finger = { id: e.pointerId, x0: mouse.x, y0: mouse.y, t0: performance.now(), wy: mouse.y, drag: false };
+    const now = performance.now();
+    finger = { id: e.pointerId, x0: mouse.x, y0: mouse.y, t0: now, wy: mouse.y, drag: false, edge: mouse.x < -view.ox * 2 + EDGE, trail: [[now, mouse.y]] };
     mouse.moved = true; mouse.down = true; mouse.touched = true;
+    gesture.held = true; gesture.fling = 0; // a touch stops a coasting list
   });
   canvas.addEventListener('pointermove', e => {
     if (!finger || e.pointerId !== finger.id) return;
+    const px = mouse.x, py = mouse.y;
     at(e);
     mouse.moved = true;
+    gesture.dx += mouse.x - px;
+    gesture.dy += mouse.y - py;
+    const now = performance.now();
+    finger.trail.push([now, mouse.y]);
+    while (finger.trail.length > 2 && now - finger.trail[0][0] > 100) finger.trail.shift();
     if (Math.hypot(mouse.x - finger.x0, mouse.y - finger.y0) > DRAG) finger.drag = true;
     // finger up scrolls the list down, like the wheel
     while (mouse.y <= finger.wy - WHEEL_STEP) { mouse.wheel++; finger.wy -= WHEEL_STEP; }
@@ -275,8 +298,23 @@ function initMouse(canvas: HTMLCanvasElement): void {
   });
   const lift = (e: PointerEvent, cancel: boolean): void => {
     if (!finger || e.pointerId !== finger.id) return;
-    if (!cancel && !finger.drag && performance.now() - finger.t0 < LONG_PRESS * 1000) mouse.click = true;
+    const t = (performance.now() - finger.t0) / 1000;
+    if (!cancel && !finger.drag && t < LONG_PRESS) mouse.click = true;
+    if (!cancel) {
+      const dx = mouse.x - finger.x0, dy = mouse.y - finger.y0;
+      const ax = Math.abs(dx), ay = Math.abs(dy);
+      if (t < SWIPE_TIME && Math.max(ax, ay) >= SWIPE_MIN && Math.max(ax, ay) >= SWIPE_AXIS * Math.min(ax, ay)) {
+        gesture.swipe = ax > ay ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+        gesture.sx = finger.x0; gesture.sy = finger.y0;
+        if (finger.edge && gesture.swipe === 'right') { press('PadBack', true); releaseBack = true; }
+      }
+      // a quick flick keeps the list coasting (UI pixels per second, finger direction)
+      const [t0, y0] = finger.trail[0];
+      const span = (performance.now() - t0) / 1000;
+      if (finger.drag && span > 0.01 && ay > ax) gesture.fling = Math.max(-2400, Math.min(2400, (mouse.y - y0) / span));
+    }
     mouse.down = false;
+    gesture.held = false;
     finger = null;
   };
   canvas.addEventListener('pointerup', e => lift(e, false));
@@ -308,6 +346,14 @@ export function heldDir(): 'up' | 'down' | 'left' | 'right' | null {
 export function endFrame(): void {
   pressed.clear(); released.clear(); rawPressed.clear();
   mouse.click = mouse.rclick = mouse.moved = mouse.touched = false; mouse.wheel = 0;
+  gesture.swipe = null; gesture.dx = 0; gesture.dy = 0;
+  if (releaseBack) { releaseBack = false; press('PadBack', false); }
+  // a flicked list coasts to a stop
+  if (gesture.fling && !gesture.held) {
+    gesture.dy = gesture.fling / 60;
+    gesture.fling *= 0.93;
+    if (Math.abs(gesture.fling) < 30) gesture.fling = 0;
+  }
 }
 
 /** Menu navigation with key repeat. Returns a direction on press and then every `rate` seconds while held. */
