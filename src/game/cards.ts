@@ -106,7 +106,7 @@ const warrior: CardDef[] = [
   },
   {
     id: 'chain_hook', name: 'Chain Hook', cls: 'warrior', cost: 1, rarity: 'common', element: 'steel', damaging: true, lock: 0.35,
-    dmg: '20', short: 'Chain down your row. On hit: pull them to their front column, stun 1.5s, gain 1 Rage.',
+    dmg: '20', short: 'Chain down your row. On hit: pull them to their front column, stun 1.75s, gain 1 Rage.',
     cast: x => {
       x.b.shoot(x.f, {
         speed: 14 * x.dir, kind: 'hook', reflectable: true,
@@ -118,7 +118,7 @@ const warrior: CardDef[] = [
           if (res.blocked && !res.dealt) return;
           const front = b.frontCol(t.side);
           if (t.st.noKnock <= 0 && b.canStand(t, front, t.row)) { t.col = front; }
-          b.stun(t, 1.5);
+          b.stun(t, 1.75);
           b.gainRage(src, 1, true);
         },
       });
@@ -242,10 +242,10 @@ const warrior: CardDef[] = [
   },
   {
     id: 'shield_slam', name: 'Shield Slam', cls: 'warrior', cost: 0, rarity: 'legendary', element: 'steel', damaging: true, lock: 0.45,
-    dmg: '80', short: 'Bash 2 panels ahead: break shields, stun 1.5s. Gain 2 Rage on hit.',
+    dmg: '80', short: 'Bash 2 panels ahead: break shields, stun 1.75s. Gain 2 Rage on hit.',
     cast: x => {
       x.b.addFx('smash', x.f.side, x.f.col + x.dir, x.f.row, 0.25);
-      const res = x.b.strike(x.f, cellsAhead(x, 1, 2), 80 * x.mult, { spell: true, breaks: true, stun: 1.5, element: 'steel' });
+      const res = x.b.strike(x.f, cellsAhead(x, 1, 2), 80 * x.mult, { spell: true, breaks: true, stun: 1.75, element: 'steel' });
       if (res.fighter) x.b.gainRage(x.f, 2, true);
     },
     ai: (b, f) => ahead(b, f, 2),
@@ -424,7 +424,7 @@ const mage: CardDef[] = [
   },
   {
     id: 'frost_nova', name: 'Frost Nova', cls: 'mage', cost: 2, rarity: 'common', element: 'frost', damaging: true, lock: 0.3,
-    dmg: '20', short: 'Hits an enemy within 2 columns of you for 20 and freezes them 1.5s. If none, lingers 6s until one comes close.',
+    dmg: '20', short: 'Hits an enemy within 2 columns of you for 20 and freezes them 1.75s. If none, lingers 6s until one comes close.',
     cast: x => { x.f.st.frostNova = 6; x.f.frostNovaUsed = false; x.b.addFx('novaZone', x.f.side, x.f.col, x.f.row, 0.6); },
     ai: (b, f) => b.foe(f).cls === 'warrior' || Math.abs(b.foe(f).col - f.col) <= 2,
   },
@@ -457,7 +457,7 @@ const mage: CardDef[] = [
   },
   {
     id: 'blizzard', name: 'Blizzard', cls: 'mage', cost: 4, rarity: 'uncommon', element: 'frost', damaging: true, lock: 0.4,
-    dmg: '25 each', short: '4s of ice shards on random enemy panels. Hit 3 times = frozen 1.5s.',
+    dmg: '25 each', short: '4s of ice shards on random enemy panels. Hit 3 times = frozen 1.75s.',
     cast: x => {
       const { b, f, foe } = x;
       let hits = 0;
@@ -470,7 +470,7 @@ const mage: CardDef[] = [
         b.later(0.5, () => {
           b.addFx('shard', f.side, c, r, 0.3);
           const res = b.strike(f, [[c, r]], 25 * x.mult, { spell: true, element: 'frost', noFlinch: true });
-          if (res.fighter && ++hits === 3) b.freeze(foe, 1.5);
+          if (res.fighter && ++hits === 3) b.freeze(foe, 1.75);
         });
       });
     },
