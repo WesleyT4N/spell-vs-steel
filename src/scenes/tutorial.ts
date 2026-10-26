@@ -15,12 +15,13 @@ import { starterDeck, toList } from '../game/deck';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
 import { defaultSkin, type ClassId } from '../art/sprites';
-import { P, UW, UH, frame, screenRect, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered, wrap } from '../engine/font';
+import { UW, UH, type Ctx } from '../engine/gfx';
+import { drawText, drawTextCentered, drawTextOutlined, wrap } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG } from '../engine/music';
+import { win, footer, INK, INK2, RED_INK, TRIM } from './skin';
 
 const DONE_KEY = 'svs:tutorial';
 export function tutorialDone(): boolean {
@@ -722,10 +723,9 @@ export class TutorialScene implements Scene {
       this.drawPage(ui, tick);
     } else if (b.phase === 'custom') {
       // the goal replaces the Draw screen's footer, so the hand stays clear
-      const [sx, , sw, sh] = screenRect(2);
-      P(ui, '#000000', sx, UH - 14, sw, 14 + (sh - UH) / 2);
       const msg = this.denyT > 0 ? 'PICK AT LEAST ONE SPELL FIRST' : s.goal(this);
-      drawTextCentered(ui, msg, UW / 2, UH - 11, this.denyT > 0 && tick % 4 < 2 ? '#f83800' : '#f8b800', 1, false);
+      footer(ui, '');
+      drawTextCentered(ui, msg, UW / 2, UH - 10, this.denyT > 0 && tick % 4 < 2 ? '#f87858' : '#f8b800', 1, false);
     } else if (b.phase === 'fight') {
       this.drawGoal(ui, s, tick);
     }
@@ -745,19 +745,19 @@ export class TutorialScene implements Scene {
     const lines = wrap(touchText(s.goal(this)), 32).slice(0, 2);
     const tip = s.tip ? wrap(touchText(s.tip(this)), 32).slice(0, 4 - lines.length) : [];
     const h = 16 + (lines.length + tip.length) * 9;
-    frame(ui, x, y, w, h, '#000000', '#f8b800');
-    drawText(ui, this.lessonLabel(), x + 6, y + 4, '#7c7c7c');
+    win(ui, x, y, w, h);
+    drawText(ui, this.lessonLabel(), x + 6, y + 4, TRIM);
     if (s.need) {
       const pr = `${Math.min(this.progress, s.need)}/${s.need}`;
-      drawText(ui, pr, x + w - 6 - pr.length * 6, y + 4, '#58d854');
+      drawText(ui, pr, x + w - 6 - pr.length * 6, y + 4, '#007800');
     }
-    lines.forEach((l, i) => drawText(ui, l, x + 6, y + 14 + i * 9, '#fcfcfc'));
-    tip.forEach((l, i) => drawText(ui, l, x + 6, y + 14 + (lines.length + i) * 9, '#bcbcbc'));
+    lines.forEach((l, i) => drawText(ui, l, x + 6, y + 14 + i * 9, INK));
+    tip.forEach((l, i) => drawText(ui, l, x + 6, y + 14 + (lines.length + i) * 9, INK2));
     const pt = s.point?.(this);
     if (pt && this.clearT <= 0) {
       const bob = tick % 4 < 2 ? 0 : 2;
       const ox = pt.dir === '←' ? bob : pt.dir === '→' ? -bob : 0, oy = pt.dir === '↑' ? bob : pt.dir === '↓' ? -bob : 0;
-      drawText(ui, pt.dir, pt.x + ox, pt.y + oy, '#f8b800', 2);
+      drawTextOutlined(ui, pt.dir, pt.x + ox, pt.y + oy, '#f8b800', 2);
     }
   }
 
@@ -769,21 +769,21 @@ export class TutorialScene implements Scene {
     const bodyH = paras.reduce((a, l) => a + l.length * 10 + 6, 0);
     const h = 52 + bodyH;
     const y = Math.max(40, Math.round((UH - 14 - h) / 2));
-    frame(ui, x, y, w, h, '#000000', '#f8b800');
-    drawText(ui, this.lessonLabel(), x + 14, y + 8, '#7c7c7c');
+    win(ui, x, y, w, h);
+    drawText(ui, this.lessonLabel(), x + 14, y + 8, TRIM);
     if (this.pages.length > 1) {
       const n = `${this.page + 1}/${this.pages.length}`;
-      drawText(ui, n, x + w - 14 - n.length * 6, y + 8, '#7c7c7c');
+      drawText(ui, n, x + w - 14 - n.length * 6, y + 8, TRIM);
     }
-    drawText(ui, pg.title, x + 14, y + 20, '#f8b800', 2);
+    drawText(ui, pg.title, x + 14, y + 20, RED_INK, 2);
     let yy = y + 42;
     for (const lines of paras) {
-      lines.forEach((l, i) => drawText(ui, l, x + 14, yy + i * 10, '#fcfcfc'));
+      lines.forEach((l, i) => drawText(ui, l, x + 14, yy + i * 10, INK));
       yy += lines.length * 10 + 6;
     }
     const last = this.page === this.pages.length - 1;
     const more = last ? (this.cur.draw ? 'PICK SPELLS' : 'GO!') : 'NEXT';
-    if (tick % 8 < 6) drawText(ui, `→ ${more}`, x + w - 14 - (more.length + 2) * 6, y + h - 14, '#f8b800');
+    if (tick % 8 < 6) drawText(ui, `→ ${more}`, x + w - 14 - (more.length + 2) * 6, y + h - 14, RED_INK);
     hint(ui, `CLICK OR ${k('attack')}: ${last ? 'START' : 'NEXT'}${this.page > 0 ? `   ${k('cast')}: BACK` : ''}   ESC: MENU`);
   }
 
@@ -794,7 +794,7 @@ export class TutorialScene implements Scene {
       'YOU KNOW THE BASICS: MOVE, ATTACK, DODGE, DRAW AND CAST.',
       'NEXT, FIGHT THE CPU, OR BUILD YOUR OWN 30-SPELL GRIMOIRE.',
     ];
-    lines.forEach((l, i) => drawTextCentered(ui, l, UW / 2, 82 + i * 12, '#fcfcfc', 1, false));
+    lines.forEach((l, i) => drawTextCentered(ui, l, UW / 2, 82 + i * 12, '#fcfcfc', 1, true));
     drawMenu(ui, TutorialScene.DONE, this.doneSel, UW / 2, 130, tick, { width: 220, gap: 24 });
     hint(ui, `CLICK OR ${k('attack')}: SELECT`);
   }

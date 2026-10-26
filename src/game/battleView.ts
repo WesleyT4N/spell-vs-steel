@@ -4,9 +4,10 @@ import { drawPanel, drawStage, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, ty
 import { getStage } from '../art/stages';
 import type { Stage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, type Tint } from '../art/sprites';
-import { P, UW, UH, blob, frame, glow, type Ctx } from '../engine/gfx';
+import { P, UW, UH, blob, frame, glow, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '../engine/font';
-import { drawCardIcon } from '../scenes/cardView';
+import { drawCardIcon, RES_INK } from '../scenes/cardView';
+import { win, bar, pip as skinPip, toInk, PAPER, PAPER2, INK, INK2, TRIM, WAX_HI } from '../scenes/skin';
 import { CARDS, ELEMENT_COLOR } from './cards';
 import { TUNING } from './tuning';
 import { heavyChargeOf } from './battle';
@@ -517,10 +518,8 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0): vo
   for (const f of b.f) drawChargeBar(ui, b, f, tick);
   // Draw gauge
   const gx = UW / 2 - 70, gw = 140;
-  frame(ui, gx, 8, gw, 12, '#000000', '#fcfcfc');
   const full = b.gauge >= 1;
-  P(ui, full ? (tick % 4 < 2 ? '#f8b800' : '#fcfcfc') : '#3cbcfc', gx + 1, 9, Math.round((gw - 2) * b.gauge), 10);
-  if (!full) P(ui, '#a4e4fc', gx + 1, 9, Math.round((gw - 2) * b.gauge), 2);
+  bar(ui, gx, 8, gw, 12, b.gauge, full ? (tick % 4 < 2 ? '#f8b800' : '#fce0a8') : '#3cbcfc');
   drawTextCentered(ui, full ? `${k('custom')}: DRAW` : 'DRAW', UW / 2, 24, full ? '#f8b800' : '#bcbcbc');
   for (const e of b.fx) if (e.kind === 'castName') drawCastCallout(ui, e);
   drawNextSpell(ui, b, b.f[me]);
@@ -529,33 +528,28 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0): vo
 function drawFighterHud(ui: Ctx, b: Battle, f: Fighter, tick: number): void {
   const right = f.side === 1, w = 132;
   const x = right ? UW - w - 8 : 8;
-  // HP box with a bar
-  frame(ui, x, 6, w, 30, '#000000', teamColor(f.cls, f.skin, f.alt));
-  drawText(ui, f.name, x + 6, 10, '#fcfcfc');
-  drawText(ui, CLASS_INFO[f.cls].name, x + 6, 20, '#7c7c7c');
+  // a parchment nameplate with a ribbon in the fighter's color, and an HP bar
+  win(ui, x, 4, w, 34, { accent: teamColor(f.cls, f.skin, f.alt), burn: 3 });
+  drawText(ui, f.name, x + 7, 11, INK);
+  drawText(ui, CLASS_INFO[f.cls].name, x + 7, 20, INK2);
   const hp = String(Math.max(0, Math.ceil(f.hp)));
   const low = f.hp / f.maxHp < 0.3;
-  drawText(ui, hp, x + w - 6 - textWidth(hp, 2), 9, low && tick % 4 < 2 ? '#f83800' : '#fcfcfc', 2);
+  drawText(ui, hp, x + w - 7 - textWidth(hp, 2), 10, low && tick % 4 < 2 ? WAX_HI : INK, 2);
   const ratio = Math.max(0, f.hp / f.maxHp);
-  P(ui, '#3c3c3c', x + 2, 31, w - 4, 3);
-  P(ui, low ? '#f83800' : ratio < 0.6 ? '#f8b800' : '#58d854', right ? x + 2 + Math.round((w - 4) * (1 - ratio)) : x + 2, 31, Math.round((w - 4) * ratio), 3);
+  bar(ui, x + 5, 29, w - 10, 5, ratio, low ? '#f83800' : ratio < 0.6 ? '#f8b800' : '#58d854', right);
   drawResource(ui, f, right ? x + w - 92 : x, 42, tick);
   drawStatuses(ui, b, f, right ? x + w : x, 58, right);
 }
 
 function drawResource(ui: Ctx, f: Fighter, x: number, y: number, tick: number): void {
-  const pip = (i: number, base: string, fill: string | null, hi: string): void => {
-    const px = x + 36 + i * 11;
-    P(ui, '#000000', px - 1, y - 1, 10, 11);
-    P(ui, base, px, y, 8, 9);
-    if (fill) { P(ui, fill, px, y, 8, 9); P(ui, hi, px, y, 8, 2); }
-  };
+  // round wax pips; `base` tints the empty socket
+  const pip = (i: number, base: string, fill: string | null, _hi: string): void => skinPip(ui, x + 36 + i * 11, y, fill, mix(base, '#d8a060', 0.6));
   if (f.cls === 'warrior') {
     drawTextOutlined(ui, 'RAGE', x, y + 1, '#f87858');
     for (let i = 0; i < 5; i++) {
       const v = f.res - i;
       if (v >= 1) pip(i, '#503000', f.st.avatar > 0 ? '#f8b800' : '#d82800', '#f87858');
-      else { pip(i, '#503000', null, ''); if (v >= 0.5) P(ui, '#881400', x + 36 + i * 11, y + 4, 8, 5); }
+      else { pip(i, '#503000', null, ''); if (v >= 0.5) P(ui, '#a81000', x + 37 + i * 11, y + 4, 7, 4); }
     }
   } else if (f.cls !== 'mage') {
     // Energy (Rogue, Ranger) and Cleric Mana: five pips, no max to grow
@@ -610,11 +604,14 @@ function drawStatuses(ui: Ctx, b: Battle, f: Fighter, edge: number, y: number, r
   if (p.burn > 0) tags.push(['ON FIRE', '#fca044']);
   let cx = edge, cy = y;
   for (const [s, col] of tags.slice(0, 8)) {
-    const tw = textWidth(s) + 8;
+    const tw = textWidth(s) + 10;
     if (right ? cx - tw < edge - 200 : cx + tw > edge + 200) { cx = edge; cy += 13; }
     const tx = right ? cx - tw : cx;
-    frame(ui, tx, cy, tw, 11, '#000000', col);
-    drawText(ui, s, tx + 4, cy + 2, col);
+    // a parchment tag with a colored tab
+    P(ui, '#000000', tx - 1, cy - 1, tw + 2, 13);
+    P(ui, PAPER, tx, cy, tw, 11); P(ui, PAPER2, tx, cy + 10, tw, 1);
+    P(ui, col, tx, cy, 3, 11);
+    drawText(ui, s, tx + 6, cy + 2, toInk(col));
     cx = right ? tx - 3 : tx + tw + 3;
   }
 }
@@ -623,21 +620,21 @@ function drawStatuses(ui: Ctx, b: Battle, f: Fighter, edge: number, y: number, r
 function drawCastCallout(ui: Ctx, e: Fx): void {
   const card = CARDS[String(e.data?.id)];
   if (!card || e.t > 2) return;
-  const w = 188, h = 58, right = e.side === 1;
+  const w = 188, h = 62, right = e.side === 1;
   const slide = Math.min(1, e.t / 0.12), fade = e.t > 1.7 ? (2 - e.t) / 0.3 : 1;
   const x = right ? UW - 8 - w + Math.round((1 - slide) * (w + 8)) : 8 - Math.round((1 - slide) * (w + 8)), y = 86;
   ui.save();
   ui.globalAlpha = Math.max(0, fade);
-  frame(ui, x, y, w, h, '#000000', ELEMENT_COLOR[card.element]);
-  drawCardIcon(ui, card, x + 6, y + 6, 32);
-  const tx = x + 44;
-  drawText(ui, card.name.toUpperCase(), tx, y + 6, '#fcfcfc');
+  win(ui, x, y, w, h, { accent: ELEMENT_COLOR[card.element], burn: 4 });
+  drawCardIcon(ui, card, x + 7, y + 10, 32);
+  const tx = x + 45;
+  drawText(ui, card.name.toUpperCase(), tx, y + 9, INK);
   const info = CLASS_INFO[card.cls];
   const meta = `${card.cost === 'all' ? 'ALL' : card.cost} ${info.res}${card.dmg !== '-' ? `  DMG ${card.dmg.toUpperCase()}` : ''}`;
-  drawText(ui, meta, tx, y + 17, info.resColor);
-  wrap(card.short.toUpperCase(), Math.floor((w - 50) / 6)).slice(0, 3).forEach((l, i) => drawText(ui, l, tx, y + 29 + i * 9, '#bcbcbc'));
+  drawText(ui, meta, tx, y + 19, RES_INK[info.res]);
+  wrap(card.short.toUpperCase(), Math.floor((w - 52) / 6)).slice(0, 3).forEach((l, i) => drawText(ui, l, tx, y + 30 + i * 9, INK2));
   if (e.data?.countered) {
-    ui.fillStyle = 'rgba(0,0,0,0.55)'; ui.fillRect(x, y, w, h);
+    ui.fillStyle = 'rgba(40,20,0,0.6)'; ui.fillRect(x, y, w, h);
     drawTextCentered(ui, 'COUNTERED', x + w / 2, y + h / 2 - 7, '#f878f8', 2);
   }
   ui.restore();
@@ -650,17 +647,18 @@ function drawNextSpell(ui: Ctx, b: Battle, f: Fighter): void {
   const more = f.queue.length - 1;
   const s = `${k('cast')}: ${card.name.toUpperCase()}`;
   const tw = textWidth(s) + (more ? textWidth(`  +${more}`) : 0);
-  frame(ui, 8, UH - 22, tw + 28, 16, '#000000', ok ? ELEMENT_COLOR[card.element] : '#7c7c7c');
-  P(ui, ok ? ELEMENT_COLOR[card.element] : '#3c3c3c', 12, UH - 18, 8, 8);
-  drawText(ui, s, 24, UH - 18, ok ? '#fcfcfc' : '#7c7c7c');
-  if (more) drawText(ui, `+${more}`, 24 + textWidth(s) + 12, UH - 18, '#7c7c7c');
-  if (!ok) drawText(ui, f.st.silenced > 0 ? 'SILENCED' : `NEED ${CLASS_INFO[card.cls].res}`, tw + 44, UH - 18, '#f83800');
-  // global cooldown: a bar along the bottom of the box fills back up between casts
+  win(ui, 8, UH - 23, tw + 28, 18, { burn: 3 });
+  P(ui, '#000000', 11, UH - 19, 10, 10);
+  P(ui, ok ? ELEMENT_COLOR[card.element] : '#7c7c7c', 12, UH - 18, 8, 8);
+  drawText(ui, s, 25, UH - 18, ok ? INK : TRIM);
+  if (more) drawText(ui, `+${more}`, 25 + textWidth(s) + 12, UH - 18, INK2);
+  if (!ok) drawTextOutlined(ui, f.st.silenced > 0 ? 'SILENCED' : `NEED ${CLASS_INFO[card.cls].res}`, tw + 44, UH - 18, '#f83800');
+  // global cooldown: a bar along the bottom of the plate fills back up between casts
   if (f.castCd > 0) {
     const p = 1 - f.castCd / TUNING.castCooldown;
-    ui.globalAlpha = 0.55; P(ui, '#000000', 9, UH - 21, tw + 26, 14); ui.globalAlpha = 1;
-    P(ui, '#3c3c3c', 10, UH - 10, tw + 24, 2);
-    P(ui, '#fcfcfc', 10, UH - 10, Math.round((tw + 24) * p), 2);
+    ui.globalAlpha = 0.45; P(ui, '#503000', 10, UH - 21, tw + 24, 14); ui.globalAlpha = 1;
+    P(ui, '#d8a060', 10, UH - 9, tw + 24, 2);
+    P(ui, '#a81000', 10, UH - 9, Math.round((tw + 24) * p), 2);
   }
 }
 

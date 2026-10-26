@@ -17,6 +17,7 @@ import { OnlineScene } from './online';
 import { tutorialDone } from './tutorial';
 import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
+import { RED_INK } from './skin';
 
 const ITEMS = ['VERSUS CPU', 'ONLINE VERSUS', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
 
@@ -85,7 +86,7 @@ export class TitleScene implements Scene {
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
     drawStage(c, getArena(), tick);
-    c.fillStyle = 'rgba(0,0,24,0.45)';
+    c.fillStyle = 'rgba(40,20,0,0.25)';
     c.fillRect(...screenRect());
     // fighters flanking the menu, the Mage under SPELL and the Warrior under STEEL to start, facing each other
     const bob = Math.floor(this.t * 2.5) % 2;
@@ -100,7 +101,7 @@ export class TitleScene implements Scene {
     drawLogo(c, W / 2, 10, this.t);
     drawMenu(ui, ITEMS, this.sel, UW / 2, MENU_Y, tick, { width: 200, gap: MENU_GAP });
     // first-timers get a nudge toward the tutorial
-    if (!tutorialDone() && tick % 8 < 6) drawText(ui, 'NEW!', UW / 2 + 40, MENU_Y + ITEMS.indexOf('TUTORIAL') * MENU_GAP + Math.round((MENU_GAP - 17) / 2), '#f8b800');
+    if (!tutorialDone() && tick % 8 < 6) drawText(ui, 'NEW!', UW / 2 + 40, MENU_Y + ITEMS.indexOf('TUTORIAL') * MENU_GAP + Math.round((MENU_GAP - 17) / 2), RED_INK);
     drawTextCentered(ui, DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2', UW / 2, 288, '#7c7c7c', 1, false);
     if (isMuted()) drawText(ui, 'MUTED', 8, 8, '#7c7c7c');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   M: MUTE`);
