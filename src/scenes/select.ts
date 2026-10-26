@@ -353,7 +353,7 @@ export class CharSelectScene implements Scene {
     else this.drawSlot(ui, 1, showing(1), tick);
 
     // drawn after the slots so its rolled ends sit on top of them
-    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, vy(3));
+    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING MODE' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, vy(3));
 
     // VS and the matchup
     vsSeal(ui, UW / 2, this.py + 60);

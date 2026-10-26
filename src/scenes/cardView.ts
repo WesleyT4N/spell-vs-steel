@@ -4,6 +4,7 @@ import { paper, seal, disc, ink, PAPER, INK, INK2, RED_INK, BLUE_INK, GOLD, WAX,
 import { drawText, drawTextCentered, textWidth, wrap } from '../engine/font';
 import { ELEMENT_COLOR, RARITY_COLOR, type CardDef, type Element } from '../game/cards';
 import { CLASS_INFO } from '../game/classes';
+import { cardIconCanvas, ICON_SIZE } from '../art/cardIcons';
 
 const EMBLEM: Record<Element | 'shield', string[]> = {
   shield: ['#########', '####.####', '####.####', '#.......#', '####.####', '.###.###.', '.###.###.', '..##.##..', '...#.#...'],
@@ -97,11 +98,11 @@ export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: 
   const lines = wrap(card.name.toUpperCase(), 12).slice(0, 2);
   lines.forEach((l, i) => drawTextCentered(c, l, x + w / 2, y + 23 + i * 9 + (lines.length === 1 ? 4 : 0), INK, 1, false));
   // art
-  const ax = x + 6, ay = y + 42, aw = w - 12, ah = 36;
+  // the art box is as tall as an icon at game scale (20 art px = 40 UI px)
+  const ax = x + 6, ay = y + 41, aw = w - 12, ah = 40;
   P(c, FRAME, ax - 1, ay - 1, aw + 2, ah + 2);
   c.drawImage(artBox(card.element, aw, ah), ax, ay);
-  // steel spells that deal no damage are guards and shouts: a shield instead of a sword
-  drawEmblem(c, card.element === 'steel' && card.dmg === '-' ? 'shield' : card.element, ax + aw / 2, ay + ah / 2, 3, ELEMENT_COLOR[card.element]);
+  drawSpellArt(c, card, ax + aw / 2, ay + ah / 2, 2);
   // damage
   const d = card.dmg === '-' ? '' : card.dmg.toUpperCase();
   if (!d) drawTextCentered(c, 'EFFECT', x + w / 2, y + 87, INK2, 1, false);
@@ -125,5 +126,18 @@ export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: 
 export function drawCardIcon(c: Ctx, card: CardDef, x: number, y: number, size: number): void {
   P(c, '#000000', x - 1, y - 1, size + 2, size + 2);
   c.drawImage(artBox(card.element, size, size), x, y);
-  drawEmblem(c, card.element === 'steel' && card.dmg === '-' ? 'shield' : card.element, x + size / 2, y + size / 2, Math.max(2, Math.floor(size / 12)), ELEMENT_COLOR[card.element]);
+  drawSpellArt(c, card, x + size / 2, y + size / 2, Math.max(1, Math.floor(size / ICON_SIZE)));
+}
+
+/** The spell's icon centered on (cx, cy), `s` UI px per art px (2 = game scale), or its element emblem if it has no icon. */
+function drawSpellArt(c: Ctx, card: CardDef, cx: number, cy: number, s: number): void {
+  const icon = cardIconCanvas(card.id);
+  if (icon) {
+    const n = ICON_SIZE * s;
+    c.imageSmoothingEnabled = false;
+    c.drawImage(icon, Math.round(cx - n / 2), Math.round(cy - n / 2), n, n);
+    return;
+  }
+  // steel spells that deal no damage are guards and shouts: a shield instead of a sword
+  drawEmblem(c, card.element === 'steel' && card.dmg === '-' ? 'shield' : card.element, cx, cy, Math.max(2, s + 1), ELEMENT_COLOR[card.element]);
 }
