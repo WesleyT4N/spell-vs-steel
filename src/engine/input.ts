@@ -2,7 +2,7 @@
 import { unlockAudio } from './audio';
 import { view } from './gfx';
 
-export type Action = 'up' | 'down' | 'left' | 'right' | 'attack' | 'cast' | 'custom' | 'confirm' | 'back' | 'pause' | 'mute' | 'lb' | 'rb';
+export type Action = 'up' | 'down' | 'left' | 'right' | 'attack' | 'cast' | 'custom' | 'confirm' | 'back' | 'pause' | 'mute' | 'lb' | 'rb' | 'reset';
 
 /** Actions the player can rebind, in the order the controls screen lists them. */
 export const BINDABLE = ['up', 'down', 'left', 'right', 'attack', 'cast', 'custom', 'pause'] as const;
@@ -17,7 +17,7 @@ export const DEFAULT_KEYS: Record<Bindable, string> = {
 const FIXED: Record<string, Action[]> = {
   ArrowUp: ['up'], ArrowDown: ['down'], ArrowLeft: ['left'], ArrowRight: ['right'],
   Enter: ['confirm'], Escape: ['back', 'pause'], Backspace: ['back'],
-  KeyM: ['mute'], KeyQ: ['lb'], KeyE: ['rb'],
+  KeyM: ['mute'], KeyQ: ['lb'], KeyE: ['rb'], KeyR: ['reset'],
   // the on-screen touch pad (src/engine/touch.ts) presses these made-up codes
   PadUp: ['up'], PadDown: ['down'], PadLeft: ['left'], PadRight: ['right'],
   PadAttack: ['attack', 'confirm'], PadCast: ['cast', 'back'], PadDraw: ['custom'], PadPause: ['pause'], PadBack: ['back'],
@@ -73,7 +73,7 @@ export function keyName(code: string): string {
 export const k = (a: Bindable): string => keyName(keys[a]);
 
 // Keys the rebinding screen refuses (they are reserved for menus and muting).
-export const RESERVED = new Set(['Escape', 'KeyM', 'KeyQ', 'KeyE', 'Backspace']);
+export const RESERVED = new Set(['Escape', 'KeyM', 'KeyQ', 'KeyE', 'KeyR', 'Backspace']);
 
 const down = new Set<Action>();
 const pressed = new Set<Action>();

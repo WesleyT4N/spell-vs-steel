@@ -6,8 +6,9 @@ import { getStage, STAGE_IDS } from '../art/stages';
 import { drawPanel, drawStage, panelFoot } from '../art/arena';
 import { useStage } from '../game/battleView';
 import { getSprite, drawFighterSprite, skinOf, mirrorSkin } from '../art/sprites';
-import { P, W, H, UW, frame, rng, screenRect, fillScreen, type Ctx } from '../engine/gfx';
+import { P, W, H, UW, rng, screenRect, fillScreen, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
+import { win, plaque, banner, FRAME, GOLD, PAPER, INK, INK2, RED_INK } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
@@ -175,7 +176,7 @@ export class StageSelectScene implements Scene {
     const st = getStage(this.view);
     // the full-size stage behind everything, dimmed, and a sharp half-size preview with the fighters on it
     drawStage(c, st, tick);
-    c.fillStyle = 'rgba(0,0,24,0.65)';
+    c.fillStyle = 'rgba(40,20,0,0.45)';
     c.fillRect(...screenRect());
     const pc = this.preview.getContext('2d')!;
     st.draw(pc, tick, 0);
@@ -185,12 +186,15 @@ export class StageSelectScene implements Scene {
       const foot = panelFoot(col, 1);
       drawFighterSprite(pc, getSprite(f.cls, f.skin, false), foot.x, foot.y - (flip ? bob : 1 - bob), flip);
     }
-    frame(ui, VX - 2, VY - 2, W + 4, H + 4, '#000000', '#fcfcfc');
+    // the preview sits in a parchment mat, like a framed painting
+    win(ui, VX - 5, VY - 5, W + 10, H + 10, { burn: 2 });
+    P(ui, FRAME, VX - 1, VY - 1, W + 2, H + 2);
     ui.drawImage(this.preview, VX, VY);
 
-    drawTextCentered(ui, 'SELECT STAGE', UW / 2, 6, '#f8b800', 2);
-    drawTextCentered(ui, st.name.toUpperCase(), UW / 2, 196, '#fcfcfc', 2);
-    drawTextCentered(ui, st.tag.toUpperCase(), UW / 2, 214, '#bcbcbc', 1);
+    banner(ui, 'SELECT STAGE', UW / 2, 2);
+    win(ui, UW / 2 - 130, 192, 260, 36, { burn: 3 });
+    drawTextCentered(ui, st.name.toUpperCase(), UW / 2, 197, INK, 2, false);
+    drawTextCentered(ui, st.tag.toUpperCase(), UW / 2, 215, INK2, 1, false);
 
     const net = this.net, rl = net?.rivalLobby;
     TILES.forEach((id, n) => {
@@ -199,13 +203,16 @@ export class StageSelectScene implements Scene {
       const mine = net ? TILES.indexOf(net.lobby.stage) === n : this.cur === n;
       const theirs = !!rl && TILES.indexOf(rl.stage) === n;
       const lit = (this.final && this.view === id) || (!this.final && mine && showSel());
-      frame(ui, x, TY, TW, TH, '#000000', lit ? '#f8b800' : hot('stile') === n ? '#fcfcfc' : '#7c7c7c');
+      const edge = lit ? GOLD : hot('stile') === n ? PAPER : FRAME;
+      plaque(ui, x, TY, TW, TH, false, edge);
       if (id === 'random') {
-        P(ui, '#000000', x + 1, TY + 1, TW - 2, TH - 2);
-        drawTextCentered(ui, '?', x + TW / 2, TY + 6, '#f8b800', 3, false);
-        drawTextCentered(ui, 'RANDOM', x + TW / 2, TY + 30, '#fcfcfc', 1, false);
-      } else ui.drawImage(thumb(id), x, TY);
-      if (lit) { P(ui, '#f8b800', x - 2, TY - 2, TW + 4, 2); P(ui, '#f8b800', x - 2, TY + TH, TW + 4, 2); P(ui, '#f8b800', x - 2, TY, 2, TH); P(ui, '#f8b800', x + TW, TY, 2, TH); }
+        drawTextCentered(ui, '?', x + TW / 2, TY + 6, RED_INK, 3, false);
+        drawTextCentered(ui, 'RANDOM', x + TW / 2, TY + 30, INK, 1, false);
+      } else {
+        ui.drawImage(thumb(id), x, TY);
+        P(ui, edge, x, TY, TW, 1); P(ui, edge, x, TY + TH - 1, TW, 1); P(ui, edge, x, TY, 1, TH); P(ui, edge, x + TW - 1, TY, 1, TH);
+      }
+      if (lit) { P(ui, GOLD, x - 2, TY - 2, TW + 4, 2); P(ui, GOLD, x - 2, TY + TH, TW + 4, 2); P(ui, GOLD, x - 2, TY, 2, TH); P(ui, GOLD, x + TW, TY, 2, TH); }
       // vote tags under the tile: yours left, theirs right
       const tag = (label: string, color: string, right: boolean, solid: boolean): void => {
         const tw = label.length * 6 + 3, tx = right ? x + TW - tw : x;

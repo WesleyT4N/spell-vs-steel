@@ -1,10 +1,11 @@
 import { hint, zone, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
-import { P, UW, frame, screenRect, type Ctx } from '../engine/gfx';
+import { UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, BINDABLE, getKey, setKey, resetKeys, keyName, k, captureNextKey, RESERVED, mouse, type Bindable } from '../engine/input';
 import { sfx } from '../engine/audio';
+import { win, selRow, PAPER, INK, INK2, RED_INK, BLUE_INK, TRIM } from './skin';
 
 const LABELS: Record<Bindable, string> = {
   up: 'MOVE UP', down: 'MOVE DOWN', left: 'MOVE LEFT', right: 'MOVE RIGHT',
@@ -49,27 +50,27 @@ export class ControlsScene implements Scene {
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
     drawStage(c, getArena(), tick);
-    c.fillStyle = 'rgba(0,0,24,0.6)';
+    c.fillStyle = 'rgba(40,20,0,0.35)';
     c.fillRect(...screenRect());
-    frame(ui, PX - 16, 14, PW + 32, 286, '#000000', '#fcfcfc');
-    drawTextCentered(ui, 'KEY MAPPING', UW / 2, 26, '#f8b800', 2, false);
+    win(ui, PX - 16, 14, PW + 32, 286);
+    drawTextCentered(ui, 'KEY MAPPING', UW / 2, 26, RED_INK, 2, false);
     ROWS.forEach((row, i) => {
       const y = rowY(i), ty = y + 6;
       const on = i === this.sel && showSel();
       zone(`row:${i}`, PX - 12, y, PW + 24, RH - 2);
-      if (on) P(ui, '#0000a8', PX - 12, y, PW + 24, RH - 2);
-      if (on && tick % 8 < 6) drawText(ui, '→', PX - 4, ty, '#f8b800');
+      if (on) selRow(ui, PX - 12, y, PW + 24, RH - 2);
+      if (on && tick % 8 < 6) drawText(ui, '→', PX - 4, ty, PAPER);
       if (row === 'reset' || row === 'back') {
-        drawText(ui, row === 'reset' ? 'RESET DEFAULTS' : 'BACK', PX + 10, ty, on ? '#fcfcfc' : '#bcbcbc');
+        drawText(ui, row === 'reset' ? 'RESET DEFAULTS' : 'BACK', PX + 10, ty, on ? INK : INK2);
         return;
       }
-      drawText(ui, LABELS[row], PX + 10, ty, on ? '#fcfcfc' : '#bcbcbc');
+      drawText(ui, LABELS[row], PX + 10, ty, on ? INK : INK2);
       const v = on && this.waiting ? (tick % 4 < 3 ? 'PRESS A KEY' : '') : keyName(getKey(row));
-      drawText(ui, v, 240, ty, on && this.waiting ? '#f8b800' : '#fcd8a8');
+      drawText(ui, v, 240, ty, on && this.waiting ? RED_INK : BLUE_INK);
     });
-    drawText(ui, `HOLD ${k('attack')}: HEAVY ATTACK    ${k('cast')} + DIRECTION: AIM SPELL`, PX, 262, '#7c7c7c');
-    drawText(ui, 'ARROW KEYS ALSO MOVE    ESC: PAUSE    M: MUTE', PX, 274, '#7c7c7c');
-    if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, 288, '#f83800', 1, false);
+    drawText(ui, `HOLD ${k('attack')}: HEAVY ATTACK    ${k('cast')} + DIRECTION: AIM SPELL`, PX, 262, TRIM);
+    drawText(ui, 'ARROW KEYS ALSO MOVE    ESC: PAUSE    M: MUTE', PX, 274, TRIM);
+    if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, 288, RED_INK, 1, false);
     hint(ui, this.waiting ? 'PRESS A KEY   ESC: CANCEL' : `CLICK A ROW OR ${k('attack')}: REBIND   ${k('cast')} / RIGHT-CLICK: BACK`);
   }
 }

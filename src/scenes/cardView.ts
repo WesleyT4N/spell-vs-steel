@@ -1,5 +1,6 @@
 // Card rendering for the sharp UI layer: the full rules readout and the card face used in the Draw hand.
-import { P, frame, dith, mix, type Ctx } from '../engine/gfx';
+import { P, dith, mix, type Ctx } from '../engine/gfx';
+import { paper, seal, disc, ink, PAPER, INK, INK2, RED_INK, BLUE_INK, GOLD, WAX, WAX_HI, FRAME } from './skin';
 import { drawText, drawTextCentered, textWidth, wrap } from '../engine/font';
 import { ELEMENT_COLOR, RARITY_COLOR, type CardDef, type Element } from '../game/cards';
 import { CLASS_INFO } from '../game/classes';
@@ -18,6 +19,9 @@ const EMBLEM: Record<Element | 'shield', string[]> = {
 
 export const resName = (card: CardDef): string => CLASS_INFO[card.cls].res;
 export const resColor = (card: CardDef): string => CLASS_INFO[card.cls].resColor;
+/** The resource color as ink, for text on parchment. */
+export const resInk = (card: CardDef): string => RES_INK[CLASS_INFO[card.cls].res];
+export const RES_INK: Record<string, string> = { RAGE: RED_INK, MANA: BLUE_INK, ENERGY: '#7c5800' };
 const costText = (card: CardDef): string => (card.cost === 'all' ? 'A' : String(card.cost));
 
 export function drawEmblem(c: Ctx, el: Element | 'shield', cx: number, cy: number, s: number, col: string): void {
@@ -44,74 +48,76 @@ function artBox(el: Element, w: number, h: number): HTMLCanvasElement {
   return o;
 }
 
-/** Name, rarity, cost, damage and rules text in a column `w` pixels wide. Returns the y below it. */
+/** Name, rarity, cost, damage and rules text in a column `w` pixels wide, in ink for a parchment window. Returns the y below it. */
 export function drawCardDetail(c: Ctx, card: CardDef, x: number, y: number, w: number): number {
   const chars = Math.floor(w / 6);
   let yy = y;
   const big = textWidth(card.name.toUpperCase(), 2) <= w;
-  if (big) { drawText(c, card.name.toUpperCase(), x, yy, '#fcfcfc', 2); yy += 18; }
-  else for (const line of wrap(card.name.toUpperCase(), chars)) { drawText(c, line, x, yy, '#fcfcfc'); yy += 10; }
-  drawText(c, `${card.rarity.toUpperCase()}  ${card.element.toUpperCase()}`, x, yy, RARITY_COLOR[card.rarity]); yy += 14;
-  drawText(c, `COST ${card.cost === 'all' ? 'ALL' : card.cost} ${resName(card)}`, x, yy, resColor(card)); yy += 11;
-  if (card.dmg !== '-') { drawText(c, `DAMAGE ${card.dmg.toUpperCase()}`, x, yy, '#f8b800'); yy += 11; }
+  if (big) { drawText(c, card.name.toUpperCase(), x, yy, INK, 2); yy += 18; }
+  else for (const line of wrap(card.name.toUpperCase(), chars)) { drawText(c, line, x, yy, INK); yy += 10; }
+  drawText(c, card.rarity.toUpperCase(), x, yy, ink(RARITY_COLOR[card.rarity]));
+  drawText(c, card.element.toUpperCase(), x + textWidth(card.rarity.toUpperCase()) + 12, yy, ink(ELEMENT_COLOR[card.element])); yy += 14;
+  drawText(c, `COST ${card.cost === 'all' ? 'ALL' : card.cost} ${resName(card)}`, x, yy, resInk(card)); yy += 11;
+  if (card.dmg !== '-') { drawText(c, `DAMAGE ${card.dmg.toUpperCase()}`, x, yy, RED_INK); yy += 11; }
   yy += 6;
-  for (const line of wrap(card.short.toUpperCase(), chars)) { drawText(c, line, x, yy, '#fcfcfc'); yy += 11; }
+  for (const line of wrap(card.short.toUpperCase(), chars)) { drawText(c, line, x, yy, INK); yy += 11; }
   return yy;
 }
 
-/** Picked cards and the cast order panel share this color. */
-export const PICKED = '#3cbcfc';
+/** Picked cards and the cast order share this color: red wax. */
+export const PICKED = WAX;
 
 export const CARD_W = 76;
 export const CARD_H = 104;
 
 /**
- * A card face as it sits in the hand. `order` is its cast position when picked, else -1.
- * `short` marks affordability: 0 = payable (gold gem ring), above 0 = that much resource missing
- * (grey gem, dimmed, NEED tag), unset = not shown. `builds` is for resources earned mid-fight (Rage):
+ * A parchment card face as it sits in the hand. `order` is its cast position when picked, else -1.
+ * `short` marks affordability: 0 = payable (gold ring on the seal), above 0 = that much resource missing
+ * (grey seal, dimmed, NEED tag), unset = not shown. `builds` is for resources earned mid-fight (Rage):
  * a short card stays bright and gets a soft +N tag instead, since it will be castable later.
  */
 export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: { order?: number; lit?: boolean; faded?: boolean; short?: number; builds?: boolean } = {}): void {
   const w = CARD_W, h = CARD_H, order = opts.order ?? -1;
-  const edge = order >= 0 ? PICKED : opts.lit ? '#fcfcfc' : RARITY_COLOR[card.rarity];
-  P(c, '#000000', x + 3, y + 3, w, h); // drop shadow
-  frame(c, x, y, w, h, '#181818', edge);
-  if (opts.lit || order >= 0) { P(c, edge, x + 1, y + 1, w - 2, 1); P(c, edge, x + 1, y + h - 2, w - 2, 1); }
-  // cost gem
+  const edge = order >= 0 ? WAX : opts.lit ? GOLD : FRAME;
+  P(c, 'rgba(40,20,0,0.5)', x + 3, y + 3, w, h); // drop shadow
+  P(c, '#000000', x - 1, y - 1, w + 2, h + 2);
+  P(c, edge, x, y, w, h);
+  paper(c, x + 2, y + 2, w - 4, h - 4, 4);
+  // wax seal cost
   const short = opts.short ?? -1, hard = short > 0 && !opts.builds;
-  const gem = hard ? '#3c3c3c' : CLASS_INFO[card.cls].gem;
-  P(c, short === 0 ? '#f8b800' : '#000000', x + 2, y + 2, 18, 18);
-  P(c, '#000000', x + 3, y + 3, 16, 16);
-  P(c, gem, x + 4, y + 4, 14, 14);
-  P(c, mix(gem, '#fcfcfc', 0.4), x + 5, y + 5, 4, 2);
-  drawTextCentered(c, costText(card), x + 11, y + 8, hard ? '#f87858' : '#fcfcfc', 1, false);
-  // rarity pip
-  P(c, '#000000', x + w - 14, y + 5, 10, 10);
-  P(c, RARITY_COLOR[card.rarity], x + w - 13, y + 6, 8, 8);
-  // name, up to two centered lines under the gem
+  const gem = hard ? '#7c7c7c' : CLASS_INFO[card.cls].gem;
+  if (short === 0) disc(c, x + 12, y + 12, 10, GOLD);
+  seal(c, x + 12, y + 12, 8, gem);
+  drawTextCentered(c, costText(card), x + 12, y + 9, '#fcfcfc', 1, false);
+  // rarity ribbon hanging from the top edge
+  P(c, RARITY_COLOR[card.rarity], x + w - 12, y + 2, 6, 11);
+  P(c, mix(RARITY_COLOR[card.rarity], '#000000', 0.35), x + w - 7, y + 2, 1, 11);
+  P(c, PAPER, x + w - 10, y + 11, 2, 2);
+  // name, up to two centered lines under the seal
   const lines = wrap(card.name.toUpperCase(), 12).slice(0, 2);
-  lines.forEach((l, i) => drawTextCentered(c, l, x + w / 2, y + 22 + i * 9 + (lines.length === 1 ? 4 : 0), '#fcfcfc', 1, false));
+  lines.forEach((l, i) => drawTextCentered(c, l, x + w / 2, y + 23 + i * 9 + (lines.length === 1 ? 4 : 0), INK, 1, false));
   // art
-  const ax = x + 5, ay = y + 42, aw = w - 10, ah = 36;
-  P(c, '#000000', ax - 1, ay - 1, aw + 2, ah + 2);
+  const ax = x + 6, ay = y + 42, aw = w - 12, ah = 36;
+  P(c, FRAME, ax - 1, ay - 1, aw + 2, ah + 2);
   c.drawImage(artBox(card.element, aw, ah), ax, ay);
   // steel spells that deal no damage are guards and shouts: a shield instead of a sword
   drawEmblem(c, card.element === 'steel' && card.dmg === '-' ? 'shield' : card.element, ax + aw / 2, ay + ah / 2, 3, ELEMENT_COLOR[card.element]);
   // damage
   const d = card.dmg === '-' ? '' : card.dmg.toUpperCase();
-  if (!d) drawTextCentered(c, 'EFFECT', x + w / 2, y + 86, '#bcbcbc', 1, false);
-  else if (textWidth(d, 2) <= w - 8) drawTextCentered(c, d, x + w / 2, y + 83, '#f8b800', 2, false);
-  else drawTextCentered(c, d.slice(0, 12), x + w / 2, y + 86, '#f8b800', 1, false);
-  if (opts.faded || hard) { c.fillStyle = `rgba(0,0,0,${opts.faded || !opts.lit ? 0.45 : 0.2})`; c.fillRect(x, y, w, h); }
+  if (!d) drawTextCentered(c, 'EFFECT', x + w / 2, y + 87, INK2, 1, false);
+  else if (textWidth(d, 2) <= w - 8) drawTextCentered(c, d, x + w / 2, y + 84, RED_INK, 2, false);
+  else drawTextCentered(c, d.slice(0, 12), x + w / 2, y + 87, RED_INK, 1, false);
+  if (opts.faded || hard) { c.fillStyle = `rgba(60,40,10,${opts.faded || !opts.lit ? 0.45 : 0.2})`; c.fillRect(x, y, w, h); }
   if (short > 0) {
     const tag = hard ? `NEED ${short}` : `+${short} ${resName(card)}`, tw = textWidth(tag) + 6;
-    P(c, '#000000', x + (w - tw) / 2, y + 66, tw, 11);
-    drawTextCentered(c, tag, x + w / 2, y + 68, hard ? '#f83800' : resColor(card), 1, false);
+    P(c, '#000000', x + (w - tw) / 2 - 1, y + 65, tw + 2, 13);
+    P(c, PAPER, x + (w - tw) / 2, y + 66, tw, 11);
+    drawTextCentered(c, tag, x + w / 2, y + 68, hard ? RED_INK : resInk(card), 1, false);
   }
-  if (order >= 0) {
+  if (order >= 0) { // a red wax tab with the cast order
     P(c, '#000000', x + w - 19, y - 7, 22, 20);
-    P(c, PICKED, x + w - 18, y - 6, 20, 18);
-    drawTextCentered(c, String(order + 1), x + w - 8, y - 3, '#000000', 2, false);
+    P(c, WAX, x + w - 18, y - 6, 20, 18); P(c, WAX_HI, x + w - 18, y - 6, 20, 1);
+    drawTextCentered(c, String(order + 1), x + w - 8, y - 3, PAPER, 2, false);
   }
 }
 
