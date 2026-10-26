@@ -1,5 +1,6 @@
 // Training mode: a fight that never ends, for testing decks. The dummy's behavior, both sides' HP and
 // resources, and the Draw gauge are set from the pause menu; R puts both fighters back to the start of the turn.
+import { getSave, setSave } from '../engine/save';
 import { setScene, dim, hint, zone, hot, showSel, drawMenu, listMouse } from './scene';
 import { clearStats } from '../game/stats';
 import type { StatsData } from './statsView';
@@ -39,16 +40,12 @@ const REFILL_AFTER = 2;
 /** How long LAST HIT stays lit after a hit. */
 const HIT_GLOW = 1.5;
 
-const KEY = 'svs:training';
 function loadSettings(): Settings {
   const def: Settings = { act: 'stand', spells: false, hp: ['refill', 'refill'], res: ['normal', 'normal'], gauge: 'normal' };
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? { ...def, ...(JSON.parse(raw) as Partial<Settings>) } : def;
-  } catch { return def; }
+  return { ...def, ...(getSave('training') as Partial<Settings> | null) };
 }
 function saveSettings(s: Settings): void {
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* storage blocked */ }
+  setSave('training', { ...s });
 }
 
 /** The training dummy: simple scripted behaviors, or the real CPU at either level. */

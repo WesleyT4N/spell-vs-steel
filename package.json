@@ -20,7 +20,7 @@
     "fuzz": "tsx scripts/fuzz.ts",
     "fuzz:ui": "vite build --minify false --outDir dist-fuzz && node scripts/uifuzz.mjs",
     "perf": "vite build && node scripts/perf.mjs",
-    "test": "tsx tests/matches.ts && tsx scripts/netcheck.ts && tsx scripts/combo-check.ts",
+    "test": "tsx tests/saves.ts && tsx tests/matches.ts && tsx scripts/netcheck.ts && tsx scripts/combo-check.ts",
     "test:screens": "vite build --config tests/screens/vite.config.ts && tsx tests/screens/run.ts"
   },
   "devDependencies": {

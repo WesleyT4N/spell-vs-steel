@@ -1,6 +1,7 @@
 // Interactive tutorial for players new to Battle Network: a scripted fight against a training dummy.
 // It drives a regular BattleScene (so the fight and the Draw screen look and play exactly like a match)
 // and layers lessons, goals and pointers on top. Every step can be skipped from the pause menu.
+import { getSave, setSave } from '../engine/save';
 import { setScene, dim, drawMenu, hint, listMouse, isHot, resetSel, type Scene } from './scene';
 import { BattleScene } from './battle';
 import { TitleScene } from './title';
@@ -23,13 +24,8 @@ import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG } from '../engine/music';
 import { win, footer, INK, INK2, RED_INK, TRIM } from './skin';
 
-const DONE_KEY = 'svs:tutorial';
-export function tutorialDone(): boolean {
-  try { return localStorage.getItem(DONE_KEY) === '1'; } catch { return false; }
-}
-function markDone(): void {
-  try { localStorage.setItem(DONE_KEY, '1'); } catch { /* storage blocked */ }
-}
+export const tutorialDone = (): boolean => getSave('tutorialDone');
+const markDone = (): void => setSave('tutorialDone', true);
 
 const SHOT_DAMAGE = 30;
 const FINALE_HP = 300;
