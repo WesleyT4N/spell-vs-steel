@@ -98,14 +98,16 @@ export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: 
   const lines = wrap(card.name.toUpperCase(), 12).slice(0, 2);
   lines.forEach((l, i) => drawTextCentered(c, l, x + w / 2, y + 23 + i * 9 + (lines.length === 1 ? 4 : 0), INK, 1, false));
   // art
-  // the art box is as tall as an icon at game scale (24 art px = 48 UI px)
-  const ax = x + 6, ay = y + 41, aw = w - 12, ah = 48;
+  // the art box is as tall as an icon at game scale (20 art px = 40 UI px)
+  const ax = x + 6, ay = y + 41, aw = w - 12, ah = 40;
   P(c, FRAME, ax - 1, ay - 1, aw + 2, ah + 2);
   c.drawImage(artBox(card.element, aw, ah), ax, ay);
   drawSpellArt(c, card, ax + aw / 2, ay + ah / 2, 2);
   // damage
   const d = card.dmg === '-' ? '' : card.dmg.toUpperCase();
-  drawTextCentered(c, d ? d.slice(0, 12) : 'EFFECT', x + w / 2, y + 92, d ? RED_INK : INK2, 1, false);
+  if (!d) drawTextCentered(c, 'EFFECT', x + w / 2, y + 87, INK2, 1, false);
+  else if (textWidth(d, 2) <= w - 8) drawTextCentered(c, d, x + w / 2, y + 84, RED_INK, 2, false);
+  else drawTextCentered(c, d.slice(0, 12), x + w / 2, y + 87, RED_INK, 1, false);
   if (opts.faded || hard) { c.fillStyle = `rgba(60,40,10,${opts.faded || !opts.lit ? 0.45 : 0.2})`; c.fillRect(x, y, w, h); }
   if (short > 0) {
     const tag = hard ? `NEED ${short}` : `+${short} ${resName(card)}`, tw = textWidth(tag) + 6;
