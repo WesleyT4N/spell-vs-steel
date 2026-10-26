@@ -1,9 +1,12 @@
-// Grand Colosseum, ported from art/arenas.html. 16-bit backdrop, 8-bit NES panels.
-// The other stages live in stages.ts and share the panel grid drawn here.
-import { P, W, H, view, rng, shade, vgrad, vnoise, sphere, glow, mix, layer, type Ctx } from '../engine/gfx';
+// Grand Colosseum and the panel grid every stage shares. Stages are drawn "Inked" like the 24px fighters:
+// outlined pieces, flat cel shading, no dithering (toolkit in ink.ts). The other stages live in stages.ts.
+import { P, W, H, view, rng, mix, layer, type Ctx } from '../engine/gfx';
+import { inked, bands, disc, blocks, inkBanner, inkTorch, inkCloud } from './ink';
 
 export const COLS = 6, ROWS = 3, PW = 38, FACE = 15, LIP = 4, X0 = 6, Y0 = 98;
-export const LEFT_EDGE = '#f83800', RIGHT_EDGE = '#3cbcfc';
+/** Panel rims per side, [light, dark], from the fighters' red and blue. */
+export const TEAM_RIM: [string, string][] = [['#dd3443', '#8d1a30'], ['#486cdb', '#212f84']];
+export const LEFT_EDGE = TEAM_RIM[0][0], RIGHT_EDGE = TEAM_RIM[1][0];
 
 /** Center-bottom (feet) position of a panel. */
 export function panelFoot(col: number, row: number): { x: number; y: number } {
@@ -11,52 +14,6 @@ export function panelFoot(col: number, row: number): { x: number; y: number } {
 }
 export function panelCenter(col: number, row: number): { x: number; y: number } {
   return { x: X0 + col * PW + PW / 2, y: Y0 + row * (FACE + LIP) + FACE / 2 };
-}
-
-function bricks(c: Ctx, x0: number, y0: number, w: number, h: number, bw: number, bh: number, ramp: string[], mortar: string, r: () => number, tint?: (x: number, y: number) => number): void {
-  const top = ramp[ramp.length - 1];
-  for (let row = 0, y = y0; y < y0 + h; row++, y += bh) {
-    const off = (row % 2) * Math.floor(bw / 2);
-    for (let x = x0 - off; x < x0 + w; x += bw) {
-      const v = 0.3 + r() * 0.35;
-      for (let yy = y; yy < Math.min(y + bh, y0 + h); yy++) for (let xx = Math.max(x, x0); xx < Math.min(x + bw, x0 + w); xx++) {
-        let col: string;
-        if (yy === y + bh - 1 || xx === x + bw - 1) col = mortar;
-        else if (yy === y) col = top;
-        else if (yy === y + bh - 2 || xx === x + bw - 2) col = ramp[0];
-        else col = shade(ramp, v + (vnoise(xx, yy, 3, 7) - 0.5) * 0.35 + (tint ? tint(xx, yy) : 0), xx, yy);
-        P(c, col, xx, yy);
-      }
-    }
-  }
-}
-
-export function cloud(c: Ctx, x: number, y: number, s: number): void {
-  const R = ['#8aa2d0', '#b4c8ea', '#dce8f8', '#ffffff'];
-  for (const [dx, dy, r] of [[-9, 2, 4], [-3, -1, 6], [5, -3, 7], [13, 0, 5], [19, 2, 3.5]]) sphere(c, x + dx * s, y + dy * s, r * s, r * s * 0.85, R);
-  P(c, R[0], x - 12 * s, y + 4 * s, 34 * s, 1);
-}
-
-export function banner(c: Ctx, x: number, y: number, w: number, h: number, ramp: string[], trim: string, t: number): void {
-  for (let i = 0; i < h; i++) {
-    const off = Math.round(Math.sin(t * 0.5 + i * 0.35 + x) * 0.8);
-    const tail = i >= h - 3 ? h - i : 0;
-    for (let j = 0; j < w; j++) {
-      if (tail && j >= tail && j < w - tail) continue;
-      const fold = Math.cos((j + t * 0.3) * 1.1) * 0.35 + 0.5 - (i / h) * 0.2;
-      P(c, j === 0 || j === w - 1 ? ramp[0] : shade(ramp, fold, x + j, y + i), x + off + j, y + i);
-    }
-    if (i === h - 5) P(c, trim, x + off + 1, y + i, w - 2, 1);
-  }
-  P(c, '#3a2410', x - 1, y - 1, w + 2, 1);
-  P(c, '#8a6a3a', x - 1, y - 2, w + 2, 1);
-}
-
-export function torch(c: Ctx, x: number, y: number, t: number, i: number): void {
-  P(c, '#2a2a30', x, y + 4, 2, 6); P(c, '#5a5a66', x - 1, y + 3, 4, 2); P(c, '#8a8a96', x - 1, y + 3, 4, 1);
-  const f = (t + i) % 3;
-  glow(c, x + 1, y, 16, '255,140,40', 0.35);
-  P(c, '#c83000', x - 1, y - 3 + (f === 1 ? 1 : 0), 4, 6); P(c, '#ff7a10', x, y - 4 + (f % 2), 2, 6); P(c, '#ffd060', x, y - 1, 2, 3); P(c, '#fff4c0', x, y, 1, 2);
 }
 
 // bowl curve: center highest, edges dip down
@@ -104,7 +61,7 @@ function skyCap(st: Stage, f: HTMLCanvasElement, w: number, h: number): HTMLCanv
     for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i + 1]; b += px[i + 2]; }
     const hex = (v: number): string => Math.round(v / W).toString(16).padStart(2, '0');
     const top = `#${hex(r)}${hex(g)}${hex(b)}`;
-    sky = layer(c => vgrad(c, 0, 0, w, h, [mix(top, '#000000', 0.45), mix(top, '#000000', 0.3), mix(top, '#000000', 0.15), top]), w, h);
+    sky = layer(c => bands(c, 0, 0, w, h, [mix(top, '#000000', 0.45), mix(top, '#000000', 0.3), mix(top, '#000000', 0.15), top]), w, h);
     skies.set(key, sky);
   }
   return sky;
@@ -133,12 +90,24 @@ export function drawStage(c: Ctx, st: Stage, t: number, cheer = 0): void {
   c.drawImage(x.canvas, -ox, -oy);
 }
 
-const STONE: PanelLook = { face: '#bcbcbc', hi: '#fcfcfc', lo: '#7c7c7c', lip: '#7c7c7c', lipLo: '#000000' };
-/** Grey stone face: one seam and a few pits. */
+const STONE: PanelLook = { face: '#bdb7cc', hi: '#eee9e7', lo: '#7e7890', lip: '#5c566c', lipLo: '#000000' };
+/** Pale stone face: one seam with a lit edge and two chips. */
 export function stoneTex(c: Ctx, x: number, y: number, w: number, h: number, r: () => number): void {
-  P(c, '#7c7c7c', x + 8 + Math.floor(r() * 18), y + 1, 1, h - 2);
-  for (let i = 0; i < 4; i++) P(c, '#7c7c7c', x + r() * w, y + 1 + r() * (h - 2));
+  const sx = x + 9 + Math.floor(r() * 14);
+  P(c, '#8a849c', sx, y, 1, h); P(c, '#eee9e7', sx + 1, y, 1, h);
+  P(c, '#8a849c', x + 2 + Math.floor(r() * 4), y + 2 + Math.floor(r() * 6), 2, 1);
+  P(c, '#8a849c', x + w - 7 + Math.floor(r() * 3), y + 3 + Math.floor(r() * 5), 2, 1);
 }
+
+// Grand Colosseum palette
+const SKY = ['#3050b8', '#3c64c8', '#5480d8', '#709ce4', '#94b8ec', '#b8d4f2'];
+const SAND_ST = ['#8a5a44', '#b07c5c', '#cfa47a', '#e8cc9c', '#fbecc4'], SAND_INK = '#4a2a26';
+const GREY = ['#4c4660', '#6e6882', '#9690a8', '#bdb7cc', '#e6e2ec'], GREY_INK = '#241c30';
+const DARK = ['#1c1020', '#34202c', '#4c3440'];
+export const PURPLE = ['#3a1848', '#5e2a74', '#8a44a0', '#b070c4'], GOLD = ['#8a5a10', '#d8a030', '#f8d878'];
+const SAND = ['#8e6440', '#b88c5c', '#d8b480', '#ecd2a0'];
+const CROWD = [['#8d1a30', '#dd3443'], ['#212f84', '#486cdb'], ['#2c6a3a', '#4c9a4e'], ['#7a5a10', '#d8a030'], ['#5e2a74', '#8a44a0'], ['#8a8296', '#d8d2dc']];
+const SKIN = [['#a4704c', '#edbe8a'], ['#6a3c2a', '#a47e73']];
 
 export class Colosseum implements Stage {
   id = 'colosseum';
@@ -149,173 +118,154 @@ export class Colosseum implements Stage {
   tex = stoneTex;
   back: HTMLCanvasElement;
   front: HTMLCanvasElement;
+  clouds: HTMLCanvasElement[];
   crowd: Fan[] = [];
 
   constructor() {
     this.back = layer(c => {
-      vgrad(c, 0, 0, W, 50, ['#2a50b8', '#3c6cd0', '#5a8ee0', '#86b4ec', '#b8d8f4']);
-      glow(c, 204, 9, 26, '255,240,200', 0.55);
-      sphere(c, 204, 9, 5, 5, ['#f8d878', '#fce8b0', '#fff8e0', '#ffffff']);
+      bands(c, 0, 0, W, 50, SKY);
+      disc(c, '#f8c050', 204, 8, 6); disc(c, '#fce49c', 204, 8, 5); disc(c, '#fffbe8', 203, 7, 3);
     });
+    this.clouds = [0.9, 0.7, 0.8].map((s, i) => inkCloud(s, i === 1, '#8aa0d4', '#c8d8f4', '#ffffff', '#4a5ca8'));
     this.front = layer(c => this.drawFront(c));
   }
 
   private drawFront(c0: Ctx): void {
-    const c = c0;
-    const r = rng(12);
-    const T = ['#6a4c30', '#8e6e4c', '#b4946c', '#d6ba90', '#eedab4', '#fcf0d4'];
-    for (let x = 0; x < W; x++) {
-      const o = k(x), am = (x + 3) % 14, n = (vnoise(x, 0, 3, 4) - 0.5) * 0.2;
-      for (let y = 0; y < 13 - o; y++) if (x % 28 === 9 && y > 1 - o) P(c, y === 2 - o ? '#5a3a1a' : x % 2 ? '#8a6038' : '#6a4626', x, y);
-      for (let y = 13 - o; y < 22 - o; y++) {
-        let v = 0.62 + n + (vnoise(x, y, 2, 9) - 0.5) * 0.25;
-        if (y === 13 - o) v = 1;
-        if (y === 14 - o) v = 0.8;
-        if (y === 21 - o) v = 0.05;
-        if (am >= 6 && am <= 8 && y >= 15 - o && y <= 18 - o) { P(c, y === 15 - o ? '#2a1a10' : '#3c2818', x, y); continue; }
-        P(c, shade(T, v, x, y), x, y);
-      }
-      for (let y = 22 - o; y < 41 - o; y++) {
-        const dx = am - 6.5, archTop = 29 - Math.round(Math.sqrt(Math.max(0, 16 - dx * dx)) * 1.2);
-        const yy = y + o;
-        let col: string;
-        if (am >= 3 && am <= 10 && yy >= archTop) {
-          const depth = (yy - archTop) / (40 - archTop);
-          col = shade(['#140c08', '#24160e', '#382416', '#4e3420'], 0.1 + depth * 0.6 + (am === 9 ? 0.3 : 0), x, y);
-        } else if (am >= 2 && am <= 11 && yy >= archTop - 2) {
-          col = am < 6 ? T[5] : T[1];
-        } else {
-          let v = am === 12 || am === 13 ? 0.78 : am === 0 ? 0.35 : am === 1 ? 0.2 : 0.55;
-          v += (vnoise(x, y, 2, 11) - 0.5) * 0.25 + n;
-          if (yy === 22) v = 0.95;
-          if (yy === 23) v = 0.15;
-          col = shade(T, v, x, y);
+    const r = rng(12), S = SAND_ST, D = DARK, WL = GREY;
+    // the stands and the podium wall, drawn flat, then bent to follow the bowl
+    const flat = layer(c => {
+      c.drawImage(inked(SAND_INK, c => {
+        for (let x = 0; x < W; x++) {
+          if (x % 28 === 9) P(c, S[0], x, 0, 1, 9); // flag poles
+          // attic: cornice and a wall with small windows
+          P(c, S[4], x, 9); P(c, S[3], x, 10); P(c, S[1], x, 11);
+          const am = (x + 3) % 14;
+          P(c, S[2], x, 12, 1, 8);
+          if (am >= 6 && am <= 7) P(c, D[0], x, 14, 1, 4);
+          if (am === 5) P(c, S[3], x, 14, 1, 4);
+          P(c, S[1], x, 20); P(c, SAND_INK, x, 21);
+          // arcade
+          const dx = am - 6.5;
+          for (let y = 22; y < 41; y++) {
+            const archTop = 30 - Math.round(Math.sqrt(Math.max(0, 16 - dx * dx)) * 1.2);
+            let col: string;
+            if (am >= 3 && am <= 10 && y >= archTop) col = y === archTop || am === 3 ? D[0] : D[1];
+            else if (am >= 2 && am <= 11 && y >= archTop - 1) col = S[4];
+            else col = am === 12 ? S[3] : am === 1 ? S[1] : S[2];
+            P(c, y === 22 ? S[4] : col, x, y);
+          }
+          P(c, S[4], x, 41); P(c, S[2], x, 42); P(c, SAND_INK, x, 43);
+          // seating steps
+          for (let y = 44; y < 62; y++) { const st = (y - 44) % 4; P(c, st === 0 ? S[3] : st === 1 ? S[1] : D[1], x, y); }
         }
-        P(c, col, x, y);
-      }
-      P(c, T[5], x, 41 - o); P(c, T[3], x, 42 - o); P(c, T[0], x, 43 - o);
-      for (let y = 44 - o; y < 62 - o; y++) {
-        const step = (y - (44 - o)) % 4;
-        P(c, step === 0 ? T[4] : step === 1 ? T[2] : shade(['#3a2614', '#5a3e24'], 0.5 + (vnoise(x, y, 3, 3) - 0.5), x, y), x, y);
-      }
-    }
-    // imperial box
-    for (let y = 42; y < 62; y++) for (let x = 100; x < 140; x++) P(c, shade(['#1a0e08', '#2e1c10'], (y - 42) / 20, x, y), x, y);
-    for (let x = 98; x < 142; x++) {
-      const stripe = Math.floor((x - 98) / 4) % 2;
-      for (let y = 36; y < 42; y++) P(c, shade(stripe ? ['#3a1048', '#5a1a70', '#7c2c98', '#a050c0'] : ['#a89070', '#d8c8a0', '#f0e4c4', '#fcf6e4'], 0.9 - (y - 36) / 7, x, y), x, y);
-    }
-    for (let x = 98; x < 142; x += 4) {
-      const col = Math.floor((x - 98) / 4) % 2 ? '#5a1a70' : '#d8c8a0';
-      P(c, col, x, 42, 3, 1); P(c, col, x + 1, 43, 1, 1);
-    }
-    for (const px of [99, 139]) { P(c, '#f8d070', px, 42, 1, 20); P(c, '#a07020', px + 1, 42, 1, 20); }
-    P(c, '#f8d070', 99, 60, 42, 1); P(c, '#a07020', 99, 61, 42, 1);
-
-    // podium wall, drawn flat then bent to follow the bowl
-    const pc = document.createElement('canvas');
-    pc.width = W; pc.height = H;
-    {
-      const c = pc.getContext('2d')!;
-      for (let x = 0; x < W; x++) { P(c, '#000000', x, 62); P(c, '#f4f0e6', x, 63); P(c, '#d0ccc0', x, 64); P(c, '#8c887c', x, 65); }
-      bricks(c, 0, 66, W, 24, 12, 5, ['#6c6c70', '#8c8c90', '#a8a8a8', '#c4c2bc', '#e0ded6'], '#4c4a50', r, (_x, y) => -((y - 66) / 24) * 0.15);
-      for (const [gx, gr] of [[120, 12], [52, 8], [188, 8]]) {
-        const cy = 90 - gr;
-        for (let y = cy - gr - 2; y < 90; y++) for (let x = gx - gr - 2; x <= gx + gr + 2; x++) {
-          const dx = x - gx, dy = Math.min(0, y - cy), d = Math.sqrt(dx * dx + dy * dy);
-          if (d <= gr) P(c, shade(['#0c080c', '#1a1218', '#2a1e24'], ((y - (cy - gr)) / (gr * 2)) * 0.8, x, y), x, y);
-          else if (d <= gr + 2 && y < cy + 1) P(c, Math.floor(Math.atan2(dy, dx) * 4) % 2 ? '#e8e6de' : '#9c9a92', x, y);
+        // imperial box with a striped awning
+        P(c, D[0], 100, 42, 40, 20);
+        for (let x = 98; x < 142; x++) {
+          const i = (x - 98) % 4, R = Math.floor((x - 98) / 4) % 2 ? PURPLE : [S[1], S[3], S[4], S[4]];
+          P(c, R[3], x, 35); P(c, R[2], x, 36, 1, 4); P(c, R[1], x, 40);
+          if (i !== 3) P(c, R[1], x, 41);
+          if (i === 1 || i === 2) P(c, R[1], x, 42);
         }
-        for (let x = gx - gr + 2; x < gx + gr - 1; x += 3) for (let y = cy - gr + 1; y < 90; y++) {
-          const dx = x - gx, dy = Math.min(0, y - cy);
-          if (dx * dx + dy * dy < gr * gr) P(c, '#3c3c46', x, y);
+        for (const px of [99, 139]) { P(c, GOLD[2], px, 42, 1, 20); P(c, GOLD[0], px + 1, 42, 1, 20); }
+        P(c, GOLD[2], 99, 60, 42, 1); P(c, GOLD[0], 99, 61, 42, 1);
+      }, W, 64), 0, 0);
+      c.drawImage(inked(GREY_INK, c => {
+        P(c, WL[4], 0, 1, W, 1); P(c, WL[3], 0, 2, W, 1); P(c, WL[1], 0, 3, W, 1); P(c, GREY_INK, 0, 4, W, 1);
+        blocks(c, 0, 5, W, 24, 12, 6, [WL[0], WL[1], WL[2], WL[3]], r);
+        // gates with portcullises
+        for (const [gx, gr] of [[120, 12], [52, 8], [188, 8]]) {
+          const cy = 29 - gr;
+          for (let y = cy - gr - 4; y < 29; y++) for (let x = gx - gr - 4; x <= gx + gr + 4; x++) {
+            const ddx = x - gx, dy = Math.min(0, y - cy), d = Math.sqrt(ddx * ddx + dy * dy);
+            if (d <= gr) P(c, (ddx % 3 === 0 || (y - cy + gr) % 4 === 3) ? D[2] : D[0], x, y);
+            else if (d <= gr + 2.2) P(c, Math.floor(Math.atan2(dy, ddx) * 3) % 2 ? WL[4] : WL[2], x, y);
+            else if (d <= gr + 3.2 && y < cy + 1) P(c, GREY_INK, x, y);
+          }
+          P(c, WL[4], gx - 1, cy - gr - 3, 3, 3); P(c, GREY_INK, gx - 2, cy - gr - 4, 5, 1);
         }
-        for (let y = cy - gr + 4; y < 90; y += 4) for (let x = gx - gr + 1; x < gx + gr; x++) {
-          const dx = x - gx, dy = Math.min(0, y - cy);
-          if (dx * dx + dy * dy < gr * gr) P(c, x % 3 ? '#4a4a56' : '#7c7c88', x, y);
+        // niches with stone guardians
+        for (const nx of [86, 154]) {
+          for (let y = 7; y < 25; y++) for (let x = nx - 5; x <= nx + 5; x++) { const dy = Math.min(0, y - 12); if ((x - nx) ** 2 + dy * dy <= 25) P(c, x < nx ? D[0] : D[1], x, y); }
+          P(c, WL[4], nx - 1, 9, 3, 3); P(c, WL[3], nx + 1, 10, 1, 2);
+          P(c, WL[4], nx - 3, 13, 6, 2); P(c, WL[3], nx + 2, 13, 2, 2);
+          P(c, WL[4], nx - 2, 15, 3, 9); P(c, WL[3], nx + 1, 15, 2, 9); P(c, WL[2], nx - 2, 19, 5, 1);
+          P(c, WL[3], nx - 4, 8, 1, 16); P(c, WL[4], nx - 4, 7, 1, 1);
+          P(c, WL[3], nx - 5, 24, 11, 1);
         }
-        P(c, '#f4f2ea', gx - 1, cy - gr - 3, 3, 3); P(c, '#9c9a92', gx + 1, cy - gr - 1, 1, 1);
-      }
-      for (const nx of [86, 154]) {
-        for (let y = 68; y < 86; y++) for (let x = nx - 5; x <= nx + 5; x++) {
-          const dy = Math.min(0, y - 73);
-          if ((x - nx) ** 2 + dy * dy <= 25) P(c, shade(['#1c1820', '#2e2832'], (x - nx + 5) / 10, x, y), x, y);
-        }
-        sphere(c, nx, 72, 2, 2, ['#8c8a84', '#c4c2bc', '#f0eee8']);
-        for (let y = 75; y < 85; y++) for (let x = nx - 3 + (y > 80 ? 0 : 1); x <= nx + 3 - (y > 80 ? 0 : 1); x++) P(c, shade(['#8c8a84', '#b4b2ac', '#dcdad2', '#f4f2ec'], 0.9 - (x - nx + 3) / 7, x, y), x, y);
-        P(c, '#cfcdc6', nx - 4, 85, 9, 1);
-      }
-    }
-    // sand
-    vgrad(c, 0, 76, W, 84, ['#9c7848', '#b89060', '#d0aa78', '#e0c08c', '#ecd09e']);
-    for (let i = 0; i < 70; i++) { const x = r() * W, y = 92 + r() * 68; P(c, r() < 0.5 ? '#f4dcb0' : '#a88050', x, y, 2 + r() * 5, 1); }
-    for (let i = 0; i < 60; i++) P(c, '#8a6840', r() * W, 92 + r() * 68);
+      }, W, 30), 0, 61);
+    }, W, 96);
+    // sand, with a few pebbles
+    P(c0, SAND[2], 0, 80, W, H - 80);
+    for (let i = 0; i < 40; i++) { const x = Math.floor(r() * W), y = 94 + Math.floor(r() * 64); P(c0, SAND[3], x, y, 2, 1); P(c0, SAND[1], x, y + 1, 2, 1); }
     for (let x = 0; x < W; x++) {
       const o = k(x);
-      c0.drawImage(pc, x, 62, 1, 28, x, 62 - o, 1, 28);
-      c0.fillStyle = 'rgba(60,30,10,0.28)';
-      c0.fillRect(x, 90 - o, 1, 4);
+      c0.drawImage(flat, x, 0, 1, 91, x, -o, 1, 91);
+      P(c0, SAND[1], x, 91 - o, 1, 3); P(c0, SAND[0], x, 91 - o, 1, 1);
     }
-    const cols = [['#a87020', '#d8a030'], ['#2c7c38', '#3c9c48'], ['#602c80', '#8040a0'], ['#c8c0b0', '#ece4d4'], ['#7c4c20', '#a06830'], ['#3c8878', '#60b8a0'], ['#a05878', '#c87898']];
     for (let x = 1; x < W - 1; x += 3) {
       const o = k(x);
-      for (let y = 45 - o; y < 60 - o; y += 4) {
+      for (let y = 47 - o; y < 62 - o; y += 4) {
         if (x > 96 && x < 144) continue;
         if (r() < 0.15) continue;
-        this.crowd.push([x + (r() < 0.5 ? 0 : 1), y, cols[Math.floor(r() * cols.length)], r() < 0.5 ? ['#c8885c', '#f0b888'] : ['#7c4c30', '#a8704c'], Math.floor(r() * 16)]);
+        this.crowd.push([x + (r() < 0.5 ? 0 : 1), y, CROWD[Math.floor(r() * CROWD.length)], SKIN[Math.floor(r() * SKIN.length)], Math.floor(r() * 16)]);
       }
     }
   }
 
   draw(c: Ctx, t: number, cheer = 0): void {
     c.drawImage(this.back, 0, 0);
-    [[30, 5, 0.8], [150, 2, 0.6], [230, 8, 0.7]].forEach(([cx, cy, s], i) => cloud(c, ((cx + t * 0.2 * (1 + i * 0.3)) % 300) - 30, cy, s));
+    [[30, 1], [150, -1], [230, 3]].forEach(([cx, cy], i) => c.drawImage(this.clouds[i], Math.round(((cx + t * 0.2 * (1 + i * 0.3)) % 300) - 44), cy));
     c.drawImage(this.front, 0, 0);
     const hopEvery = cheer > 0 ? 4 : 16;
     for (const [x, y, body, skin, ph] of this.crowd) {
       const hop = (t + ph) % hopEvery < 2 ? 1 : 0;
       P(c, skin[1], x, y - hop - 1, 2, 1); P(c, skin[0], x + 1, y - hop - 1, 1, 1);
       P(c, body[1], x, y - hop, 1, 2); P(c, body[0], x + 1, y - hop, 1, 2);
-      if (hop) P(c, skin[1], x + 2, y - 3, 1, 1);
+      if (hop && cheer > 0) P(c, skin[1], x + 2, y - 3, 1, 1);
     }
-    sphere(c, 120, 50, 2, 2, ['#a8704c', '#f0b888']);
-    P(c, '#f8d070', 118, 47, 5, 1); P(c, '#6a1a80', 117, 52, 7, 8); P(c, '#a050c0', 117, 52, 3, 8); P(c, '#fcf6e4', 120, 52, 1, 8);
-    banner(c, 18, 67 - k(23), 10, 19, ['#3a1048', '#5a1a70', '#7c2c98', '#a050c0'], '#f8d070', t);
-    banner(c, 212, 67 - k(217), 10, 19, ['#3a1048', '#5a1a70', '#7c2c98', '#a050c0'], '#f8d070', t);
-    torch(c, 70, 72 - k(70), t, 0);
-    torch(c, 168, 72 - k(168), t, 1);
+    // the emperor
+    P(c, SKIN[0][1], 119, 49, 3, 2); P(c, GOLD[2], 118, 47, 5, 1);
+    P(c, PURPLE[1], 117, 51, 7, 9); P(c, PURPLE[3], 117, 51, 2, 9); P(c, GOLD[2], 120, 51, 1, 9);
     for (let x = 9; x < W; x += 28) {
       const o = k(x), wv = (t + x) % 6 < 3 ? 1 : 0;
-      P(c, '#7c2c98', x + 1, 3 - o, 5, 1); P(c, '#a050c0', x + 1, 4 - o, 4 + wv, 1); P(c, '#5a1a70', x + 1, 5 - o, 2 + wv, 1);
+      P(c, PURPLE[3], x + 1, 1 - o, 5, 1); P(c, PURPLE[2], x + 1, 2 - o, 4 + wv, 1); P(c, PURPLE[1], x + 1, 3 - o, 2 + wv, 1);
     }
+    for (const bx of [18, 212]) inkBanner(c, bx, 67 - k(bx + 5), 10, 19, PURPLE, GOLD, GREY_INK, t);
+    inkTorch(c, 70, 72 - k(70), t, 0, GREY_INK);
+    inkTorch(c, 168, 72 - k(168), t, 1, GREY_INK);
   }
 }
 
 export type PanelState = 'clean' | 'burning' | 'cracked';
 
+/** A panel: black outline, two-tone team rim, an outlined bevelled face, and a darker front lip. */
 export function drawPanel(c: Ctx, col: number, row: number, state: PanelState, _t: number, owner: 0 | 1, highlight: string | undefined, stage: Stage): void {
   const x = X0 + col * PW, y = Y0 + row * (FACE + LIP);
-  const team = owner === 0 ? LEFT_EDGE : RIGHT_EDGE;
+  const [tl, td] = TEAM_RIM[owner];
   const fx = x + 2, fy = y + 1, fw = PW - 4, fh = FACE - 2;
   const look = stage.panel;
   P(c, '#000000', x, y - 1, PW, FACE + LIP + 1);
-  P(c, team, x + 1, y, PW - 2, FACE);
+  P(c, tl, x + 1, y, PW - 2, FACE); P(c, td, x + 1, y + FACE - 1, PW - 2, 1); P(c, td, x + PW - 2, y, 1, FACE);
   let face = look.face, hi = look.hi, lo = look.lo;
   if (state === 'burning') { face = '#000000'; hi = '#a81000'; lo = '#000000'; }
-  if (highlight) { face = mix(face, highlight, 0.55); }
-  P(c, face, fx, fy, fw, fh); P(c, hi, fx, fy, fw, 1); P(c, lo, fx, fy + fh - 1, fw, 1);
-  P(c, look.lip, x + 1, y + FACE, PW - 2, LIP); P(c, look.lipLo, x + 1, y + FACE + LIP - 1, PW - 2, 1);
-  if (state !== 'burning') stage.tex(c, fx, fy, fw, fh, rng(col * 31 + row * 7 + stage.panelSeed));
+  if (highlight) { face = mix(face, highlight, 0.55); hi = mix(hi, highlight, 0.4); lo = mix(lo, highlight, 0.4); }
+  P(c, '#000000', fx, fy, fw, fh);
+  P(c, face, fx + 1, fy + 1, fw - 2, fh - 2);
+  P(c, hi, fx + 1, fy + 1, fw - 2, 1); P(c, hi, fx + 1, fy + 1, 1, fh - 2);
+  P(c, lo, fx + 1, fy + fh - 2, fw - 2, 1); P(c, lo, fx + fw - 2, fy + 2, 1, fh - 3);
+  P(c, look.lip, x + 1, y + FACE, PW - 2, LIP); P(c, td, x + 1, y + FACE, PW - 2, 1); P(c, look.lipLo, x + 1, y + FACE + LIP - 1, PW - 2, 1);
+  // texture marks sit inside the bevel
+  if (state !== 'burning') stage.tex(c, fx + 2, fy + 2, fw - 4, fh - 4, rng(col * 31 + row * 7 + stage.panelSeed));
   if (state === 'cracked') {
     const cr = rng(col * 13 + row * 5 + 9);
-    let cx = fx + 4 + Math.floor(cr() * 6), cy = fy + 1;
-    while (cy < fy + fh - 1 && cx < fx + fw - 2) {
-      P(c, '#000000', cx, cy); P(c, '#000000', cx + 1, cy);
+    let cx = fx + 5 + Math.floor(cr() * 6), cy = fy + 2;
+    while (cy < fy + fh - 2 && cx < fx + fw - 3) {
+      P(c, '#000000', cx, cy, 2, 1);
       cx += 1 + Math.floor(cr() * 3); cy += cr() < 0.7 ? 1 : 0;
-      if (cr() < 0.25) P(c, '#000000', cx, cy - 2, 1, 2);
+      if (cr() < 0.25 && cy > fy + 3) P(c, '#000000', cx, cy - 2, 1, 2);
     }
-    let bx = fx + fw - 8, by = fy + 2;
-    for (let i = 0; i < 6; i++) { P(c, '#000000', bx, by); bx -= 1 + Math.floor(cr() * 2); by += 1; }
+    let bx = fx + fw - 8, by = fy + 3;
+    for (let i = 0; i < 5; i++) { P(c, '#000000', bx, by); bx -= 1 + Math.floor(cr() * 2); by += 1; }
   }
   // burning panels get their flames from the effects layer (fxView.drawBurn)
 }
