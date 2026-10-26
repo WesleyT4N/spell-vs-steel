@@ -180,11 +180,11 @@ export const ranger: CardDef[] = [
     dmg: '30 each', short: '12 arrows fall on random enemy panels over 3s.',
     cast: x => {
       const { b, f, foe } = x;
-      // like Blizzard: some arrows aim at the enemy's panel, each telegraphs 0.4s
+      // like Blizzard: some arrows aim at the enemy's panel, each telegraphs for the standard warning
       for (let i = 0; i < 12; i++) b.later(i * 0.25, () => {
         const cells = allEnemyPanels(b, f.side);
         const [c, r] = b.rand() < 0.35 ? [foe.col, foe.row] : cells[Math.floor(b.rand() * cells.length)];
-        b.warn(f, [[c, r]], 0.4, () => {
+        b.warn(f, [[c, r]], TUNING.warnTime, () => {
           b.addFx('arrowRain', f.side, c, r, 0.3);
           b.strike(f, [[c, r]], 30 * x.mult, { spell: true, element: 'steel', noFlinch: true });
         });
