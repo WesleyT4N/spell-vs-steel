@@ -106,7 +106,7 @@ const warrior: CardDef[] = [
   },
   {
     id: 'chain_hook', name: 'Chain Hook', cls: 'warrior', cost: 1, rarity: 'common', element: 'steel', damaging: true, lock: 0.35,
-    dmg: '20', short: 'Chain down your row. On hit: pull them to their front column, stun 1s, gain 1 Rage.',
+    dmg: '20', short: 'Chain down your row. On hit: pull them to their front column, stun 1.5s, gain 1 Rage.',
     cast: x => {
       x.b.shoot(x.f, {
         speed: 14 * x.dir, kind: 'hook', reflectable: true,
@@ -118,7 +118,7 @@ const warrior: CardDef[] = [
           if (res.blocked && !res.dealt) return;
           const front = b.frontCol(t.side);
           if (t.st.noKnock <= 0 && b.canStand(t, front, t.row)) { t.col = front; }
-          b.stun(t, 1);
+          b.stun(t, 1.5);
           b.gainRage(src, 1, true);
         },
       });
@@ -242,10 +242,10 @@ const warrior: CardDef[] = [
   },
   {
     id: 'shield_slam', name: 'Shield Slam', cls: 'warrior', cost: 0, rarity: 'legendary', element: 'steel', damaging: true, lock: 0.45,
-    dmg: '80', short: 'Bash 2 panels ahead: break shields, stun 1s. Gain 2 Rage on hit.',
+    dmg: '80', short: 'Bash 2 panels ahead: break shields, stun 1.5s. Gain 2 Rage on hit.',
     cast: x => {
       x.b.addFx('smash', x.f.side, x.f.col + x.dir, x.f.row, 0.25);
-      const res = x.b.strike(x.f, cellsAhead(x, 1, 2), 80 * x.mult, { spell: true, breaks: true, stun: 1, element: 'steel' });
+      const res = x.b.strike(x.f, cellsAhead(x, 1, 2), 80 * x.mult, { spell: true, breaks: true, stun: 1.5, element: 'steel' });
       if (res.fighter) x.b.gainRage(x.f, 2, true);
     },
     ai: (b, f) => ahead(b, f, 2),

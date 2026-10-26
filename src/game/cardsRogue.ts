@@ -217,9 +217,9 @@ export const rogue: CardDef[] = [
   },
   {
     id: 'kidney_shot', name: 'Kidney Shot', cls: 'rogue', cost: 2, rarity: 'legendary', element: 'steel', damaging: true, lock: 0.3,
-    dmg: '30', short: 'Hit the panel ahead. Stuns 0.5s per spell you cast in the last 3s (max 2s).',
+    dmg: '30', short: 'Hit the panel ahead. Stuns 0.75s per spell you cast in the last 3s (max 2s).',
     cast: x => {
-      const stun = Math.min(2, 0.5 * x.castsWithin(3));
+      const stun = Math.min(2, 0.75 * x.castsWithin(3));
       if (thrust(x, 1, 30).dealt > 0 && stun > 0) x.b.stun(x.foe, stun);
     },
     ai: (b, f) => ahead(b, f, 1),
