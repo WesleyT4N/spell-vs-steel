@@ -313,7 +313,7 @@ export class BattleScene implements Scene {
   protected get replayMode(): ReplayMode { return this.watching ? 'watch' : this.twoPlayer ? 'versus' : 'cpu'; }
 
   /** A round just ended: add it to this set's replay and save it, so even an unfinished set keeps its rounds. */
-  private keepRound(t: RoundTape): void {
+  protected keepRound(t: RoundTape): void {
     let r = SET_REPLAYS.get(this.rounds);
     if (!r) {
       r = { id: newReplayId(), v: RULES_VERSION, at: Date.now(), mode: this.replayMode, me: this.humans.length === 1 ? this.me : null, bestOf: this.m.bestOf, stage: getArena().id, rounds: [] };
