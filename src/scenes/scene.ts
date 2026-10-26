@@ -42,6 +42,8 @@ let nextZones: Zone[] = [];
 export function zone(id: string, x: number, y: number, w: number, h: number): void { nextZones.push({ id, x, y, w, h }); }
 /** Swap in the zones drawn this frame. Called by the main loop after drawing. */
 export function commitZones(): void { zones = nextZones; nextZones = []; }
+/** The clickable zones live this frame (for automated playtests). */
+export const liveZones = (): readonly Zone[] => zones;
 /** Id of the topmost zone under the pointer, or null. */
 export function hotZone(): string | null {
   for (let i = zones.length - 1; i >= 0; i--) {
