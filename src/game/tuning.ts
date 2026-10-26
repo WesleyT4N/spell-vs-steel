@@ -1,7 +1,7 @@
 // Every number worth tweaking after a playtest lives here.
 
 export const TUNING = {
-  hp: { warrior: 870, mage: 720, rogue: 650, ranger: 740, priest: 700 },
+  hp: { warrior: 870, mage: 670, rogue: 650, ranger: 740, priest: 700 },
 
   /** Seconds for the shared custom gauge to fill. */
   gaugeSeconds: 10,
@@ -107,8 +107,8 @@ export const TUNING = {
   blessHps: 12,
 
   /** Frost Nova hits an enemy within this many columns of the caster. */
-  frostNovaRange: 2,
-  frostNovaDamage: 20,
+  frostNovaRange: 3,
+  frostNovaDamage: 25,
 
   /** Frozen or stunned targets take this multiplier from all sources. */
   frozenBonus: 1.5,

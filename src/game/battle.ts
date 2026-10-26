@@ -524,7 +524,7 @@ export class Battle {
           f.frostNovaUsed = true;
           f.st.frostNova = 0;
           this.damage(foe, TUNING.frostNovaDamage, f, { spell: true, element: 'frost' });
-          this.freeze(foe, 1.5);
+          this.freeze(foe, 2);
           this.addFx('nova', f.side, f.col, f.row, 0.5);
           this.addFx('nova', f.side, foe.col, foe.row, 0.5);
           this.shake = Math.max(this.shake, 0.2);
@@ -534,7 +534,7 @@ export class Battle {
       if (f.st.glacial > 0 && foe.st.frozen <= 0 && foe.st.iceBlock <= 0) {
         const wallCol = this.walls.find(w => w.side === f.side && w.kind === 'glacial')?.col;
         if (wallCol !== undefined && foe.col === wallCol + this.dir(f) && foe.glacialCd <= 0) {
-          this.freeze(foe, 2);
+          this.freeze(foe, 2.5);
           foe.glacialCd = 3;
         }
       }
@@ -832,7 +832,7 @@ export class Battle {
         const broke = opts.breaks && !w.invuln;
         this.hitWall(w, broke ? w.hp : dmg, att, opts);
         if (broke) res.broke = true;
-        if (w.kind === 'glacial' && att.glacialCd <= 0) { this.freeze(att, 2); att.glacialCd = 3; }
+        if (w.kind === 'glacial' && att.glacialCd <= 0) { this.freeze(att, 2.5); att.glacialCd = 3; }
       }
       if (!foe.dead && foe.col === c && foe.row === r && !res.fighter) {
         const out = this.damage(foe, dmg, att, opts);

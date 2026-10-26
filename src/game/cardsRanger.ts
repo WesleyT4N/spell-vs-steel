@@ -108,9 +108,9 @@ export const ranger: CardDef[] = [
   },
   {
     id: 'power_shot', name: 'Power Shot', cls: 'ranger', cost: 3, rarity: 'common', element: 'steel', damaging: true, lock: 0.45,
-    dmg: '120', short: 'Piercing arrow down your row: through walls and barriers, knocks to their back column.',
+    dmg: '105', short: 'Piercing arrow down your row: through walls and barriers, knocks to their back column.',
     cast: x => {
-      const end = x.b.rowShot(x.f, 120 * x.mult, { spell: true, element: 'steel', pierce: true }, true);
+      const end = x.b.rowShot(x.f, 105 * x.mult, { spell: true, element: 'steel', pierce: true }, true);
       x.b.addFx('aimed', x.f.side, x.f.col, x.f.row, 0.35, { to: end.col });
       if (end.hit) x.b.knockback(x.foe, 3);
       x.b.shake = 0.15;
