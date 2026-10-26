@@ -9,7 +9,6 @@ import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, k } from '../engine/input';
 import type { PadMode } from '../engine/touch';
 import { playMusic, sfx, isMuted } from '../engine/audio';
-import { MENU_SONG } from '../engine/music';
 import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { OptionsScene } from './options';
@@ -66,7 +65,7 @@ export class TitleScene implements Scene {
   swapSide: 0 | 1 = 1;
   swapT = POOF;
 
-  enter(): void { playMusic('menu', MENU_SONG); }
+  enter(): void { playMusic('menu'); }
   pad(): PadMode { return 'none'; }
 
   update(dt: number): void {

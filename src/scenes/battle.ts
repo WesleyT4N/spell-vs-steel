@@ -3,7 +3,7 @@
 import { setScene, dim, drawMenu, hint, zone, hot, isHot, listMouse, showSel, resetSel, type Scene } from './scene';
 import { CLASS_INFO } from '../game/classes';
 import { Battle, NO_INTENT, heavyChargeOf, type Dir, type Intent, type Side } from '../game/battle';
-import { drawBattle, drawBattleUi } from '../game/battleView';
+import { drawBattle, drawBattleUi, getArena } from '../game/battleView';
 import { Cpu } from '../game/ai';
 import { CARDS, ELEMENT_COLOR } from '../game/cards';
 
@@ -18,8 +18,7 @@ import { P, UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse, localDir, localDown, localPressed, localNav, localKey } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
-import { playMusic, stopMusic, sfx, chargeHum, announce, voiceLine } from '../engine/audio';
-import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
+import { playMusic, stopMusic, stageTrack, sfx, chargeHum, announce, voiceLine } from '../engine/audio';
 import { drawCardDetail, drawCardFace, resName, resInk, RES_INK, CARD_W, CARD_H, PICKED } from './cardView';
 import { CardPreview } from './cardPreview';
 import { win, plaque, pip, disc, banner, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, BLUE_INK, WAX_HI, GOLD } from './skin';
@@ -103,7 +102,7 @@ export class BattleScene implements Scene {
   /** On-screen key name for side `s`. */
   protected keyOf(s: Side, a: 'left' | 'right' | 'attack' | 'cast' | 'custom'): string { return this.twoPlayer ? localKey(s, a) : k(a); }
 
-  enter(): void { playMusic('battle', BATTLE_SONG); }
+  enter(): void { playMusic(stageTrack(getArena().id)); }
 
   pad(): PadMode {
     const b = this.b;
@@ -161,7 +160,7 @@ export class BattleScene implements Scene {
       this.rounds.push(roundRecord(b, this.stats));
       stopMusic();
       if (b.winner !== null && (b.winner === this.me || this.ctl[b.winner] === 'player' || this.watching)) sfx('win');
-      playMusic('result', RESULT_SONG);
+      playMusic('victory');
     }
   }
 
