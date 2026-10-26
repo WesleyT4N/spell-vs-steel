@@ -17,10 +17,10 @@ import { tutorialDone } from './tutorial';
 import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
 
-const ITEMS = ['VERSUS CPU', 'ONLINE VERSUS', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
+const ITEMS = ['VERSUS CPU', 'ONLINE VERSUS', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
 
-// six rows in dev builds still clear the version line
-const MENU_Y = ITEMS.length > 5 ? 172 : 178, MENU_GAP = ITEMS.length > 5 ? 18 : 20;
+// seven rows in dev builds still clear the version line
+const MENU_Y = ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 6 ? 16 : 18;
 
 // the side fighters take turns swapping for another class, so every matchup comes around
 const SWAP = 3.5, POOF = 0.5;
@@ -73,7 +73,8 @@ export class TitleScene implements Scene {
       const item = ITEMS[this.sel];
       if (item === 'VERSUS CPU') setScene(new CharSelectScene());
       if (item === 'ONLINE VERSUS') setScene(new OnlineScene());
-      if (item === 'TUTORIAL') setScene(new CharSelectScene(undefined, 0, true));
+      if (item === 'TRAINING') setScene(new CharSelectScene(undefined, 0, 'training'));
+      if (item === 'TUTORIAL') setScene(new CharSelectScene(undefined, 0, 'tutorial'));
       if (item === 'DECK BUILDER') setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
       if (item === 'OPTIONS') setScene(new OptionsScene(() => setScene(new TitleScene())));
       // loaded on demand, so the prod build (DEV_TOOLS off) carries none of the dev tools code
