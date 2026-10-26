@@ -123,3 +123,7 @@ Every number worth tuning is in [`src/game/tuning.ts`](src/game/tuning.ts). Spel
 - `src/game/` battle rules (`battle.ts`), spells, decks, CPU, drawing (`battleView.ts`)
 - `src/scenes/` title, tutorial, setup, deck builder, battle (Draw screen, pause, results), online lobby and online battle, options, controls, card faces (`cardView.ts`); clickable zones live in `scene.ts`
 - `src/net/` online play: packets, transports, the session, rollback (`rollback.ts`, `snapshot.ts`), the desync checksum
+
+## Desktop builds
+
+A portable Windows `.exe` and a Linux AppImage for play-testers: push a `v*` tag and they are attached to a GitHub Release. See [docs/DESKTOP.md](docs/DESKTOP.md).

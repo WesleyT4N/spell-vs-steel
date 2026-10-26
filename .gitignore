@@ -6,3 +6,4 @@ dist-fuzz
 fuzz-out
 dist-test
 test-results
+release
