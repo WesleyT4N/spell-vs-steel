@@ -2,89 +2,88 @@
   <img src="docs/media/logo.gif" alt="Spell VS Steel" width="720">
 </p>
 
-<p align="center"><b>A fantasy class-based battler in the spirit of Mega Man Battle Network.</b><br>
-Build a grimoire, pick a class, and duel another player on a 6×3 grid in real time.</p>
-
 <p align="center">
   <img src="docs/media/hero.gif" alt="A Mage and a Warrior trading fire, ice and steel on a snowy mountain pass" width="720">
 </p>
 
-## The pitch
+<p align="center"><i>Draw your spells. Hold your ground. Break theirs.</i></p>
 
-Spell VS Steel is a head-to-head card battler where the cards are thrown in real time. Two fighters face off on a grid of panels, three rows each, and dodge, slash and fire spells at each other. Every few seconds the action pauses so both players can draft fresh spells from the decks they built, then the fight picks right back up.
+## About this game
 
-- **Five classes, five ways to play.** A Warrior who gets stronger as they take hits, a glass-cannon Mage, a Rogue who chains cheap tricks, a Ranger with traps and pets, and a Priest who outlasts you with heals and curses.
-- **Your deck is your character.** Every class has its own pool of spells, each with a Legendary set and a Mythic signature card. You build a 30-spell grimoire and it shapes how you fight.
-- **Fast and readable.** Matches are best of 3 short rounds. Big area attacks flash their panels before they land, so a sharp player can always see them coming.
-- **Made for PvP.** Local versus for two players on one keyboard, and online play with room codes, ranked matches and rollback netcode that keeps fights smooth over a real connection.
-- **NES-style pixel art.** 24×24 fighters with hand-drawn frames, painted stages, spell effects colored by element, and parchment menus with wax-seal costs.
+**Spell VS Steel** is a real-time grid battler where your deck is your weapon. Two fighters square off across a field of panels, dodging, slashing and hurling spells in a fast duel, and every few seconds the action freezes so both sides can draw fresh spells from the grimoires they built. Pick a class, master its cards, and outplay your rival one panel at a time.
 
-## How a fight works
+Inspired by the Mega Man Battle Network series and rebuilt for fantasy heroes and head-to-head play.
 
-New to Battle Network-style games? Here's the whole loop in five steps.
-
-### 1. Pick a class and a grimoire
-
-Choose one of the five classes and the deck of spells you'll bring. Every class comes with ready-made decks, and the deck builder lets you make your own: 30 spells, up to 4 copies of a common and 2 of an uncommon, up to 5 Legendaries, and exactly 1 Mythic.
-
-<p align="center"><img src="docs/media/select.gif" alt="Arcade mode character select: switching from Warrior to Mage" width="480"></p>
-
-### 2. Fight on the grid
-
-The arena is 6 panels wide and 3 tall. The left half (red) is yours, the right half (blue) is your opponent's, and neither of you can step onto the other side. You move between your 9 panels to line up shots and dodge theirs.
-
-Every class has the same basic kit: a **light attack** (tap) for quick chip damage and a **heavy attack** (hold and release) that hits harder. Each class also has its own resource bar that pays for spells: Rage for the Warrior, Mana for the Mage and Priest, Energy for the Rogue and Ranger.
-
-<p align="center"><img src="docs/media/fight.gif" alt="Priest and Warrior trading blows on the grid at Elderwood Ruins" width="480"></p>
-
-### 3. Fill the Draw gauge, then draft spells
-
-The bar at the top of the screen is the **Draw gauge**. It fills in about 10 seconds. When it's full, either player can open the **Draw screen**: the fight freezes and both players are dealt 5 spells from their grimoire. Pick the ones you want and the order you'll cast them in, keeping an eye on what they cost, then hit **FIGHT!** to jump back in.
-
-<p align="center"><img src="docs/media/draw.gif" alt="The Draw screen: reading cards and queueing Ice Wall and Fireball" width="480"></p>
-
-### 4. Cast your spells
-
-Back in the fight, your picks sit in a queue, and one button casts the next one. Spells are where the big plays happen: fireballs that set panels alight, ice walls that block shots, traps, pets, stuns and freezes. A frozen or stunned target takes 50% more damage from everything, so landing a freeze and following it up is the heart of a good combo.
-
-<p align="center"><img src="docs/media/cast.gif" alt="Ranger and Mage casting traps, beams and fire at Emberforge" width="480"></p>
-
-### 5. Knock them out
-
-Drop your opponent's HP to 0 to win the round. Win two rounds (best of 3) to take the match. After each round a stats screen breaks down damage, accuracy, crowd control and your best spell.
-
-<p align="center"><img src="docs/media/ko.gif" alt="A Mage finishes a Warrior with a K.O., then the round stats screen" width="480"></p>
-
-Then it starts over: fight, draw, cast, repeat. A round usually lasts somewhere between 30 seconds and a minute.
-
-## The classes
+### ⚔️ Five heroes, five ways to fight
 
 <table>
   <tr>
-    <td width="50%" align="center"><img src="docs/media/class-warrior.gif" alt="Warrior" width="100%"><br><b>Warrior</b>: heavy armor, big hits. Builds Rage from heavy attacks and from getting hit, then spends it on brutal finishers and grid control.</td>
-    <td width="50%" align="center"><img src="docs/media/class-mage.gif" alt="Mage" width="100%"><br><b>Mage</b>: glass cannon. Mana grows every Draw, so the Mage scales into the hardest-hitting spells and the best crowd control in the game.</td>
+    <td width="50%" align="center"><img src="docs/media/class-warrior.gif" alt="Warrior" width="100%"><br><b>WARRIOR</b><br>Heavy armor, big hits. Every blow they take feeds their Rage, and Rage fuels brutal finishers.</td>
+    <td width="50%" align="center"><img src="docs/media/class-mage.gif" alt="Mage" width="100%"><br><b>MAGE</b><br>The glass cannon. Mana grows every draw, and so do the fireballs, the freezes and the meteors.</td>
   </tr>
   <tr>
-    <td width="50%" align="center"><img src="docs/media/class-rogue.gif" alt="Rogue" width="100%"><br><b>Rogue</b>: chains cheap cards, vanishes, strikes from behind and stacks poison.</td>
-    <td width="50%" align="center"><img src="docs/media/class-ranger.gif" alt="Ranger" width="100%"><br><b>Ranger</b>: arrows, traps and pets. Standing still builds Energy for big shots.</td>
+    <td width="50%" align="center"><img src="docs/media/class-rogue.gif" alt="Rogue" width="100%"><br><b>ROGUE</b><br>Chains cheap tricks, vanishes into shadow and strikes from behind with stacking poison.</td>
+    <td width="50%" align="center"><img src="docs/media/class-ranger.gif" alt="Ranger" width="100%"><br><b>RANGER</b><br>Arrows, traps and loyal pets. Plant your feet, build Energy, then loose the perfect shot.</td>
   </tr>
   <tr>
-    <td width="50%" align="center"><img src="docs/media/class-priest.gif" alt="Priest" width="100%"><br><b>Priest</b>: outlasts and chips. Heals, shields and curses that burn hotter the longer you stand in them.</td>
-    <td width="50%" align="center"><img src="docs/media/title.gif" alt="The title screen" width="100%"><br>Every class counters two others and is countered by two, so no matchup is a lost cause.</td>
+    <td colspan="2" align="center"><img src="docs/media/class-priest.gif" alt="Priest" width="50%"><br><b>PRIEST</b><br>Outlasts everyone. Heals, holy shields and curses that burn hotter the longer you stand in them.</td>
   </tr>
 </table>
 
-## Modes
+Every class beats two others and struggles against two, so every matchup is a battle of wits, never a lost cause.
 
-| Mode | What it is |
-| --- | --- |
-| **Arcade** | Climb a ladder of four rivals from Easy to Hard, then face your Shadow Self. |
-| **Versus** | Two players on one keyboard, or you against the CPU. |
-| **Online** | Play a friend with a 5-letter room code, or play ranked matches. Rollback netcode keeps it responsive. |
-| **Training** | A sandbox for testing decks and practicing combos. |
-| **Tutorial** | Short lessons that teach the grid, attacks, the Draw screen and casting from zero. |
-| **Deck builder** | Build, save, import and export grimoires for every class. |
-| **Replays** | Watch your past matches. |
+### 📜 Build your grimoire
+
+Each class has its own pool of spells: commons, uncommons, a set of Legendaries and three Mythic signature cards. Shape a 30-spell grimoire around the way you like to win, or start from a ready-made deck and tweak it.
+
+<p align="center"><img src="docs/media/draw.gif" alt="The Draw screen: reading cards and queueing Ice Wall and Fireball" width="600"></p>
+
+### 🔥 Fight in real time
+
+No turns, no waiting. Move across your side of the grid, dodge telegraphed attacks, and cast your spells the moment the opening appears. Freeze or stun your foe and every hit lands harder.
+
+<p align="center"><img src="docs/media/cast.gif" alt="Ranger and Mage casting traps, beams and fire at Emberforge" width="600"></p>
+
+### 🏆 Built for rivals
+
+Duel a friend on the same keyboard, challenge them online with a room code, or climb the ranked ladder. Rollback netcode keeps online fights smooth, even over a shaky connection.
+
+<p align="center"><img src="docs/media/title.gif" alt="The title screen, with a Mage and Warrior dueling under the logo" width="600"></p>
+
+## How to play
+
+New to this kind of game? A match is one simple loop, repeated until someone falls.
+
+**1. Pick your hero and grimoire.** Choose one of the five classes and the deck of spells you'll bring.
+
+<p align="center"><img src="docs/media/select.gif" alt="Arcade mode character select: switching from Warrior to Mage" width="480"></p>
+
+**2. Fight on the grid.** The arena is 6 panels wide and 3 tall. The red half is yours, the blue half is your rival's, and neither of you can cross the line. Tap attack for a quick light hit, hold and release for a heavy one, and move between your 9 panels to line up shots and dodge theirs. Each class also has a resource bar that pays for spells: Rage, Mana or Energy.
+
+<p align="center"><img src="docs/media/fight.gif" alt="Priest and Warrior trading blows on the grid at Elderwood Ruins" width="480"></p>
+
+**3. Draw.** The **Draw gauge** at the top fills in about 10 seconds. When it's full, open the **Draw screen**: the fight freezes and both players are dealt 5 spells. Pick the ones you can afford, in the order you want to cast them, then hit **FIGHT!**
+
+**4. Cast.** Back in the fight, one button throws your next spell. This is where the big plays happen: fire that sets panels alight, walls of ice, traps, pets and freezes.
+
+**5. Knock them out.** Bring your rival's HP to 0 to take the round. Win two rounds to win the match. Then it's back to the grid: fight, draw, cast, repeat.
+
+<p align="center"><img src="docs/media/ko.gif" alt="A Mage finishes a Warrior with a K.O., then the round stats screen" width="480"></p>
+
+Never played before? The in-game **Tutorial** walks you through all of this against a training dummy.
+
+## Key features
+
+- **5 playable classes**, each with its own resource, playstyle and 26-card spell pool
+- **Deck building** with Legendaries, Mythics, ready-made decks, and import and export to share your builds
+- **Arcade mode**: four rivals of rising difficulty, then a duel against your own Shadow Self
+- **Local versus** for two players on one keyboard
+- **Online play** with room codes, ranked matches and rollback netcode
+- **Training mode** to test decks and practice combos, plus a step-by-step tutorial
+- **Replays** and a detailed stats screen after every round
+- **6 hand-drawn stages**, from a snowy mountain pass to a dwarven forge inside a volcano
+- **NES-inspired pixel art** with hand-drawn animation frames and spell effects colored by element
+- **Keyboard, mouse and touch** controls, all keys rebindable
 
 ## Controls
 
@@ -97,7 +96,7 @@ Then it starts over: fight, draw, cast, repeat. A round usually lasts somewhere 
 | Space | Open the Draw screen when the gauge is full |
 | Esc | Pause |
 
-Menus work with the mouse. Phones and tablets get an on-screen pad, and every key can be rebound in **Options**.
+---
 
 ## Play it locally
 
