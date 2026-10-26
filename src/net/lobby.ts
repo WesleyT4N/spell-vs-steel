@@ -53,6 +53,7 @@ const useUser = (): Promise<User | null> => {
 
 /** One id per page load, so leaving and coming back to the lobby keeps the same seat. */
 const MY_ID = Math.random().toString(36).slice(2, 10);
+export const lobbyId = (): string => MY_ID;
 
 export class Lobby {
   me: LobbyEntry;

@@ -16,10 +16,11 @@ import { openTransport, pickTransport, type TransportKind } from '../net/transpo
 import { CharSelectScene } from './select';
 import { RankedScene } from './ranked';
 import { LobbyScene } from './lobby';
+import { TournamentScene } from './tournament';
 import { TitleScene } from './title';
 import { win, selRow, banner, PAPER, BURN, INK, INK2, RED_INK, TRIM } from './skin';
 
-const ROWS = ['LOBBY', 'RANKED MATCH', 'MATCH', 'CREATE ROOM', 'JOIN ROOM'] as const;
+const ROWS = ['LOBBY', 'RANKED MATCH', 'TOURNAMENT', 'MATCH', 'CREATE ROOM', 'JOIN ROOM'] as const;
 type RowName = (typeof ROWS)[number];
 type Mode = 'menu' | 'code' | 'busy' | 'room' | 'error';
 
@@ -59,6 +60,7 @@ export class OnlineScene implements Scene {
 
   private activate(row: RowName): void {
     if (row === 'LOBBY') { sfx('select'); saveMatch(this.m); setScene(new LobbyScene()); return; }
+    if (row === 'TOURNAMENT') { sfx('select'); saveMatch(this.m); setScene(new TournamentScene()); return; }
     if (row === 'RANKED MATCH') { sfx('select'); saveMatch(this.m); setScene(new RankedScene()); return; }
     if (row === 'CREATE ROOM') { this.code = newRoomCode(); this.connect('host'); return; }
     if (row === 'JOIN ROOM') { this.mode = 'code'; this.code = ''; this.typeCode(); sfx('select'); return; }
@@ -178,7 +180,7 @@ export class OnlineScene implements Scene {
     drawText(ui, 'HOW IT WORKS', 26, 184 + db, RED_INK);
     const lines = [
       'LOBBY: SEE WHO IS ON THIS PAGE, CHAT, AND CHALLENGE THEM.',
-      'RANKED MATCH FINDS A RIVAL NEAR YOUR RATING (BEST OF 3).',
+      'RANKED MATCH FINDS A RIVAL NEAR YOUR RATING. TOURNAMENT: A BRACKET.',
       'FOR A FRIENDLY, ONE PLAYER PICKS CREATE ROOM AND SHARES THE CODE.',
       'THE OTHER OPENS THIS SAME PAGE, PICKS JOIN ROOM, TYPES IT IN.',
       'THEN BOTH PICK FIGHTERS AND VOTE ON THE STAGE. NO PAUSE ONLINE.',
@@ -199,7 +201,7 @@ export class OnlineScene implements Scene {
       zone(`row:${i}`, RX - 6, y - 1, RW + 12, rh - 1);
       if (on) selRow(ui, RX - 6, y - 1, RW + 12, rh - 2);
       if (on && tick % 8 < 6) drawText(ui, '→', RX, ty, PAPER);
-      if (row === 'LOBBY' || row === 'RANKED MATCH' || row === 'CREATE ROOM' || row === 'JOIN ROOM') {
+      if (row === 'LOBBY' || row === 'RANKED MATCH' || row === 'TOURNAMENT' || row === 'CREATE ROOM' || row === 'JOIN ROOM') {
         drawTextCentered(ui, row, RX + RW / 2, ty, RED_INK, 1, false);
         return;
       }
