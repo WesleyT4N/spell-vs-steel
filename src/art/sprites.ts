@@ -3,6 +3,7 @@
 import type { Ctx } from '../engine/gfx';
 import { HIRES } from './hiresSprites';
 import { FRAMES, type FrameId } from './fighterFrames';
+import { PORTRAITS } from './portraits';
 
 /** Draw the 24px fighters from the reference sheet (art/hi-res) instead of the ~18px Cartridge sprites. */
 export const USE_HIRES = true;
@@ -191,6 +192,15 @@ export function getFrame(cls: ClassId, skin: string, alt: boolean, frame: FrameI
     frameCache.set(key, s);
   }
   return s;
+}
+
+const portraitCache = new Map<string, HTMLCanvasElement>();
+/** A class's character select portrait (art/portraits.ts) in a skin, one canvas pixel per portrait pixel. */
+export function getPortrait(cls: ClassId, skin: string): HTMLCanvasElement {
+  const key = `${cls}:${skinOf(cls, skin).id}`;
+  let img = portraitCache.get(key);
+  if (!img) { img = bake({ rows: PORTRAITS[cls] }, skinned(cls, skin, false).pal, 'none'); portraitCache.set(key, img); }
+  return img;
 }
 
 /** Draw with feet at (footX, footY). `flip` mirrors so the sprite faces left. */
