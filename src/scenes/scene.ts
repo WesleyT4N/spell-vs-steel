@@ -1,7 +1,7 @@
 // Scene switching, mouse hit zones and small UI widgets shared by the menus.
 import type { Ctx } from '../engine/gfx';
-import { P, UW, UH, frame } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
+import { win, selRow, plaque, footer, sepia, toInk, INK, INK2, TRIM } from './skin';
 import { mouse } from '../engine/input';
 import { touchActive, touchText, type PadMode } from '../engine/touch';
 
@@ -66,11 +66,8 @@ export function listMouse(prefix: string, sel: number, onHover: (i: number) => v
   return mouse.click ? h : -1;
 }
 
-/** Darken the whole layer (for overlays). */
-export function dim(c: Ctx, a = 0.6): void {
-  c.fillStyle = `rgba(0,0,0,${a})`;
-  c.fillRect(0, 0, c.canvas.width, c.canvas.height);
-}
+/** Darken the whole layer with a warm wash (for overlays). */
+export function dim(c: Ctx, a = 0.6): void { sepia(c, a); }
 
 /** A vertical menu on the UI layer; each row is a clickable `menu:i` zone. */
 export function drawMenu(c: Ctx, items: string[], sel: number, cx: number, y: number, tick: number, opts: { gap?: number; width?: number; disabled?: boolean[]; scale?: number } = {}): void {
@@ -78,28 +75,28 @@ export function drawMenu(c: Ctx, items: string[], sel: number, cx: number, y: nu
   const gap = opts.gap ?? 20;
   const w = opts.width ?? Math.max(...items.map(t => textWidth(t, s))) + 48;
   const x = Math.round(cx - w / 2);
-  frame(c, x, y - 6, w, items.length * gap + 6, '#000000', '#fcfcfc');
+  win(c, x, y - 8, w, items.length * gap + 10);
   items.forEach((t, i) => {
     const yy = y + i * gap;
     const on = i === sel && showSel();
     const dis = opts.disabled?.[i];
     zone(`menu:${i}`, x + 2, yy - 4, w - 4, gap - 1);
-    if (on) P(c, '#0000a8', x + 2, yy - 4, w - 4, gap - 2);
-    drawTextCentered(c, t, cx, yy + Math.round((gap - 10 - 7 * s) / 2), dis ? '#7c7c7c' : on ? '#fcfcfc' : '#bcbcbc', s, false);
-    if (on && tick % 8 < 6) drawText(c, '→', x + 8, yy + Math.round((gap - 10 - 7 * s) / 2), '#f8b800', s);
+    if (on) selRow(c, x + 6, yy - 4, w - 12, gap - 3);
+    drawTextCentered(c, t, cx, yy + Math.round((gap - 10 - 7 * s) / 2), dis ? TRIM : on ? INK : INK2, s, false);
+    if (on && tick % 8 < 6) drawText(c, '→', x + 9, yy + Math.round((gap - 10 - 7 * s) / 2), '#fce0a8', s);
   });
 }
 
 /** Footer line of control hints on the UI layer. */
 export function hint(c: Ctx, s: string): void {
-  P(c, '#000000', 0, UH - 14, UW, 14);
-  drawTextCentered(c, touchText(s), UW / 2, UH - 11, '#bcbcbc', 1, false);
+  footer(c, touchText(s));
 }
 
 /** A small clickable button; returns nothing, registers the zone `id`. */
 export function button(c: Ctx, id: string, label: string, x: number, y: number, w: number, h: number, on: boolean, color = '#fcfcfc'): void {
   zone(id, x, y, w, h);
   const lit = on || isHot(id);
-  frame(c, x, y, w, h, lit ? '#0000a8' : '#000000', lit ? '#fcfcfc' : '#7c7c7c');
-  drawTextCentered(c, label, x + w / 2, y + Math.round((h - 7) / 2), color, 1, false);
+  const text = plaque(c, x, y, w, h, lit);
+  const ink = toInk(color);
+  drawTextCentered(c, label, x + w / 2, y + Math.round((h - 7) / 2), lit && ink !== TRIM ? text : ink, 1, false);
 }

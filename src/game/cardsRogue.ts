@@ -1,7 +1,6 @@
 // Rogue kit from the design doc's Rogue tab (2026-10-25). Stealth, Poison and backstabs; spells cost Energy, which refills every Draw.
 import type { CastCtx, HitResult } from './battle';
 import type { CardDef } from './cards';
-import { sfx } from '../engine/audio';
 import { TUNING } from './tuning';
 import { ahead, allEnemyPanels, cellsAhead } from './cardUtil';
 
@@ -18,14 +17,12 @@ function backstab(x: CastCtx, hit: (col: number, row: number) => void, window = 
 /** A shadow blade on the given panels. */
 function slash(x: CastCtx, cells: Array<[number, number]>, dmg: number): HitResult {
   for (const [c, r] of cells) x.b.addFx('stab', x.f.side, c, r, 0.25);
-  sfx('slash');
   return x.b.strike(x.f, cells, dmg * x.mult, { spell: true, element: 'shadow' });
 }
 
 /** A dagger thrust from the Rogue's panel over `reach` panels ahead. */
 function thrust(x: CastCtx, reach: number, dmg: number): HitResult {
   x.b.addFx('dagger', x.f.side, x.f.col, x.f.row, 0.2, { reach });
-  sfx('slash');
   return x.b.strike(x.f, cellsAhead(x, 1, reach), dmg * x.mult, { spell: true, element: 'steel' });
 }
 
@@ -37,7 +34,7 @@ export const rogue: CardDef[] = [
   // ---------- Commons ----------
   {
     id: 'vanish', name: 'Vanish', cls: 'rogue', cost: 1, rarity: 'common', element: 'shadow', damaging: false, lock: 0.15,
-    dmg: '-', short: 'Enter Stealth for 3s. Your next attack spell stuns for 1.5s.',
+    dmg: '-', short: 'Enter Stealth for 3s. Your next attack spell stuns for 2s.',
     cast: x => { x.b.stealth(x.f, 3); x.f.st.vanishStun = 10; },
   },
   {
@@ -117,7 +114,6 @@ export const rogue: CardDef[] = [
     cast: x => {
       const col = x.b.frontCol(x.foe.side);
       for (let r = 0; r < 3; r++) x.b.addFx('stab', x.f.side, col, r, 0.25);
-      sfx('slash');
       x.b.strike(x.f, [[col, 0], [col, 1], [col, 2]], 50 * x.mult, { spell: true, element: 'steel' });
     },
     ai: (b, f) => b.foe(f).col === b.frontCol(b.foe(f).side),
@@ -221,9 +217,9 @@ export const rogue: CardDef[] = [
   },
   {
     id: 'kidney_shot', name: 'Kidney Shot', cls: 'rogue', cost: 2, rarity: 'legendary', element: 'steel', damaging: true, lock: 0.3,
-    dmg: '30', short: 'Hit the panel ahead. Stuns 0.5s per spell you cast in the last 3s (max 2s).',
+    dmg: '30', short: 'Hit the panel ahead. Stuns 2s, plus 0.25s per spell you cast in the last 3s (max 2.5s).',
     cast: x => {
-      const stun = Math.min(2, 0.5 * x.castsWithin(3));
+      const stun = Math.min(2.5, 2 + 0.25 * x.castsWithin(3));
       if (thrust(x, 1, 30).dealt > 0 && stun > 0) x.b.stun(x.foe, stun);
     },
     ai: (b, f) => ahead(b, f, 1),

@@ -1,23 +1,23 @@
-// Online Versus lobby: pick your fighter, then create a room (and share its code or link) or join one.
+// Online Versus lobby: create a room (and share its code or link) or join one. Fighters and the stage
+// are picked together once both players are in (see select.ts and stageSelect.ts).
 import { setScene, hint, zone, hot, listMouse, button, showSel, type Scene } from './scene';
-import { PLAYABLE } from '../game/classes';
 import { getArena } from '../game/battleView';
-import { getSprite, drawFighterSprite, teamColor, SKINS, skinOf, type ClassId } from '../art/sprites';
-import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
+import { drawStage } from '../art/arena';
+import { getSprite, drawFighterSprite, teamColor, skinOf } from '../art/sprites';
+import { P, UW, frame, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, captureNextKey, k, mouse } from '../engine/input';
 import { touchActive, touchCodeBox, touchText } from '../engine/touch';
 import { sfx } from '../engine/audio';
 import { loadMatch, saveMatch, playerDeck, type MatchConfig } from '../game/match';
-import { loadCustom, validate, STARTER_NAME } from '../game/deck';
 import { CODE_LEN, isCodeChar, newRoomCode } from '../net/protocol';
 import { NetSession } from '../net/session';
 import { openTransport, pickTransport, type TransportKind } from '../net/transport';
-import { OnlineBattleScene } from './onlineBattle';
+import { CharSelectScene } from './select';
 import { TitleScene } from './title';
+import { win, selRow, banner, PAPER, BURN, INK, INK2, RED_INK, TRIM } from './skin';
 
-const CLASSES: ClassId[] = PLAYABLE;
-const ROWS = ['YOU', 'SKIN', 'DECK', 'MATCH', 'CREATE ROOM', 'JOIN ROOM'] as const;
+const ROWS = ['MATCH', 'CREATE ROOM', 'JOIN ROOM'] as const;
 type RowName = (typeof ROWS)[number];
 type Mode = 'menu' | 'code' | 'busy' | 'room' | 'error';
 
@@ -45,17 +45,9 @@ export class OnlineScene implements Scene {
     });
   }
 
-  private customValid(): boolean {
-    const d = loadCustom(this.m.p1);
-    return !!d && validate(d).length === 0;
-  }
-
   private change(row: RowName, d: 1 | -1): void {
     const cycle = <T>(list: readonly T[], v: T): T => list[(list.indexOf(v) + d + list.length) % list.length];
-    if (row === 'YOU') { this.m.p1 = cycle(CLASSES, this.m.p1); this.m.p1Deck = 'starter'; }
-    else if (row === 'SKIN') this.m.p1Skin[this.m.p1] = cycle(SKINS[this.m.p1].map(s => s.id), skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id);
-    else if (row === 'DECK') this.m.p1Deck = this.m.p1Deck === 'starter' ? 'custom' : 'starter';
-    else if (row === 'MATCH') this.m.bestOf = cycle([1, 3, 5] as const, this.m.bestOf);
+    if (row === 'MATCH') this.m.bestOf = cycle([1, 3, 5] as const, this.m.bestOf);
     else return;
     sfx('move');
     saveMatch(this.m);
@@ -85,7 +77,6 @@ export class OnlineScene implements Scene {
 
   private async connect(role: 'host' | 'guest'): Promise<void> {
     if (!this.kind) return;
-    if (this.m.p1Deck === 'custom' && !this.customValid()) { this.fail('YOUR CUSTOM DECK IS NOT READY'); return; }
     this.mode = 'busy';
     this.msg = role === 'host' ? 'OPENING ROOM...' : `JOINING ${this.code}...`;
     this.waitT = 0;
@@ -138,8 +129,7 @@ export class OnlineScene implements Scene {
       const net = this.net!;
       net.tick();
       if (net.status === 'error' || net.status === 'left') { this.net = null; this.fail(net.status === 'left' ? 'THE OTHER PLAYER LEFT' : net.error); return; }
-      if (net.matched && net.myReady === 0) { net.myReady = 1; sfx('confirm'); }
-      if (net.matched && net.remoteReady >= 1 && net.myReady >= 1) { setScene(new OnlineBattleScene(net, [0, 0], 1)); return; }
+      if (net.matched) { sfx('confirm'); setScene(new CharSelectScene(net)); return; }
       if (mouse.click && hot('btn') === 1) this.copy();
       if (back || (mouse.click && hot('btn') === 2)) this.cancel();
       return;
@@ -160,106 +150,101 @@ export class OnlineScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    getArena().draw(c, tick, 0);
-    c.fillStyle = 'rgba(0,0,24,0.6)';
-    c.fillRect(0, 0, W, H);
-    drawTextCentered(ui, 'ONLINE VERSUS', UW / 2, 8, '#f8b800', 2);
+    drawStage(c, getArena(), tick);
+    c.fillStyle = 'rgba(40,20,0,0.35)';
+    c.fillRect(...screenRect());
+    banner(ui, 'ONLINE VERSUS', UW / 2, 3);
 
     // your fighter
     const skin = skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id;
     const bob = Math.floor(tick / 4) % 2;
-    frame(ui, 16, 36, 104, 124, '#000000', teamColor(this.m.p1, skin, false));
-    drawTextCentered(ui, 'YOU', 68, 42, '#fcfcfc', 1, false);
+    win(ui, 16, 36, 104, 124, { accent: teamColor(this.m.p1, skin, false) });
+    drawTextCentered(ui, 'YOU', 68, 46, RED_INK, 1, false);
     drawFighterSprite(ui, getSprite(this.m.p1, skin, false), 68, 140 - bob * 2, false, 'none', 4);
-    const deck = this.m.p1Deck === 'starter' ? STARTER_NAME[this.m.p1].toUpperCase() : 'CUSTOM';
-    drawTextCentered(ui, deck, 68, 148, '#bcbcbc', 1, false);
 
     if (this.mode === 'menu') this.drawRows(ui, tick);
     else this.drawPanel(ui, tick);
 
     // how it connects
-    P(ui, 'rgba(0,0,0,0.75)', 16, 176, UW - 32, 112);
-    frame(ui, 16, 176, UW - 32, 112, '#000000', '#7c7c7c');
-    drawText(ui, 'HOW IT WORKS', 26, 184, '#f8b800');
+    win(ui, 16, 176, UW - 32, 112);
+    drawText(ui, 'HOW IT WORKS', 26, 184, RED_INK);
     const lines = [
       'ONE PLAYER PICKS CREATE ROOM AND SHARES THE 5-LETTER CODE.',
       'THE OTHER OPENS THIS SAME PAGE, PICKS JOIN ROOM, TYPES IT IN.',
-      'THE HOST\'S MATCH LENGTH IS USED. EITHER PLAYER CAN OPEN THE',
-      'DRAW SCREEN. THE FIGHT WAITS UNTIL BOTH HAVE PICKED.',
-      'THERE IS NO PAUSE ONLINE. ESC OPENS A MENU TO LEAVE.',
+      'THEN BOTH PICK FIGHTERS AND VOTE ON THE STAGE (SPLIT VOTES',
+      'FLIP A COIN). THE HOST\'S MATCH LENGTH IS USED. EITHER PLAYER',
+      'CAN OPEN THE DRAW SCREEN. THERE IS NO PAUSE ONLINE.',
     ];
-    lines.forEach((l, i) => drawText(ui, l, 26, 198 + i * 12, '#bcbcbc'));
-    drawText(ui, `NETWORK: ${this.kind ? NET_NAME[this.kind] : 'CHECKING...'}`, 26, 266, '#7c7c7c');
+    lines.forEach((l, i) => drawText(ui, l, 26, 198 + i * 12, INK2));
+    drawText(ui, `NETWORK: ${this.kind ? NET_NAME[this.kind] : 'CHECKING...'}`, 26, 266, TRIM);
     hint(ui, this.mode === 'code' ? (touchActive() ? 'TYPE THE CODE, THEN TAP JOIN' : 'TYPE THE CODE   ENTER: JOIN   ESC: BACK')
       : this.mode === 'menu' ? `CLICK OR ${k('attack')}: SELECT   ${k('left')}/${k('right')}: CHANGE   ${k('cast')} / RIGHT-CLICK: BACK`
         : `${k('cast')} / RIGHT-CLICK: BACK`);
   }
 
   private drawRows(ui: Ctx, tick: number): void {
-    frame(ui, RX - 8, Y0 - 8, RW + 16, ROWS.length * RH + 12, '#000000', '#fcfcfc');
+    win(ui, RX - 8, Y0 - 8, RW + 16, ROWS.length * RH + 12);
     ROWS.forEach((row, i) => {
       const y = Y0 + i * RH, ty = y + 5;
       const on = i === this.sel && showSel();
       zone(`row:${i}`, RX - 6, y - 1, RW + 12, RH - 1);
-      if (on) P(ui, '#0000a8', RX - 6, y - 1, RW + 12, RH - 2);
-      if (on && tick % 8 < 6) drawText(ui, '→', RX, ty, '#f8b800');
+      if (on) selRow(ui, RX - 6, y - 1, RW + 12, RH - 2);
+      if (on && tick % 8 < 6) drawText(ui, '→', RX, ty, PAPER);
       if (row === 'CREATE ROOM' || row === 'JOIN ROOM') {
-        drawTextCentered(ui, row, RX + RW / 2, ty, '#f8b800', 1, false);
+        drawTextCentered(ui, row, RX + RW / 2, ty, RED_INK, 1, false);
         return;
       }
-      drawText(ui, row, RX + 14, ty, on ? '#fcfcfc' : '#bcbcbc');
+      drawText(ui, row, RX + 14, ty, on ? INK : INK2);
       let value = '';
-      if (row === 'YOU') value = this.m.p1.toUpperCase();
-      if (row === 'SKIN') value = skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id.toUpperCase();
-      if (row === 'DECK') value = this.m.p1Deck === 'starter' ? `STARTER: ${STARTER_NAME[this.m.p1].toUpperCase()}` : `CUSTOM${this.customValid() ? '' : ' (NOT READY)'}`;
       if (row === 'MATCH') value = this.m.bestOf === 1 ? 'SINGLE ROUND' : `BEST OF ${this.m.bestOf}`;
       const vx = RX + RW - 16, vw = textWidth(value);
-      drawText(ui, value, vx - vw, ty, '#fcfcfc');
+      drawText(ui, value, vx - vw, ty, INK);
       const ax = vx - vw - 16;
       zone(`arrow:${i * 2}`, ax - 4, y - 1, 14, RH - 2);
       zone(`arrow:${i * 2 + 1}`, vx + 2, y - 1, 14, RH - 2);
-      drawText(ui, '←', ax, ty, hot('arrow') === i * 2 ? '#f8b800' : on ? '#fcfcfc' : '#3c3c3c');
-      drawText(ui, '→', vx + 6, ty, hot('arrow') === i * 2 + 1 ? '#f8b800' : on ? '#fcfcfc' : '#3c3c3c');
+      drawText(ui, '←', ax, ty, hot('arrow') === i * 2 ? RED_INK : on ? INK : BURN);
+      drawText(ui, '→', vx + 6, ty, hot('arrow') === i * 2 + 1 ? RED_INK : on ? INK : BURN);
     });
   }
 
   private drawPanel(ui: Ctx, tick: number): void {
     const x = RX - 8, w = RW + 16;
-    frame(ui, x, 36, w, 124, '#000000', '#fcfcfc');
+    win(ui, x, 36, w, 124);
     const cx = x + w / 2;
     if (this.mode === 'code') {
-      drawTextCentered(ui, 'ENTER ROOM CODE', cx, 48, '#fcfcfc', 1, false);
+      drawTextCentered(ui, 'ENTER ROOM CODE', cx, 48, INK, 1, false);
       for (let i = 0; i < CODE_LEN; i++) {
         const bx = cx - (CODE_LEN * 30) / 2 + i * 30;
-        frame(ui, bx, 66, 26, 30, '#000000', i === this.code.length && tick % 8 < 5 ? '#f8b800' : '#7c7c7c');
-        if (this.code[i]) drawTextCentered(ui, this.code[i], bx + 13, 73, '#f8b800', 2, false);
+        frame(ui, bx, 66, 26, 30, '#f0c880', i === this.code.length && tick % 8 < 5 ? RED_INK : TRIM);
+        if (this.code[i]) drawTextCentered(ui, this.code[i], bx + 13, 73, RED_INK, 2, false);
       }
       // phones type into a hidden text box over the code boxes
       touchCodeBox(cx - (CODE_LEN * 30) / 2, 66, CODE_LEN * 30, 30, this.code,
         v => [...v.toUpperCase()].filter(isCodeChar).join('').slice(0, CODE_LEN),
         v => { if (v.length > this.code.length) sfx('move'); this.code = v; },
         () => { if (this.code.length === CODE_LEN) { captureNextKey(null); this.connect('guest'); } });
-      if (touchActive()) drawTextCentered(ui, this.code.length === CODE_LEN ? '' : 'TAP THE BOXES TO TYPE', cx, 102, '#7c7c7c', 1, false);
-      if (this.code.length === CODE_LEN) button(ui, 'btn:0', 'JOIN', cx - 40, 112, 80, 20, false, '#f8b800');
+      if (touchActive()) drawTextCentered(ui, this.code.length === CODE_LEN ? '' : 'TAP THE BOXES TO TYPE', cx, 102, TRIM, 1, false);
+      if (this.code.length === CODE_LEN) button(ui, 'btn:0', 'JOIN', cx - 40, 112, 80, 20, false, RED_INK);
       return;
     }
-    if (this.mode === 'busy') { drawTextCentered(ui, this.msg, cx, 92, '#f8b800', 1, false); return; }
+    if (this.mode === 'busy') { drawTextCentered(ui, this.msg, cx, 92, RED_INK, 1, false); return; }
     if (this.mode === 'error') {
-      drawTextCentered(ui, this.msg, cx, 84, '#f83800', 1, false);
-      drawTextCentered(ui, touchText('CLICK TO GO BACK'), cx, 104, '#7c7c7c', 1, false);
+      drawTextCentered(ui, this.msg, cx, 84, RED_INK, 1, false);
+      drawTextCentered(ui, touchText('CLICK TO GO BACK'), cx, 104, TRIM, 1, false);
       return;
     }
     const net = this.net!;
     const host = net.role === 'host';
-    drawTextCentered(ui, host ? 'ROOM CODE' : 'JOINED ROOM', cx, 46, '#bcbcbc', 1, false);
-    drawTextCentered(ui, this.code, cx, 60, '#f8b800', 4, false);
+    drawTextCentered(ui, host ? 'ROOM CODE' : 'JOINED ROOM', cx, 46, INK2, 1, false);
+    drawTextCentered(ui, this.code, cx, 60, RED_INK, 4, false);
     const rival = net.rival;
     let status: string;
     if (!net.matched) status = host ? 'WAITING FOR A RIVAL TO JOIN' : this.waitT > 12 ? 'NO HOST YET: CHECK THE CODE' : 'WAITING FOR THE HOST';
     else status = `RIVAL: ${rival!.cls.toUpperCase()}   STARTING...`;
-    drawTextCentered(ui, tick % 8 < 6 || net.matched ? status : '', cx, 100, net.matched ? '#58d854' : '#fcfcfc', 1, false);
+    drawTextCentered(ui, tick % 8 < 6 || net.matched ? status : '', cx, 100, net.matched ? '#007800' : INK, 1, false);
     if (rival) P(ui, teamColor(rival.cls, rival.skin, false), cx - textWidth(status) / 2 - 12, 100, 7, 7);
-    if (host) button(ui, 'btn:1', this.copied > 0 ? 'COPIED!' : this.kind === 'room' ? 'COPY CODE' : 'COPY LINK', cx - 104, 128, 100, 20, false, '#fcfcfc');
-    button(ui, 'btn:2', 'CANCEL', host ? cx + 4 : cx - 50, 128, 100, 20, false, '#bcbcbc');
+    if (host) button(ui, 'btn:1', this.copied > 0 ? 'COPIED!' : this.kind === 'room' ? 'COPY CODE' : 'COPY LINK', cx - 104, 128, 100, 20, false, INK);
+    button(ui, 'btn:2', 'CANCEL', host ? cx + 4 : cx - 50, 128, 100, 20, false, INK2);
   }
 }
+
