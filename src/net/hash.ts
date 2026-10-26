@@ -14,6 +14,7 @@ export function battleHash(b: Battle): number {
   for (const p of b.pets) parts.push(p.kind, p.t, p.cd);
   for (const w of b.walls) parts.push(w.col, w.row, w.hp, w.t);
   for (const p of b.projectiles) parts.push(p.kind, p.row, p.x);
+  for (const w of b.warns) parts.push(w.col, w.row, w.t);
   parts.push(b.timers.length);
   // FNV-1a over the text
   const s = parts.join('|');
