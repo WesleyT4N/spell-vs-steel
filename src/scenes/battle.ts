@@ -23,8 +23,10 @@ import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
 import { drawCardDetail, drawCardFace, resName, resInk, RES_INK, CARD_W, CARD_H, PICKED } from './cardView';
 import { CardPreview } from './cardPreview';
-import { win, plaque, pip, disc, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, BLUE_INK, WAX_HI, GOLD } from './skin';
+import { win, plaque, pip, disc, banner, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, BLUE_INK, WAX_HI, GOLD } from './skin';
 import { CharSelectScene } from './select';
+import { StatsPanel, type StatsData } from './statsView';
+import { trackStats, roundRecord, setTotals, topSpell, type BattleStats, type RoundRecord } from '../game/stats';
 import { TitleScene } from './title';
 import { OptionsScene } from './options';
 
@@ -56,15 +58,21 @@ export class BattleScene implements Scene {
   protected timed = true;
   /** The clip of the card being read on the Draw screen. */
   private preview = new CardPreview();
+  /** Post-match stats for this round; they only watch the battle, never change it. */
+  stats: BattleStats;
+  statsPanel = new StatsPanel();
 
-  /** Rounds won in the current set, by side. `battle` lets online play hand in a seeded battle. */
-  /** Rounds won in the current set, by side. `battle` lets online play hand in a seeded battle. `ctl`: who plays each side. */
-  constructor(public m: MatchConfig, public score: [number, number] = [0, 0], battle?: Battle, public ctl: [Ctl, Ctl] = ['player', 'cpu']) {
+  /**
+   * Rounds won in the current set, by side, and the stats of the rounds already played.
+   * `battle` lets online play hand in a seeded battle. `ctl`: who plays each side.
+   */
+  constructor(public m: MatchConfig, public score: [number, number] = [0, 0], battle?: Battle, public rounds: RoundRecord[] = [], public ctl: [Ctl, Ctl] = ['player', 'cpu']) {
     this.b = battle ?? new Battle(
       { cls: m.p1, deck: sideDeck(m, 0), name: sideName(ctl, 0), skin: m.p1Skin[m.p1] },
       { cls: m.cpu, deck: sideDeck(m, 1), name: sideName(ctl, 1), skin: m.cpuSkin[m.cpu] },
     );
     this.cpu = new Cpu(m.difficulty);
+    this.stats = trackStats(this.b);
     if (ctl[0] === 'cpu') this.cpu0 = new Cpu(m.difficulty);
     this.me = this.home;
     this.rivalName = sideName(ctl, this.home === 0 ? 1 : 0);
@@ -141,6 +149,7 @@ export class BattleScene implements Scene {
       this.ended = true;
       resetSel();
       if (b.winner !== null) this.score[b.winner]++;
+      this.rounds.push(roundRecord(b, this.stats));
       stopMusic();
       if (b.winner !== null && (b.winner === this.me || this.ctl[b.winner] === 'player' || this.watching)) sfx('win');
       playMusic('result', RESULT_SONG);
@@ -250,7 +259,7 @@ export class BattleScene implements Scene {
       sfx('select');
       if (this.pauseSel === 0) this.paused = false;
       if (this.pauseSel === 1) setScene(new OptionsScene(() => setScene(this)));
-      if (this.pauseSel === 2) setScene(new BattleScene(this.m, this.score, undefined, this.ctl));
+      if (this.pauseSel === 2) setScene(new BattleScene(this.m, this.score, undefined, this.rounds, this.ctl));
       if (this.pauseSel === 3) { stopMusic(); setScene(new TitleScene()); }
     }
   }
@@ -271,6 +280,7 @@ export class BattleScene implements Scene {
   }
 
   protected updateResult(dt: number): void {
+    this.statsPanel.update(this.statsData());
     const items = this.resultItems.length;
     const clicked = listMouse('menu', this.resultSel, i => { this.resultSel = i; sfx('move'); });
     if (clicked >= 0) this.resultSel = clicked;
@@ -280,8 +290,8 @@ export class BattleScene implements Scene {
       sfx('select');
       stopMusic();
       const choice = this.resultItems[this.resultSel];
-      if (choice === 'NEXT ROUND') setScene(new BattleScene(this.m, this.score, undefined, this.ctl));
-      if (choice === 'REMATCH') setScene(new BattleScene(this.m, [0, 0], undefined, this.ctl));
+      if (choice === 'NEXT ROUND') setScene(new BattleScene(this.m, this.score, undefined, this.rounds, this.ctl));
+      if (choice === 'REMATCH') setScene(new BattleScene(this.m, [0, 0], undefined, [], this.ctl));
       if (choice === 'CHARACTER SELECT') setScene(new CharSelectScene());
       if (choice === 'TITLE') setScene(new TitleScene());
     }
@@ -308,35 +318,57 @@ export class BattleScene implements Scene {
       drawTextCentered(ui, s, UW / 2, 124, s === 'FIGHT!' ? '#f8b800' : '#fcfcfc', 6);
     }
     if (b.phase === 'ko' && b.koT > 0.4) drawTextCentered(ui, 'K.O.', UW / 2, 116, '#f83800', 6);
-    if (b.phase === 'over') {
-      dim(ui, 0.45);
-      const won = b.winner === this.me, shared = this.humans.length !== 1;
-      if (shared && (this.m.bestOf === 1 || !this.setOver)) {
-        // sharing a screen or watching: name the winner instead of "you"
-        const who = b.winner === null ? '' : b.f[b.winner].name;
-        drawTextCentered(ui, b.winner === null ? 'DRAW' : this.m.bestOf === 1 ? `${who} WINS!` : `${who} TAKES THE ROUND`, UW / 2, this.m.bestOf === 1 ? 64 : 56, '#f8b800', this.m.bestOf === 1 ? 5 : 3);
-        if (this.m.bestOf > 1) drawTextCentered(ui, `${b.f[0].name} ${this.score[0]} - ${this.score[1]} ${b.f[1].name}`, UW / 2, 104, '#fcfcfc', 2);
-      } else if (shared) {
-        const top: Side = this.score[0] >= this.need ? 0 : 1;
-        drawTextCentered(ui, `${b.f[top].name} WINS THE SET!`, UW / 2, 56, '#f8b800', 3);
-        drawTextCentered(ui, `${b.f[0].name} ${this.score[0]} - ${this.score[1]} ${b.f[1].name}`, UW / 2, 104, '#fcfcfc', 2);
-      } else if (this.m.bestOf === 1) {
-        drawTextCentered(ui, won ? 'YOU WIN!' : 'YOU LOSE', UW / 2, 64, won ? '#f8b800' : '#bcbcbc', 5);
-      } else {
-        const setWon = this.score[this.me] >= this.need;
-        const title = this.setOver ? (setWon ? 'SET WON!' : 'SET LOST') : won ? 'ROUND WON' : 'ROUND LOST';
-        drawTextCentered(ui, title, UW / 2, 56, won ? '#f8b800' : '#bcbcbc', 4);
-        drawTextCentered(ui, `YOU ${this.score[this.me]} - ${this.score[1 - this.me]} ${this.rivalName}`, UW / 2, 104, '#fcfcfc', 2);
-      }
-      drawMenu(ui, this.resultItems, this.resultSel, UW / 2, 160, tick, { width: 200, gap: 24 });
-      hint(ui, `CLICK OR ${k('attack')}: SELECT`);
-    }
+    if (b.phase === 'over') this.drawResult(ui, tick);
     if (this.paused) {
       dim(ui, 0.55);
       drawTextCentered(ui, 'PAUSED', UW / 2, 76, '#fcfcfc', 4);
       drawMenu(ui, this.pauseItems, this.pauseSel, UW / 2, 130, tick, { width: 200, gap: 24 });
       hint(ui, `CLICK OR ${k('attack')}: SELECT   ${k('cast')} / RIGHT-CLICK: RESUME`);
     }
+  }
+
+  /** What the stats panel shows: this round, or the whole set once a best-of set is decided. */
+  protected statsData(): StatsData {
+    const me = this.me, names: [string, string] = this.humans.length !== 1 ? [this.b.f[0].name, this.b.f[1].name] : me === 0 ? ['YOU', this.rivalName] : [this.rivalName, 'YOU'];
+    const set = this.m.bestOf > 1;
+    const totals = set && this.setOver && this.rounds.length > 1 ? setTotals(this.rounds) : null;
+    const scope = totals ? `SET OF ${this.rounds.length}` : set ? `ROUND ${Math.max(1, this.rounds.length)}` : 'THIS MATCH';
+    return { me, names, fighters: this.b.f, shown: totals ?? this.stats.side, scope, rounds: set ? this.rounds : [], current: this.stats };
+  }
+
+  /** Results: the outcome on a banner, the stats panel, and the menu with your best spell beside it. */
+  private drawResult(ui: Ctx, tick: number): void {
+    const b = this.b;
+    dim(ui, 0.55);
+    const won = b.winner === this.me;
+    const setWon = this.score[this.me] >= this.need;
+    let title = this.m.bestOf === 1 ? (b.winner === null ? 'DRAW' : won ? 'YOU WIN!' : 'YOU LOSE')
+      : this.setOver ? (setWon ? 'SET WON!' : 'SET LOST') : won ? 'ROUND WON' : 'ROUND LOST';
+    let score = `YOU ${this.score[this.me]} - ${this.score[1 - this.me]} ${this.rivalName}`;
+    if (this.humans.length !== 1) {
+      // sharing a screen or watching: name the winner instead of "you"
+      const top: Side = this.setOver ? (this.score[0] >= this.need ? 0 : 1) : (b.winner ?? 0);
+      const who = b.f[top].name;
+      title = b.winner === null && !this.setOver ? 'DRAW' : this.m.bestOf === 1 ? `${who} WINS!` : this.setOver ? `${who} WINS THE SET` : `${who} WINS THE ROUND`;
+      score = `${b.f[0].name} ${this.score[0]} - ${this.score[1]} ${b.f[1].name}`;
+    }
+    banner(ui, title, UW / 2, 6);
+    if (this.m.bestOf > 1) drawTextCentered(ui, score, UW / 2, 34, '#fcfcfc');
+    const data = this.statsData();
+    this.statsPanel.draw(ui, data, 8, 46, 344, 254);
+    const items = this.resultItems;
+    drawMenu(ui, items, this.resultSel, 416, 62, tick, { width: 112, gap: 22 });
+    // your best spell of the round (or set), as a card
+    const best = topSpell(data.shown[this.me]);
+    if (best) {
+      const y = 62 + items.length * 22 + 14;
+      win(ui, 368, y, 96, 152, { burn: 3 });
+      drawTextCentered(ui, 'BEST SPELL', 416, y + 8, RED_INK, 1, false);
+      drawCardFace(ui, CARDS[best[0]], 378, y + 20);
+      const done = best[1].heal > best[1].dmg ? `+${Math.round(best[1].heal)} HEALED` : `${Math.round(best[1].dmg)} DAMAGE`;
+      drawTextCentered(ui, done, 416, y + 130, INK, 1, false);
+    }
+    hint(ui, `CLICK OR ${k('attack')}: SELECT   ${k('left')}/${k('right')}: STATS TABS`);
   }
 
   private drawCustom(c: Ctx, tick: number, ui: Ctx): void {
