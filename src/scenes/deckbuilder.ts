@@ -113,7 +113,8 @@ export class DeckBuilderScene implements Scene {
       else if (navPressed('left', dt)) this.change(card, -1);
       else if (wasPressed('cast')) { this.change(card, -1); return; }
     } else if (wasPressed('confirm')) this.special(this.sel);
-    if (wasPressed('back') && !card) this.exit();
+    // BACK leaves even with a card selected (the cast key removes a copy first, above)
+    if (wasPressed('back')) this.exit();
   }
 
   private exit(): void {
