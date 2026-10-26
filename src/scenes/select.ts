@@ -188,7 +188,7 @@ export class CharSelectScene implements Scene {
   private activateChip(c: Chip): void {
     if (c === 'DECK') { this.toggleDeck(0); return; }
     else if (c === 'EDIT DECK') { this.editDeck(this.local ? this.focus : 0); return; }
-    else if (c === 'CPU LEVEL') { this.m.difficulty = this.m.difficulty === 'easy' ? 'normal' : 'easy'; sfx('move'); }
+    else if (c === 'CPU LEVEL') { this.m.difficulty = this.m.difficulty === 'easy' ? 'normal' : this.m.difficulty === 'normal' ? 'hard' : 'easy'; sfx('move'); }
     else if (c === 'MATCH') { const o = [1, 3, 5] as const; this.m.bestOf = o[(o.indexOf(this.m.bestOf) + 1) % o.length]; sfx('move'); }
     else if (c === 'NEXT') { this.next(); return; }
     saveMatch(this.m);
