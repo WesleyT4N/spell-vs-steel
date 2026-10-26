@@ -14,6 +14,7 @@ import { Rollback } from '../src/net/rollback';
 import { saveBattle, loadBattle } from '../src/net/snapshot';
 import type { NetInput } from '../src/net/protocol';
 import { recordRound, TapeWriter, type RoundTape } from '../src/game/replay';
+import type { BattleEvent } from '../src/game/events';
 
 const N = Number(process.argv[2] ?? 25);
 const MAX_LAT = Number(process.argv[3] ?? 14);
@@ -31,6 +32,8 @@ for (let m = 0; m < N; m++) {
 
   // 1. the reference battle, straight through; CPUs make the inputs and picks
   const x = make(), xs = trackStats(x);
+  const seen: Record<string, number> = {};
+  x.sink = (e: BattleEvent) => { seen[e.type] = (seen[e.type] ?? 0) + 1; };
   let xTape: RoundTape | null = null;
   recordRound(x, t => { xTape = t; });
   const cpus = [new Cpu('normal'), new Cpu('normal')];
@@ -52,10 +55,15 @@ for (let m = 0; m < N; m++) {
     hashes.push(battleHash(x));
   }
   frames += ins.length;
+  // the battle tells its listeners what happened (audio plays these)
+  if (!seen.cast || !seen.hit || !seen.sound) { failures++; console.log(`match ${m}: missing battle events ${JSON.stringify(seen)}`); }
+  if (x.phase === 'over' && x.winner !== null && seen.ko !== 1) { failures++; console.log(`match ${m}: ${seen.ko ?? 0} K.O. events`); }
 
   // 2. each machine through rollback, the rival's inputs arriving 0..MAX_LAT frames late with spikes
   for (const me of [0, 1] as Side[]) {
     const y = make(), ys = trackStats(y);
+    const sink = (): void => {};
+    y.sink = sink;
     const net = seeded(seed * 31 + me);
     let remoteKnown = 0, bad = '';
     const rb = new Rollback(y, me, {
@@ -88,6 +96,7 @@ for (let m = 0; m < N; m++) {
     if (!bad && y.phase !== x.phase) bad = `never finished (frame ${rb.frame}/${ins.length}, confirmed ${rb.confirmed})`;
     if (!bad && battleHash(y) !== hashes[hashes.length - 1]) bad = 'final state differs';
     if (!bad && y.winner !== x.winner) bad = 'different winner';
+    if (!bad && y.sink !== sink) bad = 'event listener lost after a rollback';
     if (!bad && JSON.stringify(ys) !== JSON.stringify(xs)) bad = 'post-match stats differ';
     if (!bad && xTape && JSON.stringify({ ...w.finish(), hash: 0 }) !== JSON.stringify({ ...(xTape as RoundTape), hash: 0 })) { const a = w.finish(), c = xTape as RoundTape; bad = `replay tape differs: n ${a.n}/${c.n} ev ${JSON.stringify(a.events.slice(0,4))} vs ${JSON.stringify(c.events.slice(0,4))} fr ${a.frames.length}/${c.frames.length} hash ${a.hash === c.hash}`; }
     totalRb += rb.rollbacks;
