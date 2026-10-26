@@ -1,6 +1,8 @@
 // Training mode: a fight that never ends, for testing decks. The dummy's behavior, both sides' HP and
 // resources, and the Draw gauge are set from the pause menu; R puts both fighters back to the start of the turn.
-import { setScene, dim, hint, zone, hot, showSel } from './scene';
+import { setScene, dim, hint, zone, hot, showSel, drawMenu, listMouse } from './scene';
+import { clearStats } from '../game/stats';
+import type { StatsData } from './statsView';
 import { NO_INTENT, heavyChargeOf, type Battle, type Dir, type Fighter, type Intent } from '../game/battle';
 import { Cpu } from '../game/ai';
 import { CARDS } from '../game/cards';
@@ -132,6 +134,9 @@ export class TrainingScene extends BattleScene {
   private lastDmgT = -99;
   private menuSel = 0;
   private resetT = 0;
+  /** The stats panel, opened from the pause menu over the paused fight. */
+  private statsOpen = false;
+  private statsSel = 0;
 
   constructor(m: MatchConfig) {
     // one endless round, so no round counter
@@ -162,6 +167,7 @@ export class TrainingScene extends BattleScene {
       { label: 'DRAW GAUGE', value: () => (s.gauge === 'full' ? 'ALWAYS FULL' : 'NORMAL'), change: () => { s.gauge = s.gauge === 'full' ? 'normal' : 'full'; } },
       { label: touchActive() ? 'RESET POSITIONS' : 'RESET POSITIONS (R)', act: () => { this.paused = false; this.reset(); } },
       { label: 'NEW HAND NOW', act: () => { this.paused = false; this.newHand(); } },
+      { label: 'SESSION STATS', act: () => { this.statsOpen = true; this.statsSel = 0; this.paused = true; } },
       { label: 'RESTART FROM TURN 1', act: () => setScene(new TrainingScene(this.m)) },
       { label: 'CHARACTER SELECT', act: () => { stopMusic(); setScene(new CharSelectScene(undefined, 0, 'training')); } },
       { label: 'QUIT TO TITLE', act: () => { stopMusic(); setScene(new TitleScene()); } },
@@ -244,6 +250,7 @@ export class TrainingScene extends BattleScene {
   }
 
   protected updatePause(dt: number): void {
+    if (this.statsOpen) { this.updateStats(dt); return; }
     const rows = this.rows, n = rows.length;
     const h = hot('trow'), arrow = hot('tarrow');
     if (mouse.moved && h >= 0 && h !== this.menuSel) { this.menuSel = h; sfx('move'); }
@@ -266,7 +273,28 @@ export class TrainingScene extends BattleScene {
     if (pr.change) { pr.change(1); sfx('move'); this.close(false); return; }
     sfx('select');
     pr.act?.();
-    this.close();
+    if (!this.statsOpen) this.close();
+  }
+
+  private static readonly STATS_ITEMS = ['BACK', 'CLEAR STATS'];
+
+  /** The session stats: tabs on left/right, BACK or CLEAR STATS, right-click or the back key returns to the menu. */
+  private updateStats(dt: number): void {
+    this.statsPanel.update(this.statsData());
+    const n = TrainingScene.STATS_ITEMS.length;
+    const clicked = listMouse('menu', this.statsSel, i => { this.statsSel = i; sfx('move'); });
+    if (mouse.rclick || (wasPressed('back') && !wasPressed('pause'))) { this.statsOpen = false; sfx('back'); return; }
+    if (navPressed('up', dt)) { this.statsSel = (this.statsSel + n - 1) % n; sfx('move'); }
+    if (navPressed('down', dt)) { this.statsSel = (this.statsSel + 1) % n; sfx('move'); }
+    const pick = clicked >= 0 ? clicked : wasPressed('confirm') || wasPressed('pause') ? this.statsSel : -1;
+    if (pick < 0) return;
+    sfx('select');
+    if (pick === 0) this.statsOpen = false;
+    else clearStats(this.stats);
+  }
+
+  protected statsData(): StatsData {
+    return { ...super.statsData(), scope: 'THIS SESSION', rounds: [] };
   }
 
   /** Remember the settings; `resume` also leaves the menu. */
@@ -283,7 +311,16 @@ export class TrainingScene extends BattleScene {
     const b = this.b;
     if (b.phase === 'fight' || b.phase === 'ko') this.drawReadout(ui, tick);
     if (this.resetT > 0 && b.phase === 'fight') drawTextCentered(ui, 'RESET', UW / 2, 124, '#58d854', 4);
-    if (paused) this.drawMenu(ui, tick);
+    if (paused && this.statsOpen) this.drawStats(ui, tick);
+    else if (paused) this.drawMenu(ui, tick);
+  }
+
+  private drawStats(ui: Ctx, tick: number): void {
+    dim(ui, 0.6);
+    banner(ui, 'TRAINING STATS', UW / 2, 6);
+    this.statsPanel.draw(ui, this.statsData(), 8, 46, 344, 254);
+    drawMenu(ui, TrainingScene.STATS_ITEMS, this.statsSel, 416, 62, tick, { width: 112, gap: 22 });
+    hint(ui, `CLICK OR ${k('attack')}: SELECT   ${k('left')}/${k('right')}: TABS   ${k('cast')} / RIGHT-CLICK: BACK`);
   }
 
   /** Fighting-game damage readout, under the Draw gauge. */
