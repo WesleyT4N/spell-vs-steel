@@ -11,6 +11,7 @@ const SHOT_SOUND: Partial<Record<string, string>> = { fireball: 'shot_fireball',
 export const panOf = (col: number): number => (col - 2.5) / 3;
 import { seeded, randomSeed, shuffle } from './rng';
 import { CLASS_INFO } from './classes';
+import { ComboTracker, cantAct } from './combo';
 export { shuffle };
 
 export const COLS = 6, ROWS = 3;
@@ -100,12 +101,10 @@ export interface Fighter {
   stillT: number;
   lastCol: number;
   lastRow: number;
-  /** Healing done since the last Draw screen (Atonement). */
-  healedTurn: number;
+  /** Priest DoTs on this fighter (Shadow Word: Pain, Devouring Plague). */
+  dots: Dot[];
   /** Damage this fighter took from the enemy while Death Marked. */
   deathMarkAcc: number;
-  /** Prayer of Mending: heals left. */
-  mending: number;
   /** Visual: seconds of hit flash. */
   flash: number;
   /** Visual: current pose. */
@@ -117,21 +116,26 @@ export interface Fighter {
 export type StatusKey =
   | 'frozen' | 'stunned' | 'flinch' | 'iceBlock' | 'roared' | 'berserk' | 'avatar' | 'ascendance'
   | 'lastStand' | 'reflect' | 'counterspell' | 'mortal' | 'evoLock' | 'noKnock' | 'frostNova' | 'glacial'
-  // Rogue, Ranger, Cleric
+  // Rogue, Ranger, Priest
   | 'stealth' | 'silenced' | 'rooted' | 'sleep' | 'untargetable' | 'evasion' | 'spellImmune' | 'deadlyPoison'
   | 'deathMark' | 'hunted' | 'revealed' | 'shadowDance' | 'nightsEmbrace' | 'pandemic' | 'lightFoot' | 'focus' | 'rapidFire' | 'deadeye'
-  | 'tripwire' | 'painSup' | 'guardian' | 'ascension' | 'avatarLight' | 'purified' | 'mending' | 'channel'
+  | 'tripwire' | 'channel' | 'weakened' | 'powerInfusion' | 'halo' | 'shadowform'
   | 'vanishStun' | 'backstab' | 'riposte' | 'adrenaline' | 'decoy';
 
 const STATUS_KEYS: StatusKey[] = ['frozen', 'stunned', 'flinch', 'iceBlock', 'roared', 'berserk', 'avatar', 'ascendance', 'lastStand', 'reflect', 'counterspell', 'mortal', 'evoLock', 'noKnock', 'frostNova', 'glacial',
   'stealth', 'silenced', 'rooted', 'sleep', 'untargetable', 'evasion', 'spellImmune', 'deadlyPoison', 'deathMark', 'hunted', 'revealed', 'shadowDance', 'nightsEmbrace', 'pandemic', 'lightFoot', 'focus', 'rapidFire', 'deadeye',
-  'tripwire', 'painSup', 'guardian', 'ascension', 'avatarLight', 'purified', 'mending', 'channel',
+  'tripwire', 'channel', 'weakened', 'powerInfusion', 'halo', 'shadowform',
   'vanishStun', 'backstab', 'riposte', 'adrenaline', 'decoy'];
 
 /** Buffs a dispel (Purge) strips. */
-export const BUFF_KEYS: StatusKey[] = ['berserk', 'avatar', 'ascendance', 'lastStand', 'reflect', 'counterspell', 'noKnock', 'frostNova', 'stealth', 'untargetable', 'evasion', 'spellImmune', 'deadlyPoison', 'shadowDance', 'nightsEmbrace', 'lightFoot', 'focus', 'rapidFire', 'deadeye', 'tripwire', 'painSup', 'guardian', 'ascension', 'avatarLight', 'purified', 'mending', 'vanishStun', 'riposte', 'adrenaline', 'decoy'];
-/** Debuffs a cleanse removes (and Purify blocks). */
-const DEBUFF_KEYS: StatusKey[] = ['frozen', 'stunned', 'silenced', 'rooted', 'sleep', 'roared', 'mortal', 'deathMark', 'hunted', 'revealed'];
+export const BUFF_KEYS: StatusKey[] = ['berserk', 'avatar', 'ascendance', 'lastStand', 'reflect', 'counterspell', 'noKnock', 'frostNova', 'stealth', 'untargetable', 'evasion', 'spellImmune', 'deadlyPoison', 'shadowDance', 'nightsEmbrace', 'lightFoot', 'focus', 'rapidFire', 'deadeye', 'tripwire', 'powerInfusion', 'halo', 'shadowform', 'vanishStun', 'riposte', 'adrenaline', 'decoy'];
+/** Debuffs a cleanse removes. */
+const DEBUFF_KEYS: StatusKey[] = ['frozen', 'stunned', 'silenced', 'rooted', 'sleep', 'roared', 'mortal', 'deathMark', 'hunted', 'revealed', 'weakened'];
+
+/** What a blessed panel gives the Priest standing on it. Holy Sanctum's panels give all four. */
+export type BlessKind = 'heal' | 'mana' | 'shield' | 'power' | 'all';
+/** A Priest damage over time, ticking once a second. */
+export interface Dot { id: string; dps: number; t: number; acc: number; src: Side }
 
 export interface Panel {
   owner: Side;
@@ -146,13 +150,17 @@ export interface Panel {
   toxic: number;
   toxicSide: Side;
   toxicAcc: number;
-  /** Blessed panels heal their owner standing on them. */
+  /** Blessed panels help their owner standing on them, until the next Draw screen. One blessing per panel. */
   bless: number;
+  blessKind: BlessKind;
   blessAcc: number;
-  /** Holy fire (Consecration): like burning, drawn gold. */
-  smite: number;
-  smiteDps: number;
-  smiteAcc: number;
+  manaAcc: number;
+  /** Cursed panels hurt and Weaken an enemy of `curseSide` standing on them, until the next Draw screen. */
+  curse: number;
+  curseSide: Side;
+  curseAcc: number;
+  /** Curse ticks the current victim has taken without stepping off (damage ramps). */
+  curseTicks: number;
   /** Smokescreen: the owner's side is stealthed while standing in it. */
   smoke: number;
   smokeSide: Side;
@@ -178,7 +186,10 @@ export interface Projectile {
   dead?: boolean;
 }
 
+/** A tutorial highlight on a panel (lesson guidance, not danger). */
 export interface Mark { col: number; row: number; t: number; color: string }
+/** A danger telegraph: a panel an area spell is about to hit. Every class's area spells use the same flash (BN style). */
+export interface Warn { col: number; row: number; t: number; dur: number; side: Side }
 /** A hidden Ranger trap. Only its owner sees it. */
 /** Traps last until the next Draw screen. A Tripwire is one trap per panel of a column, sharing a `group`. */
 export interface Trap { side: Side; col: number; row: number; arm: number; kind: 'freeze' | 'explode' | 'mine' | 'blast' | 'wire'; group?: number; fired?: boolean }
@@ -217,6 +228,7 @@ export class Battle {
   walls: Wall[] = [];
   projectiles: Projectile[] = [];
   marks: Mark[] = [];
+  warns: Warn[] = [];
   traps: Trap[] = [];
   pets: Pet[] = [];
   texts: FloatText[] = [];
@@ -239,6 +251,8 @@ export class Battle {
   cheer = 0;
   /** Damage dealt by each side, split by source (for tuning). */
   stats = [{ basic: 0, spell: 0, other: 0 }, { basic: 0, spell: 0, other: 0 }];
+  /** True combo counter (display only, not part of the rules). */
+  combo = new ComboTracker();
 
   /** Every random roll in the rules comes from here, so two machines given the same seed play the same battle. */
   rand: ReturnType<typeof seeded>;
@@ -258,7 +272,7 @@ export class Battle {
       this.panels[c] = [];
       for (let r = 0; r < ROWS; r++) {
         const owner: Side = c < 3 ? 0 : 1;
-        this.panels[c][r] = { owner, baseOwner: owner, ownerT: 0, burn: 0, burnDps: 0, burnAcc: 0, cracked: false, hole: 0, toxic: 0, toxicSide: 0, toxicAcc: 0, bless: 0, blessAcc: 0, smite: 0, smiteDps: 0, smiteAcc: 0, smoke: 0, smokeSide: 0 };
+        this.panels[c][r] = { owner, baseOwner: owner, ownerT: 0, burn: 0, burnDps: 0, burnAcc: 0, cracked: false, hole: 0, toxic: 0, toxicSide: 0, toxicAcc: 0, bless: 0, blessKind: 'heal', blessAcc: 0, manaAcc: 0, curse: 0, curseSide: 0, curseAcc: 0, curseTicks: 0, smoke: 0, smokeSide: 0 };
       }
     }
   }
@@ -272,10 +286,11 @@ export class Battle {
       const fresh = makeFighter(f.side, { cls: f.cls, deck: [], name: f.name, skin: f.skin }, f.alt, this.rand);
       return { ...fresh, deck: f.deck, discard: f.discard, resMax: f.resMax };
     }) as [Fighter, Fighter];
-    this.walls = []; this.projectiles = []; this.marks = []; this.traps = []; this.pets = [];
+    this.walls = []; this.projectiles = []; this.marks = []; this.warns = []; this.traps = []; this.pets = [];
     this.texts = []; this.fx = []; this.timers = []; this.anims = [];
     this.clearPanels();
     this.shake = 0; this.cheer = 0;
+    this.combo.reset();
   }
 
   foe(f: Fighter): Fighter { return this.f[1 - f.side]; }
@@ -311,7 +326,17 @@ export class Battle {
     this.fx.push({ t: 0, dur, kind, side, col, row, data });
     sfxFx(kind, { pan: panOf(col), dur, data: { ...data, d: side === 0 ? 1 : -1 } });
   }
-  mark(col: number, row: number, dur: number, color: string): void { if (this.inGrid(col, row)) this.marks.push({ col, row, t: dur, color }); }
+  /**
+   * The standard area-spell telegraph: `cells` flash for `delay` seconds, then `hit` runs. Pass TUNING.warnTime unless the
+   * spell has a longer telegraph of its own. Everything here runs on the battle clock, so it stays in lockstep online.
+   */
+  warn(att: Fighter | Side, cells: Array<[number, number]>, delay: number, hit?: () => void): void {
+    const side = typeof att === 'number' ? att : att.side;
+    for (const [col, row] of cells) if (this.inGrid(col, row)) this.warns.push({ col, row, t: delay, dur: delay, side });
+    if (hit) this.later(delay, hit);
+  }
+  /** Is this panel about to be hit by `side`'s enemy? */
+  warned(col: number, row: number, side?: Side): boolean { return this.warns.some(w => w.col === col && w.row === row && w.side !== side); }
   text(f: Fighter, s: string, color: string): void {
     this.texts.push({ x: f.col, y: f.row, text: s, color, t: 0 });
   }
@@ -320,8 +345,9 @@ export class Battle {
   beginCustom(): void {
     this.phase = 'custom';
     this.turn++;
-    // traps last until the next Draw screen
+    // traps, blessings and curses last until the next Draw screen
     this.traps = [];
+    for (const col of this.panels) for (const p of col) { p.bless = 0; p.curse = 0; }
     for (const f of this.f) {
       this.blinkHome(f);
       // uncast picks from last turn are discarded
@@ -335,10 +361,12 @@ export class Battle {
         f.res = Math.max(f.res, TUNING.rogue.energyTopUp);
       } else if (f.cls === 'ranger' && this.turn > 1) {
         f.res = Math.min(TUNING.ranger.energyCap, f.res + 1);
-      } else if (f.cls === 'cleric' && this.turn > 1) {
-        f.res = Math.min(TUNING.cleric.manaCap, f.res + TUNING.cleric.manaPerDraw);
+      } else if (f.cls === 'priest' && this.turn > 1) {
+        f.res = Math.min(TUNING.priest.manaCap, f.res + TUNING.priest.manaPerDraw);
       }
-      f.healedTurn = 0;
+      // the shield pool and Shadowform last one round
+      f.shields = f.shields.filter(s => s.kind !== 'holy');
+      f.st.shadowform = 0;
       const hand: string[] = [];
       while (hand.length < TUNING.handSize) {
         if (!f.deck.length) {
@@ -401,6 +429,8 @@ export class Battle {
     this.anims = this.anims.filter(a => a.t < a.dur);
     for (const m of this.marks) m.t -= dt;
     this.marks = this.marks.filter(m => m.t > 0);
+    for (const w of this.warns) w.t -= dt;
+    this.warns = this.warns.filter(w => w.t > 0);
 
     this.updatePanels(dt);
     this.updateWalls(dt);
@@ -409,6 +439,7 @@ export class Battle {
     this.updateTraps(dt);
     this.updatePets(dt);
     this.updateZones();
+    this.combo.update(this, dt);
 
     for (const f of this.f) {
       if (!f.dead && f.hp <= 0 && this.noKo) {
@@ -444,15 +475,18 @@ export class Battle {
         }
         if (p.burn <= 0) { p.burn = 0; p.burnDps = 0; }
       }
-      if (p.smite > 0) {
-        p.smite -= dt;
-        p.smiteAcc += dt;
-        if (p.smiteAcc >= TUNING.burnTick) {
-          p.smiteAcc -= TUNING.burnTick;
-          const v = this.fighterAt(c, r);
-          if (v && v.side === p.owner) this.damage(v, Math.round(p.smiteDps * TUNING.burnTick), this.foe(v), { element: 'holy', noFlinch: true, dot: true });
-        }
-        if (p.smite <= 0) { p.smite = 0; p.smiteDps = 0; }
+      if (p.curse > 0) {
+        const v = this.fighterAt(c, r);
+        if (v && v.side !== p.curseSide) {
+          p.curseAcc += dt;
+          if (p.curseAcc >= 1) {
+            // each second spent on the same curse hurts more, so standing still is punished
+            p.curseAcc -= 1;
+            const P = TUNING.priest, dmg = Math.min(P.curseDps + P.curseRamp * p.curseTicks, P.curseMax);
+            p.curseTicks++;
+            this.damage(v, dmg, this.f[p.curseSide], { element: 'shadow', noFlinch: true, dot: true });
+          }
+        } else { p.curseAcc = 0; p.curseTicks = 0; }
       }
       if (p.toxic > 0) {
         p.toxic -= dt;
@@ -466,14 +500,21 @@ export class Battle {
       }
       if (p.smoke > 0) p.smoke = Math.max(0, p.smoke - dt);
       if (p.bless > 0) {
-        p.bless -= dt;
+        // blessings only work while their owner stands on them
+        const v = this.fighterAt(c, r);
+        if (!v || v.side !== p.owner) { p.blessAcc = 0; p.manaAcc = 0; continue; }
+        const k = p.blessKind, T = TUNING.priest;
         p.blessAcc += dt;
+        p.manaAcc += dt;
         if (p.blessAcc >= 1) {
           p.blessAcc -= 1;
-          const v = this.fighterAt(c, r);
-          if (v && v.side === p.owner) this.heal(v, TUNING.blessHps);
+          if (k === 'heal' || k === 'all') this.heal(v, TUNING.blessHps);
+          if (k === 'shield' || k === 'all') this.addHolyShield(v, T.blessShieldPerSec, 999);
         }
-        if (p.bless <= 0) p.bless = 0;
+        if (p.manaAcc >= T.blessManaSeconds) {
+          p.manaAcc -= T.blessManaSeconds;
+          if ((k === 'mana' || k === 'all') && v.res < T.manaCap) this.gainRes(v, 1);
+        }
       }
     }
   }
@@ -561,7 +602,7 @@ export class Battle {
       if (f.st.glacial > 0 && foe.st.frozen <= 0 && foe.st.iceBlock <= 0) {
         const wallCol = this.walls.find(w => w.side === f.side && w.kind === 'glacial')?.col;
         if (wallCol !== undefined && foe.col === wallCol + this.dir(f) && foe.glacialCd <= 0) {
-          this.freeze(foe, 2);
+          this.freeze(foe, 2.5);
           foe.glacialCd = 3;
         }
       }
@@ -589,6 +630,7 @@ export class Battle {
     if (f.poseT === 0) f.pose = 'idle';
     if (f.dead) return;
     this.updatePoison(f, dt);
+    this.updateDots(f, dt);
     if (f.cls === 'ranger') {
       // Energy comes from standing still; any change of panel restarts the count
       // (Light Footed keeps the count through moves; Deadeye doubles the rate)
@@ -656,7 +698,6 @@ export class Battle {
       if (dmg > 0) { this.addFx('stab', f.side, f.col, f.row, 0.4); this.damage(f, dmg, this.foe(f), { spell: true, element: 'shadow' }); }
     }
     if (k === 'nightsEmbrace') f.st.stealth = 0;
-    if (k === 'mending') f.mending = 0;
     if (k === 'backstab') this.blinkHome(f);
   }
 
@@ -724,7 +765,7 @@ export class Battle {
   costOf(f: Fighter, card: CardDef): number {
     if (f.st.avatar > 0 || f.st.ascendance > 0) return 0;
     if (card.cost === 'all') return Math.max(1, f.res);
-    return Math.max(0, card.cost - (f.powerLeft > 0 ? 1 : 0));
+    return Math.max(0, card.cost - (f.powerLeft > 0 ? 1 : 0) - (f.st.powerInfusion > 0 ? 1 : 0));
   }
 
   canAfford(f: Fighter, card: CardDef): boolean {
@@ -835,7 +876,7 @@ export class Battle {
         }
       }
     } else {
-      const T = TUNING.cleric;
+      const T = TUNING.priest;
       f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
       if (kind === 'light') {
         const end = this.rowShot(f, T.lightDamage, { basic: kind, element: 'holy' });
@@ -844,7 +885,7 @@ export class Battle {
         // Smite: a pillar of light a fixed distance ahead
         const c = f.col + T.smiteRange * d;
         this.addFx('holyPillar', f.side, c, f.row, 0.4);
-        const res = this.strike(f, [[c, f.row]], T.heavyDamage, { basic: kind, element: 'holy' });
+        const res = this.strike(f, [[c, f.row]], T.heavyDamage, { basic: kind, element: 'holy', knockback: T.smiteKnock > 0 });
         if (res.fighter && res.dealt > 0) this.heal(f, T.smiteHeal);
       }
     }
@@ -864,7 +905,7 @@ export class Battle {
         const broke = opts.breaks && !w.invuln;
         this.hitWall(w, broke ? w.hp : dmg, att, opts);
         if (broke) res.broke = true;
-        if (w.kind === 'glacial' && att.glacialCd <= 0) { this.freeze(att, 2); att.glacialCd = 3; }
+        if (w.kind === 'glacial' && att.glacialCd <= 0) { this.freeze(att, 2.5); att.glacialCd = 3; }
       }
       if (!foe.dead && foe.col === c && foe.row === r && !res.fighter) {
         const out = this.damage(foe, dmg, att, opts);
@@ -934,7 +975,7 @@ export class Battle {
   }
 
   addPoison(t: Fighter, n: number): void {
-    if (t.dead || t.st.iceBlock > 0 || t.st.purified > 0 || n <= 0) return;
+    if (t.dead || t.st.iceBlock > 0 || n <= 0) return;
     const cap = t.st.pandemic > 0 ? 5 : TUNING.poisonMaxStacks;
     t.poison = Math.min(cap, t.poison + n);
     t.poisonT = TUNING.poisonSeconds;
@@ -953,40 +994,87 @@ export class Battle {
     if (f.poisonT <= 0) { f.poison = 0; f.poisonAcc = 0; }
   }
 
+  /** Put a Priest DoT on `t`, picking them wherever they are (misses in Stealth). Recasting refreshes it. */
+  addDot(t: Fighter, src: Fighter, id: string, dps: number, secs: number): boolean {
+    if (t.dead || t.st.iceBlock > 0) return false;
+    if (!this.targetable(t)) { this.text(t, 'MISS', '#bcbcbc'); return false; }
+    t.dots = [...t.dots.filter(d => d.id !== id), { id, dps, t: secs, acc: 0, src: src.side }];
+    this.addFx('shadowHit', src.side, t.col, t.row, 0.35);
+    return true;
+  }
+
+  /** Is this fighter standing on a panel the other side cursed? */
+  onCurse(f: Fighter): boolean {
+    const p = this.panels[f.col][f.row];
+    return p.curse > 0 && p.curseSide !== f.side;
+  }
+
+  private updateDots(f: Fighter, dt: number): void {
+    if (!f.dots.length) return;
+    for (const d of f.dots) {
+      // Shadowform: the caster's DoTs tick twice as fast; Devouring Plague lasts twice as long on a cursed panel
+      const rate = this.f[d.src].st.shadowform > 0 ? 2 : 1;
+      d.t -= dt * (d.id === 'devouring_plague' && this.onCurse(f) ? 0.5 : 1);
+      d.acc += dt * rate;
+      while (d.acc >= 1 && d.t > -1e-6) {
+        d.acc -= 1;
+        this.damage(f, d.dps, this.f[d.src], { element: 'shadow', noFlinch: true, dot: true, spell: true });
+      }
+    }
+    f.dots = f.dots.filter(d => d.t > 0);
+  }
+
   /** Remove Poison, the fire under you, freeze and other debuffs. Pandemic Poison stays. */
   cleanse(f: Fighter): void {
     if (f.st.pandemic <= 0) { f.poison = 0; f.poisonT = 0; }
     const p = this.panels[f.col][f.row];
-    p.burn = 0; p.burnDps = 0; p.smite = 0;
+    p.burn = 0; p.burnDps = 0;
+    f.dots = [];
     for (const k of DEBUFF_KEYS) f.st[k] = 0;
     f.deathMarkAcc = 0;
     this.addFx('healBurst', f.side, f.col, f.row, 0.4);
   }
 
   silence(f: Fighter, t: number): void {
-    if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
+    if (f.dead || f.st.iceBlock > 0) return;
     f.st.silenced = Math.max(f.st.silenced, t);
     this.text(f, 'SILENCED', '#9878f8');
   }
 
   root(f: Fighter, t: number): void {
-    if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
+    if (f.dead || f.st.iceBlock > 0) return;
     f.st.rooted = Math.max(f.st.rooted, t);
     this.text(f, 'ROOTED', '#58d854');
   }
 
   /** A stun that any damage breaks (Blind, Wyvern Sting). */
   sleep(f: Fighter, t: number): void {
-    if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
+    if (f.dead || f.st.iceBlock > 0) return;
     f.st.sleep = Math.max(f.st.sleep, t);
     f.charging = false;
     this.text(f, 'ASLEEP', '#9878f8');
   }
 
-  /** Bless a panel of the owner's area for `t` seconds. */
-  bless(col: number, row: number, t: number): void {
+  /** Bless a panel until the next Draw screen. A new blessing replaces the old one and clears enemy traps. */
+  bless(col: number, row: number, kind: BlessKind): void {
     const p = this.panel(col, row);
-    if (p && p.hole <= 0) p.bless = Math.max(p.bless, t);
+    if (!p || p.hole > 0) return;
+    p.bless = 999; p.blessKind = kind; p.blessAcc = 0; p.manaAcc = 0;
+    // holy ground clears any enemy trap hidden on it
+    this.traps = this.traps.filter(t => !(t.col === col && t.row === row && t.side !== p.owner));
+  }
+
+  /** Curse an enemy panel of `side` until the next Draw screen. */
+  curse(side: Side, col: number, row: number): void {
+    const p = this.panel(col, row);
+    if (!p || p.owner === side) return;
+    p.curse = 999; p.curseSide = side;
+  }
+
+  /** The blessing under a fighter, if they own it. */
+  blessUnder(f: Fighter): BlessKind | null {
+    const p = this.panels[f.col][f.row];
+    return p.bless > 0 && p.owner === f.side ? p.blessKind : null;
   }
 
   hitWall(w: Wall, dmg: number, _src: Fighter | null, _opts: HitOpts): void {
@@ -996,7 +1084,7 @@ export class Battle {
   }
 
   freeze(f: Fighter, t: number): void {
-    if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
+    if (f.dead || f.st.iceBlock > 0) return;
     f.st.frozen = Math.max(f.st.frozen, t, TUNING.ccMin);
     f.charging = false;
     this.text(f, 'FROZEN', '#3cbcfc');
@@ -1004,7 +1092,7 @@ export class Battle {
   }
 
   stun(f: Fighter, t: number): void {
-    if (f.dead || f.st.iceBlock > 0 || f.st.purified > 0) return;
+    if (f.dead || f.st.iceBlock > 0) return;
     f.st.stunned = Math.max(f.st.stunned, t, TUNING.ccMin);
     f.charging = false;
     this.text(f, 'STUN', '#f8b800');
@@ -1012,19 +1100,11 @@ export class Battle {
 
   heal(f: Fighter, amt: number): void {
     if (f.dead) return;
-    if (f.st.avatarLight > 0) amt *= 2;
     if (f.st.mortal > 0) amt = Math.round(amt / 2);
     amt = Math.round(amt);
     f.hp = Math.min(f.maxHp, f.hp + amt);
-    f.healedTurn += amt;
     this.text(f, '+' + amt, '#58d854');
     sfx('heal', { pan: panOf(f.col) });
-    // Avatar of Light: every heal also smites the enemy for the same amount
-    if (f.st.avatarLight > 0) {
-      const foe = this.foe(f);
-      this.addFx('holyPillar', f.side, foe.col, foe.row, 0.35);
-      this.damage(foe, amt, f, { spell: true, element: 'holy', noFlinch: true });
-    }
   }
 
   /** Core damage pipeline: immunity, guard, multipliers, shields, last stand, Rage. */
@@ -1059,12 +1139,15 @@ export class Battle {
       return out;
     }
 
+    const locked = cantAct(target);
     let amt = base;
     if (src && src.st.roared > 0) amt *= 0.7;
     if (target.st.frozen > 0 || target.st.stunned > 0 || target.st.sleep > 0) amt *= TUNING.frozenBonus;
     // Steady Focus: the rooted Ranger hits harder
     if (src && src.st.focus > 0) amt *= TUNING.ranger.focusBonus;
-    if (target.st.painSup > 0) amt *= 0.5;
+    // Weakened (Hex, or standing on a cursed panel) doesn't stack; Hallowed Ground boosts its owner
+    if (src && (src.st.weakened > 0 || this.onCurse(src))) amt *= TUNING.priest.weakened;
+    if (src) { const k = this.blessUnder(src); if (k === 'power' || k === 'all') amt *= TUNING.priest.hallowedBonus; }
     // any hit wakes a sleeping target (that hit still got the bonus)
     if (target.st.sleep > 0 && !opts.dot) target.st.sleep = 0;
 
@@ -1108,23 +1191,10 @@ export class Battle {
       target.lastStandAbsorbed += amt;
       amt = Math.min(amt, target.hp - 1);
     }
-    if (target.st.ascension > 0) amt = Math.min(amt, target.hp - 1);
-    if (target.st.guardian > 0 && amt >= target.hp) {
-      target.st.guardian = 0;
-      target.hp = Math.max(target.hp, 200);
-      this.text(target, 'GUARDIAN SPIRIT', '#f8d878');
-      this.addFx('healBurst', target.side, target.col, target.row, 0.6);
-      sfx('heal', { pan: panOf(target.col) });
-      return out;
-    }
     target.hp = Math.max(0, target.hp - amt);
     out.dealt = amt;
+    this.combo.hit(target, amt, !!opts.dot, locked);
     if (target.st.deathMark > 0 && src && src.side !== target.side) target.deathMarkAcc += amt;
-    if (target.st.mending > 0 && target.mending > 0 && !opts.dot) {
-      target.mending--;
-      if (target.mending <= 0) target.st.mending = 0;
-      this.later(0.05, () => this.heal(target, 30));
-    }
     // Deadly Poison: every basic hit, and each spell once per cast
     if (src && src !== target && !opts.dot && src.st.deadlyPoison > 0 && (opts.basic || (opts.spell && src.dpSeq !== src.castSeq))) {
       if (!opts.basic) src.dpSeq = src.castSeq;
@@ -1138,7 +1208,7 @@ export class Battle {
     target.flash = 0.12;
     target.pose = 'hurt';
     target.poseT = 0.15;
-    this.texts.push({ x: target.col, y: target.row, text: String(amt), color: opts.element === 'fire' ? '#fca044' : opts.element === 'frost' ? '#a4e4fc' : opts.element === 'poison' ? '#b8f818' : opts.element === 'holy' ? '#f8d878' : '#fcfcfc', t: 0 });
+    this.texts.push({ x: target.col, y: target.row, text: String(amt), color: opts.element === 'fire' ? '#fca044' : opts.element === 'frost' ? '#a4e4fc' : opts.element === 'poison' ? '#b8f818' : opts.element === 'holy' ? '#f8d878' : opts.element === 'shadow' ? '#9878f8' : '#fcfcfc', t: 0 });
     if (target.cls === 'warrior') this.gainRage(target, Math.min(TUNING.warrior.rageWhenHitMax, amt / TUNING.warrior.rageDamagePerPip));
     if (amt >= TUNING.flinchThreshold && !opts.noFlinch && target.st.noKnock <= 0 && target.st.avatar <= 0) {
       target.st.flinch = TUNING.flinchTime;
@@ -1202,6 +1272,7 @@ export class Battle {
     if (foe.st.counterspell > 0 && card.id !== 'counterspell') {
       foe.st.counterspell = 0;
       this.text(f, 'COUNTERED', '#f878f8');
+      if (TUNING.mage.counterSilence > 0) this.later(0.3, () => this.silence(f, TUNING.mage.counterSilence));
       const callout = this.fx.find(e => e.kind === 'castName' && e.side === f.side);
       if (callout?.data) callout.data.countered = 1;
       this.addFx('counter', f.side, f.col, f.row, 0.5);
@@ -1306,6 +1377,13 @@ export class Battle {
     return true;
   }
 
+  /** Holy shields share one pool, capped at TUNING.priest.shieldCap. */
+  addHolyShield(f: Fighter, hp: number, t: number): void {
+    const s = f.shields.find(x => x.kind === 'holy');
+    if (s) { s.hp = Math.min(TUNING.priest.shieldCap, s.hp + hp); s.t = Math.max(s.t, t); }
+    else f.shields.push({ kind: 'holy', hp: Math.min(TUNING.priest.shieldCap, hp), t, hits: 0 });
+  }
+
   addShield(f: Fighter, kind: Shield['kind'], hp: number, t: number): void {
     f.shields = f.shields.filter(s => s.kind !== kind);
     f.shields.push({ kind, hp, t, hits: 0 });
@@ -1336,7 +1414,7 @@ export function heavyChargeOf(f: Fighter): number {
 export interface FighterSpec { cls: ClassId; deck: string[]; name: string; skin?: string }
 
 // Rogue Energy tops up at the first Draw screen, so it starts empty here.
-const START_RES: Record<ClassId, number> = { warrior: 0, mage: TUNING.mage.manaStart, rogue: 0, ranger: TUNING.ranger.energyStart, cleric: TUNING.cleric.manaStart };
+const START_RES: Record<ClassId, number> = { warrior: 0, mage: TUNING.mage.manaStart, rogue: 0, ranger: TUNING.ranger.energyStart, priest: TUNING.priest.manaStart };
 
 function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => number): Fighter {
   const { cls, deck, name } = spec;
@@ -1354,7 +1432,7 @@ function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => nu
     shout: 0, rallyLeft: 0, powerLeft: 0, frostNovaUsed: false, lastStandAbsorbed: 0, glacialCd: 0,
     poison: 0, poisonT: 0, poisonAcc: 0, dodges: 0,
     homeCol: -1, homeRow: -1, castTimes: [], castSeq: 0, dpSeq: 0, castStun: 0, coldBlood: false, decoyCol: 0, decoyRow: 0,
-    stillT: 0, lastCol: -1, lastRow: -1, healedTurn: 0, deathMarkAcc: 0, mending: 0,
+    stillT: 0, lastCol: -1, lastRow: -1, dots: [], deathMarkAcc: 0,
     flash: 0, pose: 'idle', poseT: 0, dead: false,
   };
 }

@@ -9,7 +9,7 @@ export const MYTHICS_REQUIRED = 1;
 /** Card id -> copies. */
 export type DeckCounts = Record<string, number>;
 
-const STARTERS: Record<ClassId, DeckCounts> = {
+export const STARTERS: Record<ClassId, DeckCounts> = {
   warrior: {
     step_slash: 4, guard: 3, lunge: 3, iron_skin: 2, shield_wall: 2, execute: 3, chain_hook: 3, shieldbreaker: 2, battle_shout: 2,
     leap_strike: 1, wide_cleave: 1,
@@ -34,16 +34,16 @@ const STARTERS: Record<ClassId, DeckCounts> = {
     kill_shot: 1, explosive_shot: 1,
     deadeye: 1,
   },
-  cleric: {
-    prayer: 3, flash_heal: 3, renew: 2, power_word_shield: 2, purify: 1, sanctuary: 2, holy_fire: 4, penance: 3, holy_nova: 2, hammer_of_justice: 3,
-    holy_wall: 1, atonement: 1,
-    wrath_of_heaven: 1, holy_word_serenity: 1,
-    day_of_judgment: 1,
+  priest: {
+    prayer: 2, flash_heal: 3, holy_fire: 3, penance: 3, power_word_shield: 2, hallowed_ground: 2, sanctuary: 2, shadow_word_pain: 3, devouring_plague: 2, desecrate: 2,
+    wellspring: 1, hex: 1, mind_sear: 1,
+    halo: 1, void_rift: 1,
+    wrath_of_heaven: 1,
   },
 };
 
 export const starterDeck = (cls: ClassId): DeckCounts => ({ ...STARTERS[cls] });
-export const STARTER_NAME: Record<ClassId, string> = { warrior: 'Brawler', mage: 'Elementalist', rogue: 'Assassin', ranger: 'Hunter', cleric: 'Priest' };
+export const STARTER_NAME: Record<ClassId, string> = { warrior: 'Brawler', mage: 'Elementalist', rogue: 'Assassin', ranger: 'Hunter', priest: 'Disciple' };
 
 export const deckSize = (d: DeckCounts): number => Object.values(d).reduce((a, b) => a + b, 0);
 export const countRarity = (d: DeckCounts, r: CardDef['rarity']): number =>

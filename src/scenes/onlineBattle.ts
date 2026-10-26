@@ -7,6 +7,7 @@ import { loadMatch } from '../game/match';
 import { battleHash } from '../net/hash';
 import { NO_INPUT, type NetInput } from '../net/protocol';
 import type { NetSession } from '../net/session';
+import { roundRecord, type RoundRecord } from '../game/stats';
 import { UW, type Ctx } from '../engine/gfx';
 import { drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
@@ -31,13 +32,13 @@ export class OnlineBattleScene extends BattleScene {
   locked = false;
   waitingNext = false;
 
-  constructor(public net: NetSession, score: [number, number], public roundNo: number) {
+  constructor(public net: NetSession, score: [number, number], public roundNo: number, rounds: RoundRecord[] = []) {
     const me: Side = net.side;
     const mine = net.hello, theirs = net.rival!;
     const spec = (h: typeof mine, you: boolean) => ({ cls: h.cls, deck: h.deck.slice(), name: you ? 'YOU' : 'RIVAL', skin: h.skin });
     const specs = me === 0 ? [spec(mine, true), spec(theirs, false)] : [spec(theirs, false), spec(mine, true)];
     const m = { ...loadMatch(), bestOf: net.start!.bestOf };
-    super(m, score, new Battle(specs[0], specs[1], roundSeed(net.start!.seed, roundNo)));
+    super(m, score, new Battle(specs[0], specs[1], roundSeed(net.start!.seed, roundNo)), rounds);
     this.me = me;
     this.rivalName = 'RIVAL';
     this.pauseItems = ['RESUME', 'LEAVE MATCH'];
@@ -107,6 +108,7 @@ export class OnlineBattleScene extends BattleScene {
       this.ended = true;
       resetSel();
       if (b.winner !== null) this.score[b.winner]++;
+      this.rounds.push(roundRecord(b, this.stats));
       this.paused = false;
       stopMusic();
       if (b.winner === this.me) sfx('win');
@@ -131,10 +133,11 @@ export class OnlineBattleScene extends BattleScene {
   protected get resultItems(): string[] { return [this.setOver ? 'REMATCH' : 'NEXT ROUND', 'LEAVE']; }
 
   protected updateResult(dt: number): void {
+    this.statsPanel.update(this.statsData());
     const net = this.net, next = this.roundNo + 1;
     if (this.waitingNext && net.remoteReady >= next) {
       stopMusic();
-      setScene(new OnlineBattleScene(net, this.setOver ? [0, 0] : this.score, next));
+      setScene(new OnlineBattleScene(net, this.setOver ? [0, 0] : this.score, next, this.setOver ? [] : this.rounds));
       return;
     }
     if (this.waitingNext) return;
@@ -181,8 +184,8 @@ export class OnlineBattleScene extends BattleScene {
       drawTextCentered(ui, 'WAITING FOR RIVAL...', UW / 2, 146, RED_INK, 1, false);
     }
     if (b.phase === 'over' && this.waitingNext) {
-      win(ui, UW / 2 - 100, 219, 200, 20, { burn: 3 });
-      drawTextCentered(ui, 'WAITING FOR RIVAL...', UW / 2, 226, RED_INK, 1, false);
+      win(ui, 360, 38, 112, 20, { burn: 3 });
+      drawTextCentered(ui, 'WAITING FOR RIVAL', 416, 45, RED_INK, 1, false);
     }
     if (net.status === 'lost' || net.status === 'left' || net.status === 'error') {
       dim(ui, 0.7);
