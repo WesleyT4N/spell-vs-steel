@@ -21,8 +21,11 @@ import { touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
 import { drawCardDetail, drawCardFace, resName, resInk, RES_INK, CARD_W, CARD_H, PICKED } from './cardView';
-import { win, plaque, pip, disc, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, WAX_HI, GOLD } from './skin';
+import { CardPreview } from './cardPreview';
+import { win, plaque, pip, disc, banner, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, WAX_HI, GOLD } from './skin';
 import { CharSelectScene } from './select';
+import { StatsPanel, type StatsData } from './statsView';
+import { trackStats, roundRecord, setTotals, topSpell, type BattleStats, type RoundRecord } from '../game/stats';
 import { TitleScene } from './title';
 import { OptionsScene } from './options';
 
@@ -47,18 +50,27 @@ export class BattleScene implements Scene {
   me: Side = 0;
   /** False in training: the Draw screen waits for you. */
   protected timed = true;
+  /** The clip of the card being read on the Draw screen. */
+  private preview = new CardPreview();
+  /** Post-match stats for this round; they only watch the battle, never change it. */
+  stats: BattleStats;
+  statsPanel = new StatsPanel();
 
-  /** Rounds won in the current set, by side. `battle` lets online play hand in a seeded battle. */
   /** The CPU's deck this round (a 'random' pick is rolled here). */
   protected cpuDeck: string;
 
-  constructor(public m: MatchConfig, public score: [number, number] = [0, 0], battle?: Battle) {
+  /**
+   * Rounds won in the current set, by side, and the stats of the rounds already played.
+   * `battle` lets online play hand in a seeded battle.
+   */
+  constructor(public m: MatchConfig, public score: [number, number] = [0, 0], battle?: Battle, public rounds: RoundRecord[] = []) {
     this.cpuDeck = rollCpuDeck(m);
     this.b = battle ?? new Battle(
       { cls: m.p1, deck: playerDeck(m), name: 'YOU', skin: m.p1Skin[m.p1] },
       { cls: m.cpu, deck: toList(presetDeck(m.cpu, this.cpuDeck)), name: 'CPU', skin: m.cpuSkin[m.cpu] },
     );
     this.cpu = new Cpu(m.difficulty);
+    this.stats = trackStats(this.b);
   }
 
   enter(): void { playMusic('battle', BATTLE_SONG); }
@@ -110,6 +122,7 @@ export class BattleScene implements Scene {
       this.ended = true;
       resetSel();
       if (b.winner !== null) this.score[b.winner]++;
+      this.rounds.push(roundRecord(b, this.stats));
       stopMusic();
       if (b.winner === this.me) sfx('win');
       playMusic('result', RESULT_SONG);
@@ -132,6 +145,9 @@ export class BattleScene implements Scene {
 
   protected updateCustom(dt: number): void {
     const offer = this.b.offer[this.me];
+    const reading = this.reading();
+    this.preview.show(reading >= 0 ? CARDS[offer[reading]] : null);
+    this.preview.update(dt);
     const rows = offer.length + 1;
     for (let i = 0; i < offer.length; i++) {
       const cur = this.lift[i] ?? 0, to = this.level(i) * LIFT;
@@ -159,6 +175,13 @@ export class BattleScene implements Scene {
     if (wasPressed('custom') || (wasPressed('pause') && !wasPressed('confirm'))) { this.confirmCustom(); return; }
     if (wasPressed('confirm')) { this.choose(true); return; }
     if (wasPressed('cast') && this.picks.length) { this.picks.pop(); sfx('back'); }
+  }
+
+  /** The hand card under the pointer, or under the key cursor; -1 when none is being read. */
+  private reading(): number {
+    const n = this.b.offer[this.me].length;
+    const i = this.mouseMode ? hot('card') : showSel() ? this.cursor : -1;
+    return i >= 0 && i < n ? i : -1;
   }
 
   /** Raise level of hand card `i`: 0 resting, 1 hovered, 2 picked. */
@@ -192,7 +215,7 @@ export class BattleScene implements Scene {
       sfx('select');
       if (this.pauseSel === 0) this.paused = false;
       if (this.pauseSel === 1) setScene(new OptionsScene(() => setScene(this)));
-      if (this.pauseSel === 2) setScene(new BattleScene(this.m, this.score));
+      if (this.pauseSel === 2) setScene(new BattleScene(this.m, this.score, undefined, this.rounds));
       if (this.pauseSel === 3) { stopMusic(); setScene(new TitleScene()); }
     }
   }
@@ -209,6 +232,7 @@ export class BattleScene implements Scene {
   }
 
   protected updateResult(dt: number): void {
+    this.statsPanel.update(this.statsData());
     const items = this.resultItems.length;
     const clicked = listMouse('menu', this.resultSel, i => { this.resultSel = i; sfx('move'); });
     if (clicked >= 0) this.resultSel = clicked;
@@ -218,7 +242,7 @@ export class BattleScene implements Scene {
       sfx('select');
       stopMusic();
       const choice = this.resultItems[this.resultSel];
-      if (choice === 'NEXT ROUND') setScene(new BattleScene(this.m, this.score));
+      if (choice === 'NEXT ROUND') setScene(new BattleScene(this.m, this.score, undefined, this.rounds));
       if (choice === 'REMATCH') setScene(new BattleScene(this.m));
       if (choice === 'CHARACTER SELECT') setScene(new CharSelectScene());
       if (choice === 'TITLE') setScene(new TitleScene());
@@ -239,26 +263,49 @@ export class BattleScene implements Scene {
       drawTextCentered(ui, s, UW / 2, 124, s === 'FIGHT!' ? '#f8b800' : '#fcfcfc', 6);
     }
     if (b.phase === 'ko' && b.koT > 0.4) drawTextCentered(ui, 'K.O.', UW / 2, 116, '#f83800', 6);
-    if (b.phase === 'over') {
-      dim(ui, 0.45);
-      const won = b.winner === this.me;
-      if (this.m.bestOf === 1) {
-        drawTextCentered(ui, won ? 'YOU WIN!' : 'YOU LOSE', UW / 2, 64, won ? '#f8b800' : '#bcbcbc', 5);
-      } else {
-        const setWon = this.score[this.me] >= this.need;
-        const title = this.setOver ? (setWon ? 'SET WON!' : 'SET LOST') : won ? 'ROUND WON' : 'ROUND LOST';
-        drawTextCentered(ui, title, UW / 2, 56, won ? '#f8b800' : '#bcbcbc', 4);
-        drawTextCentered(ui, `YOU ${this.score[this.me]} - ${this.score[1 - this.me]} ${this.rivalName}`, UW / 2, 104, '#fcfcfc', 2);
-      }
-      drawMenu(ui, this.resultItems, this.resultSel, UW / 2, 160, tick, { width: 200, gap: 24 });
-      hint(ui, `CLICK OR ${k('attack')}: SELECT`);
-    }
+    if (b.phase === 'over') this.drawResult(ui, tick);
     if (this.paused) {
       dim(ui, 0.55);
       drawTextCentered(ui, 'PAUSED', UW / 2, 76, '#fcfcfc', 4);
       drawMenu(ui, this.pauseItems, this.pauseSel, UW / 2, 130, tick, { width: 200, gap: 24 });
       hint(ui, `CLICK OR ${k('attack')}: SELECT   ${k('cast')} / RIGHT-CLICK: RESUME`);
     }
+  }
+
+  /** What the stats panel shows: this round, or the whole set once a best-of set is decided. */
+  protected statsData(): StatsData {
+    const me = this.me, names: [string, string] = me === 0 ? ['YOU', this.rivalName] : [this.rivalName, 'YOU'];
+    const set = this.m.bestOf > 1;
+    const totals = set && this.setOver && this.rounds.length > 1 ? setTotals(this.rounds) : null;
+    const scope = totals ? `SET OF ${this.rounds.length}` : set ? `ROUND ${Math.max(1, this.rounds.length)}` : 'THIS MATCH';
+    return { me, names, fighters: this.b.f, shown: totals ?? this.stats.side, scope, rounds: set ? this.rounds : [], current: this.stats };
+  }
+
+  /** Results: the outcome on a banner, the stats panel, and the menu with your best spell beside it. */
+  private drawResult(ui: Ctx, tick: number): void {
+    const b = this.b;
+    dim(ui, 0.55);
+    const won = b.winner === this.me;
+    const setWon = this.score[this.me] >= this.need;
+    const title = this.m.bestOf === 1 ? (b.winner === null ? 'DRAW' : won ? 'YOU WIN!' : 'YOU LOSE')
+      : this.setOver ? (setWon ? 'SET WON!' : 'SET LOST') : won ? 'ROUND WON' : 'ROUND LOST';
+    banner(ui, title, UW / 2, 6);
+    if (this.m.bestOf > 1) drawTextCentered(ui, `YOU ${this.score[this.me]} - ${this.score[1 - this.me]} ${this.rivalName}`, UW / 2, 34, '#fcfcfc');
+    const data = this.statsData();
+    this.statsPanel.draw(ui, data, 8, 46, 344, 254);
+    const items = this.resultItems;
+    drawMenu(ui, items, this.resultSel, 416, 62, tick, { width: 112, gap: 22 });
+    // your best spell of the round (or set), as a card
+    const best = topSpell(data.shown[this.me]);
+    if (best) {
+      const y = 62 + items.length * 22 + 14;
+      win(ui, 368, y, 96, 152, { burn: 3 });
+      drawTextCentered(ui, 'BEST SPELL', 416, y + 8, RED_INK, 1, false);
+      drawCardFace(ui, CARDS[best[0]], 378, y + 20);
+      const done = best[1].heal > best[1].dmg ? `+${Math.round(best[1].heal)} HEALED` : `${Math.round(best[1].dmg)} DAMAGE`;
+      drawTextCentered(ui, done, 416, y + 130, INK, 1, false);
+    }
+    hint(ui, `CLICK OR ${k('attack')}: SELECT   ${k('left')}/${k('right')}: STATS TABS`);
   }
 
   private drawCustom(c: Ctx, tick: number, ui: Ctx): void {
@@ -301,21 +348,10 @@ export class BattleScene implements Scene {
       drawText(ui, this.rivalDeckText(), 18, 102, TRIM);
     }
 
-    // right: cast order
+    // right: the clip of the card being read, else the cast order
     win(ui, 244, 34, 228, 98);
-    drawText(ui, 'CAST ORDER', 254, 44, PICKED);
-    if (!this.picks.length) drawText(ui, touchText('CLICK CARDS TO QUEUE THEM'), 254, 60, TRIM);
-    this.picks.slice(0, 5).forEach((i, n) => {
-      const cd = CARDS[offer[i]], y = 58 + n * 12;
-      drawText(ui, `${n + 1}`, 254, y, PICKED);
-      P(ui, ELEMENT_COLOR[cd.element], 266, y, 3, 7);
-      drawText(ui, cd.name.toUpperCase(), 274, y, INK);
-      drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, short[i] > 0 ? (builds ? resInk(cd) : RED_INK) : INK);
-    });
-    const info = CLASS_INFO[f.cls];
-    const over = !builds && this.picks.some(i => short[i] > 0);
-    drawText(ui, `TOTAL COST ${total}`, 254, 118, over ? RED_INK : INK2);
-    drawText(ui, info.refill, 462 - info.refill.length * 6, 118, TRIM);
+    if (this.reading() >= 0) this.preview.draw(ui, 252, 41, 212, 84);
+    else this.drawCastOrder(ui, short, builds, total);
 
     // fight button: red wax, ringed in gold when it has the cursor
     const onOk = this.cursor === offer.length && showSel();
@@ -336,6 +372,23 @@ export class BattleScene implements Scene {
       if (!this.mouseMode && this.cursor === i && showSel() && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, GOLD, 1, true);
     });
     hint(ui, `CLICK: PICK  RIGHT-CLICK: UNDO   KEYS: ${k('left')}/${k('right')} + ${k('attack')}  ${k('cast')} UNDO  ${k('custom')} FIGHT`);
+  }
+
+  private drawCastOrder(ui: Ctx, short: number[], builds: boolean, total: number): void {
+    const f = this.b.f[this.me], offer = this.b.offer[this.me];
+    drawText(ui, 'CAST ORDER', 254, 44, PICKED);
+    if (!this.picks.length) drawText(ui, touchText('CLICK CARDS TO QUEUE THEM'), 254, 60, TRIM);
+    this.picks.slice(0, 5).forEach((i, n) => {
+      const cd = CARDS[offer[i]], y = 58 + n * 12;
+      drawText(ui, `${n + 1}`, 254, y, PICKED);
+      P(ui, ELEMENT_COLOR[cd.element], 266, y, 3, 7);
+      drawText(ui, cd.name.toUpperCase(), 274, y, INK);
+      drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, short[i] > 0 ? (builds ? resInk(cd) : RED_INK) : INK);
+    });
+    const info = CLASS_INFO[f.cls];
+    const over = !builds && this.picks.some(i => short[i] > 0);
+    drawText(ui, `TOTAL COST ${total}`, 254, 118, over ? RED_INK : INK2);
+    drawText(ui, info.refill, 462 - info.refill.length * 6, 118, TRIM);
   }
 
   /**
