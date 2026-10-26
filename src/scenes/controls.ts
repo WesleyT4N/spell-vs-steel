@@ -1,47 +1,72 @@
-import { hint, zone, listMouse, showSel, type Scene } from './scene';
+import { hint, zone, hot, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
-import { wasPressed, navPressed, BINDABLE, getKey, setKey, resetKeys, keyName, k, captureNextKey, RESERVED, mouse, type Bindable } from '../engine/input';
+import { wasPressed, navPressed, BINDABLE, getKey, setKey, resetKeys, keyName, k, captureNextKey, RESERVED, mouse, type Bindable,
+  LOCAL_ACTS, getP2Key, setP2Key, resetP2Keys, type LocalAct } from '../engine/input';
 import { sfx } from '../engine/audio';
-import { win, selRow, PAPER, INK, INK2, RED_INK, BLUE_INK, TRIM } from './skin';
+import { win, selRow, plaque, PAPER, INK, INK2, RED_INK, BLUE_INK, TRIM } from './skin';
 
 const LABELS: Record<Bindable, string> = {
   up: 'MOVE UP', down: 'MOVE DOWN', left: 'MOVE LEFT', right: 'MOVE RIGHT',
   attack: 'ATTACK / OK', cast: 'CAST / BACK', custom: 'OPEN DRAW SCREEN', pause: 'PAUSE',
 };
-const ROWS = [...BINDABLE, 'reset', 'back'] as const;
-const PX = 64, PW = UW - 128, Y0 = 48, RH = 20;
-const rowY = (i: number): number => Y0 + i * RH + (i >= BINDABLE.length ? 8 : 0);
+/** Tabs: player 1's keys (used everywhere), then player 2's for two players on one keyboard in Versus. */
+const TABS = ['PLAYER 1', 'PLAYER 2'] as const;
+type Row = Bindable | 'reset' | 'back';
+const PX = 64, PW = UW - 128, Y0 = 64, RH = 18;
+const TY = 40, TW = 104, TGAP = 8, TX0 = Math.round(UW / 2 - (TABS.length * TW + (TABS.length - 1) * TGAP) / 2);
 
-/** Rebinding screen: pick an action, press the new key. */
+/** Rebinding screen: pick an action, press the new key. Tabs switch between player 1's and player 2's keys. */
 export class ControlsScene implements Scene {
   sel = 0;
+  tab = 0;
   waiting = false;
   msg = '';
   msgT = 0;
   constructor(private back: () => void) {}
 
+  private get rows(): Row[] { return this.tab === 0 ? [...BINDABLE, 'reset', 'back'] : [...LOCAL_ACTS, 'reset', 'back']; }
+  private rowY(i: number): number { return Y0 + i * RH + (i >= this.rows.length - 2 ? 8 : 0); }
+
+  private setTab(t: number): void {
+    this.tab = (t + TABS.length) % TABS.length;
+    this.sel = Math.min(this.sel, this.rows.length - 1);
+    sfx('move');
+  }
+
   update(dt: number): void {
     this.msgT -= dt;
     if (this.waiting) return;
-    if (navPressed('up', dt)) { this.sel = (this.sel + ROWS.length - 1) % ROWS.length; sfx('move'); }
-    if (navPressed('down', dt)) { this.sel = (this.sel + 1) % ROWS.length; sfx('move'); }
+    const rows = this.rows;
+    if (navPressed('up', dt)) { this.sel = (this.sel + rows.length - 1) % rows.length; sfx('move'); }
+    if (navPressed('down', dt)) { this.sel = (this.sel + 1) % rows.length; sfx('move'); }
+    if (navPressed('left', dt) || wasPressed('lb')) this.setTab(this.tab - 1);
+    if (navPressed('right', dt) || wasPressed('rb')) this.setTab(this.tab + 1);
     if (wasPressed('back') || mouse.rclick) { sfx('back'); this.back(); return; }
+    const tab = hot('tab');
+    if (mouse.click && tab >= 0) { if (tab !== this.tab) this.setTab(tab); return; }
     const clicked = listMouse('row', this.sel, i => { this.sel = i; sfx('move'); });
     if (clicked >= 0) this.sel = clicked;
     if (!wasPressed('confirm') && clicked < 0) return;
-    const row = ROWS[this.sel];
+    const row = rows[this.sel];
     if (row === 'back') { sfx('back'); this.back(); return; }
-    if (row === 'reset') { resetKeys(); sfx('select'); this.flash('DEFAULTS RESTORED'); return; }
+    if (row === 'reset') {
+      if (this.tab === 0) resetKeys(); else resetP2Keys();
+      sfx('select'); this.flash('DEFAULTS RESTORED');
+      return;
+    }
     sfx('select');
     this.waiting = true;
+    const tabAt = this.tab;
     captureNextKey(code => {
       this.waiting = false;
       if (code === 'Escape') { sfx('back'); return; }
-      if (RESERVED.has(code)) { sfx('deny'); this.flash(`${keyName(code)} IS RESERVED`); return; }
-      setKey(row, code);
+      // player 1's pause key pauses for both players in Versus, so player 2 can't take it
+      if (RESERVED.has(code) || (tabAt === 1 && code === getKey('pause'))) { sfx('deny'); this.flash(`${keyName(code)} IS RESERVED`); return; }
+      if (tabAt === 0) setKey(row as Bindable, code);
+      else setP2Key(row as LocalAct, code);
       sfx('select');
     });
   }
@@ -53,24 +78,36 @@ export class ControlsScene implements Scene {
     c.fillStyle = 'rgba(40,20,0,0.35)';
     c.fillRect(...screenRect());
     win(ui, PX - 16, 14, PW + 32, 286);
-    drawTextCentered(ui, 'KEY MAPPING', UW / 2, 26, RED_INK, 2, false);
-    ROWS.forEach((row, i) => {
-      const y = rowY(i), ty = y + 6;
+    drawTextCentered(ui, 'KEY MAPPING', UW / 2, 22, RED_INK, 2, false);
+    TABS.forEach((t, i) => {
+      const x = TX0 + i * (TW + TGAP), on = i === this.tab;
+      zone(`tab:${i}`, x, TY, TW, 14);
+      const text = plaque(ui, x, TY, TW, 14, on);
+      drawTextCentered(ui, t, x + TW / 2, TY + 4, on ? text : i === 1 ? BLUE_INK : RED_INK, 1, false);
+    });
+    this.rows.forEach((row, i) => {
+      const y = this.rowY(i), ty = y + 5;
       const on = i === this.sel && showSel();
-      zone(`row:${i}`, PX - 12, y, PW + 24, RH - 2);
-      if (on) selRow(ui, PX - 12, y, PW + 24, RH - 2);
+      zone(`row:${i}`, PX - 12, y, PW + 24, RH - 1);
+      if (on) selRow(ui, PX - 12, y, PW + 24, RH - 1);
       if (on && tick % 8 < 6) drawText(ui, '→', PX - 4, ty, PAPER);
       if (row === 'reset' || row === 'back') {
         drawText(ui, row === 'reset' ? 'RESET DEFAULTS' : 'BACK', PX + 10, ty, on ? INK : INK2);
         return;
       }
       drawText(ui, LABELS[row], PX + 10, ty, on ? INK : INK2);
-      const v = on && this.waiting ? (tick % 4 < 3 ? 'PRESS A KEY' : '') : keyName(getKey(row));
+      const key = this.tab === 0 ? getKey(row) : getP2Key(row as LocalAct);
+      const v = on && this.waiting ? (tick % 4 < 3 ? 'PRESS A KEY' : '') : keyName(key);
       drawText(ui, v, 240, ty, on && this.waiting ? RED_INK : BLUE_INK);
     });
-    drawText(ui, `HOLD ${k('attack')}: HEAVY ATTACK    ${k('cast')} + DIRECTION: AIM SPELL`, PX, 262, TRIM);
-    drawText(ui, 'ARROW KEYS ALSO MOVE    ESC: PAUSE    M: MUTE', PX, 274, TRIM);
+    if (this.tab === 0) {
+      drawText(ui, `HOLD ${k('attack')}: HEAVY ATTACK    ${k('cast')} + DIRECTION: AIM SPELL`, PX, 262, TRIM);
+      drawText(ui, 'ARROWS ALSO MOVE (NOT IN 2P VERSUS)   ESC: PAUSE   M: MUTE', PX, 274, TRIM);
+    } else {
+      drawText(ui, 'FOR TWO PLAYERS ON ONE KEYBOARD IN VERSUS', PX, 262, TRIM);
+      drawText(ui, `NUMPAD ALSO WORKS: 8456 MOVE, 1 2 3   ${keyName(getKey('pause'))}/ESC: PAUSE`, PX, 274, TRIM);
+    }
     if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, 288, RED_INK, 1, false);
-    hint(ui, this.waiting ? 'PRESS A KEY   ESC: CANCEL' : `CLICK A ROW OR ${k('attack')}: REBIND   ${k('cast')} / RIGHT-CLICK: BACK`);
+    hint(ui, this.waiting ? 'PRESS A KEY   ESC: CANCEL' : `CLICK A ROW OR ${k('attack')}: REBIND   ←/→: TAB   ${k('cast')} / RIGHT-CLICK: BACK`);
   }
 }

@@ -43,7 +43,8 @@ export class DeckBuilderScene implements Scene {
     this.cards = cardsFor(this.cls).sort((a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity] || costNum(a) - costNum(b));
     // no saved deck yet: start from the ready-made deck picked on the character select
     const m = loadMatch();
-    this.deck = loadCustom(this.cls) ?? presetDeck(this.cls, m.p1 === this.cls && m.p1Deck !== 'custom' ? m.p1Deck : 'starter');
+    const picked = m.p1 === this.cls ? m.p1Deck : m.cpu === this.cls ? m.cpuDeck : 'starter';
+    this.deck = loadCustom(this.cls) ?? presetDeck(this.cls, picked);
     // the START FROM rows sit above the cards, in view; the cursor starts on the first card
     this.sel = this.top; this.scroll = 0;
   }

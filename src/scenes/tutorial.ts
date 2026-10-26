@@ -570,7 +570,7 @@ export class TutorialScene implements Scene {
 
   private begin(cls: TutorialClass): void {
     const saved = loadMatch();
-    const m: MatchConfig = { ...saved, p1: cls, p1Deck: 'starter', cpu: 'mage', difficulty: 'easy', bestOf: 1 };
+    const m: MatchConfig = { ...saved, p1: cls, p1Deck: 'starter', cpu: 'mage', cpuDeck: 'starter', difficulty: 'easy', bestOf: 1 };
     this.inner = new BattleScene(m);
     this.inner.b = new Battle(
       { cls, deck: toList(starterDeck(cls)), name: 'YOU', skin: saved.p1Skin[cls] ?? defaultSkin(cls) },
@@ -720,7 +720,7 @@ export class TutorialScene implements Scene {
     }
   }
 
-  private static DONE = ['VERSUS CPU', 'DECK BUILDER', 'TRY ANOTHER CLASS', 'TITLE'];
+  private static DONE = ['VERSUS MODE', 'DECK BUILDER', 'TRY ANOTHER CLASS', 'TITLE'];
   private updateDone(dt: number): void {
     const items = TutorialScene.DONE.length;
     const clicked = listMouse('menu', this.doneSel, i => { this.doneSel = i; sfx('move'); });
@@ -731,7 +731,7 @@ export class TutorialScene implements Scene {
       sfx('select');
       stopMusic();
       const choice = TutorialScene.DONE[this.doneSel];
-      if (choice === 'VERSUS CPU') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); setScene(new CharSelectScene()); }
+      if (choice === 'VERSUS MODE') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); setScene(new CharSelectScene()); }
       if (choice === 'DECK BUILDER') setScene(new DeckBuilderScene(this.cls, () => setScene(new TitleScene())));
       if (choice === 'TRY ANOTHER CLASS') setScene(new CharSelectScene(undefined, 0, 'tutorial'));
       if (choice === 'TITLE') setScene(new TitleScene());
