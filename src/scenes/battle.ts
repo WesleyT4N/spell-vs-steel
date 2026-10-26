@@ -11,8 +11,8 @@ const HAND_Y = 194, HAND_GAP = 84;
 const handX = (i: number, n: number): number => Math.round(UW / 2 - (HAND_GAP * (n - 1) + CARD_W) / 2 + i * HAND_GAP);
 /** Pixels per raise level: hovered cards rise one level, picked cards two. */
 const LIFT = 12;
-import { starterDeck, toList, STARTER_NAME } from '../game/deck';
-import { playerDeck, type MatchConfig } from '../game/match';
+import { presetDeck, presetName, toList } from '../game/deck';
+import { playerDeck, rollCpuDeck, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
 import { P, UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
@@ -49,10 +49,14 @@ export class BattleScene implements Scene {
   protected timed = true;
 
   /** Rounds won in the current set, by side. `battle` lets online play hand in a seeded battle. */
+  /** The CPU's deck this round (a 'random' pick is rolled here). */
+  protected cpuDeck: string;
+
   constructor(public m: MatchConfig, public score: [number, number] = [0, 0], battle?: Battle) {
+    this.cpuDeck = rollCpuDeck(m);
     this.b = battle ?? new Battle(
       { cls: m.p1, deck: playerDeck(m), name: 'YOU', skin: m.p1Skin[m.p1] },
-      { cls: m.cpu, deck: toList(starterDeck(m.cpu)), name: 'CPU', skin: m.cpuSkin[m.cpu] },
+      { cls: m.cpu, deck: toList(presetDeck(m.cpu, this.cpuDeck)), name: 'CPU', skin: m.cpuSkin[m.cpu] },
     );
     this.cpu = new Cpu(m.difficulty);
   }
@@ -196,7 +200,7 @@ export class BattleScene implements Scene {
   /** Hooks the online scene overrides. */
   protected rivalName = 'CPU';
   protected pauseItems = ['RESUME', 'OPTIONS', 'RESTART', 'QUIT TO TITLE'];
-  protected rivalDeckText(): string { return `CPU DECK: ${STARTER_NAME[this.m.cpu].toUpperCase()}`; }
+  protected rivalDeckText(): string { return `CPU DECK: ${presetName(this.m.cpu, this.cpuDeck).toUpperCase()}`; }
 
   protected get need(): number { return Math.ceil(this.m.bestOf / 2); }
   protected get setOver(): boolean { return Math.max(...this.score) >= this.need; }

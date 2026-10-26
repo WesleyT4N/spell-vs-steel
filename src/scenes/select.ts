@@ -12,8 +12,8 @@ import { drawText, drawTextCentered } from '../engine/font';
 import { win, plaque, banner, vsSeal, FRAME, GOLD, INK, INK2, TRIM, BURN, RED_INK, BLUE_INK } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
-import { loadMatch, saveMatch, playerDeck, type MatchConfig } from '../game/match';
-import { loadCustom, validate, STARTER_NAME } from '../game/deck';
+import { loadMatch, saveMatch, playerDeck, cycleDeck, type MatchConfig } from '../game/match';
+import { loadCustom, validate, presetName } from '../game/deck';
 import type { NetSession } from '../net/session';
 import { DeckBuilderScene } from './deckbuilder';
 import { StageSelectScene } from './stageSelect';
@@ -91,7 +91,7 @@ export class CharSelectScene implements Scene {
 
   private setClass(s: 0 | 1, cls: ClassId): void {
     if (s === 0) { if (cls !== this.m.p1) this.m.p1Deck = 'starter'; this.m.p1 = cls; }
-    else this.m.cpu = cls;
+    else { if (cls !== this.m.cpu && this.m.cpuDeck !== 'random') this.m.cpuDeck = 'starter'; this.m.cpu = cls; }
     saveMatch(this.m);
   }
 
@@ -101,6 +101,20 @@ export class CharSelectScene implements Scene {
     skins[cls] = list[(i + d + list.length) % list.length];
     sfx('move');
     saveMatch(this.m);
+  }
+
+  /** Your deck cycles through the ready-made decks and your custom one; the CPU's through the ready-made ones and RANDOM. */
+  private stepDeck(s: 0 | 1, d: 1 | -1): void {
+    if (s === 0) this.m.p1Deck = cycleDeck(this.m.p1, this.m.p1Deck, 'custom', d);
+    else this.m.cpuDeck = cycleDeck(this.m.cpu, this.m.cpuDeck, 'random', d);
+    sfx('move');
+    saveMatch(this.m);
+  }
+
+  /** Name shown for a slot's deck. */
+  private deckLabel(s: 0 | 1, cls: ClassId): string {
+    if (s === 0) return this.m.p1Deck === 'custom' ? `CUSTOM${this.customValid() ? '' : '!'}` : presetName(cls, this.m.p1Deck).toUpperCase();
+    return this.m.cpuDeck === 'random' ? 'RANDOM' : presetName(cls, this.m.cpuDeck).toUpperCase();
   }
 
   /** Lock in the hovered tile for the current slot and move on to its skin. */
@@ -134,7 +148,7 @@ export class CharSelectScene implements Scene {
   }
 
   private activateChip(c: Chip): void {
-    if (c === 'DECK') { this.m.p1Deck = this.m.p1Deck === 'starter' ? 'custom' : 'starter'; sfx('move'); }
+    if (c === 'DECK') { this.stepDeck(0, 1); return; }
     else if (c === 'EDIT DECK') { sfx('select'); saveMatch(this.m); setScene(new DeckBuilderScene(this.m.p1, () => setScene(new CharSelectScene(undefined, 4, this.mode)))); return; }
     else if (c === 'CPU LEVEL') { this.m.difficulty = this.m.difficulty === 'easy' ? 'normal' : 'easy'; sfx('move'); }
     else if (c === 'MATCH') { const o = [1, 3, 5] as const; this.m.bestOf = o[(o.indexOf(this.m.bestOf) + 1) % o.length]; sfx('move'); }
@@ -175,7 +189,8 @@ export class CharSelectScene implements Scene {
     if (wasPressed('back') || mouse.rclick) { this.back(); return; }
 
     if (mouse.click) {
-      const tile = hot('tile'), sw = hot('swatch'), csw = hot('cswatch'), chip = hot('chip');
+      const tile = hot('tile'), sw = hot('swatch'), csw = hot('cswatch'), chip = hot('chip'), deck = hot('deck');
+      if (deck >= 0) { this.stepDeck(deck as 0 | 1, 1); this.sync(); return; }
       if (tile >= 0) {
         // a tile picks for the slot being chosen; once both are set it re-picks yours
         if (this.step === 4 || this.step === 1) this.step = 0;
@@ -209,6 +224,8 @@ export class CharSelectScene implements Scene {
       if (ok) this.pickTile(this.cur);
     } else if (this.step === 1 || this.step === 3) {
       if (l || r) this.stepSkin(this.slot, d);
+      if (navPressed('up', dt)) this.stepDeck(this.slot, -1);
+      if (navPressed('down', dt)) this.stepDeck(this.slot, 1);
       if (ok) this.advance();
     } else {
       const n = this.chips.length, h = hot('chip');
@@ -282,7 +299,7 @@ export class CharSelectScene implements Scene {
       chips.forEach((ch, i) => {
         const x = x0 + i * (cw + gap), on = this.step === 4 && this.chip === i && showSel();
         let label: string = ch;
-        if (ch === 'DECK') label = this.m.p1Deck === 'starter' ? 'STARTER DECK' : `CUSTOM DECK${this.customValid() ? '' : '!'}`;
+        if (ch === 'DECK') label = this.m.p1Deck === 'custom' ? `CUSTOM DECK${this.customValid() ? '' : '!'}` : presetName(this.m.p1, this.m.p1Deck).toUpperCase();
         if (ch === 'CPU LEVEL') label = `CPU: ${this.m.difficulty.toUpperCase()}`;
         if (ch === 'MATCH') label = this.m.bestOf === 1 ? '1 ROUND' : `BEST OF ${this.m.bestOf}`;
         if (ch === 'NEXT') label = net ? (this.locked ? 'LOCKED IN' : 'LOCK IN') : this.training ? 'START →' : 'STAGE →';
@@ -298,7 +315,7 @@ export class CharSelectScene implements Scene {
       return;
     }
     const keys = `${k('left')}/${k('right')}`;
-    hint(ui, this.step === 1 || this.step === 3 ? `${keys}: SKIN   ${k('attack')} / CLICK A COLOR: ${this.tutorial ? 'START' : 'OK'}   ${k('cast')}: BACK`
+    hint(ui, this.step === 1 || this.step === 3 ? `${keys}: SKIN   ${this.tutorial ? '' : `${k('up')}/${k('down')}: DECK   `}${k('attack')} / CLICK A COLOR: ${this.tutorial ? 'START' : 'OK'}   ${k('cast')}: BACK`
       : this.locked ? `${k('cast')} / RIGHT-CLICK: LEAVE ROOM`
         : this.step === 4 ? `${keys}: MOVE   ${k('attack')}: CHANGE   ${k('cast')} / RIGHT-CLICK: BACK`
           : `${keys} OR HOVER: CHOOSE   ${k('attack')} / CLICK: PICK   ${k('cast')} / RIGHT-CLICK: BACK`);
@@ -352,8 +369,13 @@ export class CharSelectScene implements Scene {
     // skins: clickable swatches for your slot (and the CPU's)
     const list = SKINS[cls], sw = 14, sx = Math.round(cx - (list.length * sw) / 2);
     const editable = s === 0 || !net;
-    const deck = s === 0 ? (this.m.p1Deck === 'starter' ? STARTER_NAME[cls].toUpperCase() : 'CUSTOM') : STARTER_NAME[cls].toUpperCase();
-    if (!(net && s === 1)) drawTextCentered(ui, `DECK: ${deck}`, cx, PY + 132, TRIM, 1, false);
+    // the deck line is a button: click (or up/down while picking a color) steps through the decks
+    if (!(net && s === 1) && !this.tutorial) {
+      const text = `DECK: ${this.deckLabel(s, cls)}`, tw = text.length * 6 + 20;
+      zone(`deck:${s}`, cx - tw / 2, PY + 129, tw, 12);
+      const lit = hot('deck') === s;
+      drawTextCentered(ui, `< ${text} >`, cx, PY + 132, lit ? RED_INK : TRIM, 1, false);
+    }
     if (!editable) return;
     const skinStep = (s === 0 && this.step === 1) || (s === 1 && this.step === 3);
     list.forEach((sk, n) => {
