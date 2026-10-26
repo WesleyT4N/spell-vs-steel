@@ -91,7 +91,7 @@ export const PLAYSTYLES: Playstyle[] = [
 export const stylesFor = (cls: ClassId): Playstyle[] => PLAYSTYLES.filter(s => s.cls === cls);
 export const styleById = (id: string): Playstyle => PLAYSTYLES.find(s => s.id === id) ?? BALANCED;
 
-/** How fully each difficulty commits to its style: Easy plays a watered-down version (on top of its slow reactions). */
+/** How fully each difficulty commits to its style. Full commitment exaggerates a style's weak spots, so every level plays it at half strength for now. */
 const COMMIT: Record<Difficulty, number> = { easy: 0.5, normal: 0.5, hard: 0.5 };
 
 /** A style as played at a difficulty: its numeric knobs pulled toward the standard CPU by (1 - commitment). */
