@@ -10,7 +10,7 @@ export function battleHash(b: Battle): number {
     for (const v of Object.values(f.st)) parts.push(v);
     for (const s of f.shields) parts.push(s.kind, s.hp, s.t);
   }
-  for (const col of b.panels) for (const p of col) parts.push(p.owner, p.ownerT, p.burn, p.hole, p.cracked ? 1 : 0, p.toxic, p.bless, p.blessKind, p.blessAcc, p.manaAcc, p.curse, p.curseSide, p.curseAcc);
+  for (const col of b.panels) for (const p of col) parts.push(p.owner, p.ownerT, p.burn, p.hole, p.cracked ? 1 : 0, p.toxic, p.bless, p.blessKind, p.blessAcc, p.manaAcc, p.curse, p.curseSide, p.curseAcc, p.curseTicks);
   for (const t of b.traps) parts.push(t.kind, t.col, t.row, t.arm);
   for (const p of b.pets) parts.push(p.kind, p.t, p.cd);
   for (const w of b.walls) parts.push(w.col, w.row, w.hp, w.t);
