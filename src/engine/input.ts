@@ -1,5 +1,6 @@
 // Keyboard input with per-frame "pressed" edges and rebindable keys (saved in the browser).
 import { unlockAudio } from './audio';
+import { view } from './gfx';
 
 export type Action = 'up' | 'down' | 'left' | 'right' | 'attack' | 'cast' | 'custom' | 'confirm' | 'back' | 'pause' | 'mute' | 'lb' | 'rb' | 'reset';
 
@@ -156,8 +157,9 @@ let finger: { id: number; x0: number; y0: number; t0: number; wy: number; drag: 
 function initMouse(canvas: HTMLCanvasElement): void {
   const at = (e: MouseEvent): void => {
     const r = canvas.getBoundingClientRect();
-    mouse.x = Math.floor((e.clientX - r.left) * canvas.width / r.width);
-    mouse.y = Math.floor((e.clientY - r.top) * canvas.height / r.height);
+    // map to UI-layer pixels; the 480×320 game sits centered on a screen that may show more around it
+    mouse.x = Math.floor((e.clientX - r.left) * view.w * 2 / r.width) - view.ox * 2;
+    mouse.y = Math.floor((e.clientY - r.top) * view.h * 2 / r.height) - view.oy * 2;
   };
   canvas.addEventListener('mousemove', e => { at(e); mouse.moved = true; });
   canvas.addEventListener('mousedown', e => {

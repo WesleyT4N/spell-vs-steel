@@ -2,8 +2,9 @@
 // Classes come from the card list itself, so new classes appear here as soon as their cards exist.
 import { hint, zone, hot, isHot, button, type Scene } from './scene';
 import { getArena } from '../game/battleView';
+import { drawStage } from '../art/arena';
 import type { ClassId } from '../art/sprites';
-import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
+import { P, UW, frame, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { sfx } from '../engine/audio';
@@ -102,9 +103,9 @@ export class EncyclopediaScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    getArena().draw(c, tick, 0);
+    drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(0,0,24,0.8)';
-    c.fillRect(0, 0, W, H);
+    c.fillRect(...screenRect());
     const cards = this.list();
     if (this.sel >= cards.length) this.sel = Math.max(0, cards.length - 1);
 

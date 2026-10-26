@@ -14,7 +14,7 @@ const LIFT = 12;
 import { starterDeck, toList, STARTER_NAME } from '../game/deck';
 import { playerDeck, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
-import { P, UW, frame, type Ctx } from '../engine/gfx';
+import { P, UW, frame, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
@@ -262,8 +262,10 @@ export class BattleScene implements Scene {
     dim(c, 0.5);
 
     // header: turn, timer, resource
-    P(ui, '#000000', 0, 0, UW, 28);
-    P(ui, '#0000a8', 0, 0, UW, 26);
+    // the header bar reaches the screen's sides
+    const [sx, , sw] = screenRect(2);
+    P(ui, '#000000', sx, 0, sw, 28);
+    P(ui, '#0000a8', sx, 0, sw, 26);
     drawText(ui, `DRAW   TURN ${b.turn}`, 10, 10, '#fcfcfc');
     const secs = Math.ceil(this.timer);
     if (this.timed) drawTextCentered(ui, String(secs).padStart(2, '0'), UW / 2, 6, secs <= 5 && tick % 4 < 2 ? '#f83800' : '#f8b800', 2);
