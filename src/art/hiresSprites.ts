@@ -151,7 +151,7 @@ export const HIRES: Record<ClassId, HiresDef> = {
       white: { c: '#7c7c7c', d: '#d3d3d3', e: '#a4a4a4', h: '#fcfcfc' },
     },
   },
-  cleric: {
+  priest: {
     pal: ["#000000", "#f7f3ec", "#f4b761", "#c1bcce", "#f7f3ec", "#e09147", "#b26a3f", "#a096ac", "#784737", "#422b2b", "#f6d4a1", "#3063c9", "#5994ea", "#716c8b", "#253882"],
     rows: [
       '...............aa...',
