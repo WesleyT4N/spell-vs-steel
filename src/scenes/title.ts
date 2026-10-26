@@ -21,10 +21,10 @@ import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
 import { RED_INK } from './skin';
 
-const ITEMS = ['VERSUS MODE', 'ONLINE MODE', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
+const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
 
-// seven rows in dev builds still clear the version line
-const MENU_Y = ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 6 ? 16 : 18;
+// seven rows (eight in dev builds) still clear the version line
+const MENU_Y = ITEMS.length > 7 ? 162 : ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 7 ? 15 : ITEMS.length > 6 ? 16 : 18;
 // taller screens (phone portrait) have room under the stage: rows grow into it, with double-size text once they fit
 const MAX_GAP = 36, BIG_GAP = 24;
 
@@ -178,6 +178,7 @@ export class TitleScene implements Scene {
     if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
       sfx('select');
       const item = ITEMS[this.sel];
+      if (item === 'ARCADE MODE') setScene(new CharSelectScene(undefined, 0, 'arcade'));
       if (item === 'VERSUS MODE') setScene(new CharSelectScene());
       if (item === 'ONLINE MODE') setScene(new OnlineScene());
       if (item === 'TRAINING') setScene(new CharSelectScene(undefined, 0, 'training'));
