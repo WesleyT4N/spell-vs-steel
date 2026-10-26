@@ -299,6 +299,7 @@ export class SandboxScene implements Scene {
     if (this.b.phase !== 'fight') return;
     f.queue.unshift(id);
     f.lock = 0;
+    f.castCd = 0;
     this.b.castTop(f, side === 0 ? heldDir() : null);
     if (f.queue[0] === id) f.queue.shift(); // couldn't afford it: don't leave it on top
   }
