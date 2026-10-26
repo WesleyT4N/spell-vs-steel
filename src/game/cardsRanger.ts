@@ -80,7 +80,7 @@ export const ranger: CardDef[] = [
   },
   {
     id: 'freezing_trap', name: 'Freezing Trap', cls: 'ranger', cost: 1, rarity: 'common', element: 'frost', damaging: true, lock: 0.25,
-    dmg: '20', short: 'Hidden trap on a random enemy panel until the next Draw. Freezes for 1.75s.',
+    dmg: '20', short: 'Hidden trap on a random enemy panel until the next Draw. Freezes for 2s.',
     cast: x => { const [c, r] = randomEnemyPanel(x.b, x.f); trap(x.b, x.f, c, r, 'freeze'); },
   },
   {

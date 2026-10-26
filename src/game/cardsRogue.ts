@@ -34,7 +34,7 @@ export const rogue: CardDef[] = [
   // ---------- Commons ----------
   {
     id: 'vanish', name: 'Vanish', cls: 'rogue', cost: 1, rarity: 'common', element: 'shadow', damaging: false, lock: 0.15,
-    dmg: '-', short: 'Enter Stealth for 3s. Your next attack spell stuns for 1.75s.',
+    dmg: '-', short: 'Enter Stealth for 3s. Your next attack spell stuns for 2s.',
     cast: x => { x.b.stealth(x.f, 3); x.f.st.vanishStun = 10; },
   },
   {
@@ -217,9 +217,9 @@ export const rogue: CardDef[] = [
   },
   {
     id: 'kidney_shot', name: 'Kidney Shot', cls: 'rogue', cost: 2, rarity: 'legendary', element: 'steel', damaging: true, lock: 0.3,
-    dmg: '30', short: 'Hit the panel ahead. Stuns 1.75s, plus 0.25s per spell you cast in the last 3s (max 2.5s).',
+    dmg: '30', short: 'Hit the panel ahead. Stuns 2s, plus 0.25s per spell you cast in the last 3s (max 2.5s).',
     cast: x => {
-      const stun = Math.min(2.5, 1.75 + 0.25 * x.castsWithin(3));
+      const stun = Math.min(2.5, 2 + 0.25 * x.castsWithin(3));
       if (thrust(x, 1, 30).dealt > 0 && stun > 0) x.b.stun(x.foe, stun);
     },
     ai: (b, f) => ahead(b, f, 1),

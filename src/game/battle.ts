@@ -475,7 +475,7 @@ export class Battle {
         continue;
       }
       this.addFx('trapPop', t.side, t.col, t.row, 0.5, { kind: t.kind });
-      if (t.kind === 'freeze') { this.damage(v, 20, src, { spell: true, element: 'frost' }); this.freeze(v, 1.75); }
+      if (t.kind === 'freeze') { this.damage(v, 20, src, { spell: true, element: 'frost' }); this.freeze(v, 2); }
       else if (t.kind === 'explode') {
         const cells: Array<[number, number]> = [[t.col, t.row], [t.col - 1, t.row], [t.col + 1, t.row], [t.col, t.row - 1], [t.col, t.row + 1]];
         for (const [c, r] of cells) if (this.inGrid(c, r)) this.addFx('explode', t.side, c, r, 0.35);
@@ -524,7 +524,7 @@ export class Battle {
           f.frostNovaUsed = true;
           f.st.frostNova = 0;
           this.damage(foe, TUNING.frostNovaDamage, f, { spell: true, element: 'frost' });
-          this.freeze(foe, 1.75);
+          this.freeze(foe, 2);
           this.addFx('nova', f.side, f.col, f.row, 0.5);
           this.addFx('nova', f.side, foe.col, foe.row, 0.5);
           this.shake = Math.max(this.shake, 0.2);
