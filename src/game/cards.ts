@@ -1,9 +1,10 @@
-// Every Warrior and Mage spell from the design doc (Rogue, Ranger and Cleric drafts live in cardsRogue/Ranger/Cleric.ts). Numbers follow the doc; prototype-only
+// Every Warrior and Mage spell from the design doc (Rogue, Ranger and Priest drafts live in cardsRogue/Ranger/Priest.ts). Numbers follow the doc; prototype-only
 // interpretations are called out in the `short` text or a comment.
 import type { Battle, CastCtx, Fighter } from './battle';
 import type { ClassId } from '../art/sprites';
 import { sfx } from '../engine/audio';
 import { shuffle } from './rng';
+import { TUNING } from './tuning';
 
 export type Element = 'steel' | 'fire' | 'frost' | 'arcane' | 'shadow' | 'poison' | 'nature' | 'holy';
 export type Rarity = 'common' | 'uncommon' | 'legendary' | 'mythic';
@@ -37,7 +38,7 @@ export const MAX_COPIES: Record<Rarity, number> = { common: 4, uncommon: 2, lege
 import { sameRow, ahead, cellsAhead, allEnemyPanels, lowHp, lunge } from './cardUtil';
 import { rogue } from './cardsRogue';
 import { ranger } from './cardsRanger';
-import { cleric } from './cardsCleric';
+import { priest } from './cardsPriest';
 
 // ---------- Warrior ----------
 const warrior: CardDef[] = [
@@ -72,12 +73,13 @@ const warrior: CardDef[] = [
     id: 'leap_strike', name: 'Leap Strike', cls: 'warrior', cost: 3, rarity: 'uncommon', element: 'steel', damaging: true, lock: 0.8,
     dmg: '120', short: 'Leap in front of the enemy and smash their panel plus above and below.',
     cast: x => {
-      const tc = x.foe.col, tr = x.foe.row;
-      lunge(x, tc - x.dir, tr, 0.3, 0.2, 0.25, 14);
-      x.b.later(0.3, () => {
+      const tc = x.foe.col, tr = x.foe.row, w = TUNING.warnTime;
+      const cells: Array<[number, number]> = [[tc, tr - 1], [tc, tr], [tc, tr + 1]];
+      lunge(x, tc - x.dir, tr, 0.3, w - 0.3 + 0.2, 0.25, 14);
+      x.b.warn(x.f, cells, w, () => {
         x.b.addFx('smash', x.f.side, tc, tr, 0.3);
         x.b.shake = 0.2;
-        x.b.strike(x.f, [[tc, tr - 1], [tc, tr], [tc, tr + 1]], 120 * x.mult, { spell: true, element: 'steel' });
+        x.b.strike(x.f, cells, 120 * x.mult, { spell: true, element: 'steel' });
       });
     },
   },
@@ -173,8 +175,11 @@ const warrior: CardDef[] = [
     dmg: '90', short: 'Sweeping slash hits all 3 panels of the enemy front column.',
     cast: x => {
       const col = x.b.frontCol(x.foe.side);
-      x.b.addFx('wide', x.f.side, col, 1, 0.3);
-      x.b.strike(x.f, [[col, 0], [col, 1], [col, 2]], 90 * x.mult, { spell: true, element: 'steel' });
+      const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
+      x.b.warn(x.f, cells, TUNING.warnTime, () => {
+        x.b.addFx('wide', x.f.side, col, 1, 0.3);
+        x.b.strike(x.f, cells, 90 * x.mult, { spell: true, element: 'steel' });
+      });
     },
     ai: (b, f) => b.foe(f).col === b.frontCol(b.foe(f).side),
   },
@@ -183,10 +188,13 @@ const warrior: CardDef[] = [
     dmg: '60', short: 'Shockwave hits the enemy front column and cracks those panels.',
     cast: x => {
       const col = x.b.frontCol(x.foe.side);
-      x.b.addFx('shockwave', x.f.side, col, 1, 0.4);
-      x.b.shake = 0.2;
-      x.b.strike(x.f, [[col, 0], [col, 1], [col, 2]], 60 * x.mult, { spell: true, element: 'steel' });
-      for (let r = 0; r < 3; r++) x.b.panels[col][r].cracked = true;
+      const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
+      x.b.warn(x.f, cells, TUNING.warnTime, () => {
+        x.b.addFx('shockwave', x.f.side, col, 1, 0.4);
+        x.b.shake = 0.2;
+        x.b.strike(x.f, cells, 60 * x.mult, { spell: true, element: 'steel' });
+        for (let r = 0; r < 3; r++) x.b.panels[col][r].cracked = true;
+      });
     },
   },
   {
@@ -196,7 +204,8 @@ const warrior: CardDef[] = [
       const { b, f, foe } = x;
       const r = f.row, front = b.frontCol(foe.side), d = x.dir;
       const waves: Array<Array<[number, number]>> = [[[front, r]], [[front + d, r - 1], [front + d, r], [front + d, r + 1]], [[front + 2 * d, r - 1], [front + 2 * d, r + 1]]];
-      waves.forEach((cells, i) => b.later(0.1 * i, () => {
+      // the whole cone flashes first, then the quake rolls through it wave by wave
+      waves.forEach((cells, i) => b.warn(f, cells, TUNING.warnTime + 0.1 * i, () => {
         for (const [c, rr] of cells) if (b.inGrid(c, rr)) b.addFx('quake', f.side, c, rr, 0.3);
         b.strike(f, cells, 60 * x.mult, { spell: true, element: 'steel' });
       }));
@@ -232,12 +241,15 @@ const warrior: CardDef[] = [
       const { b, f, foe } = x;
       const col = b.frontCol(foe.side);
       if (col === b.backCol(foe.side)) { b.text(f, 'NO ROOM', '#bcbcbc'); return; }
-      b.shake = 0.3;
-      b.addFx('shockwave', f.side, col, 1, 0.4);
-      b.strike(f, [[col, 0], [col, 1], [col, 2]], 80 * x.mult, { spell: true, element: 'steel' });
-      b.walls = b.walls.filter(w => w.col !== col);
-      for (let r = 0; r < 3; r++) b.panels[col][r].hole = 8;
-      if (foe.col === col) { if (!b.knockback(foe, 1)) b.relocate(foe); }
+      const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
+      b.warn(f, cells, TUNING.warnTime, () => {
+        b.shake = 0.3;
+        b.addFx('shockwave', f.side, col, 1, 0.4);
+        b.strike(f, cells, 80 * x.mult, { spell: true, element: 'steel' });
+        b.walls = b.walls.filter(w => w.col !== col);
+        for (let r = 0; r < 3; r++) b.panels[col][r].hole = 8;
+        if (foe.col === col) { if (!b.knockback(foe, 1)) b.relocate(foe); }
+      });
     },
   },
   {
@@ -293,10 +305,10 @@ const warrior: CardDef[] = [
       const { b, f, foe } = x;
       const mid = b.frontCol(foe.side) + x.dir;
       lunge(x, mid, 1, 0.45, 0.25, 0.3, 30);
-      b.later(0.45, () => {
+      const cells = allEnemyPanels(b, f.side);
+      b.warn(f, cells, 0.45, () => {
         b.shake = 0.5;
         b.cheer = 2;
-        const cells = allEnemyPanels(b, f.side);
         for (const [c, r] of cells) { b.addFx('quake', f.side, c, r, 0.4); b.panels[c][r].cracked = true; }
         b.strike(f, cells, 200 * x.mult, { spell: true, element: 'steel' });
       });
@@ -315,13 +327,13 @@ function targeted(x: CastCtx, delay: number, fn: (c: number, r: number) => void)
 const mage: CardDef[] = [
   {
     id: 'arcane_missiles', name: 'Arcane Missiles', cls: 'mage', cost: 1, rarity: 'common', element: 'arcane', damaging: true, lock: 0.45,
-    dmg: '20x3', short: '3 homing missiles strike the enemy wherever they are.',
+    dmg: '25x3', short: '3 homing missiles strike the enemy wherever they are.',
     cast: x => {
       for (let i = 0; i < 3; i++) x.b.later(i * 0.12, () => {
         x.b.projectiles.push({
           side: x.f.side, row: x.f.row, x: x.f.col, speed: 0, kind: 'missile', reflectable: true,
           homing: { p: 0, dur: 0.4, sx: x.f.col, sy: x.f.row, target: x.foe.side },
-          onHit: (b, t) => { if (t) b.damage(t, 20 * x.mult, b.f[1 - t.side], { spell: true, element: 'arcane', noFlinch: true }); },
+          onHit: (b, t) => { if (t) b.damage(t, 25 * x.mult, b.f[1 - t.side], { spell: true, element: 'arcane', noFlinch: true }); },
         });
         sfx('missile');
       });
@@ -366,15 +378,15 @@ const mage: CardDef[] = [
   },
   {
     id: 'repulse', name: 'Repulse', cls: 'mage', cost: 1, rarity: 'common', element: 'arcane', damaging: true, lock: 0.3,
-    dmg: '20', short: 'Gust down your row knocks the enemy to their back column.',
+    dmg: '25', short: 'Gust down your row knocks the enemy to their back column and stuns them 1s.',
     cast: x => {
       x.b.shoot(x.f, {
         speed: 16 * x.dir, kind: 'gust', reflectable: true,
         onHit: (b, t, w, _c, p) => {
-          if (w) { b.hitWall(w, 20, x.f, {}); return; }
+          if (w) { b.hitWall(w, 25, x.f, {}); return; }
           if (!t) return;
-          b.damage(t, 20 * x.mult, b.f[p.side], { spell: true, element: 'arcane' });
           b.knockback(t, 3);
+          b.damage(t, 25 * x.mult, b.f[p.side], { spell: true, element: 'arcane', stun: 1 });
         },
       });
     },
@@ -382,12 +394,12 @@ const mage: CardDef[] = [
   },
   {
     id: 'ignite', name: 'Ignite', cls: 'mage', cost: 1, rarity: 'common', element: 'fire', damaging: true, lock: 0.3,
-    dmg: '15/s', short: 'The column the enemy stands in burns for 5s.',
-    cast: x => { for (let r = 0; r < 3; r++) x.b.burn(x.foe.col, r, 5, 15 * x.mult); },
+    dmg: '18/s', short: 'The column the enemy stands in burns for 5s.',
+    cast: x => { for (let r = 0; r < 3; r++) x.b.burn(x.foe.col, r, 5, 18 * x.mult); },
   },
   {
     id: 'fireball', name: 'Fireball', cls: 'mage', cost: 3, rarity: 'common', element: 'fire', damaging: true, lock: 0.4,
-    dmg: '100', short: 'Fireball down your row. Explodes on a 2x2 square and leaves it burning.',
+    dmg: '120', short: 'Fireball down your row. Explodes on a 2x2 square and leaves it burning.',
     cast: x => {
       x.b.shoot(x.f, {
         speed: 9 * x.dir, kind: 'fireball', reflectable: true,
@@ -399,7 +411,7 @@ const mage: CardDef[] = [
           const cells: Array<[number, number]> = [[col, row], [col + d, row], [col, r2], [col + d, r2]];
           b.shake = 0.2;
           for (const [c, rr] of cells) { b.addFx('explode', src.side, c, rr, 0.35); b.burn(c, rr, 5, 15); }
-          b.strike(src, cells, 100 * x.mult, { spell: true, element: 'fire' });
+          b.strike(src, cells, 120 * x.mult, { spell: true, element: 'fire' });
         },
       });
     },
@@ -407,12 +419,14 @@ const mage: CardDef[] = [
   },
   {
     id: 'scorch', name: 'Scorch', cls: 'mage', cost: 2, rarity: 'common', element: 'fire', damaging: true, lock: 0.3,
-    dmg: '60', short: 'Every burning panel erupts. 60 to anyone on one.',
+    dmg: '75', short: 'Every burning panel erupts. 75 to anyone on one.',
     cast: x => {
       const cells: Array<[number, number]> = [];
       for (let c = 0; c < 6; c++) for (let r = 0; r < 3; r++) if (x.b.panels[c][r].burn > 0 && x.b.panels[c][r].owner !== x.f.side) cells.push([c, r]);
-      for (const [c, r] of cells) x.b.addFx('explode', x.f.side, c, r, 0.35);
-      x.b.strike(x.f, cells, 60 * x.mult, { spell: true, element: 'fire' });
+      x.b.warn(x.f, cells, TUNING.warnTime, () => {
+        for (const [c, r] of cells) x.b.addFx('explode', x.f.side, c, r, 0.35);
+        x.b.strike(x.f, cells, 75 * x.mult, { spell: true, element: 'fire' });
+      });
     },
     ai: (b, f) => { const foe = b.foe(f); return b.panels[foe.col][foe.row].burn > 0.4; },
   },
@@ -424,9 +438,9 @@ const mage: CardDef[] = [
   },
   {
     id: 'frost_nova', name: 'Frost Nova', cls: 'mage', cost: 2, rarity: 'common', element: 'frost', damaging: true, lock: 0.3,
-    dmg: '20', short: 'Hits an enemy within 2 columns of you for 20 and freezes them 2s. If none, lingers 6s until one comes close.',
+    dmg: '25', short: 'Hits an enemy within 3 columns of you for 25 and freezes them 2s. If none, lingers 6s until one comes close.',
     cast: x => { x.f.st.frostNova = 6; x.f.frostNovaUsed = false; x.b.addFx('novaZone', x.f.side, x.f.col, x.f.row, 0.6); },
-    ai: (b, f) => b.foe(f).cls === 'warrior' || Math.abs(b.foe(f).col - f.col) <= 2,
+    ai: (b, f) => b.foe(f).cls === 'warrior' || Math.abs(b.foe(f).col - f.col) <= 3,
   },
   {
     id: 'arcane_intellect', name: 'Arcane Intellect', cls: 'mage', cost: 1, rarity: 'uncommon', element: 'arcane', damaging: false, lock: 0.3,
@@ -435,29 +449,30 @@ const mage: CardDef[] = [
   },
   {
     id: 'arcane_blast', name: 'Arcane Blast', cls: 'mage', cost: 2, rarity: 'uncommon', element: 'arcane', damaging: true, lock: 0.35,
-    dmg: '90', short: 'Arcane hit on the enemy wherever they are.',
+    dmg: '110', short: 'Arcane hit on the enemy wherever they are.',
     cast: x => {
       x.b.later(0.15, () => {
         x.b.addFx('arcaneHit', x.f.side, x.foe.col, x.foe.row, 0.35);
-        x.b.damage(x.foe, 90 * x.mult, x.f, { spell: true, element: 'arcane', targeted: true });
+        x.b.damage(x.foe, 110 * x.mult, x.f, { spell: true, element: 'arcane', targeted: true });
       });
     },
   },
   {
     id: 'flamestrike', name: 'Flamestrike', cls: 'mage', cost: 3, rarity: 'uncommon', element: 'fire', damaging: true, lock: 0.35,
-    dmg: '130', short: 'After 1s, a fire pillar hits their panel and sets that whole column burning.',
+    dmg: '155', short: 'After 1s, a fire pillar hits their panel and sets that whole column burning.',
     cast: x => {
-      x.b.mark(x.foe.col, x.foe.row, 1, '#f83800');
+      x.b.warn(x.f, [[x.foe.col, x.foe.row]], 1);
       targeted(x, 1, (c, r) => {
         x.b.addFx('pillar', x.f.side, c, r, 0.45);
-        x.b.strike(x.f, [[c, r]], 130 * x.mult, { spell: true, element: 'fire' });
+        sfx('explode');
+        x.b.strike(x.f, [[c, r]], 155 * x.mult, { spell: true, element: 'fire' });
         for (let rr = 0; rr < 3; rr++) x.b.burn(c, rr, 5, 15);
       });
     },
   },
   {
     id: 'blizzard', name: 'Blizzard', cls: 'mage', cost: 4, rarity: 'uncommon', element: 'frost', damaging: true, lock: 0.4,
-    dmg: '25 each', short: '4s of ice shards on random enemy panels. Hit 3 times = frozen 2s.',
+    dmg: '30 each', short: '4s of ice shards on random enemy panels. Hit 2 times = frozen 2s.',
     cast: x => {
       const { b, f, foe } = x;
       let hits = 0;
@@ -466,11 +481,10 @@ const mage: CardDef[] = [
         const cells = allEnemyPanels(b, f.side);
         const aim = b.rand() < 0.4;
         const [c, r] = aim ? [foe.col, foe.row] : cells[Math.floor(b.rand() * cells.length)];
-        b.mark(c, r, 0.5, '#3cbcfc');
-        b.later(0.5, () => {
+        b.warn(f, [[c, r]], 0.5, () => {
           b.addFx('shard', f.side, c, r, 0.3);
-          const res = b.strike(f, [[c, r]], 25 * x.mult, { spell: true, element: 'frost', noFlinch: true });
-          if (res.fighter && ++hits === 3) b.freeze(foe, 2);
+          const res = b.strike(f, [[c, r]], 30 * x.mult, { spell: true, element: 'frost', noFlinch: true });
+          if (res.fighter && ++hits === 2) b.freeze(foe, 2);
         });
       });
     },
@@ -479,35 +493,34 @@ const mage: CardDef[] = [
     id: 'ice_block', name: 'Ice Block', cls: 'mage', cost: 2, rarity: 'uncommon', element: 'frost', damaging: false, lock: 0,
     dmg: '-', short: 'Immune to everything for 2s, but you cannot move or act.',
     cast: x => { x.f.st.iceBlock = 2; },
-    ai: (b, f) => b.marks.some(m => m.col === f.col && m.row === f.row) || (lowHp(f, 0.3) && Math.abs(b.foe(f).col - f.col) <= 2),
+    ai: (b, f) => b.warned(f.col, f.row, f.side) || (lowHp(f, 0.3) && Math.abs(b.foe(f).col - f.col) <= 2),
   },
   {
     id: 'counterspell', name: 'Counterspell', cls: 'mage', cost: 2, rarity: 'legendary', element: 'arcane', damaging: false, lock: 0.2,
-    dmg: '-', short: 'For 4s, the next spell the enemy casts is cancelled.',
+    dmg: '-', short: 'For 4s, the next spell the enemy casts is cancelled and they are silenced for 3s.',
     cast: x => { x.f.st.counterspell = 4; x.b.addFx('counter', x.f.side, x.f.col, x.f.row, 0.5); },
     ai: (b, f) => b.foe(f).queue.length > 0,
   },
   {
     id: 'meteor', name: 'Meteor', cls: 'mage', cost: 5, rarity: 'legendary', element: 'fire', damaging: true, lock: 0.4,
-    dmg: '180', short: 'After 1.5s, crashes on their panel in a plus shape and leaves it burning.',
+    dmg: '220', short: 'After 1.5s, crashes on their panel in a plus shape and leaves it burning.',
     cast: x => {
       const c0 = x.foe.col, r0 = x.foe.row;
       const cells: Array<[number, number]> = [[c0, r0], [c0 - 1, r0], [c0 + 1, r0], [c0, r0 - 1], [c0, r0 + 1]];
-      for (const [c, r] of cells) x.b.mark(c, r, 1.5, '#f83800');
       x.b.addFx('meteorFall', x.f.side, c0, r0, 1.5);
-      x.b.later(1.5, () => {
+      x.b.warn(x.f, cells, 1.5, () => {
         x.b.shake = 0.5;
         x.b.cheer = 2;
         for (const [c, r] of cells) { x.b.addFx('explode', x.f.side, c, r, 0.5); x.b.burn(c, r, 5, 15); }
-        x.b.strike(x.f, cells, 180 * x.mult, { spell: true, element: 'fire' });
+        x.b.strike(x.f, cells, 220 * x.mult, { spell: true, element: 'fire' });
       });
     },
   },
   {
     id: 'arcane_surge', name: 'Arcane Surge', cls: 'mage', cost: 'all', rarity: 'legendary', element: 'arcane', damaging: true, lock: 0.45,
-    dmg: '50/Mana', short: 'Spend ALL Mana: arcane blast on the enemy, 50 damage per Mana spent.',
+    dmg: '60/Mana', short: 'Spend ALL Mana: arcane blast on the enemy, 60 damage per Mana spent.',
     cast: x => {
-      const dmg = 50 * x.spent * x.mult;
+      const dmg = 60 * x.spent * x.mult;
       x.b.later(0.2, () => {
         x.b.addFx('arcaneHit', x.f.side, x.foe.col, x.foe.row, 0.5);
         x.b.shake = 0.3;
@@ -529,40 +542,41 @@ const mage: CardDef[] = [
   },
   {
     id: 'dragons_breath', name: "Dragon's Breath", cls: 'mage', cost: 3, rarity: 'legendary', element: 'fire', damaging: true, lock: 0.5,
-    dmg: '100 each', short: 'Cone of flame hits the enemy front two columns and leaves them burning.',
+    dmg: '120 each', short: 'Cone of flame hits the enemy front two columns and leaves them burning.',
     cast: x => {
       const { b, f, foe } = x;
       const c1 = b.frontCol(foe.side), c2 = c1 + x.dir;
       const cells: Array<[number, number]> = [];
       for (const c of [c1, c2]) for (let r = 0; r < 3; r++) cells.push([c, r]);
-      for (const [c, r] of cells) { b.addFx('explode', f.side, c, r, 0.4); b.burn(c, r, 5, 15); }
-      b.strike(f, cells, 100 * x.mult, { spell: true, element: 'fire' });
+      b.warn(f, cells, TUNING.warnTime, () => {
+        for (const [c, r] of cells) { b.addFx('explode', f.side, c, r, 0.4); b.burn(c, r, 5, 15); }
+        b.strike(f, cells, 120 * x.mult, { spell: true, element: 'fire' });
+      });
     },
     ai: (b, f) => { const foe = b.foe(f); return Math.abs(foe.col - b.frontCol(foe.side)) <= 1; },
   },
   {
     id: 'comet_storm', name: 'Comet Storm', cls: 'mage', cost: 5, rarity: 'legendary', element: 'fire', damaging: true, lock: 0.4,
-    dmg: '50 each', short: '6 comets fall on random enemy panels, leaving them burning.',
+    dmg: '60 each', short: '6 comets fall on random enemy panels, leaving them burning.',
     cast: x => {
       const { b, f } = x;
       const cells = shuffle(allEnemyPanels(b, f.side), b.rand).slice(0, 6);
       cells.forEach(([c, r], i) => {
-        b.later(i * 0.25, () => b.mark(c, r, 0.5, '#f83800'));
-        b.later(i * 0.25 + 0.5, () => {
+        b.later(i * 0.25, () => b.warn(f, [[c, r]], 0.5, () => {
           b.addFx('explode', f.side, c, r, 0.35);
           b.burn(c, r, 5, 15);
-          b.strike(f, [[c, r]], 50 * x.mult, { spell: true, element: 'fire', noFlinch: true });
-        });
+          b.strike(f, [[c, r]], 60 * x.mult, { spell: true, element: 'fire', noFlinch: true });
+        }));
       });
     },
   },
   {
     id: 'deep_freeze', name: 'Deep Freeze', cls: 'mage', cost: 3, rarity: 'legendary', element: 'frost', damaging: false, lock: 0.3,
-    dmg: '-', short: 'Freeze the enemy for 2.5s. They cannot move or act.',
+    dmg: '-', short: 'Freeze the enemy for 3s. They cannot move or act.',
     cast: x => {
       if (!x.b.targetable(x.foe)) { x.b.text(x.foe, 'MISS', '#bcbcbc'); return; }
       x.b.addFx('shard', x.f.side, x.foe.col, x.foe.row, 0.4);
-      x.b.freeze(x.foe, 2.5);
+      x.b.freeze(x.foe, 3);
     },
   },
   // Mythics
@@ -573,15 +587,15 @@ const mage: CardDef[] = [
   },
   {
     id: 'inferno', name: 'Inferno', cls: 'mage', cost: 5, rarity: 'mythic', element: 'fire', damaging: true, lock: 0.5,
-    dmg: '20/s', short: 'All enemy panels burn for 10s. Outlasts the next custom screen.',
+    dmg: '24/s', short: 'All enemy panels burn for 10s. Outlasts the next custom screen.',
     cast: x => {
       x.b.cheer = 2;
-      for (const [c, r] of allEnemyPanels(x.b, x.f.side)) { x.b.burn(c, r, 10, 20 * x.mult); x.b.addFx('explode', x.f.side, c, r, 0.3); }
+      for (const [c, r] of allEnemyPanels(x.b, x.f.side)) { x.b.burn(c, r, 10, 24 * x.mult); x.b.addFx('explode', x.f.side, c, r, 0.3); }
     },
   },
   {
     id: 'glacial_fortress', name: 'Glacial Fortress', cls: 'mage', cost: 5, rarity: 'mythic', element: 'frost', damaging: false, lock: 0.5,
-    dmg: '-', short: '10s: ice fills the column in front of you, blocking all shots. Touching it freezes 2s.',
+    dmg: '-', short: '10s: ice fills the column in front of you, blocking all shots. Touching it freezes 2.5s.',
     cast: x => {
       const { b, f } = x;
       // Ice goes in your own front column; if you stand there you step back first.
@@ -595,7 +609,7 @@ const mage: CardDef[] = [
   },
 ];
 
-export const ALL_CARDS: CardDef[] = [...warrior, ...mage, ...rogue, ...ranger, ...cleric];
+export const ALL_CARDS: CardDef[] = [...warrior, ...mage, ...rogue, ...ranger, ...priest];
 export const CARDS: Record<string, CardDef> = Object.fromEntries(ALL_CARDS.map(c => [c.id, c]));
 export const cardsFor = (cls: ClassId): CardDef[] => ALL_CARDS.filter(c => c.cls === cls);
 
