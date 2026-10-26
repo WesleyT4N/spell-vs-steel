@@ -27,8 +27,8 @@ export interface RoundTape {
   n: number;
   hash: number;
   winner: Side | null;
-  /** Fighters changed after the battle was made (arcade's boss): [name, max HP] a side. */
-  fx?: [[string, number], [string, number]];
+  /** Fighters changed after the battle was made (arcade's rivals and boss): [name, max HP, power] a side. */
+  fx?: [[string, number, number?], [string, number, number?]];
 }
 
 export type ReplayMode = 'cpu' | 'arcade' | 'versus' | 'watch' | 'online' | 'ranked';
@@ -65,8 +65,8 @@ export class TapeWriter {
     const tape = this.tape, b = this.b;
     if (this.finished) return;
     if (!tape.n) {
-      const f = b.f.map(x => [x.name, x.maxHp] as [string, number]) as [[string, number], [string, number]];
-      if (f.some((x, i) => x[0] !== tape.specs[i].name || x[1] !== TUNING.hp[tape.specs[i].cls as ClassId])) tape.fx = f;
+      const f = b.f.map(x => [x.name, x.maxHp, x.power] as [string, number, number]) as [[string, number, number], [string, number, number]];
+      if (f.some((x, i) => x[0] !== tape.specs[i].name || x[1] !== TUNING.hp[tape.specs[i].cls as ClassId] || x[2] !== 1)) tape.fx = f;
     }
     const code = encode(ins[0]) + encode(ins[1]);
     const last = tape.frames[tape.frames.length - 1];
@@ -112,7 +112,7 @@ export class TapePlayer {
 
   constructor(readonly tape: RoundTape) {
     this.b = new Battle(copySpec(tape.specs[0]), copySpec(tape.specs[1]), tape.seed);
-    tape.fx?.forEach(([name, hp], i) => { const f = this.b.f[i]; f.name = name; f.maxHp = f.hp = hp; });
+    tape.fx?.forEach(([name, hp, power], i) => { const f = this.b.f[i]; f.name = name; f.maxHp = f.hp = hp; f.power = power ?? 1; });
   }
 
   get done(): boolean { return this.b.phase === 'over' || this.i >= this.tape.n; }
