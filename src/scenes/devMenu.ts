@@ -10,6 +10,10 @@ import { EncyclopediaScene } from './encyclopedia';
 import { SandboxScene } from './sandbox';
 import { LabScene } from './lab';
 import { VoiceTestScene } from './voiceTest';
+import { BattleScene } from './battle';
+import { loadMatch } from '../game/match';
+import { CLASS_IDS } from '../game/classes';
+import type { ClassId } from '../art/sprites';
 
 const ITEMS = ['CARD ENCYCLOPEDIA', 'SANDBOX', 'BALANCE LAB', 'VOICE TEST', 'BACK'];
 const ABOUT = [
@@ -69,6 +73,15 @@ export function devFromHash(home: () => void): boolean {
   else if (tag === 'lab') setScene(new LabScene(menu));
   else if (tag === 'voices') setScene(new VoiceTestScene(menu));
   else if (tag === 'dev') menu();
+  else if (tag.startsWith('watch')) {
+    // CPU vs CPU on the real battle screen: #watch, or #watch=warrior-mage
+    const [a, b] = tag.split('=')[1]?.split('-') ?? [];
+    const m = loadMatch();
+    if (CLASS_IDS.includes(a as ClassId)) m.p1 = a as ClassId;
+    if (CLASS_IDS.includes(b as ClassId)) m.cpu = b as ClassId;
+    m.p1Deck = m.cpuDeck = 'starter';
+    setScene(new BattleScene(m, [0, 0], undefined, [], ['cpu', 'cpu']));
+  }
   else return false;
   return true;
 }
