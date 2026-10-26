@@ -36,7 +36,7 @@ Every class beats two others and struggles against two, so every matchup is a ba
 
 In the **Spell Deck Builder**, each class has its own pool of spells: commons, uncommons, a set of Legendaries and three Mythic signature cards. Shape a 30-spell deck around the way you like to win, or start from a ready-made deck and tweak it.
 
-<p align="center"><img src="docs/media/draw.gif" alt="The Draw screen: reading cards and queueing Ice Wall and Fireball" width="600"></p>
+<p align="center"><img src="docs/media/draw.gif" alt="The Draw screen: reading cards and queueing Fireball and Deep Freeze" width="600"></p>
 
 ### 🔥 Fight in real time
 
