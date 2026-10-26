@@ -2,7 +2,7 @@
 import { NO_INTENT, heavyChargeOf, type Battle, type BlessKind, type Dir, type Fighter, type Intent } from './battle';
 import { CARDS } from './cards';
 import { TUNING, type Difficulty } from './tuning';
-import { BALANCED, roleOf, type Playstyle } from './playstyles';
+import { BALANCED, playedAt, roleOf, type Playstyle } from './playstyles';
 
 export class Cpu {
   private think = 0;
@@ -13,9 +13,12 @@ export class Cpu {
   private wantTap = false;
   private cfg: (typeof TUNING.cpu)[Difficulty];
 
-  constructor(public difficulty: Difficulty, public style: Playstyle = BALANCED) {
+  constructor(public difficulty: Difficulty, style: Playstyle = BALANCED) {
     this.cfg = TUNING.cpu[difficulty];
+    this.style = playedAt(style, difficulty);
   }
+  /** The style as this difficulty plays it (Easy only half commits to it). */
+  style: Playstyle;
 
   intent(b: Battle, f: Fighter, dt: number): Intent {
     if (b.phase !== 'fight' || f.dead) { this.holding = false; return NO_INTENT; }
@@ -80,7 +83,7 @@ export class Cpu {
       if (Math.random() < 0.08) { this.wantTap = true; this.holding = true; }
     } else if (inReach && f.lock <= 0 && Math.random() < st.attack) {
       this.wantTap = true;
-      this.holding = Math.random() < (this.difficulty === 'normal' ? 0.35 : 0.15) * st.attack;
+      this.holding = Math.random() < (this.difficulty === 'hard' ? 0.6 : this.difficulty === 'normal' ? 0.35 : 0.15) * st.attack;
       if (Math.random() < 0.5) return;
     }
     // defensive styles get out of the enemy's row rather than trade hits

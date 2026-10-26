@@ -4,6 +4,7 @@ import { CLASS_INFO } from '../game/classes';
 import { Battle, NO_INTENT, heavyChargeOf, type Dir, type Intent, type Side } from '../game/battle';
 import { drawBattle, drawBattleUi } from '../game/battleView';
 import { Cpu } from '../game/ai';
+import { styleFor } from '../game/playstyles';
 import { CARDS, ELEMENT_COLOR } from '../game/cards';
 
 // Draw screen layout (UI pixels): the hand fans along the bottom, details and cast order above it.
@@ -57,7 +58,7 @@ export class BattleScene implements Scene {
       { cls: m.p1, deck: playerDeck(m), name: 'YOU', skin: m.p1Skin[m.p1] },
       { cls: m.cpu, deck: toList(starterDeck(m.cpu)), name: 'CPU', skin: m.cpuSkin[m.cpu] },
     );
-    this.cpu = new Cpu(m.difficulty);
+    this.cpu = new Cpu(m.difficulty, styleFor(m.cpu, m.difficulty, m.p1));
   }
 
   enter(): void { playMusic('battle', BATTLE_SONG); }
