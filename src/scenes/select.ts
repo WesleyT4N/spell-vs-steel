@@ -8,10 +8,10 @@ import { setScene, hint, zone, hot, isHot, button, showSel, type Scene } from '.
 import { PLAYABLE, CLASS_INFO } from '../game/classes';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
-import { getSprite, drawFighterSprite, teamColor, SKINS, skinOf, mirrorSkin, type ClassId } from '../art/sprites';
-import { P, UW, screenRect, fillScreen, vy, vspan, type Ctx } from '../engine/gfx';
+import { getSprite, getPortrait, drawFighterSprite, teamColor, SKINS, skinOf, mirrorSkin, type ClassId } from '../art/sprites';
+import { P, UW, screenRect, fillScreen, vy, vspan, mix, dith, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
-import { win, plaque, banner, vsSeal, FRAME, GOLD, INK, INK2, TRIM, BURN, RED_INK, BLUE_INK } from './skin';
+import { win, plaque, banner, vsSeal, FRAME, GOLD, INK, INK2, TRIM, PAPER, RED_INK, BLUE_INK } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { loadMatch, saveMatch, playerDeck, sideName, cycleDeck, deckLabel, type MatchConfig } from '../game/match';
@@ -36,6 +36,17 @@ const BLURB: Record<ClassId, [string, string]> = {
   ranger: ['ARROWS, TRAPS AND PETS', 'STAND STILL FOR ENERGY'],
   priest: ['OUTLASTS AND CHIPS', 'HEALS AND CURSES'],
 };
+
+/** Portrait backdrops: a dark wash in each class's element (steel, arcane, shadow, nature, holy), dark to light. */
+const BACKDROP: Record<ClassId, [string, string, string]> = {
+  warrior: ['#1c1c38', '#3c3c3c', '#7c7c7c'],
+  mage: ['#1c1c38', '#4428bc', '#940084'],
+  rogue: ['#000000', '#1c1c38', '#5b162a'],
+  ranger: ['#002800', '#005800', '#00a800'],
+  priest: ['#503000', '#ac7c00', '#f8d878'],
+};
+// portrait frame (UI pixels): the 40x32 bust at 2x inside a 2px ink border
+const FW = 84, FH = 68, PORTRAIT_IN = 0.18;
 
 /** 0/1: picking the left side's fighter/skin, 2/3: the right side's (skipped online), 4: options. */
 type Step = 0 | 1 | 2 | 3 | 4;
@@ -63,6 +74,9 @@ export class CharSelectScene implements Scene {
   msgT = 0;
   /** Local Versus: the side EDIT DECK opens, the last one picked for or clicked. */
   focus: 0 | 1 = 0;
+  t = 0;
+  /** Per side: the portrait on show and when it arrived, so a new pick slides in. */
+  shown: Array<{ key: string; at: number }> = [{ key: '', at: -1 }, { key: '', at: -1 }];
   /** Online: the session whose rival fills the right-hand slot. `tutorial`: pick the class to learn, then start it. */
   constructor(private net?: NetSession, startAt: Step = 0, private mode: SelectMode = 'versus') {
     this.step = net ? 0 : startAt;
@@ -198,6 +212,7 @@ export class CharSelectScene implements Scene {
   }
 
   update(dt: number): void {
+    this.t += dt;
     this.msgT = Math.max(0, this.msgT - dt);
     const net = this.net;
     if (net) {
@@ -384,10 +399,46 @@ export class CharSelectScene implements Scene {
     const x = PX[1], cx = x + PW / 2;
     win(ui, x, this.py, PW, PH);
     drawTextCentered(ui, 'OPPONENT', cx, this.py + 10, TRIM, 1, false);
-    drawFighterSprite(ui, getSprite('mage', SKINS.mage[0].id, false), cx, this.py + 86, true, 'ghost', 3);
-    P(ui, BURN, cx - 20, this.py + 87, 40, 2);
-    drawTextCentered(ui, 'DUMMY', cx, this.py + 94, INK2, 2, false);
-    ['A TRAINING DUMMY', 'ABOUT 5 MINUTES', 'OF LESSONS'].forEach((l, i) => drawTextCentered(ui, l, cx, this.py + 112 + i * 9, TRIM, 1, false));
+    // the dummy gets the empty portrait frame with its ghosted stand-in inside
+    this.drawPortrait(ui, 1, null, '', cx, this.py + 23);
+    drawFighterSprite(ui, getSprite('mage', SKINS.mage[0].id, false), cx, this.py + 87, true, 'ghost', 2);
+    drawTextCentered(ui, 'DUMMY', cx, this.py + 95, INK2, 2, false);
+    ['A TRAINING DUMMY', 'ABOUT 5 MINUTES', 'OF LESSONS'].forEach((l, i) => drawTextCentered(ui, l, cx, this.py + 111 + i * 9, TRIM, 1, false));
+  }
+
+  /**
+   * A fighter's portrait in an ink frame over a wash in its element, facing the middle. A new pick slides in from
+   * the outer edge behind a white flash. `cls` null draws the empty frame (RANDOM, or a rival still connecting).
+   */
+  private drawPortrait(ui: Ctx, s: 0 | 1, cls: ClassId | null, skin: string, cx: number, y: number): void {
+    const x = cx - FW / 2, key = `${cls}:${skin}`, sh = this.shown[s];
+    if (sh.key !== key) { sh.key = key; sh.at = sh.at < 0 ? -1 : this.t; }
+    const k = sh.at < 0 ? 1 : Math.min(1, (this.t - sh.at) / PORTRAIT_IN);
+    P(ui, '#000000', x - 1, y - 1, FW + 2, FH + 2);
+    P(ui, FRAME, x, y, FW, FH);
+    const ix = x + 2, iy = y + 2, iw = FW - 4, ih = FH - 4;
+    // dithered bands, light toward the bottom; 2px dither cells to match the 2x portrait pixels
+    const ramp = cls ? BACKDROP[cls] : ['#000000', '#1c1c38', '#3c3c3c'] as const;
+    for (let yy = 0; yy < ih; yy += 2) {
+      const v = (yy / ih) * (ramp.length - 1), b = Math.min(ramp.length - 2, Math.floor(v)), f = v - b;
+      for (let xx = 0; xx < iw; xx += 2) P(ui, dith(xx >> 1, yy >> 1) < f ? ramp[b + 1] : ramp[b], ix + xx, iy + yy, 2, 2);
+    }
+    if (!cls) return;
+    const img = getPortrait(cls, skin), pw = img.width * 2, ph = img.height * 2;
+    // slides from the outer edge (left panel from the left), snapped to the 2px grid
+    const off = Math.round(((1 - k) ** 2 * (s === 0 ? -iw : iw)) / 2) * 2;
+    ui.save();
+    ui.beginPath(); ui.rect(ix, iy, iw, ih); ui.clip();
+    const px = cx - pw / 2 + off, py = iy + ih - ph;
+    if (s === 1) { ui.translate(px + pw, py); ui.scale(-1, 1); ui.drawImage(img, 0, 0, pw, ph); }
+    else ui.drawImage(img, px, py, pw, ph);
+    ui.restore();
+    if (k < 1) {
+      // the arrival flash fades out in dithered steps
+      for (let yy = 0; yy < ih; yy += 2) for (let xx = 0; xx < iw; xx += 2) if (dith(xx >> 1, yy >> 1) > k * 1.6) P(ui, '#fcfcfc', ix + xx, iy + yy, 2, 2);
+    }
+    // a thin team-color sill under the bust
+    P(ui, cls ? mix(teamColor(cls, skin, false), '#000000', 0.2) : FRAME, ix, iy + ih - 2, iw, 2);
   }
 
   private drawSlot(ui: Ctx, s: 0 | 1, show: { cls: ClassId | null; skin: string }, tick: number): void {
@@ -401,16 +452,16 @@ export class CharSelectScene implements Scene {
     // local Versus: the name is a toggle between a player and the CPU
     if (this.local) button(ui, `ctl:${s}`, `< ${who} >`, x + PW / 2 - 34, this.py + 6, 68, 14, false, s === 0 ? RED_INK : BLUE_INK);
     else drawTextCentered(ui, who, x + PW / 2, this.py + 10, s === 0 ? RED_INK : BLUE_INK, 1, false);
-    const cx = x + PW / 2, bob = Math.floor(tick / 4 + s) % 2;
+    const cx = x + PW / 2;
     if (!cls) {
-      drawTextCentered(ui, '?', cx, this.py + 36, TRIM, 6, false);
-      drawTextCentered(ui, net && s === 1 && !net.rival ? 'CONNECTING...' : 'RANDOM', cx, this.py + 94, INK2, 2, false);
+      this.drawPortrait(ui, s, null, '', cx, this.py + 23);
+      drawTextCentered(ui, '?', cx, this.py + 36, PAPER, 6, false);
+      drawTextCentered(ui, net && s === 1 && !net.rival ? 'CONNECTING...' : 'RANDOM', cx, this.py + 95, INK2, 2, false);
       return;
     }
-    drawFighterSprite(ui, getSprite(cls, skin, false), cx, this.py + 86 - bob * 2, s === 1, 'none', 3);
-    P(ui, BURN, cx - 20, this.py + 87, 40, 2);
-    drawTextCentered(ui, CLASS_INFO[cls].name, cx, this.py + 94, INK, 2, false);
-    BLURB[cls].forEach((l, i) => drawTextCentered(ui, l, cx, this.py + 112 + i * 9, INK2, 1, false));
+    this.drawPortrait(ui, s, cls, skin, cx, this.py + 23);
+    drawTextCentered(ui, CLASS_INFO[cls].name, cx, this.py + 95, INK, 2, false);
+    BLURB[cls].forEach((l, i) => drawTextCentered(ui, l, cx, this.py + 111 + i * 9, INK2, 1, false));
     // skins: clickable swatches for your slot (and the CPU's)
     const list = SKINS[cls], sw = 14, sx = Math.round(cx - (list.length * sw) / 2);
     const editable = s === 0 || !net;
