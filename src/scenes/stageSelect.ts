@@ -3,10 +3,10 @@
 // flip between the two votes, shown as a roulette).
 import { setScene, hint, zone, hot, showSel, type Scene } from './scene';
 import { getStage, STAGE_IDS } from '../art/stages';
-import { drawPanel, panelFoot } from '../art/arena';
+import { drawPanel, drawStage, panelFoot } from '../art/arena';
 import { useStage } from '../game/battleView';
 import { getSprite, drawFighterSprite, skinOf, mirrorSkin } from '../art/sprites';
-import { P, W, H, UW, frame, rng, type Ctx } from '../engine/gfx';
+import { P, W, H, UW, frame, rng, screenRect, fillScreen, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
@@ -174,9 +174,9 @@ export class StageSelectScene implements Scene {
   draw(c: Ctx, tick: number, ui: Ctx): void {
     const st = getStage(this.view);
     // the full-size stage behind everything, dimmed, and a sharp half-size preview with the fighters on it
-    st.draw(c, tick, 0);
+    drawStage(c, st, tick);
     c.fillStyle = 'rgba(0,0,24,0.65)';
-    c.fillRect(0, 0, W, H);
+    c.fillRect(...screenRect());
     const pc = this.preview.getContext('2d')!;
     st.draw(pc, tick, 0);
     for (let r = 0; r < 3; r++) for (let col = 0; col < 6; col++) drawPanel(pc, col, r, 'clean', tick, col < 3 ? 0 : 1, undefined, st);
@@ -227,7 +227,7 @@ export class StageSelectScene implements Scene {
     if (status) drawTextCentered(ui, status, UW / 2, 294, '#f8b800', 1);
 
     if (net && (net.status === 'error' || net.status === 'left' || net.status === 'lost')) {
-      P(ui, 'rgba(0,0,0,0.8)', 0, 0, UW, 320);
+      fillScreen(ui, 'rgba(0,0,0,0.8)', 2);
       drawTextCentered(ui, net.status === 'left' ? 'YOUR RIVAL LEFT' : net.status === 'lost' ? 'CONNECTION LOST' : net.error || 'CONNECTION ERROR', UW / 2, 140, '#f83800', 2);
       hint(ui, 'CLICK: BACK TO TITLE');
       return;

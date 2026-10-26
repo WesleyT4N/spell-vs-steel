@@ -15,7 +15,7 @@ import { starterDeck, toList } from '../game/deck';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
 import { defaultSkin, type ClassId } from '../art/sprites';
-import { P, UW, UH, frame, type Ctx } from '../engine/gfx';
+import { P, UW, UH, frame, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, wrap } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
@@ -722,7 +722,8 @@ export class TutorialScene implements Scene {
       this.drawPage(ui, tick);
     } else if (b.phase === 'custom') {
       // the goal replaces the Draw screen's footer, so the hand stays clear
-      P(ui, '#000000', 0, UH - 14, UW, 14);
+      const [sx, , sw, sh] = screenRect(2);
+      P(ui, '#000000', sx, UH - 14, sw, 14 + (sh - UH) / 2);
       const msg = this.denyT > 0 ? 'PICK AT LEAST ONE SPELL FIRST' : s.goal(this);
       drawTextCentered(ui, msg, UW / 2, UH - 11, this.denyT > 0 && tick % 4 < 2 ? '#f83800' : '#f8b800', 1, false);
     } else if (b.phase === 'fight') {
