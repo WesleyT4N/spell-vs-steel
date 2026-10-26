@@ -1,63 +1,269 @@
 {
   "_comment": "Voice script for scripts/voices/gen.py. Keys are clip banks: <class>:<kind>[_<element>] and ann:<call>. Each bank picks a random line at play time.",
   "voices": {
-    "ann": { "voice": "am_onyx", "lang": "en-us", "semitones": -3, "speed": 0.85 },
-    "warrior": { "voice": "am_fenrir", "lang": "en-us", "semitones": -2, "speed": 1.0 },
-    "mage": { "voice": "bm_george", "lang": "en-gb", "semitones": -3, "speed": 0.95 },
-    "rogue": { "voice": "af_nicole", "lang": "en-us", "semitones": -1, "speed": 1.05 },
-    "ranger": { "voice": "bm_lewis", "lang": "en-gb", "semitones": -2, "speed": 1.0 },
-    "cleric": { "voice": "bf_emma", "lang": "en-gb", "semitones": -1, "speed": 0.95 }
+    "ann": {
+      "voice": {
+        "am_fenrir": 0.6,
+        "bm_george": 0.4
+      },
+      "lang": "en-gb",
+      "semitones": -5,
+      "keepFormants": true,
+      "grit": 9,
+      "speed": 0.9,
+      "_who": "a gruff old dwarf"
+    },
+    "warrior": {
+      "voice": "am_fenrir",
+      "lang": "en-us",
+      "semitones": -2,
+      "speed": 1.0
+    },
+    "mage": {
+      "voice": "bm_george",
+      "lang": "en-gb",
+      "semitones": -3,
+      "speed": 0.95
+    },
+    "rogue": {
+      "voice": "af_nicole",
+      "lang": "en-us",
+      "semitones": -1,
+      "speed": 1.05
+    },
+    "ranger": {
+      "voice": "bm_lewis",
+      "lang": "en-gb",
+      "semitones": -2,
+      "speed": 1.0
+    },
+    "cleric": {
+      "voice": "bf_emma",
+      "lang": "en-gb",
+      "semitones": -1,
+      "speed": 0.95
+    }
   },
   "lines": {
-    "ann:round1": ["Round one!"], "ann:round2": ["Round two!"], "ann:round3": ["Round three!"],
-    "ann:round4": ["Round four!"], "ann:round5": ["Round five!"], "ann:final": ["Final round!"],
-    "ann:fight": ["Fight!"], "ann:ko": ["K. O.!"], "ann:perfect": ["Perfect!"],
-    "ann:wins_warrior": ["Warrior wins!"], "ann:wins_mage": ["Mage wins!"], "ann:wins_rogue": ["Rogue wins!"],
-    "ann:wins_ranger": ["Ranger wins!"], "ann:wins_priest": ["Priest wins!"], "ann:wins_cleric": ["Cleric wins!"],
-    "ann:match_warrior": ["Warrior wins the match!"], "ann:match_mage": ["Mage wins the match!"], "ann:match_rogue": ["Rogue wins the match!"],
-    "ann:match_ranger": ["Ranger wins the match!"], "ann:match_priest": ["Priest wins the match!"], "ann:match_cleric": ["Cleric wins the match!"],
-
-    "warrior:grunt": ["Hah!", "Hyah!", "Hup!"],
-    "warrior:cast": ["Hyah!", "Take this!", "Haaah!"],
-    "warrior:castBig": ["For glory!", "Feel my rage!"],
-    "warrior:hurt": ["Ugh!", "Agh!", "Oof!"],
-    "warrior:hurtBig": ["Aaagh!", "Gah!"],
-    "warrior:death": ["No... not yet..."],
-    "warrior:win": ["Victory is mine!", "Ha! Too easy!"],
-
-    "mage:grunt": ["Hah!", "Hmph!"],
-    "mage:cast_fire": ["Ignis!", "Burn!"],
-    "mage:cast_frost": ["Glacius!", "Freeze!"],
-    "mage:cast_arcane": ["Arcanum!", "Arcane!"],
-    "mage:cast": ["Arcanum!"],
-    "mage:castBig": ["Witness true power!", "Feel the flames!"],
-    "mage:hurt": ["Ugh!", "Ngh!", "Oof!"],
-    "mage:hurtBig": ["Aaargh!", "Gah!"],
-    "mage:death": ["Impossible..."],
-    "mage:win": ["Knowledge is power.", "Just as I foresaw."],
-
-    "rogue:grunt": ["Hah!", "Tch!"],
-    "rogue:cast": ["Too slow.", "Gotcha.", "Hah!"],
-    "rogue:castBig": ["Now you see me...", "Into the shadows!"],
-    "rogue:hurt": ["Ugh!", "Ah!", "Tch!"],
-    "rogue:hurtBig": ["Aaah!", "Argh!"],
-    "rogue:death": ["Caught... at last..."],
-    "rogue:win": ["You never saw me coming.", "Easy money."],
-
-    "ranger:grunt": ["Hup!", "Hah!", "Hyah!"],
-    "ranger:cast": ["Loose!", "Got you!", "Hup!"],
-    "ranger:castBig": ["Nowhere to run!", "Right between the eyes!"],
-    "ranger:hurt": ["Ugh!", "Agh!", "Oof!"],
-    "ranger:hurtBig": ["Aaagh!", "Argh!"],
-    "ranger:death": ["Missed... my mark..."],
-    "ranger:win": ["Right on target.", "The hunt is over."],
-
-    "cleric:grunt": ["Hah!", "Hyah!"],
-    "cleric:cast": ["Be blessed.", "Light!", "Smite!"],
-    "cleric:castBig": ["By the light!", "Heaven's judgment!"],
-    "cleric:hurt": ["Ah!", "Ugh!", "Oh!"],
-    "cleric:hurtBig": ["Aaah!", "Agh!"],
-    "cleric:death": ["The light... fades..."],
-    "cleric:win": ["The light prevails.", "Go in peace."]
+    "ann:round1": [
+      "Round one!"
+    ],
+    "ann:round2": [
+      "Round two!"
+    ],
+    "ann:round3": [
+      "Round three!"
+    ],
+    "ann:round4": [
+      "Round four!"
+    ],
+    "ann:round5": [
+      "Round five!"
+    ],
+    "ann:final": [
+      "Final round! Make it count!"
+    ],
+    "ann:fight": [
+      "Fight!"
+    ],
+    "ann:ko": [
+      "K. O.! Down they go!"
+    ],
+    "ann:perfect": [
+      "Perfect! Not a scratch on 'em!"
+    ],
+    "ann:wins_warrior": [
+      "Warrior wins! Ha ha!"
+    ],
+    "ann:wins_mage": [
+      "Mage wins! Ha ha!"
+    ],
+    "ann:wins_rogue": [
+      "Rogue wins! Ha ha!"
+    ],
+    "ann:wins_ranger": [
+      "Ranger wins! Ha ha!"
+    ],
+    "ann:wins_priest": [
+      "Priest wins! Ha ha!"
+    ],
+    "ann:wins_cleric": [
+      "Cleric wins! Ha ha!"
+    ],
+    "ann:match_warrior": [
+      "Warrior wins the match! Drinks are on me!"
+    ],
+    "ann:match_mage": [
+      "Mage wins the match! Drinks are on me!"
+    ],
+    "ann:match_rogue": [
+      "Rogue wins the match! Drinks are on me!"
+    ],
+    "ann:match_ranger": [
+      "Ranger wins the match! Drinks are on me!"
+    ],
+    "ann:match_priest": [
+      "Priest wins the match! Drinks are on me!"
+    ],
+    "ann:match_cleric": [
+      "Cleric wins the match! Drinks are on me!"
+    ],
+    "warrior:grunt": [
+      "Hah!",
+      "Hyah!",
+      "Hup!"
+    ],
+    "warrior:cast": [
+      "Hyah!",
+      "Take this!",
+      "Haaah!"
+    ],
+    "warrior:castBig": [
+      "For glory!",
+      "Feel my rage!"
+    ],
+    "warrior:hurt": [
+      "Ugh!",
+      "Agh!",
+      "Oof!"
+    ],
+    "warrior:hurtBig": [
+      "Aaagh!",
+      "Gah!"
+    ],
+    "warrior:death": [
+      "No... not yet..."
+    ],
+    "warrior:win": [
+      "Victory is mine!",
+      "Ha! Too easy!"
+    ],
+    "mage:grunt": [
+      "Hah!",
+      "Hmph!"
+    ],
+    "mage:cast_fire": [
+      "Ignis!",
+      "Burn!"
+    ],
+    "mage:cast_frost": [
+      "Glacius!",
+      "Freeze!"
+    ],
+    "mage:cast_arcane": [
+      "Arcanum!",
+      "Arcane!"
+    ],
+    "mage:cast": [
+      "Arcanum!"
+    ],
+    "mage:castBig": [
+      "Witness true power!",
+      "Feel the flames!"
+    ],
+    "mage:hurt": [
+      "Ugh!",
+      "Ngh!",
+      "Oof!"
+    ],
+    "mage:hurtBig": [
+      "Aaargh!",
+      "Gah!"
+    ],
+    "mage:death": [
+      "Impossible..."
+    ],
+    "mage:win": [
+      "Knowledge is power.",
+      "Just as I foresaw."
+    ],
+    "rogue:grunt": [
+      "Hah!",
+      "Tch!"
+    ],
+    "rogue:cast": [
+      "Too slow.",
+      "Gotcha.",
+      "Hah!"
+    ],
+    "rogue:castBig": [
+      "Now you see me...",
+      "Into the shadows!"
+    ],
+    "rogue:hurt": [
+      "Ugh!",
+      "Ah!",
+      "Tch!"
+    ],
+    "rogue:hurtBig": [
+      "Aaah!",
+      "Argh!"
+    ],
+    "rogue:death": [
+      "Caught... at last..."
+    ],
+    "rogue:win": [
+      "You never saw me coming.",
+      "Easy money."
+    ],
+    "ranger:grunt": [
+      "Hup!",
+      "Hah!",
+      "Hyah!"
+    ],
+    "ranger:cast": [
+      "Loose!",
+      "Got you!",
+      "Hup!"
+    ],
+    "ranger:castBig": [
+      "Nowhere to run!",
+      "Right between the eyes!"
+    ],
+    "ranger:hurt": [
+      "Ugh!",
+      "Agh!",
+      "Oof!"
+    ],
+    "ranger:hurtBig": [
+      "Aaagh!",
+      "Argh!"
+    ],
+    "ranger:death": [
+      "Missed... my mark..."
+    ],
+    "ranger:win": [
+      "Right on target.",
+      "The hunt is over."
+    ],
+    "cleric:grunt": [
+      "Hah!",
+      "Hyah!"
+    ],
+    "cleric:cast": [
+      "Be blessed.",
+      "Light!",
+      "Smite!"
+    ],
+    "cleric:castBig": [
+      "By the light!",
+      "Heaven's judgment!"
+    ],
+    "cleric:hurt": [
+      "Ah!",
+      "Ugh!",
+      "Oh!"
+    ],
+    "cleric:hurtBig": [
+      "Aaah!",
+      "Agh!"
+    ],
+    "cleric:death": [
+      "The light... fades..."
+    ],
+    "cleric:win": [
+      "The light prevails.",
+      "Go in peace."
+    ]
   }
 }

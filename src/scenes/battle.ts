@@ -128,7 +128,7 @@ export class BattleScene implements Scene {
       if (this.m.bestOf > 1) {
         const last = this.score[0] === this.need - 1 && this.score[1] === this.need - 1;
         announce(last ? 'final' : 'round', { n: this.score[0] + this.score[1] + 1 });
-        this.roundAt = performance.now();
+        this.roundAt = performance.now() + (last ? 700 : 0);
       }
       return;
     }
@@ -142,9 +142,9 @@ export class BattleScene implements Scene {
       const w = b.f[b.winner], who = CLASS_INFO[w.cls].name;
       const perfect = w.hp >= w.maxHp;
       const call = (): void => announce(this.setOver && this.m.bestOf > 1 ? 'match' : 'wins', { who });
-      if (perfect) { announce('perfect'); window.setTimeout(call, 900); } else call();
+      if (perfect) { announce('perfect'); window.setTimeout(call, 1800); } else call();
       // the winner's victory line once the announcer is done
-      window.setTimeout(() => voiceLine(w.cls, 'win', 0, w.side), perfect ? 2700 : 2000);
+      window.setTimeout(() => voiceLine(w.cls, 'win', 0, w.side), (perfect ? 1800 : 0) + (this.setOver && this.m.bestOf > 1 ? 2600 : 1500));
     }
   }
 

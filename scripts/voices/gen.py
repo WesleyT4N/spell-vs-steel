@@ -16,16 +16,27 @@ models = sys.argv[1] if len(sys.argv) > 1 else '.'
 script = json.load(open(os.path.join(here, 'lines.json')))
 k = Kokoro(os.path.join(models, 'kokoro.onnx'), os.path.join(models, 'voices.bin'))
 
+def style(v):
+    """A voice name, or a blend {name: weight} of several."""
+    if isinstance(v['voice'], str):
+        return v['voice']
+    return sum(k.get_voice_style(n) * w for n, w in v['voice'].items())
+
 def render(text, v):
-    samples, sr = k.create(text, voice=v['voice'], speed=v['speed'], lang=v['lang'])
+    samples, sr = k.create(text, voice=style(v), speed=v['speed'], lang=v['lang'])
     with tempfile.TemporaryDirectory() as d:
         wav, mp3 = os.path.join(d, 'a.wav'), os.path.join(d, 'a.mp3')
         sf.write(wav, samples, sr)
         rate = 2 ** (v['semitones'] / 12)
         # pitch down without slowing, trim silence at both ends, tighten dynamics
-        af = (f'asetrate={sr}*{rate:.5f},aresample={sr},atempo={1 / rate:.5f},'
+        # 'keepFormants' drops the pitch but not the throat (deep but not a giant); otherwise both move together
+        shift = (f'rubberband=pitch={rate:.5f}:formant=preserved,' if v.get('keepFormants')
+                 else f'asetrate={sr}*{rate:.5f},aresample={sr},atempo={1 / rate:.5f},')
+        # 'grit' (dB of drive) roughens the voice through a soft clipper, with a little chest
+        grit = (f",lowshelf=f=220:g=3,volume={v['grit']}dB,asoftclip=type=tanh,volume=-{v['grit']}dB" if v.get('grit') else '')
+        af = (shift +
               'silenceremove=start_periods=1:start_threshold=-45dB,areverse,silenceremove=start_periods=1:start_threshold=-45dB,areverse,'
-              'highpass=f=90,acompressor=threshold=-20dB:ratio=3:attack=5:release=80')
+              'highpass=f=90,acompressor=threshold=-20dB:ratio=3:attack=5:release=80' + grit)
         mid = os.path.join(d, 'b.wav')
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', wav, '-af', af, '-ac', '1', '-ar', '24000', '-c:a', 'pcm_f32le', mid], check=True)
         # level every line the same: loudness by RMS, peaks held under -1 dBFS, 8 ms fades so nothing clicks
@@ -40,8 +51,16 @@ def render(text, v):
 
 out = {}
 total = 0
+only = sys.argv[2] if len(sys.argv) > 2 else None
+old = {}
+if only:  # keep every other bank from the current file
+    src = open(os.path.join(root, 'src/engine/voiceClips.ts')).read()
+    old = json.loads('{' + src.split('= {', 1)[1].rsplit('};', 1)[0].rstrip().rstrip(',') + '}')
 for key, texts in script['lines'].items():
     who = key.split(':')[0]
+    if only and who != only:
+        out[key] = old[key]
+        continue
     v = script['voices'][who]
     out[key] = []
     for t in texts:
