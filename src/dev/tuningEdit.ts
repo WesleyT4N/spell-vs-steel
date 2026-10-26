@@ -1,5 +1,6 @@
-// Live editing of TUNING and CARD_POWER for the dev tools. Edits last until the page reloads.
+// Live editing of TUNING, CARD_POWER and card costs for the dev tools. Edits last until the page reloads.
 import { TUNING } from '../game/tuning';
+import { CARDS, type CardDef } from '../game/cards';
 import { CARD_POWER } from './instrument';
 
 type Tree = Record<string, unknown>;
@@ -34,31 +35,57 @@ export function setPower(id: string, v: number): void {
   changed();
 }
 
-/** Everything that differs from the shipped numbers. */
-export function overrides(): { tuning: Record<string, number>; cardPower: Record<string, number> } {
-  const tuning: Record<string, number> = {};
-  for (const p of tuningPaths()) if (getTuning(p) !== DEFAULTS[p]) tuning[p] = getTuning(p);
-  return { tuning, cardPower: { ...CARD_POWER } };
-}
+/** Shipped costs, so a cost edit can be undone. */
+const COSTS: Record<string, CardDef['cost']> = Object.fromEntries(Object.values(CARDS).map(c => [c.id, c.cost]));
+export const defaultCost = (id: string): CardDef['cost'] => COSTS[id];
 
-export const isModified = (): boolean => {
-  const o = overrides();
-  return Object.keys(o.tuning).length > 0 || Object.keys(o.cardPower).length > 0;
-};
-
-export function resetAll(): void {
-  for (const p of tuningPaths()) if (getTuning(p) !== DEFAULTS[p]) setTuningRaw(p, DEFAULTS[p]);
-  for (const id of Object.keys(CARD_POWER)) delete CARD_POWER[id];
+export function setCost(id: string, v: CardDef['cost']): void {
+  if (!CARDS[id]) return;
+  CARDS[id].cost = v;
   changed();
 }
 
-/** Apply a JSON blob made by overrides() (pasted back in). Returns how many values it set. */
-export function applyOverrides(o: { tuning?: Record<string, number>; cardPower?: Record<string, number> }): number {
+export interface Overrides { tuning: Record<string, number>; cardPower: Record<string, number>; cardCost?: Record<string, number> }
+
+/** Everything that differs from the shipped numbers. */
+export function overrides(): Overrides {
+  const tuning: Record<string, number> = {};
+  for (const p of tuningPaths()) if (getTuning(p) !== DEFAULTS[p]) tuning[p] = getTuning(p);
+  const cardCost: Record<string, number> = {};
+  for (const c of Object.values(CARDS)) if (c.cost !== COSTS[c.id] && typeof c.cost === 'number') cardCost[c.id] = c.cost;
+  return { tuning, cardPower: { ...CARD_POWER }, cardCost };
+}
+
+export const overrideCount = (o: Overrides = overrides()): number =>
+  Object.keys(o.tuning).length + Object.keys(o.cardPower).length + Object.keys(o.cardCost ?? {}).length;
+
+export const isModified = (): boolean => overrideCount() > 0;
+
+function resetRaw(): void {
+  for (const p of tuningPaths()) if (getTuning(p) !== DEFAULTS[p]) setTuningRaw(p, DEFAULTS[p]);
+  for (const id of Object.keys(CARD_POWER)) delete CARD_POWER[id];
+  for (const c of Object.values(CARDS)) c.cost = COSTS[c.id];
+}
+
+export function resetAll(): void {
+  resetRaw();
+  changed();
+}
+
+/** Apply a blob made by overrides() on top of the current numbers. Returns how many values it set. */
+export function applyOverrides(o: Partial<Overrides>): number {
   let n = 0;
   for (const [p, v] of Object.entries(o.tuning ?? {})) if (p in DEFAULTS && typeof v === 'number') { setTuningRaw(p, v); n++; }
   for (const [id, v] of Object.entries(o.cardPower ?? {})) if (typeof v === 'number') { CARD_POWER[id] = v; n++; }
+  for (const [id, v] of Object.entries(o.cardCost ?? {})) if (CARDS[id] && typeof v === 'number') { CARDS[id].cost = v; n++; }
   changed();
   return n;
+}
+
+/** Back to the shipped numbers, then apply `o` (a script run replaces earlier edits instead of stacking). */
+export function replaceOverrides(o: Partial<Overrides>): number {
+  resetRaw();
+  return applyOverrides(o);
 }
 
 function setTuningRaw(path: string, v: number): void {
