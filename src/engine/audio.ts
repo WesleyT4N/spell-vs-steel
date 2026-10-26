@@ -1,7 +1,7 @@
 // WebAudio sound: realistic combat/spell effects (sfxReal), NES-style blips for menus, and a tiny SNES-style sequencer for the BGM.
 import { playReal, type RealOpts } from './sfxReal';
-import { playVoice, type VoiceKind } from './voice';
-import { playCall, warmSpeech, stopSpeech, type Call } from './announcer';
+import { playVoice, loadClips, type VoiceKind } from './voice';
+import { playCall, type Call } from './announcer';
 import type { ClassId } from '../art/sprites';
 
 let ctx: AudioContext | null = null;
@@ -79,7 +79,7 @@ function init(): AudioContext | null {
 export function unlockAudio(): void {
   const was = ctx;
   const c = init();
-  if (!was) warmSpeech();
+  if (!was && c) void loadClips(c);
   if (c && c.state === 'suspended') void c.resume();
 }
 
@@ -87,7 +87,6 @@ export function toggleMute(): boolean {
   muted = !muted;
   try { localStorage.setItem('svs:muted', muted ? '1' : '0'); } catch { /* storage blocked */ }
   applyGains();
-  if (muted) stopSpeech();
   return muted;
 }
 export const isMuted = (): boolean => muted;
@@ -178,19 +177,18 @@ export function sfx(name: string, o?: RealOpts): void {
 }
 
 /** A fighter's voice: grunts, casting, hurt and death. `side` keeps each fighter to one line at a time. */
-export function voiceLine(cls: ClassId, kind: VoiceKind, pan = 0, side = 0): void {
+export function voiceLine(cls: ClassId, kind: VoiceKind, pan = 0, side = 0, element?: string): void {
   const c = ctx;
   if (!c || c.state !== 'running' || quiet || muted || settings.voice === 0) return;
-  playVoice(c, voiceBus, cls, kind, pan, side);
+  playVoice(c, voiceBus, cls, kind, pan, side, element);
 }
 
 /** The announcer: a stinger plus the spoken words. */
 export function announce(call: Call, args?: { n?: number; who?: string }): void {
   const c = ctx;
-  if (quiet || muted || settings.announcer === 0) return;
-  playCall(c, c ? annBus : null, call, masterGain() * settings.announcer / 10, args);
+  if (!c || c.state !== 'running' || quiet || muted || settings.announcer === 0) return;
+  playCall(c, annBus, call, args);
 }
-export { stopSpeech };
 
 /** The sound that goes with a spell effect's visual (see battle.addFx). */
 export function sfxFx(kind: string, o?: RealOpts): void { sfx('fx:' + kind, o); }
