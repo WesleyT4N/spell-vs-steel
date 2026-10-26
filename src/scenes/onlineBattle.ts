@@ -22,6 +22,8 @@ const STEP = 1 / 60;
 const roundSeed = (seed: number, r: number): number => (seed + Math.imul(r, 0x9e3779b9)) >>> 0;
 
 export class OnlineBattleScene extends BattleScene {
+  /** The match runs on in the background for the other player, so going away doesn't open the pause menu. */
+  suspend(): void { /* keep playing */ }
   /** Next lockstep frame to run. */
   frame = 0;
   /** Presses seen while waiting on the other side, merged into the next scheduled input. */

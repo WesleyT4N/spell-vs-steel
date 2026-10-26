@@ -4,7 +4,7 @@
 import './frameClock';
 import '../../src/main';
 import { setScene, getScene } from '../../src/scenes/scene';
-import { endFrame } from '../../src/engine/input';
+import { endFrame, pollInput } from '../../src/engine/input';
 import { TitleScene } from '../../src/scenes/title';
 import { OptionsScene } from '../../src/scenes/options';
 import { ControlsScene } from '../../src/scenes/controls';
@@ -37,10 +37,23 @@ function watch(over: Partial<MatchConfig> = {}): BattleScene {
   return s;
 }
 
+/** Plug in a standard-mapping pad and tap A, so the game sees a pad in use. */
+function fakePad(): void {
+  const buttons = Array.from({ length: 17 }, (_, i) => ({ pressed: i === 0, value: i === 0 ? 1 : 0, touched: false }));
+  const pad = { index: 0, id: 'test pad', connected: true, mapping: 'standard', buttons, axes: [0, 0, 0, 0], timestamp: 0 };
+  Object.defineProperty(navigator, 'getGamepads', { value: () => [pad, null, null, null], configurable: true });
+  pollInput();
+  buttons[0] = { pressed: false, value: 0, touched: false };
+  pollInput();
+  endFrame();
+}
+
 const screens: Record<string, () => void> = {
   'title': title,
   'options': () => setScene(new OptionsScene(title)),
   'key-mapping': () => setScene(new ControlsScene(title)),
+  // a pad plugged in and just pressed: the PAD column is live and hints name pad buttons
+  'key-mapping-pad': () => { fakePad(); setScene(new ControlsScene(title)); run(0.1); },
   'select-fighter': () => setScene(new CharSelectScene()),
   'select-skin': () => setScene(new CharSelectScene(undefined, 1)),
   'select-rival': () => setScene(new CharSelectScene(undefined, 2)),

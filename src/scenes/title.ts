@@ -20,8 +20,10 @@ import { tutorialDone } from './tutorial';
 import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
 import { RED_INK } from './skin';
+import { platform } from '../platform';
 
-const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
+// QUIT only in the desktop app (a web page can't close itself)
+const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : []), ...(platform.lifecycle.canQuit ? ['QUIT'] : [])];
 
 // seven rows (eight in dev builds) still clear the version line
 const MENU_Y = ITEMS.length > 7 ? 162 : ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 7 ? 15 : ITEMS.length > 6 ? 16 : 18;
@@ -186,6 +188,7 @@ export class TitleScene implements Scene {
       if (item === 'DECK BUILDER') setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
       if (item === 'OPTIONS') setScene(new OptionsScene(() => setScene(new TitleScene())));
       // loaded on demand, so the prod build (DEV_TOOLS off) carries none of the dev tools code
+      if (item === 'QUIT') platform.lifecycle.quit();
       if (item === 'DEV TOOLS' && DEV_TOOLS) void import('./devMenu').then(m => setScene(new m.DevMenuScene(() => setScene(new TitleScene()))));
     }
   }
