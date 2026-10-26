@@ -1,6 +1,7 @@
 // Parallel balance grid: every class against every class over many deck pairings, on all CPU cores.
 // Usage: npx tsx scripts/balance.ts [options]   (or npm run balance -- [options])
-//   --pools starter,archetype,variant,random  which deck pools to run, one grid each (default starter,archetype,random)
+//   --pools starter,archetype,variant,random,style,style-starter  which deck pools to run, one grid each (default starter,archetype,random)
+//                    style = each CPU playstyle with its matching archetype deck; style-starter = each playstyle with the starter
 //   --n 40           matches per deck pair (half with each side first)
 //   --k 4            random decks per class (random pool) or builds per archetype (variant pool)
 //   --classes a,b    only these classes

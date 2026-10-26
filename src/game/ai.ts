@@ -2,6 +2,7 @@
 import { NO_INTENT, heavyChargeOf, type Battle, type BlessKind, type Dir, type Fighter, type Intent } from './battle';
 import { CARDS } from './cards';
 import { TUNING, type Difficulty } from './tuning';
+import { BALANCED, roleOf, type Playstyle } from './playstyles';
 
 export class Cpu {
   private think = 0;
@@ -12,7 +13,7 @@ export class Cpu {
   private wantTap = false;
   private cfg: (typeof TUNING.cpu)[Difficulty];
 
-  constructor(public difficulty: Difficulty) {
+  constructor(public difficulty: Difficulty, public style: Playstyle = BALANCED) {
     this.cfg = TUNING.cpu[difficulty];
   }
 
@@ -41,7 +42,8 @@ export class Cpu {
     const aligned = foe.row === f.row;
 
     // 1. Dodge telegraphs and incoming projectiles.
-    if (Math.random() < this.cfg.dodge && this.inDanger(b, f)) {
+    const st = this.style;
+    if (Math.random() < this.cfg.dodge * st.dodge && this.inDanger(b, f)) {
       const step = this.safeStep(b, f);
       if (step) { this.pendingMove = step; return; }
     }
@@ -51,7 +53,7 @@ export class Cpu {
     if (top) {
       if (b.canAfford(f, top) && f.st.evoLock <= 0 && f.castCd <= 0) {
         const good = top.ai ? top.ai(b, f) : true;
-        if (good || this.waitedOnTop > this.cfg.castPatience * 3 || (this.difficulty === 'easy' && Math.random() < 0.25)) {
+        if (good || Math.random() < st.eager || this.waitedOnTop > this.cfg.castPatience * 3 * st.patience || (this.difficulty === 'easy' && Math.random() < 0.25)) {
           this.wantCast = true;
           this.waitedOnTop = 0;
           return;
@@ -76,10 +78,15 @@ export class Cpu {
     } else if (f.cls === 'rogue' && heavyReach && !inReach && f.lock <= 0) {
       // out of stab range: wind up a Throwing Knife instead
       if (Math.random() < 0.08) { this.wantTap = true; this.holding = true; }
-    } else if (inReach && f.lock <= 0) {
+    } else if (inReach && f.lock <= 0 && Math.random() < st.attack) {
       this.wantTap = true;
-      this.holding = Math.random() < (this.difficulty === 'normal' ? 0.35 : 0.15);
+      this.holding = Math.random() < (this.difficulty === 'normal' ? 0.35 : 0.15) * st.attack;
       if (Math.random() < 0.5) return;
+    }
+    // defensive styles get out of the enemy's row rather than trade hits
+    if (st.evade && aligned && seen && (Math.abs(dist) <= 3 || foe.charging) && Math.random() < st.evade) {
+      const side = ([['up', -1], ['down', 1]] as Array<[Dir, number]>).filter(([, dr]) => b.canStand(f, f.col, f.row + dr) && !this.cursed(b, f, f.col, f.row + dr));
+      if (side.length) { this.pendingMove = side[Math.floor(Math.random() * side.length)][0]; return; }
     }
     // a Rogue in a backstab window holds its panel: any move would blink it home
     if (f.st.backstab > 0) return;
@@ -99,7 +106,9 @@ export class Cpu {
     const aim = Math.random() < this.cfg.aim;
     // a stealthed enemy can't be tracked: hold the current row
     const row = foe.st.stealth > 0 ? f.row : aim ? foe.row : Math.floor(Math.random() * 3);
-    if (f.cls === 'warrior' || f.cls === 'rogue') return [b.frontCol(f.side), row];
+    const range = this.style.range;
+    if (f.cls === 'warrior' || f.cls === 'rogue') return [range < 0 ? b.frontCol(f.side) - b.dir(f) : b.frontCol(f.side), row];
+    if (range < 0 && f.cls !== 'priest') return [b.backCol(f.side), row];
     if (f.cls === 'priest') {
       // go stand on the most useful blessing we have
       const spot = this.bestBlessing(b, f);
@@ -174,7 +183,7 @@ export class Cpu {
 
   /** Rogue: spend the full Energy bar on a chain. Setup first, then a blink, then the finishers that want to be up close.
    *  Ambush only comes with a Stealth card cast before it. */
-  private pickRogue(offer: string[], energy: number, cost: (i: number) => number): number[] {
+  private pickRogue(offer: string[], energy: number, cost: (i: number) => number, want: (i: number) => number): number[] {
     const STEALTH = ['vanish', 'shadow_clone', 'smokescreen', 'nights_embrace'];
     const RANK: Record<string, number> = {
       vanish: 0, shadow_clone: 0, smokescreen: 0, nights_embrace: 0, cold_blood: 0, deadly_poison: 0, adrenaline_rush: 0, shadow_dance: 0,
@@ -192,7 +201,7 @@ export class Cpu {
     const hide = idx.find(i => STEALTH.includes(offer[i]));
     const ambush = idx.find(i => offer[i] === 'ambush');
     if (hide !== undefined && ambush !== undefined && cost(hide) + cost(ambush) <= energy) { take(hide); take(ambush); }
-    for (const i of idx.filter(i => offer[i] !== 'ambush').sort((a, c) => cost(c) - cost(a))) take(i);
+    for (const i of idx.filter(i => offer[i] !== 'ambush').sort((a, c) => want(c) - want(a))) take(i);
     // finishers (Shiv, Kidney Shot, Envenom, Eviscerate...) go last, after the chain is set up
     return chosen.sort((a, c) => (RANK[offer[a]] ?? 2) - (RANK[offer[c]] ?? 2));
   }
@@ -206,7 +215,9 @@ export class Cpu {
       return idx.sort(() => Math.random() - 0.5).slice(0, n);
     }
     const cost = (i: number): number => { const c = CARDS[offer[i]].cost; return c === 'all' ? Math.max(1, f.res) : c; };
-    if (f.cls === 'rogue') return this.pickRogue(offer, f.res, cost);
+    // how much this style wants a card: its cost, nudged by the style's taste for its role
+    const want = (i: number): number => cost(i) + this.style.prefer[roleOf(offer[i])];
+    if (f.cls === 'rogue') return this.pickRogue(offer, f.res, cost, want);
     if (f.cls !== 'warrior') {
       // Energy and Mana are known up front (the Ranger will earn about 2 more while it stands still)
       let mana = f.res + (f.cls === 'ranger' ? 2 : 0);
@@ -214,8 +225,8 @@ export class Cpu {
       const chosen: number[] = [];
       // Focus first (it pays for itself), then the most expensive things we can afford.
       for (const i of idx.filter(i => offer[i] === 'arcane_focus')) { chosen.push(i); mana += 1; }
-      const rest = idx.filter(i => !chosen.includes(i)).sort((a, c) => cost(c) - cost(a));
-      for (const i of rest) if (cost(i) <= mana) { chosen.push(i); mana -= cost(i); }
+      const rest = idx.filter(i => !chosen.includes(i)).sort((a, c) => want(c) - want(a));
+      for (const i of rest) if (cost(i) <= mana && want(i) > -1) { chosen.push(i); mana -= cost(i); }
       // cast cheap control first, big damage last; the Ranger's core combo is Steady Focus, Hunter's Mark, Rapid Fire
       // the Priest lays its fields first, then curses and DoTs, then damage
       const FIRST: Record<string, number> = {
@@ -223,15 +234,18 @@ export class Cpu {
         power_infusion: -10, holy_sanctum: -9, aegis_field: -8, sacred_ground: -8, sanctuary: -7, wellspring: -7, hallowed_ground: -6,
         shadowform: -5, void_rift: -5, mind_sear: -5, desecrate: -5, shadow_word_pain: -4, devouring_plague: -4,
       };
-      return chosen.sort((a, c) => (FIRST[offer[a]] ?? cost(a)) - (FIRST[offer[c]] ?? cost(c)));
+      // a defensive style puts its protection up before anything else
+      const early = (i: number): number => (this.style.kind === 'defensive' && roleOf(offer[i]) === 'defense' ? -20 : 0) + (FIRST[offer[i]] ?? cost(i));
+      return chosen.sort((a, c) => early(a) - early(c));
     }
     // Warrior: builders first, then spenders we can expect to afford this turn.
     let budget = f.res + 3;
-    const builders = idx.filter(i => cost(i) === 0);
-    const spenders = idx.filter(i => cost(i) > 0).sort((a, c) => cost(a) - cost(c));
+    const builders = idx.filter(i => cost(i) === 0 && want(i) > -1);
+    const spenders = idx.filter(i => cost(i) > 0).sort((a, c) => cost(a) - cost(c) || want(c) - want(a));
     const chosen = [...builders];
-    // a 4-5 Rage finisher is worth banking for: queue it last and keep only what still leaves room for it
-    const big = spenders.filter(i => cost(i) >= 4).pop();
+    // a big finisher is worth banking for: queue it last and keep only what still leaves room for it
+    const bigMin = this.style.bigMin;
+    const big = bigMin ? spenders.filter(i => cost(i) >= bigMin).pop() : undefined;
     if (big !== undefined) budget -= cost(big);
     for (const i of spenders) if (i !== big && cost(i) <= budget) { chosen.push(i); budget -= cost(i); }
     if (big !== undefined) chosen.push(big);
