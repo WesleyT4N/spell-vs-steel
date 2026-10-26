@@ -230,13 +230,13 @@ const warrior: CardDef[] = [
     cast: x => x.b.addShield(x.f, 'unbreakable', 150, 6),
   },
   {
-    id: 'berserk', name: 'Berserk', cls: 'warrior', cost: 2, rarity: 'legendary', element: 'steel', damaging: false, lock: 0.3,
+    id: 'berserk', name: 'Berserk', cls: 'warrior', cost: 1, rarity: 'legendary', element: 'steel', damaging: false, lock: 0.3,
     dmg: '-', short: 'For 10s, basic attacks build double Rage and you cannot be knocked back.',
     cast: x => { x.f.st.berserk = 10; x.b.addFx('shout', x.f.side, x.f.col, x.f.row, 0.6); },
   },
   {
     id: 'ground_shatter', name: 'Ground Shatter', cls: 'warrior', cost: 3, rarity: 'legendary', element: 'steel', damaging: true, lock: 0.5,
-    dmg: '110', short: 'Turn the enemy front column into holes for 8s. 110 to anyone caught.',
+    dmg: '110', short: 'Turn the enemy front column into holes for 4s. 110 to anyone caught.',
     cast: x => {
       const { b, f, foe } = x;
       const col = b.frontCol(foe.side);
@@ -247,7 +247,7 @@ const warrior: CardDef[] = [
         b.addFx('shockwave', f.side, col, 1, 0.4);
         b.strike(f, cells, 110 * x.mult, { spell: true, element: 'steel' });
         b.walls = b.walls.filter(w => w.col !== col);
-        for (let r = 0; r < 3; r++) b.panels[col][r].hole = 8;
+        for (let r = 0; r < 3; r++) b.panels[col][r].hole = 4;
         if (foe.col === col) { if (!b.knockback(foe, 1)) b.relocate(foe); }
       });
     },
@@ -281,9 +281,9 @@ const warrior: CardDef[] = [
     ai: (b, f) => ahead(b, f, 2),
   },
   {
-    id: 'spell_reflection', name: 'Spell Reflection', cls: 'warrior', cost: 2, rarity: 'legendary', element: 'steel', damaging: false, lock: 0.2,
-    dmg: 'theirs', short: 'For 4s, the next projectile spell that hits you bounces back at the caster.',
-    cast: x => { x.f.st.reflect = 4; },
+    id: 'spell_reflection', name: 'Spell Reflection', cls: 'warrior', cost: 1, rarity: 'legendary', element: 'steel', damaging: false, lock: 0.2,
+    dmg: 'theirs', short: 'For 6s, the next projectile spell that hits you bounces back at the caster.',
+    cast: x => { x.f.st.reflect = 6; },
     ai: (b, f) => b.foe(f).cls === 'mage' && sameRow(b, f),
   },
   // Mythics
