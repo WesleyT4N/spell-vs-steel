@@ -56,6 +56,7 @@ export class OnlineBattleScene extends BattleScene {
   update(dt: number): void {
     const b = this.b, net = this.net;
     net.tick();
+    this.callouts();
     this.fightBanner = Math.max(0, this.fightBanner - dt);
     if (net.status === 'lost' || net.status === 'left' || net.status === 'error') { this.updateDown(); return; }
 

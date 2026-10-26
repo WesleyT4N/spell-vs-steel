@@ -140,6 +140,7 @@ export class TrainingScene extends BattleScene {
     // one endless round, so no round counter
     super({ ...m, bestOf: 1 });
     this.timed = false;
+    this.announce = false;
     this.rivalName = 'DUMMY';
     this.b.noKo = true;
     this.b.f[1].name = 'DUMMY';

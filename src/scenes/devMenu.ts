@@ -9,12 +9,14 @@ import { sfx } from '../engine/audio';
 import { EncyclopediaScene } from './encyclopedia';
 import { SandboxScene } from './sandbox';
 import { LabScene } from './lab';
+import { VoiceTestScene } from './voiceTest';
 
-const ITEMS = ['CARD ENCYCLOPEDIA', 'SANDBOX', 'BALANCE LAB', 'BACK'];
+const ITEMS = ['CARD ENCYCLOPEDIA', 'SANDBOX', 'BALANCE LAB', 'VOICE TEST', 'BACK'];
 const ABOUT = [
   'EVERY SPELL OF EVERY CLASS, WITH FILTERS',
   'DEBUG MODE: CAST ANY SPELL, DUMMIES, SLOW-MO, HIT LOG',
   'CPU VS CPU SIMS, PER-CARD STATS, LIVE TUNING',
+  'EVERY CLASS VOICE LINE AND ANNOUNCER CALL',
   '',
 ];
 
@@ -33,7 +35,8 @@ export class DevMenuScene implements Scene {
     if (i === 0) openEncyclopedia(here);
     if (i === 1) setScene(new SandboxScene(here));
     if (i === 2) setScene(new LabScene(here));
-    if (i === 3) { sfx('back'); this.back(); }
+    if (i === 3) setScene(new VoiceTestScene(here));
+    if (i === 4) { sfx('back'); this.back(); }
   }
 
   update(dt: number): void {
@@ -63,6 +66,7 @@ export function devFromHash(home: () => void): boolean {
   if (tag === 'cards') openEncyclopedia(menu);
   else if (tag === 'sandbox') setScene(new SandboxScene(menu));
   else if (tag === 'lab') setScene(new LabScene(menu));
+  else if (tag === 'voices') setScene(new VoiceTestScene(menu));
   else if (tag === 'dev') menu();
   else return false;
   return true;
