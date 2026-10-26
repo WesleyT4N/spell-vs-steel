@@ -29,7 +29,7 @@ The `.exe` is unsigned, so Windows SmartScreen says "Windows protected your PC" 
 - Everything offline: Arcade, Versus (keyboard and gamepads), Training, Tutorial, Deck Builder, Replays.
 - Online **Create Room / Join Room**: PeerJS over WebRTC, using the public PeerJS signaling server (see
   `src/net/transport.ts`). The room screen copies the code, since a link can't open the app.
-- Lobby, Ranked and Tournaments need the claude.ai page (room + db capabilities) and say so.
+- Lobby, Ranked and Tournaments need the claude.ai page (room + db capabilities); elsewhere they say "not supported yet".
 
 Saves live in Electron's storage for the app (localStorage under the user's app-data folder), so they
 survive updating to a newer `.exe`. F11 or Alt+Enter toggles fullscreen.

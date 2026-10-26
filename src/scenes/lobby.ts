@@ -156,7 +156,7 @@ export class LobbyScene implements Scene {
     win(ui, LX, TOP + dy, LW, H);
     win(ui, RX, TOP + dy, RW, H);
     if (this.mode === 'error') {
-      drawTextCentered(ui, 'THE LOBBY NEEDS THE CLAUDE.AI PAGE', UW / 2, 140 + dy, RED_INK, 1, false);
+      drawTextCentered(ui, 'THE LOBBY IS NOT SUPPORTED YET HERE', UW / 2, 140 + dy, RED_INK, 1, false);
       drawTextCentered(ui, touchText('CLICK TO GO BACK'), UW / 2, 156 + dy, TRIM, 1, false);
       return;
     }
