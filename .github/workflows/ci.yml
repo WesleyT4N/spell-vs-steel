@@ -1,0 +1,82 @@
+# Runs on every PR (against the PR merged into its base, so two PRs that each pass alone but break
+# each other once merged get caught) and on every push to main.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Type-check, builds, full matches
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Type-check (game and tests)
+        run: npm run typecheck
+      - name: Dev build
+        run: npm run build
+      - name: Player build
+        run: npm run build:prod
+      - name: CPU vs CPU matches, every class pair
+        run: npx tsx tests/matches.ts
+      - name: Online determinism
+        run: npx tsx scripts/netcheck.ts 25
+      - name: Combo counter
+        run: npx tsx scripts/combo-check.ts
+      - name: Rollback matches straight play
+        run: npx tsx scripts/rollcheck.ts 25
+
+  screens:
+    name: Screens at every aspect ratio
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Build the screen harness
+        run: npx vite build --config tests/screens/vite.config.ts
+      - name: Shoot every screen at every shape
+        run: npx tsx tests/screens/run.ts test-results/head
+
+      # The same screens on the base branch, to list what this PR changes visually. This PR's tests/ folder
+      # is used on both sides so the screen list matches; if the base can't build it, the diff is skipped.
+      - name: Shoot the base branch
+        id: base
+        if: github.event_name == 'pull_request' && always()
+        continue-on-error: true
+        run: |
+          git worktree add ../base "origin/${{ github.base_ref }}"
+          rm -rf ../base/tests && cp -r tests ../base/tests
+          (cd ../base && npm ci && npx vite build --config tests/screens/vite.config.ts)
+          npx tsx tests/screens/run.ts test-results/base --harness ../base/dist-test/tests/screens/harness.html || true
+      - name: Compare with base
+        if: github.event_name == 'pull_request' && always() && steps.base.outcome == 'success'
+        run: |
+          npx tsx tests/screens/compare.ts test-results/base test-results/head test-results/report
+          cat test-results/report/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screens-report
+          path: test-results/
+          retention-days: 14
