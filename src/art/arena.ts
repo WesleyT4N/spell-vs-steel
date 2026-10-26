@@ -1,6 +1,6 @@
 // Grand Colosseum, ported from art/arenas.html. 16-bit backdrop, 8-bit NES panels.
 // The other stages live in stages.ts and share the panel grid drawn here.
-import { P, W, H, rng, shade, vgrad, vnoise, sphere, glow, mix, layer, type Ctx } from '../engine/gfx';
+import { P, W, H, view, rng, shade, vgrad, vnoise, sphere, glow, mix, layer, type Ctx } from '../engine/gfx';
 
 export const COLS = 6, ROWS = 3, PW = 38, FACE = 15, LIP = 4, X0 = 6, Y0 = 98;
 export const LEFT_EDGE = '#f83800', RIGHT_EDGE = '#3cbcfc';
@@ -80,6 +80,57 @@ export interface Stage {
   tex(c: Ctx, x: number, y: number, w: number, h: number, r: () => number): void;
   /** Draw the full backdrop. `t` is an animation tick (about 8 per second); `cheer` livens up any crowd. */
   draw(c: Ctx, t: number, cheer?: number): void;
+}
+
+// Stages are painted for a 3:2 screen. Wider or taller screens get the sides and floor mirrored outward
+// and the sky stretched upward, so the scenery carries on into the margins without seams.
+let flat: Ctx | null = null, wide: Ctx | null = null;
+const buffer = (w: number, h: number, old: Ctx | null): Ctx => {
+  if (old && old.canvas.width === w && old.canvas.height === h) return old;
+  const o = document.createElement('canvas');
+  o.width = w; o.height = h;
+  const x = o.getContext('2d')!;
+  x.imageSmoothingEnabled = false;
+  return x;
+};
+// The sky above a stage on tall screens: its top edge's average color, deepening upward. Cached per stage and size.
+const skies = new Map<string, HTMLCanvasElement>();
+function skyCap(st: Stage, f: HTMLCanvasElement, w: number, h: number): HTMLCanvasElement {
+  const key = `${st.id}:${w}x${h}`;
+  let sky = skies.get(key);
+  if (!sky) {
+    const px = f.getContext('2d')!.getImageData(0, 0, W, 1).data;
+    let r = 0, g = 0, b = 0;
+    for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i + 1]; b += px[i + 2]; }
+    const hex = (v: number): string => Math.round(v / W).toString(16).padStart(2, '0');
+    const top = `#${hex(r)}${hex(g)}${hex(b)}`;
+    sky = layer(c => vgrad(c, 0, 0, w, h, [mix(top, '#000000', 0.45), mix(top, '#000000', 0.3), mix(top, '#000000', 0.15), top]), w, h);
+    skies.set(key, sky);
+  }
+  return sky;
+}
+
+/** Draw a stage's backdrop over the whole visible screen. */
+export function drawStage(c: Ctx, st: Stage, t: number, cheer = 0): void {
+  const { w, h, ox, oy } = view;
+  if (!ox && !oy) { st.draw(c, t, cheer); return; }
+  flat = buffer(W, H, flat);
+  flat.clearRect(0, 0, W, H);
+  st.draw(flat, t, cheer);
+  wide = buffer(w, h, wide);
+  const f = flat.canvas, x = wide;
+  x.drawImage(f, ox, oy);
+  if (ox) {
+    x.save(); x.translate(2 * ox, 0); x.scale(-1, 1); x.drawImage(f, 0, 0, ox, H, ox, oy, ox, H); x.restore();
+    x.save(); x.translate(2 * (ox + W), 0); x.scale(-1, 1); x.drawImage(f, W - ox, 0, ox, H, ox + W - ox, oy, ox, H); x.restore();
+  }
+  if (oy) {
+    const g = x.canvas;
+    // above: more sky, since mirrored walls hanging upside down look wrong
+    x.drawImage(skyCap(st, f, w, oy), 0, 0);
+    x.save(); x.translate(0, 2 * (oy + H)); x.scale(1, -1); x.drawImage(g, 0, oy + H - oy, w, oy, 0, oy + H - oy, w, oy); x.restore();
+  }
+  c.drawImage(x.canvas, -ox, -oy);
 }
 
 const STONE: PanelLook = { face: '#bcbcbc', hi: '#fcfcfc', lo: '#7c7c7c', lip: '#7c7c7c', lipLo: '#000000' };

@@ -1,6 +1,6 @@
 // Draws a Battle: arena, panels, fighters, spell effects and the HUD.
 import { k } from '../engine/input';
-import { drawPanel, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState } from '../art/arena';
+import { drawPanel, drawStage, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState } from '../art/arena';
 import { getStage } from '../art/stages';
 import type { Stage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, type Tint } from '../art/sprites';
@@ -28,7 +28,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): voi
   const a = getArena();
   c.save();
   if (b.shake > 0) c.translate(Math.round((Math.random() - 0.5) * 4 * Math.min(1, b.shake * 4)), Math.round((Math.random() - 0.5) * 3 * Math.min(1, b.shake * 4)));
-  a.draw(c, tick, b.cheer);
+  drawStage(c, a, tick, b.cheer);
 
   // panels
   for (let r = 0; r < 3; r++) for (let col = 0; col < 6; col++) {

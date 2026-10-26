@@ -4,8 +4,9 @@
 import { setScene, hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
 import { PLAYABLE, CLASS_INFO } from '../game/classes';
 import { getArena } from '../game/battleView';
+import { drawStage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, SKINS, skinOf, mirrorSkin, type ClassId } from '../art/sprites';
-import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
+import { P, UW, frame, screenRect, fillScreen, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
@@ -205,9 +206,9 @@ export class CharSelectScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    getArena().draw(c, tick, 0);
+    drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(0,0,24,0.6)';
-    c.fillRect(0, 0, W, H);
+    c.fillRect(...screenRect());
     drawTextCentered(ui, this.tutorial ? 'TUTORIAL' : 'CHOOSE YOUR FIGHTER', UW / 2, 8, '#f8b800', 2);
 
     const net = this.net, rl = net?.rivalLobby, rival = net?.rival;
@@ -272,10 +273,10 @@ export class CharSelectScene implements Scene {
         button(ui, `chip:${i}`, label, x, CY, cw, CH, on, ch === 'NEXT' ? (this.step === 4 ? '#f8b800' : '#7c7c7c') : '#fcfcfc');
       });
     }
-    if (this.msgT > 0) { P(ui, '#000000', 0, 186, UW, 16); drawTextCentered(ui, this.msg, UW / 2, 190, '#f83800'); }
+    if (this.msgT > 0) { P(ui, '#000000', screenRect(2)[0], 186, screenRect(2)[2], 16); drawTextCentered(ui, this.msg, UW / 2, 190, '#f83800'); }
 
     if (net && (net.status === 'error' || net.status === 'left' || net.status === 'lost')) {
-      P(ui, 'rgba(0,0,0,0.8)', 0, 0, UW, 320);
+      fillScreen(ui, 'rgba(0,0,0,0.8)', 2);
       drawTextCentered(ui, net.status === 'left' ? 'YOUR RIVAL LEFT' : net.status === 'lost' ? 'CONNECTION LOST' : net.error || 'CONNECTION ERROR', UW / 2, 140, '#f83800', 2);
       hint(ui, 'CLICK: BACK TO TITLE');
       return;
