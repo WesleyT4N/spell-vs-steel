@@ -4,14 +4,15 @@ import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { teamColor, type ClassId } from '../art/sprites';
 import { P, UW, screenRect, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered, wrap } from '../engine/font';
+import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { cardsFor, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef } from '../game/cards';
 import { canAdd, countRarity, deckSize, loadCustom, saveCustom, starterDeck, presetsFor, validate, DECK_SIZE, MAX_LEGENDARIES, type DeckCounts, type DeckPreset } from '../game/deck';
 import { loadMatch, saveMatch } from '../game/match';
 import { PLAYABLE } from '../game/classes';
-import { drawCardFace, resInk, resName, CARD_W, CARD_H } from './cardView';
+import { drawCardDetail, resInk } from './cardView';
+import { CardPreview } from './cardPreview';
 import { win, selRow, ink, PAPER, BURN, INK, INK2, RED_INK, GOLD, TRIM } from './skin';
 
 const RARITY_ORDER = { common: 0, uncommon: 1, legendary: 2, mythic: 3 };
@@ -21,6 +22,8 @@ const CLASSES: ClassId[] = PLAYABLE;
 const VISIBLE = 16, RH = 14;
 const LX = 8, LY = 52, LW = 268;
 const DX = 286, DW = UW - DX - 8;
+/** Height of the card's clip at the top of the detail window. */
+const PREVIEW_H = 80;
 
 export class DeckBuilderScene implements Scene {
   deck: DeckCounts = {};
@@ -29,6 +32,8 @@ export class DeckBuilderScene implements Scene {
   scroll = 0;
   msg = '';
   msgT = 0;
+
+  private preview = new CardPreview();
 
   constructor(public cls: ClassId, private back: () => void) {
     this.load();
@@ -87,6 +92,8 @@ export class DeckBuilderScene implements Scene {
 
   update(dt: number): void {
     this.msgT = Math.max(0, this.msgT - dt);
+    this.preview.show(showSel() ? this.cards[this.sel] ?? null : null);
+    this.preview.update(dt);
 
     // mouse: hover reads a card, click adds, right-click removes, wheel scrolls
     if (mouse.wheel && hot('row') >= 0) this.scroll = Math.max(0, Math.min(this.rows - VISIBLE, this.scroll + mouse.wheel * 2));
@@ -184,26 +191,15 @@ export class DeckBuilderScene implements Scene {
     P(ui, BURN, LX + LW + 1, LY - 2, 3, trackH);
     P(ui, INK2, LX + LW + 1, by - 2, 3, bh);
 
-    // detail: the card itself, its numbers, then its rules
+    // detail: the card's clip, then its numbers and rules
     const card = showSel() ? this.cards[this.sel] : undefined;
     const dh = VISIBLE * RH + 6;
     win(ui, DX, LY - 4, DW, dh, { accent: card ? ELEMENT_COLOR[card.element] : undefined });
     if (card) {
       const have = this.deck[card.id] ?? 0;
-      drawCardFace(ui, card, DX + 8, LY + 4, { lit: true });
-      const cx = DX + CARD_W + 18;
-      let y = LY + 8;
-      const line = (s: string, col: string): void => { drawText(ui, s, cx, y, col); y += 12; };
-      line(card.rarity.toUpperCase(), ink(RARITY_COLOR[card.rarity]));
-      line(card.element.toUpperCase(), ink(ELEMENT_COLOR[card.element]));
-      line(`${card.cost === 'all' ? 'ALL' : card.cost} ${resName(card)}`, resInk(card));
-      if (card.dmg !== '-') line(`DMG ${card.dmg.toUpperCase()}`, RED_INK);
-      y += 6;
-      line('IN DECK', TRIM);
-      line(`${have} / ${MAX_COPIES[card.rarity]}`, have ? INK : TRIM);
-      let ry = LY + CARD_H + 16;
-      drawText(ui, card.name.toUpperCase(), DX + 8, ry, INK); ry += 14;
-      for (const l of wrap(card.short.toUpperCase(), Math.floor((DW - 16) / 6))) { drawText(ui, l, DX + 8, ry, INK2); ry += 11; }
+      this.preview.draw(ui, DX + 8, LY + 6, DW - 16, PREVIEW_H);
+      const y = drawCardDetail(ui, card, DX + 8, LY + PREVIEW_H + 14, DW - 16) + 6;
+      drawText(ui, `IN DECK ${have} / ${MAX_COPIES[card.rarity]}`, DX + 8, y, have ? INK : TRIM);
     } else if (!showSel()) {
       drawText(ui, 'TOUCH A CARD TO READ IT', DX + 8, LY + 8, INK2);
     } else {
