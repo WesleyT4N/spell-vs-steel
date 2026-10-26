@@ -7,7 +7,8 @@ import { getSprite, drawFighterSprite, teamColor, type Tint } from '../art/sprit
 import { P, UW, UH, blob, frame, glow, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '../engine/font';
 import { drawCardIcon, RES_INK } from '../scenes/cardView';
-import { win, bar, pip as skinPip, toInk, PAPER, PAPER2, INK, INK2, TRIM, WAX_HI } from '../scenes/skin';
+import { win, bar, pip as skinPip, toInk, PAPER, PAPER2, INK, INK2, TRIM, WAX_HI, RED_INK } from '../scenes/skin';
+import { COMBO_HOLD } from './combo';
 import { CARDS, ELEMENT_COLOR } from './cards';
 import { TUNING } from './tuning';
 import { heavyChargeOf } from './battle';
@@ -516,6 +517,7 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0): vo
   }
   for (const f of b.f) drawFighterHud(ui, b, f, tick);
   for (const f of b.f) drawChargeBar(ui, b, f, tick);
+  for (const f of b.f) drawCombo(ui, b, f);
   // Draw gauge
   const gx = UW / 2 - 70, gw = 140;
   const full = b.gauge >= 1;
@@ -539,6 +541,21 @@ function drawFighterHud(ui: Ctx, b: Battle, f: Fighter, tick: number): void {
   bar(ui, x + 5, 29, w - 10, 5, ratio, low ? '#f83800' : ratio < 0.6 ? '#f8b800' : '#58d854', right);
   drawResource(ui, f, right ? x + w - 92 : x, 42, tick);
   drawStatuses(ui, b, f, right ? x + w : x, 58, right);
+}
+
+/** The true combo counter on the attacker's side: a parchment tag with the hit count and combo damage. */
+function drawCombo(ui: Ctx, b: Battle, f: Fighter): void {
+  const c = b.combo.shown(f.side);
+  if (!c) return;
+  const right = f.side === 1, w = 92, h = 34;
+  // a finished combo slides back out toward the edge
+  const out = c.live ? 0 : Math.max(0, (c.ago - (COMBO_HOLD - 0.25)) / 0.25);
+  const x = Math.round(right ? UW - w - 8 + out * (w + 10) : 8 - out * (w + 10)), y = 96;
+  win(ui, x, y, w, h, { accent: teamColor(f.cls, f.skin, f.alt), burn: 3 });
+  const hits = `${c.hits} HITS`;
+  drawText(ui, hits, x + Math.round((w - textWidth(hits, 2)) / 2), y + 9, c.live ? RED_INK : INK2, 2);
+  const dmg = `COMBO ${Math.round(c.dmg)}`;
+  drawText(ui, dmg, x + Math.round((w - textWidth(dmg)) / 2), y + 24, c.live ? INK : INK2);
 }
 
 function drawResource(ui: Ctx, f: Fighter, x: number, y: number, tick: number): void {
