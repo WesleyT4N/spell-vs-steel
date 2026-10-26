@@ -17,6 +17,7 @@ npm run build:prod  # player-facing build in dist-prod/: dev tools off and their
 npm run sim      # headless CPU-vs-CPU matches; prints win rates, match length, damage sources
 npm run sim -- 100 --cards   # same, with per-card casts, damage and win rate when cast
 npm run netcheck # two seeded battles fed the same inputs must stay identical (online play depends on it)
+npm run rollcheck # battles played through rollback (late inputs, wrong guesses, replays) must end identical to straight play
 npm run netsoak -- 440  # whole online matches between two simulated machines over lag, jitter, loss, dropouts and tabbed-out players; fails on any desync or stuck match
 npm run fuzz -- 500   # rules fuzzer: random legal decks, mashing/random/CPU inputs, odd Draw picks, training
                       # resets; checks invariants every frame and replays each match to prove determinism
@@ -61,7 +62,9 @@ Code lives in `src/dev/` (instrumentation, sims, tuning edits, DOM helpers) and 
 
 Title > **Online Versus**. Pick your fighter, then **Create Room** and share the 5-letter code (or the link, `?room=CODE`), or **Join Room** and type a code. The host's match length is used. Either player can open the Draw screen; the fight waits until both have picked. There is no pause online.
 
-How it works: **delay-based lockstep**. Both machines run the same battle from a shared seed and only trade controls. Each press is scheduled a few frames ahead (picked from the measured ping, shown during the fight) so it arrives in time; on a lag spike the fight waits instead of rubber-banding, and both players get the same delay. Every packet repeats all inputs the other side hasn't confirmed, so lost or merged packets cost nothing. A checksum every half second flags a desync on screen.
+How it works: **rollback netcode** (GGPO style). Both machines run the same battle from a shared seed and only trade controls. Your press goes in a couple of frames ahead (a little more on a slow connection). The battle never waits for the other player's inputs: it guesses them (still holding what they held, pressing nothing new), and when the real ones arrive it rewinds to the last frame both inputs were known, replays, and runs forward again, so a wrong guess shows as a short correction instead of a freeze. Only a long silence (over 10 frames of guessing) makes it wait. The Draw screen opens and the round ends only on frames both sides agree on, and replayed frames are silent. Every packet repeats all inputs the other side hasn't confirmed, so lost or merged packets cost nothing. A checksum every half second flags a desync on screen. The readout during the fight shows ping, input delay and the latest correction length.
+
+Rollback rules for the sim (`src/net/snapshot.ts` saves and restores the battle in place, so closures in timers and projectiles stay valid): state a spell's timers share must live in `b.keep({...})`, not in a `let` the closure captures; anything that watches the battle and keeps its own state (like post-match stats) must hand that state to the rollback as an extra root; render-only effects (hit-stop, sparks, screen kick) stay out of the battle. `npm run rollcheck` catches slips.
 
 Connections (`src/net/transport.ts`):
 
@@ -119,4 +122,4 @@ Every number worth tuning is in [`src/game/tuning.ts`](src/game/tuning.ts). Spel
 - `src/art/` Cartridge NES sprites, the Grand Colosseum arena, the logo
 - `src/game/` battle rules (`battle.ts`), spells, decks, CPU, drawing (`battleView.ts`)
 - `src/scenes/` title, tutorial, setup, deck builder, battle (Draw screen, pause, results), online lobby and online battle, options, controls, card faces (`cardView.ts`); clickable zones live in `scene.ts`
-- `src/net/` online play: packets, transports, the lockstep session, the desync checksum
+- `src/net/` online play: packets, transports, the session, rollback (`rollback.ts`, `snapshot.ts`), the desync checksum
