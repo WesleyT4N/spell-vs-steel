@@ -11,6 +11,7 @@ const SHOT_SOUND: Partial<Record<string, string>> = { fireball: 'shot_fireball',
 export const panOf = (col: number): number => (col - 2.5) / 3;
 import { seeded, randomSeed, shuffle } from './rng';
 import { CLASS_INFO } from './classes';
+import { ComboTracker, cantAct } from './combo';
 export { shuffle };
 
 export const COLS = 6, ROWS = 3;
@@ -237,6 +238,8 @@ export class Battle {
   cheer = 0;
   /** Damage dealt by each side, split by source (for tuning). */
   stats = [{ basic: 0, spell: 0, other: 0 }, { basic: 0, spell: 0, other: 0 }];
+  /** True combo counter (display only, not part of the rules). */
+  combo = new ComboTracker();
 
   /** Every random roll in the rules comes from here, so two machines given the same seed play the same battle. */
   rand: ReturnType<typeof seeded>;
@@ -274,6 +277,7 @@ export class Battle {
     this.texts = []; this.fx = []; this.timers = []; this.anims = [];
     this.clearPanels();
     this.shake = 0; this.cheer = 0;
+    this.combo.reset();
   }
 
   foe(f: Fighter): Fighter { return this.f[1 - f.side]; }
@@ -407,6 +411,7 @@ export class Battle {
     this.updateTraps(dt);
     this.updatePets(dt);
     this.updateZones();
+    this.combo.update(this, dt);
 
     for (const f of this.f) {
       if (!f.dead && f.hp <= 0 && this.noKo) {
@@ -1055,6 +1060,7 @@ export class Battle {
       return out;
     }
 
+    const locked = cantAct(target);
     let amt = base;
     if (src && src.st.roared > 0) amt *= 0.7;
     if (target.st.frozen > 0 || target.st.stunned > 0 || target.st.sleep > 0) amt *= TUNING.frozenBonus;
@@ -1115,6 +1121,7 @@ export class Battle {
     }
     target.hp = Math.max(0, target.hp - amt);
     out.dealt = amt;
+    this.combo.hit(target, amt, !!opts.dot, locked);
     if (target.st.deathMark > 0 && src && src.side !== target.side) target.deathMarkAcc += amt;
     if (target.st.mending > 0 && target.mending > 0 && !opts.dot) {
       target.mending--;
