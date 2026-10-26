@@ -99,10 +99,11 @@ const STINGER: Record<Call, (t: number) => void> = {
 const SAY_AT: Partial<Record<Call, number>> = { round: 0.3, final: 0.4 };
 
 /** Make a call: its stinger and its line. `who` is the winner's class name as shown (WARRIOR, PRIEST...). */
-export function playCall(c: BaseAudioContext, out: AudioNode, call: Call, args: { n?: number; who?: string } = {}): void {
+/** `out` takes the spoken line, `fx` the stinger (it rides the sound effects channel). */
+export function playCall(c: BaseAudioContext, out: AudioNode, fx: AudioNode | null, call: Call, args: { n?: number; who?: string } = {}): void {
   if (c.state === 'closed') return;
-  rig(c as AudioContext, out);
-  STINGER[call](c.currentTime + 0.01);
+  if (fx) { rig(c as AudioContext, fx);
+  STINGER[call](c.currentTime + 0.01); }
   const who = (args.who ?? '').toLowerCase();
   const key = call === 'round' ? `round${Math.min(5, Math.max(1, args.n ?? 1))}` : call === 'wins' || call === 'match' ? `${call}_${who}` : call;
   playAnnouncerLine(c, out, key, SAY_AT[call] ?? 0);

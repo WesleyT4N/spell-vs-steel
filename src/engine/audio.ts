@@ -5,7 +5,7 @@ import { playCall, type Call } from './announcer';
 import type { ClassId } from '../art/sprites';
 
 let ctx: AudioContext | null = null;
-let master: GainNode, sfxBus: GainNode, voiceBus: GainNode, annBus: GainNode, realBus: GainNode, musicBus: GainNode, reverb: ConvolverNode, reverbSend: GainNode;
+let master: GainNode, sfxBus: GainNode, stingBus: GainNode, voiceBus: GainNode, annBus: GainNode, realBus: GainNode, musicBus: GainNode, reverb: ConvolverNode, reverbSend: GainNode;
 let noiseBuf: AudioBuffer;
 let muted = false;
 
@@ -21,7 +21,7 @@ try {
 } catch { /* storage blocked */ }
 
 // Base mix levels at full volume.
-const MASTER = 1, SFX_LEVEL = 0.45, MUSIC_LEVEL = 0.32, VOICE_LEVEL = 0.5, ANN_LEVEL = 0.45;
+const MASTER = 1, SFX_LEVEL = 0.45, MUSIC_LEVEL = 0.32, VOICE_LEVEL = 0.5, ANN_LEVEL = 0.55;
 const masterGain = (): number => (muted ? 0 : MASTER * settings.master / 10);
 const sfxGain = (): number => (settings.sfxOn ? SFX_LEVEL * settings.sfx / 10 : 0);
 const musicGain = (): number => (settings.musicOn ? MUSIC_LEVEL * settings.music / 10 : 0);
@@ -58,6 +58,8 @@ function init(): AudioContext | null {
   musicBus = ctx.createGain(); musicBus.gain.value = musicGain(); musicBus.connect(master);
   voiceBus = ctx.createGain(); voiceBus.gain.value = voiceGain(); voiceBus.connect(master);
   annBus = ctx.createGain(); annBus.gain.value = annGain(); annBus.connect(master);
+  // announcer stingers sit on the SFX channel, well under the announcer's voice
+  stingBus = ctx.createGain(); stingBus.gain.value = 0.45; stingBus.connect(sfxBus);
   // SNES-ish echo: a short generated reverb tail
   reverb = ctx.createConvolver();
   const len = Math.floor(ctx.sampleRate * 1.6);
@@ -187,7 +189,7 @@ export function voiceLine(cls: ClassId, kind: VoiceKind, pan = 0, side = 0, elem
 export function announce(call: Call, args?: { n?: number; who?: string }): void {
   const c = ctx;
   if (!c || c.state !== 'running' || quiet || muted || settings.announcer === 0) return;
-  playCall(c, annBus, call, args);
+  playCall(c, annBus, settings.sfxOn && settings.sfx > 0 ? stingBus : null, call, args);
 }
 
 /** The sound that goes with a spell effect's visual (see battle.addFx). */
