@@ -3,9 +3,9 @@ import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { drawLogo } from '../art/logo';
 import { getSprite, drawFighterSprite, defaultSkin, type ClassId } from '../art/sprites';
-import { P, W, UW, screenRect, type Ctx } from '../engine/gfx';
+import { P, W, UW, UH, view, screenRect, type Ctx } from '../engine/gfx';
 import { PLAYABLE } from '../game/classes';
-import { drawText, drawTextCentered } from '../engine/font';
+import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, k } from '../engine/input';
 import type { PadMode } from '../engine/touch';
 import { playMusic, sfx, isMuted } from '../engine/audio';
@@ -19,10 +19,22 @@ import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
 import { RED_INK } from './skin';
 
-const ITEMS = ['VERSUS CPU', 'ONLINE VERSUS', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
+const ITEMS = ['VERSUS MODE', 'ONLINE MODE', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
 
 // seven rows in dev builds still clear the version line
 const MENU_Y = ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 6 ? 16 : 18;
+// taller screens (phone portrait) have room under the stage: rows grow into it, with double-size text once they fit
+const MAX_GAP = 36, BIG_GAP = 24;
+
+/** Row gap, text scale, menu width and version-line y for the current screen height. */
+function menuLayout(): { gap: number; scale: number; width: number; versionY: number } {
+  // the screen's bottom edge on the UI layer, less the footer and the version line
+  const bottom = UH + view.oy * 2 - 14;
+  const versionY = bottom - 18;
+  const gap = Math.max(MENU_GAP, Math.min(MAX_GAP, Math.floor((versionY - 6 - MENU_Y) / ITEMS.length)));
+  const scale = gap >= BIG_GAP ? 2 : 1;
+  return { gap, scale, width: scale > 1 ? 240 : 200, versionY: Math.max(288, versionY) };
+}
 
 // the side fighters take turns swapping for another class, so every matchup comes around
 const SWAP = 3.5, POOF = 0.5;
@@ -73,8 +85,8 @@ export class TitleScene implements Scene {
     if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
       sfx('select');
       const item = ITEMS[this.sel];
-      if (item === 'VERSUS CPU') setScene(new CharSelectScene());
-      if (item === 'ONLINE VERSUS') setScene(new OnlineScene());
+      if (item === 'VERSUS MODE') setScene(new CharSelectScene());
+      if (item === 'ONLINE MODE') setScene(new OnlineScene());
       if (item === 'TRAINING') setScene(new CharSelectScene(undefined, 0, 'training'));
       if (item === 'TUTORIAL') setScene(new CharSelectScene(undefined, 0, 'tutorial'));
       if (item === 'DECK BUILDER') setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
@@ -99,10 +111,14 @@ export class TitleScene implements Scene {
       if (k < 1) poof(c, x, 112, k);
     }
     drawLogo(c, W / 2, 10, this.t);
-    drawMenu(ui, ITEMS, this.sel, UW / 2, MENU_Y, tick, { width: 200, gap: MENU_GAP });
+    const { gap, scale, width, versionY } = menuLayout();
+    drawMenu(ui, ITEMS, this.sel, UW / 2, MENU_Y, tick, { width, gap, scale, grow: false });
     // first-timers get a nudge toward the tutorial
-    if (!tutorialDone() && tick % 8 < 6) drawText(ui, 'NEW!', UW / 2 + 40, MENU_Y + ITEMS.indexOf('TUTORIAL') * MENU_GAP + Math.round((MENU_GAP - 17) / 2), RED_INK);
-    drawTextCentered(ui, DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2', UW / 2, 288, '#7c7c7c', 1, false);
+    if (!tutorialDone() && tick % 8 < 6) {
+      const x = scale > 1 ? UW / 2 + textWidth('TUTORIAL', scale) / 2 + 8 : UW / 2 + 40;
+      drawText(ui, 'NEW!', x, MENU_Y + ITEMS.indexOf('TUTORIAL') * gap + Math.round((gap - 17) / 2), RED_INK);
+    }
+    drawTextCentered(ui, DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2', UW / 2, versionY, '#7c7c7c', 1, false);
     if (isMuted()) drawText(ui, 'MUTED', 8, 8, '#7c7c7c');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   M: MUTE`);
   }

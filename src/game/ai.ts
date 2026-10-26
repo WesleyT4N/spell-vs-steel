@@ -181,7 +181,7 @@ export class Cpu {
   }
 
   inDanger(b: Battle, f: Fighter): boolean {
-    if (b.marks.some(m => m.col === f.col && m.row === f.row)) return true;
+    if (b.warned(f.col, f.row, f.side)) return true;
     if (b.onCurse(f)) return true;
     return b.projectiles.some(p => p.side !== f.side && !p.homing && p.row === f.row && Math.abs(p.x - f.col) < 3 && Math.sign(f.col - p.x) === Math.sign(p.speed));
   }
@@ -191,7 +191,7 @@ export class Cpu {
     const safe = dirs.filter(([, dc, dr]) => {
       const c = f.col + dc, r = f.row + dr;
       if (!b.canStand(f, c, r) || this.cursed(b, f, c, r)) return false;
-      if (b.marks.some(m => m.col === c && m.row === r)) return false;
+      if (b.warned(c, r, f.side)) return false;
       return dr !== 0 || !b.projectiles.some(p => p.side !== f.side && p.row === r);
     });
     if (!safe.length) return null;

@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "netcheck": "tsx scripts/netcheck.ts",
+    "combocheck": "tsx scripts/combo-check.ts",
     "peerserver": "peerjs --port 9000 --host 127.0.0.1"
   },
   "devDependencies": {

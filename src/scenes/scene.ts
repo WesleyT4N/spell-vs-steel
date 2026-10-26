@@ -1,5 +1,5 @@
 // Scene switching, mouse hit zones and small UI widgets shared by the menus.
-import type { Ctx } from '../engine/gfx';
+import { spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { win, selRow, plaque, footer, sepia, toInk, INK, INK2, TRIM } from './skin';
 import { mouse } from '../engine/input';
@@ -70,9 +70,11 @@ export function listMouse(prefix: string, sel: number, onHover: (i: number) => v
 export function dim(c: Ctx, a = 0.6): void { sepia(c, a); }
 
 /** A vertical menu on the UI layer; each row is a clickable `menu:i` zone. */
-export function drawMenu(c: Ctx, items: string[], sel: number, cx: number, y: number, tick: number, opts: { gap?: number; width?: number; disabled?: boolean[]; scale?: number } = {}): void {
+export function drawMenu(c: Ctx, items: string[], sel: number, cx: number, y: number, tick: number, opts: { gap?: number; width?: number; disabled?: boolean[]; scale?: number; grow?: boolean } = {}): void {
   const s = opts.scale ?? 1;
-  const gap = opts.gap ?? 20;
+  let gap = opts.gap ?? 20;
+  // phone portrait: rows grow taller, downward into the spare height
+  if (opts.grow !== false) gap = Math.round(gap * spread.k);
   const w = opts.width ?? Math.max(...items.map(t => textWidth(t, s))) + 48;
   const x = Math.round(cx - w / 2);
   win(c, x, y - 8, w, items.length * gap + 10);

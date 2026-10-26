@@ -1,13 +1,15 @@
 // Training mode: a fight that never ends, for testing decks. The dummy's behavior, both sides' HP and
 // resources, and the Draw gauge are set from the pause menu; R puts both fighters back to the start of the turn.
-import { setScene, dim, hint, zone, hot, showSel } from './scene';
+import { setScene, dim, hint, zone, hot, showSel, drawMenu, listMouse } from './scene';
+import { clearStats } from '../game/stats';
+import type { StatsData } from './statsView';
 import { NO_INTENT, heavyChargeOf, type Battle, type Dir, type Fighter, type Intent } from '../game/battle';
 import { Cpu } from '../game/ai';
 import { CARDS } from '../game/cards';
 import { CLASS_INFO } from '../game/classes';
 import { TUNING } from '../game/tuning';
 import type { MatchConfig } from '../game/match';
-import { UW, type Ctx } from '../engine/gfx';
+import { UW, spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { touchActive } from '../engine/touch';
@@ -34,8 +36,8 @@ const ACTS: Array<[DummyAct, string]> = [['stand', 'STAND'], ['move', 'MOVE'], [
 const RES: ResMode[] = ['normal', 'full', 0, 1, 2, 3, 4, 5];
 /** Seconds without a hit before a Refill HP bar tops back up. */
 const REFILL_AFTER = 2;
-/** Hits closer together than this count as one combo. */
-const COMBO_GAP = 1.5;
+/** How long LAST HIT stays lit after a hit. */
+const HIT_GLOW = 1.5;
 
 const KEY = 'svs:training';
 function loadSettings(): Settings {
@@ -130,16 +132,17 @@ export class TrainingScene extends BattleScene {
   private dealt = 0;
   private lastDmg = 0;
   private lastDmgT = -99;
-  private combo = 0;
-  private hits = 0;
-  private best = 0;
   private menuSel = 0;
   private resetT = 0;
+  /** The stats panel, opened from the pause menu over the paused fight. */
+  private statsOpen = false;
+  private statsSel = 0;
 
   constructor(m: MatchConfig) {
     // one endless round, so no round counter
     super({ ...m, bestOf: 1 });
     this.timed = false;
+    this.announce = false;
     this.rivalName = 'DUMMY';
     this.b.noKo = true;
     this.b.f[1].name = 'DUMMY';
@@ -165,6 +168,7 @@ export class TrainingScene extends BattleScene {
       { label: 'DRAW GAUGE', value: () => (s.gauge === 'full' ? 'ALWAYS FULL' : 'NORMAL'), change: () => { s.gauge = s.gauge === 'full' ? 'normal' : 'full'; } },
       { label: touchActive() ? 'RESET POSITIONS' : 'RESET POSITIONS (R)', act: () => { this.paused = false; this.reset(); } },
       { label: 'NEW HAND NOW', act: () => { this.paused = false; this.newHand(); } },
+      { label: 'SESSION STATS', act: () => { this.statsOpen = true; this.statsSel = 0; this.paused = true; } },
       { label: 'RESTART FROM TURN 1', act: () => setScene(new TrainingScene(this.m)) },
       { label: 'CHARACTER SELECT', act: () => { stopMusic(); setScene(new CharSelectScene(undefined, 0, 'training')); } },
       { label: 'QUIT TO TITLE', act: () => { stopMusic(); setScene(new TitleScene()); } },
@@ -188,7 +192,6 @@ export class TrainingScene extends BattleScene {
     b.f[1].name = 'DUMMY';
     b.gauge = 0;
     this.prevHp = [b.f[0].hp, b.f[1].hp];
-    this.combo = 0; this.hits = 0;
     this.resetT = 0.8;
     this.applySettings();
     sfx('select');
@@ -231,14 +234,11 @@ export class TrainingScene extends BattleScene {
     if (this.paused && !wasPaused) this.menuSel = 0;
     if (b.phase !== 'fight') return;
     this.applySettings();
-    // damage readout: what you dealt this frame, chained into combos
+    // damage readout: what you dealt this frame (combos come from the battle's true combo counter)
     const now = b.time;
     const total = b.stats[0].basic + b.stats[0].spell + b.stats[0].other;
     const d = total - before;
     if (d > 0) {
-      if (now - this.lastDmgT > COMBO_GAP) { this.combo = 0; this.hits = 0; }
-      this.combo += d; this.hits++;
-      this.best = Math.max(this.best, this.combo);
       this.lastDmg = d; this.lastDmgT = now;
       this.dealt += d;
     }
@@ -251,6 +251,7 @@ export class TrainingScene extends BattleScene {
   }
 
   protected updatePause(dt: number): void {
+    if (this.statsOpen) { this.updateStats(dt); return; }
     const rows = this.rows, n = rows.length;
     const h = hot('trow'), arrow = hot('tarrow');
     if (mouse.moved && h >= 0 && h !== this.menuSel) { this.menuSel = h; sfx('move'); }
@@ -273,7 +274,28 @@ export class TrainingScene extends BattleScene {
     if (pr.change) { pr.change(1); sfx('move'); this.close(false); return; }
     sfx('select');
     pr.act?.();
-    this.close();
+    if (!this.statsOpen) this.close();
+  }
+
+  private static readonly STATS_ITEMS = ['BACK', 'CLEAR STATS'];
+
+  /** The session stats: tabs on left/right, BACK or CLEAR STATS, right-click or the back key returns to the menu. */
+  private updateStats(dt: number): void {
+    this.statsPanel.update(this.statsData());
+    const n = TrainingScene.STATS_ITEMS.length;
+    const clicked = listMouse('menu', this.statsSel, i => { this.statsSel = i; sfx('move'); });
+    if (mouse.rclick || (wasPressed('back') && !wasPressed('pause'))) { this.statsOpen = false; sfx('back'); return; }
+    if (navPressed('up', dt)) { this.statsSel = (this.statsSel + n - 1) % n; sfx('move'); }
+    if (navPressed('down', dt)) { this.statsSel = (this.statsSel + 1) % n; sfx('move'); }
+    const pick = clicked >= 0 ? clicked : wasPressed('confirm') || wasPressed('pause') ? this.statsSel : -1;
+    if (pick < 0) return;
+    sfx('select');
+    if (pick === 0) this.statsOpen = false;
+    else clearStats(this.stats);
+  }
+
+  protected statsData(): StatsData {
+    return { ...super.statsData(), scope: 'THIS SESSION', rounds: [] };
   }
 
   /** Remember the settings; `resume` also leaves the menu. */
@@ -290,41 +312,53 @@ export class TrainingScene extends BattleScene {
     const b = this.b;
     if (b.phase === 'fight' || b.phase === 'ko') this.drawReadout(ui, tick);
     if (this.resetT > 0 && b.phase === 'fight') drawTextCentered(ui, 'RESET', UW / 2, 124, '#58d854', 4);
-    if (paused) this.drawMenu(ui, tick);
+    if (paused && this.statsOpen) this.drawStats(ui, tick);
+    else if (paused) this.drawMenu(ui, tick);
+  }
+
+  private drawStats(ui: Ctx, tick: number): void {
+    dim(ui, 0.6);
+    banner(ui, 'TRAINING STATS', UW / 2, 6);
+    this.statsPanel.draw(ui, this.statsData(), 8, 46, 344, 254);
+    drawMenu(ui, TrainingScene.STATS_ITEMS, this.statsSel, 416, 62, tick, { width: 112, gap: 22 });
+    hint(ui, `CLICK OR ${k('attack')}: SELECT   ${k('left')}/${k('right')}: TABS   ${k('cast')} / RIGHT-CLICK: BACK`);
   }
 
   /** Fighting-game damage readout, under the Draw gauge. */
   private drawReadout(ui: Ctx, tick: number): void {
     const w = 208, x = Math.round(UW / 2 - w / 2), y = 34;
     win(ui, x, y, w, 26, { burn: 3 });
-    const recent = this.b.time - this.lastDmgT <= COMBO_GAP;
-    drawText(ui, `LAST HIT ${Math.round(this.lastDmg)}`, x + 7, y + 6, INK);
-    const combo = `COMBO ${Math.round(this.combo)}${this.hits > 1 ? ` (${this.hits} HITS)` : ''}`;
-    drawText(ui, combo, x + w - 7 - textWidth(combo), y + 6, recent && tick % 4 < 3 ? RED_INK : INK);
-    drawText(ui, `BEST ${Math.round(this.best)}`, x + 7, y + 15, INK2);
+    const recent = this.b.time - this.lastDmgT <= HIT_GLOW;
+    drawText(ui, `LAST HIT ${Math.round(this.lastDmg)}`, x + 7, y + 6, recent ? RED_INK : INK);
+    // true combos only: hits that land while the dummy can't act
+    const c = this.b.combo.shown(0), best = this.b.combo.best[0];
+    const combo = c ? `COMBO ${c.hits} HITS ${Math.round(c.dmg)} DMG` : 'COMBO -';
+    drawText(ui, combo, x + w - 7 - textWidth(combo), y + 6, c?.live && tick % 4 < 3 ? RED_INK : INK);
+    drawText(ui, best.hits ? `BEST ${Math.round(best.dmg)}` : 'BEST -', x + 7, y + 15, INK2);
     const keys = touchActive() ? 'PAUSE: MENU' : `R: RESET  ${k('pause')}: MENU`;
     drawText(ui, keys, x + w - 7 - textWidth(keys), y + 15, TRIM);
   }
 
   private drawMenu(ui: Ctx, tick: number): void {
     dim(ui, 0.6);
-    const rows = this.rows, x = 92, w = UW - 184, rh = 17, y0 = 46;
+    const rows = this.rows, x = 92, w = UW - 184, rh = Math.round(17 * spread.k), y0 = 46;
     banner(ui, 'TRAINING', UW / 2, 8);
     win(ui, x, y0 - 8, w, rows.length * rh + 14);
     rows.forEach((r, i) => {
       // a gap between the settings and the actions below them
       const yy = y0 + i * rh + (i >= 8 ? 4 : 0), on = i === this.menuSel && showSel();
+      const ty = yy + 2 + Math.round((rh - 17) / 2);
       zone(`trow:${i}`, x + 2, yy - 3, w - 4, rh - 1);
       if (on) selRow(ui, x + 4, yy - 3, w - 8, rh - 2);
-      drawText(ui, r.label, x + 14, yy + 2, on ? INK : INK2);
-      if (on && tick % 8 < 6) drawText(ui, '→', x + 4, yy + 2, PAPER);
+      drawText(ui, r.label, x + 14, ty, on ? INK : INK2);
+      if (on && tick % 8 < 6) drawText(ui, '→', x + 4, ty, PAPER);
       if (r.value) {
         const v = r.value(), vx = x + w - 92;
-        drawTextCentered(ui, v, vx + 40, yy + 2, RED_INK, 1, false);
+        drawTextCentered(ui, v, vx + 40, ty, RED_INK, 1, false);
         zone(`tarrow:${i * 2}`, vx - 4, yy - 3, 14, rh - 1);
         zone(`tarrow:${i * 2 + 1}`, vx + 74, yy - 3, 14, rh - 1);
-        drawText(ui, '<', vx, yy + 2, hot('tarrow') === i * 2 ? INK : TRIM);
-        drawText(ui, '>', vx + 78, yy + 2, hot('tarrow') === i * 2 + 1 ? INK : TRIM);
+        drawText(ui, '<', vx, ty, hot('tarrow') === i * 2 ? INK : TRIM);
+        drawText(ui, '>', vx + 78, ty, hot('tarrow') === i * 2 + 1 ? INK : TRIM);
       }
     });
     hint(ui, `${k('up')}/${k('down')}: MOVE   ${k('left')}/${k('right')} OR CLICK: CHANGE   ${k('cast')} / RIGHT-CLICK: RESUME`);
