@@ -27,7 +27,8 @@ def style(v):
 def render(text, v):
     rate = 2 ** (v['semitones'] / 12)
     # spoken faster by the same factor the tape-style pitch drop below slows it down
-    samples, sr = k.create(text, voice=style(v), speed=v['speed'] / rate, lang=v['lang'])
+    ipa = text.startswith('/') and text.endswith('/')
+    samples, sr = k.create(text.strip('/') if ipa else text, voice=style(v), speed=v['speed'] / rate, lang=v['lang'], is_phonemes=ipa)
     with tempfile.TemporaryDirectory() as d:
         wav, mp3 = os.path.join(d, 'a.wav'), os.path.join(d, 'a.mp3')
         sf.write(wav, samples, sr)
