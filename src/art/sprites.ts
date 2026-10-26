@@ -2,6 +2,7 @@
 // Rogue, Ranger and Cleric are the Classic set (art/classic-sprites.ts); their skins recolor the tint letters b/c/d.
 import type { Ctx } from '../engine/gfx';
 import { HIRES } from './hiresSprites';
+import { FRAMES, type FrameId } from './fighterFrames';
 
 /** Draw the 24px fighters from the reference sheet (art/hi-res) instead of the ~18px Cartridge sprites. */
 export const USE_HIRES = true;
@@ -176,6 +177,22 @@ export function getSprite(cls: ClassId, skin: string, alt: boolean): Sprite {
   return s;
 }
 
+const frameCache = new Map<string, Sprite>();
+/** One animation frame of a fighter (art/fighterFrames.ts) in a skin. Falls back to the idle frame. */
+export function getFrame(cls: ClassId, skin: string, alt: boolean, frame: FrameId): Sprite {
+  const set = FRAMES[cls], id = set.frames[frame] ? frame : 'idle0';
+  const key = `${cls}:${skin}${alt ? ':alt' : ''}:${id}`;
+  let s = frameCache.get(key);
+  if (!s) {
+    const { pal } = skinned(cls, skin, alt), rows = set.frames[id]!;
+    const img = {} as Record<Tint, HTMLCanvasElement>;
+    for (const t of ['none', 'flash', 'ice', 'stun', 'ghost'] as Tint[]) img[t] = bake({ rows }, pal, t);
+    s = { w: rows[0].length, h: rows.length, ax: set.ax, res: 1, img };
+    frameCache.set(key, s);
+  }
+  return s;
+}
+
 /** Draw with feet at (footX, footY). `flip` mirrors so the sprite faces left. */
 export function drawFighterSprite(c: Ctx, s: Sprite, footX: number, footY: number, flip: boolean, tint: Tint = 'none', scale = 1): void {
   const img = s.img[tint], px = scale / s.res; // size of one sprite pixel where we draw
@@ -196,8 +213,6 @@ export interface Pose {
   sy?: number;
   /** Pixels the top row shifts toward the facing direction (negative leans back); lower rows shift less. */
   lean?: number;
-  /** Fall: 0 standing, 0.5 halfway, 1 flat on the ground. Positive falls forward, negative backward. */
-  fall?: number;
   /** Rows hidden from the top (a dissolve eating down the body). */
   cut?: number;
   /** Interlace: draw only every other row, offset by `scan` (0 or 1). */
@@ -216,25 +231,12 @@ function mirrored(img: HTMLCanvasElement): HTMLCanvasElement {
   return m;
 }
 
-/** drawFighterSprite with a pose: squash and stretch, lean, fall over, dissolve. */
+/** drawFighterSprite with a pose: squash and stretch, lean, dissolve. */
 export function drawFighterPosed(c: Ctx, s: Sprite, footX: number, footY: number, flip: boolean, tint: Tint = 'none', pose: Pose = {}): void {
   const src = flip ? mirrored(s.img[tint]) : s.img[tint];
   const w = src.width, h = src.height, px = 1 / s.res;
   const ax = (flip ? w - 1 - s.ax * s.res : s.ax * s.res) * px;
   const fx = Math.round(footX), fy = Math.round(footY), d = flip ? -1 : 1;
-  const fall = pose.fall ?? 0;
-  if (Math.abs(fall) >= 0.25) {
-    // pivot on the feet like a falling tree; snapped to 45 or 90 degrees so the pixels stay legible
-    const a = (Math.abs(fall) >= 0.75 ? Math.PI / 2 : Math.PI / 4) * Math.sign(fall) * d;
-    const flat = Math.abs(fall) >= 0.75;
-    c.save();
-    // lying down, the body's far side would sink under the floor: lift it back onto the panel
-    c.translate(fx - (flat ? Math.sign(fall) * d * 4 : 0), fy - (flat ? Math.round((w * px - ax) * 0.5) : 0));
-    c.rotate(a);
-    c.drawImage(src, -ax, -h * px, w * px, h * px);
-    c.restore();
-    return;
-  }
   const sy = pose.sy ?? 1, lean = pose.lean ?? 0, cut = pose.cut ?? 0;
   const dh = Math.max(1, Math.round(h * sy));
   for (let r = 0; r < dh; r++) {

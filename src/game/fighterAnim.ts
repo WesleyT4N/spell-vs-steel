@@ -3,6 +3,7 @@
 // so the lockstep simulation never sees it.
 import { panelFoot } from '../art/arena';
 import { spriteRows, type ClassId, type Pose, type Sprite } from '../art/sprites';
+import type { FrameId } from '../art/fighterFrames';
 import { P, glow, type Ctx } from '../engine/gfx';
 import { TUNING } from './tuning';
 import type { Battle, Fighter, Fx } from './battle';
@@ -35,6 +36,9 @@ const seenCast = new WeakSet<Fx>();
 export interface Look {
   /** Offset from the panel foot (steps, recoil, hops). */
   ox: number; oy: number;
+  /** Which drawn frame of the class's sheet (art/fighterFrames.ts). */
+  frame: FrameId;
+  /** Dissolves and fades on top of the frame. */
   pose: Pose;
   alpha: number;
   hide: boolean;
@@ -84,83 +88,69 @@ export function observe(b: Battle, f: Fighter): State {
   return s;
 }
 
-/** The fighter's offset and pose this frame. `held`: frozen, stunned or asleep (no recoil, no idle). */
+/** The fighter's frame and offset this frame. `held`: frozen, stunned or asleep (no recoil, no idle). */
 export function lookOf(b: Battle, f: Fighter, s: State, held: boolean): Look {
   const t = b.time, d = b.dir(f), cls = f.cls;
-  const L: Look = { ox: 0, oy: 0, pose: {}, alpha: 1, hide: false, white: false };
+  const L: Look = { ox: 0, oy: 0, frame: 'idle0', pose: {}, alpha: 1, hide: false, white: false };
   if (f.dead) return deathLook(b, f, s, L);
+  if (held) return L;
 
-  // idle: each class breathes its own way
-  if (f.pose === 'idle' && !held) {
-    if (cls === 'mage') L.oy = -1 - Math.round(Math.sin(t * 2.6));                    // hovers on his magic
-    else if (cls === 'rogue') L.pose.sy = Math.floor(t * 3.6) % 2 ? 23 / 24 : 1;        // bouncing on her toes
-    else if (cls === 'warrior') L.oy = -(Math.floor(t * 1.6) % 2);                       // slow, heavy breaths
-    else if (cls === 'cleric') L.oy = -(Math.floor(t * 1.4) % 2);
-    else L.oy = -(Math.floor(t * 2.5) % 2);
-  }
+  // idle: each class breathes at its own pace
+  const rate = cls === 'rogue' ? 3.6 : cls === 'warrior' ? 1.6 : cls === 'cleric' ? 1.4 : cls === 'mage' ? 1.3 : 2.5;
+  L.frame = Math.floor(t * rate) % 2 ? 'idle1' : 'idle0';
+  if (cls === 'mage') L.oy = -1 - Math.round(Math.sin(t * 2.6));   // hovers on his magic
 
   // steps
   const mp = (t - s.mvT) / (s.knock ? 0.1 : STEP[cls]);
   if (mp >= 0 && mp < 1) {
     const here = panelFoot(f.col, f.row);
     const bx = s.fromX - here.x, by = s.fromY - here.y;   // where we came from, relative to here
-    if (s.knock) { L.ox += bx * (1 - ease(mp)); L.oy += by * (1 - ease(mp)); L.pose.lean = -2; }
+    if (s.knock) { L.ox += bx * (1 - ease(mp)); L.oy += by * (1 - ease(mp)); L.frame = 'hit'; }
     else if (cls === 'warrior') {
       // a short, heavy hop that lands in a crouch
       L.ox += bx * (1 - mp); L.oy += by * (1 - mp) - Math.round(Math.sin(mp * Math.PI) * 2);
-      L.pose.sy = mp < 0.2 ? 0.92 : 1;
+      L.frame = mp < 0.7 ? 'hop' : 'land';
     } else if (cls === 'ranger') {
       // a light, springy leap
       L.ox += bx * (1 - ease(mp)); L.oy += by * (1 - ease(mp)) - Math.round(Math.sin(mp * Math.PI) * 5);
-      L.pose.sy = mp < 0.3 ? 1.08 : 1; L.pose.lean = 1;
+      L.frame = mp < 0.75 ? 'hop' : 'land';
     } else if (cls === 'cleric') {
-      // glides over the floor
+      // glides over the floor, robe trailing
       L.ox += bx * (1 - ease(mp)); L.oy += by * (1 - ease(mp)) - 1;
+      L.frame = 'hop';
     } else if (cls === 'mage') {
       // blinks: already there, fading in line by line
       L.pose.scan = mp < 0.5 ? Math.floor(t * 60) % 2 : undefined;
+      L.frame = 'hop';
     } else {
       // Rogue dashes: already there in a low crouch, afterimages trail behind (drawUnder)
-      L.pose.sy = 0.88; L.pose.lean = 2;
+      L.frame = 'land';
     }
-  } else if (mp >= 1 && mp < 1.6 && !s.knock && cls === 'warrior') {
-    L.pose.sy = mp < 1.3 ? 0.88 : 0.96;   // the stomp lands
+  } else if (mp >= 1 && mp < 1.5 && !s.knock && (cls === 'warrior' || cls === 'ranger')) {
+    L.frame = 'land';   // the landing settles
   }
+
+  // basic attacks: a held charge shows the wind-up; a heavy winds up, then swings
+  if (f.charging && f.charge > 0.15) L.frame = 'windup';
+  if (f.pose === 'attack') L.frame = f.poseT > 0.14 ? 'windup' : 'slash';
+  if (f.pose === 'heavy') L.frame = f.poseT > 0.26 ? 'windup' : 'slash';
 
   // casting
   const cp = (t - s.castT) / CAST;
-  if (cp >= 0 && cp < 1 && !held) castPose(cls, cp, L);
+  if (cp >= 0 && cp < 0.75) {
+    L.frame = cp < 0.3 ? 'cast0' : 'cast1';
+    if (cls === 'mage') L.oy -= Math.round(Math.sin(Math.min(1, cp * 1.4) * Math.PI) * 3);   // lifts off the floor on the spell
+  }
 
-  // getting hit: recoil away from the blow, each class in its own way
+  // getting hit: recoil away from the blow
   const hp = (t - s.hitT) / HIT;
-  if (hp >= 0 && hp < 1 && !held) {
+  if (hp >= 0 && hp < 1) {
     const k = hp < 0.12 ? hp / 0.12 : 1 - ease((hp - 0.12) / 0.88), big = s.hitBig ? 1.5 : 1;
-    const [back, lean, sy] = cls === 'warrior' ? [1, -1, 1] : cls === 'mage' ? [3, -3, 0.94] : cls === 'rogue' ? [2, -1, 0.86] : [2, -2, 0.96];
+    const back = cls === 'warrior' ? 1 : cls === 'mage' ? 3 : 2;
     L.ox -= Math.round(back * big * k) * d;
-    L.pose.lean = Math.round(lean * big * k);
-    L.pose.sy = 1 - (1 - sy) * k;
+    if (hp < 0.6) L.frame = 'hit';
   }
   return L;
-}
-
-function castPose(cls: ClassId, p: number, L: Look): void {
-  if (cls === 'warrior') {
-    // a war cry: hunch, then rise up tall
-    L.pose.sy = p < 0.15 ? 0.9 : p < 0.5 ? 1.08 : 1;
-  } else if (cls === 'mage') {
-    // lifts off the floor on the spell
-    L.oy -= Math.round(Math.sin(Math.min(1, p * 1.4) * Math.PI) * 3);
-    L.pose.lean = p < 0.5 ? -1 : 0;
-  } else if (cls === 'rogue') {
-    // a quick crouch, then springs forward
-    L.pose.sy = p < 0.2 ? 0.84 : 1; L.pose.lean = p < 0.2 ? 0 : p < 0.5 ? 2 : 0;
-  } else if (cls === 'ranger') {
-    // plants and draws back, then releases
-    L.pose.lean = p < 0.35 ? -2 : p < 0.55 ? 1 : 0;
-  } else {
-    // kneels in prayer, then stands
-    L.pose.sy = p < 0.4 ? 0.88 : 1;
-  }
 }
 
 // ---------- the KO ----------
@@ -170,32 +160,33 @@ function deathLook(b: Battle, f: Fighter, s: State, L: Look): Look {
   switch (f.cls) {
     case 'warrior':
       // staggers back, drops to a knee, topples forward
-      if (t < 0.2) { L.ox = -Math.round(ease(t / 0.2) * 2) * d; L.pose.lean = -2; }
-      else if (t < 0.55) { L.ox = -2 * d; L.pose.sy = 0.78; L.pose.lean = 1; }
-      else { L.ox = -2 * d; L.pose.fall = t < 0.65 ? 0.5 : 1; }
+      if (t < 0.2) { L.ox = -Math.round(ease(t / 0.2) * 2) * d; L.frame = 'hit'; }
+      else if (t < 0.6) { L.ox = -2 * d; L.frame = 'kneel'; }
+      else { L.ox = -2 * d; L.frame = 'down'; }
       break;
     case 'ranger':
       // knocked off balance, falls backward
-      if (t < 0.25) { const p = t / 0.25; L.ox = -Math.round(ease(p) * 4) * d; L.oy = -Math.round(Math.sin(p * Math.PI) * 4); L.pose.lean = -2; }
-      else { L.ox = -4 * d; L.pose.fall = t < 0.35 ? -0.5 : -1; }
+      if (t < 0.25) { const p = t / 0.25; L.ox = -Math.round(ease(p) * 4) * d; L.oy = -Math.round(Math.sin(p * Math.PI) * 4); L.frame = 'hit'; }
+      else if (t < 0.4) { L.ox = -4 * d; L.frame = 'kneel'; }
+      else { L.ox = -4 * d; L.frame = 'down'; }
       break;
     case 'mage':
-      // reels, then unravels into arcane motes from the hat down
-      if (t < 0.3) { L.pose.lean = -3; L.oy = -Math.round(Math.sin((t / 0.3) * Math.PI) * 3); }
-      else { const p = clamp01((t - 0.3) / 0.9); L.pose.cut = Math.floor(p * 26); L.hide = p >= 1; }
+      // reels, sinks to his knees, then unravels into arcane motes from the hat down
+      if (t < 0.3) { L.frame = 'hit'; L.oy = -Math.round(Math.sin((t / 0.3) * Math.PI) * 3); }
+      else { const p = clamp01((t - 0.45) / 0.9); L.frame = 'kneel'; L.pose.cut = 4 + Math.floor(p * 22); L.hide = p >= 1; }
       break;
     case 'rogue':
       // doubles over, then vanishes in a burst of smoke, leaving her dagger behind
-      if (t < 0.2) L.pose.lean = -2;
-      else if (t < 0.4) L.pose.sy = 0.8;
-      else if (t < 0.5) { L.pose.sy = 0.8; L.alpha = 0.4; }
+      if (t < 0.2) L.frame = 'hit';
+      else if (t < 0.4) L.frame = 'kneel';
+      else if (t < 0.5) { L.frame = 'kneel'; L.alpha = 0.4; }
       else L.hide = true;
       break;
     case 'cleric':
       // kneels, light falls on him, and he rises into it
-      if (t < 0.35) L.pose.sy = 0.84;
-      else if (t < 0.55) { L.pose.sy = 0.84; L.white = Math.floor(t * 20) % 2 === 0; }
-      else { const p = clamp01((t - 0.55) / 0.9); L.white = true; L.oy = -Math.round(ease(p) * 26); L.alpha = 1 - p; L.pose.scan = p > 0.3 ? Math.floor(t * 30) % 2 : undefined; L.hide = p >= 1; }
+      L.frame = 'kneel';
+      if (t >= 0.35 && t < 0.55) L.white = Math.floor(t * 20) % 2 === 0;
+      else if (t >= 0.55) { const p = clamp01((t - 0.55) / 0.9); L.frame = 'cast1'; L.white = true; L.oy = -Math.round(ease(p) * 26); L.alpha = 1 - p; L.pose.scan = p > 0.3 ? Math.floor(t * 30) % 2 : undefined; L.hide = p >= 1; }
       break;
   }
   return L;
@@ -204,7 +195,7 @@ function deathLook(b: Battle, f: Fighter, s: State, L: Look): Look {
 // ---------- effects around the fighter ----------
 
 /** Behind the fighter: cast glyphs on the floor, step trails, the Cleric's light. x, y: the panel foot. */
-export function drawUnder(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, x: number, y: number, flip: boolean, drawGhost: (gx: number, gy: number, pose: Pose) => void): void {
+export function drawUnder(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, x: number, y: number, flip: boolean, drawGhost: (gx: number, gy: number, frame: FrameId) => void): void {
   const t = b.time;
   if (f.dead) {
     const k = t - s.deadT;
@@ -228,7 +219,7 @@ export function drawUnder(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, x
     for (const k of [0.33, 0.66]) {
       if (mp > k) continue;
       c.globalAlpha = 0.5 * (1 - mp / k);
-      drawGhost(Math.round(here.x + (s.fromX - here.x) * k), Math.round(here.y + (s.fromY - here.y) * k), { sy: 0.88, lean: 2 });
+      drawGhost(Math.round(here.x + (s.fromX - here.x) * k), Math.round(here.y + (s.fromY - here.y) * k), 'land');
     }
     c.globalAlpha = 1;
   }
@@ -342,7 +333,7 @@ export function drawOver(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, L:
   // casting
   const cp = (t - s.castT) / CAST;
   if (cp >= 0 && cp < 1) {
-    const ramp = ELEMENT_RAMP[s.castEl] ?? ARC, top = y - sp.h;
+    const ramp = ELEMENT_RAMP[s.castEl] ?? ARC, top = y - sp.h + spriteRows(sp).findIndex(r => r.length > 0);
     if (cls === 'cleric' && cp < 0.8) {
       // a halo over his head while he prays
       const col = cp < 0.1 || Math.floor(t * 20) % 4 ? ramp[2] : ramp[3];
