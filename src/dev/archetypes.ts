@@ -1,7 +1,7 @@
 // Deck pools for the balance sims: common archetypes per class (one per Mythic) and random legal decks.
 // Archetypes are keyed by class id as a plain string so a class that is not in this build is skipped.
 import { CARDS, ALL_CARDS, MAX_COPIES, type CardDef } from '../game/cards';
-import { DECK_SIZE, MAX_LEGENDARIES, canAdd, validate, deckSize, starterDeck, type DeckCounts } from '../game/deck';
+import { DECK_SIZE, MAX_LEGENDARIES, canAdd, validate, deckSize, starterDeck, presetsFor, type DeckCounts } from '../game/deck';
 import { seeded, type Rng } from '../game/rng';
 import type { ClassId } from '../art/sprites';
 import { stylesFor } from '../game/playstyles';
@@ -162,12 +162,13 @@ export function randomDeck(cls: ClassId, rand: Rng): DeckCounts {
 
 export interface PoolDeck { cls: ClassId; key: string; name: string; deck: DeckCounts; /** CPU playstyle id (default: balanced). */ style?: string }
 
-export type PoolKind = 'starter' | 'archetype' | 'variant' | 'random' | 'style' | 'style-starter';
+export type PoolKind = 'starter' | 'archetype' | 'variant' | 'random' | 'style' | 'style-starter' | 'preset' | 'preset-style';
 
 /**
  * Decks for one class. `starter` = the shipped starter, `archetype` = each archetype's fixed list,
  * `variant` = `k` random builds of each archetype, `random` = `k` random legal decks,
- * `style` = each CPU playstyle with its matching archetype, `style-starter` = each playstyle with the starter.
+ * `style` = each CPU playstyle with its matching archetype, `style-starter` = each playstyle with the starter,
+ * `preset` = the shipped ready-made decks (starter + Mythic decks), `preset-style` = each of those with each playstyle.
  */
 export function deckPool(cls: ClassId, kind: PoolKind, k: number, seed: number): PoolDeck[] {
   const rand = seeded(seed);
@@ -183,6 +184,10 @@ export function deckPool(cls: ClassId, kind: PoolKind, k: number, seed: number):
       const deck = kind === 'style' && a ? buildArchetype(cls, a) : starterDeck(cls);
       out.push({ cls, key: `${cls}:${s.id.replace(`${cls}_`, '')}`, name: s.name, deck, style: s.id });
     }
+  }
+  if (kind === 'preset') for (const p of presetsFor(cls)) out.push({ cls, key: `${cls}:${p.id}`, name: p.name, deck: { ...p.cards } });
+  if (kind === 'preset-style') {
+    for (const p of presetsFor(cls)) for (const s of stylesFor(cls)) out.push({ cls, key: `${cls}:${p.id}/${s.id.replace(`${cls}_`, '')}`, name: `${p.name} (${s.name})`, deck: { ...p.cards }, style: s.id });
   }
   if (kind === 'random') for (let i = 0; i < k; i++) out.push({ cls, key: `${cls}:random#${i + 1}`, name: `Random #${i + 1}`, deck: randomDeck(cls, rand) });
   for (const p of out) {
