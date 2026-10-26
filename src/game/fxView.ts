@@ -21,7 +21,7 @@ const ICED = '#002c8c';
 
 // ---------- particles ----------
 interface Box { x0: number; x1: number; y0: number; y1: number }
-interface Part { x: number; y: number; vx: number; vy: number; g: number; drag: number; age: number; life: number; ramp: string[]; size: number; shrink: number; dither: boolean; box?: Box }
+export interface Part { x: number; y: number; vx: number; vy: number; g: number; drag: number; age: number; life: number; ramp: string[]; size: number; shrink: number; dither: boolean; box?: Box }
 // each Battle keeps its own particles, so a card preview drawn beside a fight doesn't disturb it
 interface Layer { parts: Part[]; lastTime: number }
 const layers = new WeakMap<Battle, Layer>();
@@ -42,6 +42,8 @@ function part(x: number, y: number, o: Partial<Part>): Part {
   cur.parts.push(p);
   return p;
 }
+/** Spawn a particle from outside the effects (fighter animations). No box: it may leave the 24x24 footprint. */
+export const spawnPart = (x: number, y: number, o: Partial<Part>): void => { part(x, y, o); };
 const emit = (n: number, f: (i: number) => void): void => { for (let i = 0; i < n; i++) f(i); };
 const ember = (x: number, y: number, box: Box, o: Partial<Part> = {}): Part => part(x, y, { vx: rnd(-12, 12), vy: rnd(-30, -8), g: 18, life: rnd(0.35, 0.8), ramp: HEAT.slice(1), box, ...o });
 const smoke = (x: number, y: number, box: Box, o: Partial<Part> = {}): Part => part(x, y, { vx: rnd(-5, 5), vy: rnd(-14, -6), life: rnd(0.6, 1.1), ramp: SMOKE, size: rnd(2, 4), shrink: -0.3, dither: true, box, ...o });
@@ -164,7 +166,7 @@ function cross(c: Ctx, x: number, y: number, col: string, s = 1): void {
 }
 
 // ---------- effects ----------
-const ELEMENT_RAMP: Record<string, string[]> = { steel: STEEL, fire: FIRE, frost: ICE, arcane: ARC, shadow: SHADOW, poison: TOX, nature: ['#005800', '#58d854', '#b8f818', '#fcfcfc'], holy: HOLY };
+export const ELEMENT_RAMP: Record<string, string[]> = { steel: STEEL, fire: FIRE, frost: ICE, arcane: ARC, shadow: SHADOW, poison: TOX, nature: ['#005800', '#58d854', '#b8f818', '#fcfcfc'], holy: HOLY };
 const DART: Record<string, string[]> = { knife: STEEL, knifeHeavy: STEEL, arrow: ['#503000', '#ac7c00', '#bcbcbc', '#fcfcfc'], aimed: STEEL, holySpark: HOLY };
 const cellPx = (col: number, row: number): { x: number; y: number } => panelFoot(col, row);
 

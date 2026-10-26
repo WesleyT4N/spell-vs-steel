@@ -297,7 +297,7 @@ export class BattleScene implements Scene {
       sfx('select');
       if (this.pauseSel === 0) this.paused = false;
       if (this.pauseSel === 1) setScene(new OptionsScene(() => setScene(this)));
-      if (this.pauseSel === 2) setScene(new BattleScene(this.m, this.score, undefined, this.rounds, this.ctl));
+      if (this.pauseSel === 2) setScene(this.again(this.score, this.rounds));
       if (this.pauseSel === 3) { stopMusic(); setScene(new TitleScene()); }
     }
   }
@@ -308,6 +308,11 @@ export class BattleScene implements Scene {
   protected rivalDeckText(): string {
     const foe: Side = this.me === 0 ? 1 : 0, f = this.b.f[foe];
     return `${f.name} DECK: ${deckLabel(f.cls, this.decks[foe])}`;
+  }
+
+  /** The next round (or a fresh set) of this match; arcade fights carry their run along. */
+  protected again(score: [number, number], rounds: RoundRecord[]): Scene {
+    return new BattleScene(this.m, score, undefined, rounds, this.ctl);
   }
 
   protected get need(): number { return Math.ceil(this.m.bestOf / 2); }
@@ -326,12 +331,16 @@ export class BattleScene implements Scene {
     if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
       sfx('select');
       stopMusic();
-      const choice = this.resultItems[this.resultSel];
-      if (choice === 'NEXT ROUND') setScene(new BattleScene(this.m, this.score, undefined, this.rounds, this.ctl));
-      if (choice === 'REMATCH') setScene(new BattleScene(this.m, [0, 0], undefined, [], this.ctl));
-      if (choice === 'CHARACTER SELECT') setScene(new CharSelectScene());
-      if (choice === 'TITLE') setScene(new TitleScene());
+      this.onResult(this.resultItems[this.resultSel]);
     }
+  }
+
+  /** A results menu item was picked. */
+  protected onResult(choice: string): void {
+    if (choice === 'NEXT ROUND') setScene(this.again(this.score, this.rounds));
+    if (choice === 'REMATCH') setScene(this.again([0, 0], []));
+    if (choice === 'CHARACTER SELECT') setScene(new CharSelectScene());
+    if (choice === 'TITLE') setScene(new TitleScene());
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
