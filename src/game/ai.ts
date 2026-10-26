@@ -49,7 +49,7 @@ export class Cpu {
     // 2. Spells.
     const top = f.queue[0] ? CARDS[f.queue[0]] : null;
     if (top) {
-      if (b.canAfford(f, top) && f.st.evoLock <= 0) {
+      if (b.canAfford(f, top) && f.st.evoLock <= 0 && f.castCd <= 0) {
         const good = top.ai ? top.ai(b, f) : true;
         if (good || this.waitedOnTop > this.cfg.castPatience * 3 || (this.difficulty === 'easy' && Math.random() < 0.25)) {
           this.wantCast = true;

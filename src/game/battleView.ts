@@ -439,6 +439,11 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
     P(c, '#000000', cx - 1, cy - 1, 10, 9);
     P(c, ok ? ELEMENT_COLOR[card.element] : '#7c7c7c', cx, cy, 8, 7);
     if (i === 0) drawText(c, card.cost === 'all' ? 'A' : String(card.cost), cx + 1, cy, '#000000');
+    // global cooldown: a shade over the top chip that drains away as it recharges
+    if (i === 0 && f.castCd > 0) {
+      const sh = Math.ceil(7 * f.castCd / TUNING.castCooldown);
+      c.globalAlpha = 0.65; P(c, '#000000', cx, cy, 8, sh); c.globalAlpha = 1;
+    }
   }
 }
 
@@ -645,6 +650,13 @@ function drawNextSpell(ui: Ctx, b: Battle, f: Fighter): void {
   drawText(ui, s, 24, UH - 18, ok ? '#fcfcfc' : '#7c7c7c');
   if (more) drawText(ui, `+${more}`, 24 + textWidth(s) + 12, UH - 18, '#7c7c7c');
   if (!ok) drawText(ui, f.st.silenced > 0 ? 'SILENCED' : `NEED ${CLASS_INFO[card.cls].res}`, tw + 44, UH - 18, '#f83800');
+  // global cooldown: a bar along the bottom of the box fills back up between casts
+  if (f.castCd > 0) {
+    const p = 1 - f.castCd / TUNING.castCooldown;
+    ui.globalAlpha = 0.55; P(ui, '#000000', 9, UH - 21, tw + 26, 14); ui.globalAlpha = 1;
+    P(ui, '#3c3c3c', 10, UH - 10, tw + 24, 2);
+    P(ui, '#fcfcfc', 10, UH - 10, Math.round((tw + 24) * p), 2);
+  }
 }
 
 /** A charge meter under a fighter's feet while a heavy winds up; flashes READY when full. */
