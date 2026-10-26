@@ -1,5 +1,6 @@
 // Arcade ladder: one run through every other class, the CPU getting tougher each fight, then your own shadow.
 // A run lives in memory; only the best clear per class is saved.
+import { getSave, setSave } from '../engine/save';
 import { SKINS, mirrorSkin, skinOf, type ClassId } from '../art/sprites';
 import { STAGE_IDS } from '../art/stages';
 import { PLAYABLE } from './classes';
@@ -94,10 +95,8 @@ export function rungMatch(run: ArcadeRun): MatchConfig {
 }
 
 export interface ArcadeRecord { time: number; continues: number }
-const KEY = 'svs:arcade';
-
 export function loadRecords(): Partial<Record<ClassId, ArcadeRecord>> {
-  try { return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Record<ClassId, ArcadeRecord>>; } catch { return {}; }
+  return { ...getSave('arcade') } as Partial<Record<ClassId, ArcadeRecord>>;
 }
 
 /** Saves a clear if it beats the class's best (fewer continues first, then faster). True when it is a new best. */
@@ -106,7 +105,7 @@ export function saveClear(cls: ClassId, rec: ArcadeRecord): boolean {
   const better = !old || rec.continues < old.continues || (rec.continues === old.continues && rec.time < old.time);
   if (!better) return false;
   all[cls] = rec;
-  try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { /* storage blocked */ }
+  setSave('arcade', all as Record<string, ArcadeRecord>);
   return true;
 }
 

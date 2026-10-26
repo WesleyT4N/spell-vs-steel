@@ -235,6 +235,8 @@ export class Battle {
   fx: Fx[] = [];
   timers: Timer[] = [];
   anims: Anim[] = [];
+  /** See keep(). */
+  kept: object[] = [];
   phase: Phase = 'custom';
   gauge = 0;
   /** Training mode: a fighter brought to 0 HP refills instead of losing. */
@@ -328,6 +330,16 @@ export class Battle {
   // ---------- scheduling ----------
   later(delay: number, fn: () => void): void { this.timers.push({ t: delay, fn }); }
   anim(dur: number, fn: (p: number) => void): void { fn(0); this.anims.push({ t: 0, dur, fn }); }
+  /**
+   * Counters a spell's timers share (hits landed so far, ...). Rollback netcode rewinds everything
+   * reachable from the battle, so mutable state a closure keeps must live in an object kept here,
+   * never in a `let` the closure captures. `npm run rollcheck` catches the slip.
+   */
+  keep<T extends object>(state: T): T {
+    this.kept.push(state);
+    if (this.kept.length > 32) this.kept.shift();
+    return state;
+  }
   addFx(kind: string, side: Side, col: number, row: number, dur: number, data?: Record<string, number | string>): void {
     this.fx.push({ t: 0, dur, kind, side, col, row, data });
     sfxFx(kind, { pan: panOf(col), dur, data: { ...data, d: side === 0 ? 1 : -1 } });

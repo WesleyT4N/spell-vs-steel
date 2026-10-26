@@ -475,7 +475,7 @@ const mage: CardDef[] = [
     dmg: '30 each', short: '4s of ice shards on random enemy panels. Hit 2 times = frozen 2s.',
     cast: x => {
       const { b, f, foe } = x;
-      let hits = 0;
+      const n = b.keep({ hits: 0 });
       // ~2 shards/s; each telegraphs 0.5s. Prototype: 40% of shards aim at the enemy's panel.
       for (let i = 0; i < 8; i++) b.later(i * 0.5, () => {
         const cells = allEnemyPanels(b, f.side);
@@ -484,7 +484,7 @@ const mage: CardDef[] = [
         b.warn(f, [[c, r]], 0.5, () => {
           b.addFx('shard', f.side, c, r, 0.3);
           const res = b.strike(f, [[c, r]], 30 * x.mult, { spell: true, element: 'frost', noFlinch: true });
-          if (res.fighter && ++hits === 2) b.freeze(foe, 2);
+          if (res.fighter && ++n.hits === 2) b.freeze(foe, 2);
         });
       });
     },

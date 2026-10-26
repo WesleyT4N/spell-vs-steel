@@ -1,6 +1,7 @@
 // Balance lab: run CPU-vs-CPU matches in the browser, read per-card stats, and tweak numbers live.
 // Tuning edits apply to the whole game (Versus and the sandbox too) until the page reloads.
 import { popScene, type Scene } from './scene';
+import { getSave, setSave } from '../engine/save';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { screenRect, type Ctx } from '../engine/gfx';
@@ -46,7 +47,6 @@ let lastSingle: Task | null = null;
 let lastMatrix: Map<string, Task> | null = null;
 let lastGrid: { plan: GridPlan; run: GridRun; report: GridReport } | null = null;
 
-const SCRIPT_KEY = 'svs:lab:script';
 const SCRIPT_HELP = `# One edit per line. Runs from the shipped numbers every time.
 # hp.mage = 700              any number from the Tuning list below
 # warrior.heavyDamage *= 1.1 also += and -=
@@ -54,8 +54,8 @@ const SCRIPT_HELP = `# One edit per line. Runs from the shipped numbers every ti
 # fireball.cost = 2          a card's cost
 # mage.power = 95%           every card of a class
 `;
-const loadScript = (): string => { try { return localStorage.getItem(SCRIPT_KEY) ?? SCRIPT_HELP; } catch { return SCRIPT_HELP; } };
-const saveScript = (t: string): void => { try { localStorage.setItem(SCRIPT_KEY, t); } catch { /* storage blocked */ } };
+const loadScript = (): string => getSave('labScript') ?? SCRIPT_HELP;
+const saveScript = (t: string): void => setSave('labScript', t);
 
 export class LabScene implements Scene {
   private root!: HTMLElement;

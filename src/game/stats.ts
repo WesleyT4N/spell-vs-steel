@@ -91,6 +91,10 @@ function blank(cls: ClassId): SideStats {
 /** What a hit or heal is credited to: one cast or one basic attack. */
 interface Tag { id: string; side: Side; hit: boolean; damaging: boolean }
 
+const ROLLBACK = Symbol('stats rollback state');
+/** Everything stats keep that rollback netcode must save and restore along with the battle. */
+export const statsRollbackRoots = (s: BattleStats): object[] => [s, (s as unknown as Record<symbol, object>)[ROLLBACK]].filter(Boolean);
+
 /** Start keeping stats for `b`. The returned object fills in as the battle runs. */
 export function trackStats(b: Battle): BattleStats {
   const out: BattleStats = { side: [blank(b.f[0].cls), blank(b.f[1].cls)], fightSecs: 0, turns: 1 };
@@ -100,6 +104,12 @@ export function trackStats(b: Battle): BattleStats {
 
   let current: Tag | null = null;
   const burnTag = new Map<Panel, Tag>();
+  const blessTag = new Map<Panel, Tag>();
+  const curseTag = new Map<Panel, Tag>();
+  /** Recent tags: they change as they land (`hit`), so rollback netcode must rewind them with the battle. */
+  const tags: Tag[] = [];
+  const newTag = (t: Tag): Tag => { tags.push(t); if (tags.length > 64) tags.shift(); return t; };
+  Object.defineProperty(out, ROLLBACK, { value: { tags, burnTag, blessTag, curseTag }, enumerable: false });
   const tagged = new WeakSet<object>();
   /** Traps and companions remember the spell that placed them. */
   const placed = new WeakMap<object, Tag>();
@@ -140,7 +150,7 @@ export function trackStats(b: Battle): BattleStats {
 
   const basicAttack = b.basicAttack.bind(b);
   b.basicAttack = (f, kind) => {
-    const tag: Tag = { id: kind, side: f.side, hit: false, damaging: true };
+    const tag = newTag({ id: kind, side: f.side, hit: false, damaging: true });
     safe(() => { out.side[f.side].attacks++; src(out.side[f.side], kind).casts++; });
     under(tag, () => basicAttack(f, kind));
   };
@@ -149,7 +159,7 @@ export function trackStats(b: Battle): BattleStats {
   b.castTop = (f, held) => {
     const id = f.queue[0], before = f.queue.length;
     const card = id ? CARDS[id] : undefined;
-    const tag: Tag | null = id ? { id, side: f.side, hit: false, damaging: !!card?.damaging } : null;
+    const tag: Tag | null = id ? newTag({ id, side: f.side, hit: false, damaging: !!card?.damaging }) : null;
     under(tag, () => castTop(f, held));
     if (!tag || f.queue.length >= before) return;
     safe(() => {
@@ -165,14 +175,12 @@ export function trackStats(b: Battle): BattleStats {
   const later = b.later.bind(b);
   b.later = (delay, fn) => later(delay, carry(fn));
 
-  const blessTag = new Map<Panel, Tag>();
   const bless = b.bless.bind(b);
   b.bless = (col, row, kind) => {
     safe(() => { const p = b.panel(col, row); if (p && current) blessTag.set(p, current); });
     bless(col, row, kind);
   };
 
-  const curseTag = new Map<Panel, Tag>();
   const curse = b.curse.bind(b);
   b.curse = (side, col, row) => {
     safe(() => { const p = b.panel(col, row); if (p && current) curseTag.set(p, current); });
