@@ -284,7 +284,7 @@ export class TitleScene implements Scene {
       const x = scale > 1 ? UW / 2 + textWidth('TUTORIAL', scale) / 2 + 8 : UW / 2 + 40;
       drawText(ui, 'NEW!', x, MENU_Y + ITEMS.indexOf('TUTORIAL') * gap + Math.round((gap - 17) / 2), RED_INK);
     }
-    drawTextCentered(ui, DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2', UW / 2, versionY, '#7c7c7c', 1, false);
+    drawTextCentered(ui, `${DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2'}   -   DESIGNED BY WES   -   BUILT BY CLAUDE`, UW / 2, versionY, '#7c7c7c', 1, false);
     if (isMuted()) drawText(ui, 'MUTED', 8, 8, '#7c7c7c');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   M: MUTE`);
   }
