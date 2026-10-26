@@ -105,13 +105,13 @@
     ],
     "warrior:grunt": [
       "Hah!",
-      "/hjˈɑː!/",
-      "Hup!"
+      "Hup!",
+      "/hˈɑːh!/"
     ],
     "warrior:cast": [
-      "/hjˈɑː!/",
       "Take this!",
-      "/hˈɑːɑː!/"
+      "/hˈɑːɑː!/",
+      "/hˈɑːh!/"
     ],
     "warrior:castBig": [
       "For glory!",
@@ -204,7 +204,7 @@
     "ranger:grunt": [
       "Hup!",
       "Hah!",
-      "/hjˈɑː!/"
+      "/hˈɑːh!/"
     ],
     "ranger:cast": [
       "Loose!",
@@ -233,7 +233,7 @@
     ],
     "cleric:grunt": [
       "Hah!",
-      "/hjˈɑː!/"
+      "/hˈɑːh!/"
     ],
     "cleric:cast": [
       "Be blessed.",
