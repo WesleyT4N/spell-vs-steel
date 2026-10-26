@@ -59,7 +59,7 @@ export function bigButton(c: Ctx, id: string, label: string, x: number, y: numbe
     paper(c, fx, fy, fw, fh - 4 + sink, 3);
   }
   const ink = opts.disabled ? TRIM : wax ? PAPER : INK;
-  const s = opts.scale ?? (h >= 72 && textWidth(label, 3) < w - 24 ? 3 : textWidth(label, 2) < w - 12 ? 2 : 1);
+  const s = opts.scale ?? (h >= 72 && textWidth(label, 3) < w - 24 ? 3 : textWidth(label, 2) <= w - 8 ? 2 : 1);
   const th = 7 * s, subH = opts.sub ? 10 : 0;
   const ty = fy + Math.round((fh - 4 + sink - th - subH) / 2) + subH;
   if (opts.sub) drawTextCentered(c, opts.sub, x + w / 2, ty - 10, opts.disabled ? TRIM : wax ? PAPER2 : INK2, 1, false);
@@ -97,7 +97,9 @@ export const barTapped = (which: 'back' | 'primary' | 'mid'): boolean => mouse.c
 /** A row of tabs; each is zone `prefix:i`. */
 export function tabs(c: Ctx, prefix: string, labels: string[], sel: number, x: number, y: number, w: number, h = 48): void {
   const n = labels.length, gap = 4, tw = (w - gap * (n - 1)) / n;
-  labels.forEach((l, i) => bigButton(c, `${prefix}:${i}`, l, x + i * (tw + gap), y, tw, h, { primary: i === sel, scale: textWidth(l, 2) < tw - 10 ? 2 : 1 }));
+  // one text size for the whole row
+  const scale = labels.every(l => textWidth(l, 2) <= tw - 4) ? 2 : 1;
+  labels.forEach((l, i) => bigButton(c, `${prefix}:${i}`, l, x + i * (tw + gap), y, tw, h, { primary: i === sel, scale }));
 }
 
 /**

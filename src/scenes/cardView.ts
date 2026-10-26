@@ -49,18 +49,18 @@ function artBox(el: Element, w: number, h: number): HTMLCanvasElement {
 }
 
 /** Name, rarity, cost, damage and rules text in a column `w` pixels wide, in ink for a parchment window. Returns the y below it. */
-export function drawCardDetail(c: Ctx, card: CardDef, x: number, y: number, w: number): number {
-  const chars = Math.floor(w / 6);
+export function drawCardDetail(c: Ctx, card: CardDef, x: number, y: number, w: number, z = 1): number {
+  const chars = Math.floor(w / (6 * z));
   let yy = y;
-  const big = textWidth(card.name.toUpperCase(), 2) <= w;
-  if (big) { drawText(c, card.name.toUpperCase(), x, yy, INK, 2); yy += 18; }
-  else for (const line of wrap(card.name.toUpperCase(), chars)) { drawText(c, line, x, yy, INK); yy += 10; }
-  drawText(c, card.rarity.toUpperCase(), x, yy, ink(RARITY_COLOR[card.rarity]));
-  drawText(c, card.element.toUpperCase(), x + textWidth(card.rarity.toUpperCase()) + 12, yy, ink(ELEMENT_COLOR[card.element])); yy += 14;
-  drawText(c, `COST ${card.cost === 'all' ? 'ALL' : card.cost} ${resName(card)}`, x, yy, resInk(card)); yy += 11;
-  if (card.dmg !== '-') { drawText(c, `DAMAGE ${card.dmg.toUpperCase()}`, x, yy, RED_INK); yy += 11; }
-  yy += 6;
-  for (const line of wrap(card.short.toUpperCase(), chars)) { drawText(c, line, x, yy, INK); yy += 11; }
+  const big = textWidth(card.name.toUpperCase(), 2 * z) <= w;
+  if (big) { drawText(c, card.name.toUpperCase(), x, yy, INK, 2 * z); yy += 18 * z; }
+  else for (const line of wrap(card.name.toUpperCase(), chars)) { drawText(c, line, x, yy, INK, z); yy += 10 * z; }
+  drawText(c, card.rarity.toUpperCase(), x, yy, ink(RARITY_COLOR[card.rarity]), z);
+  drawText(c, card.element.toUpperCase(), x + textWidth(card.rarity.toUpperCase(), z) + 12 * z, yy, ink(ELEMENT_COLOR[card.element]), z); yy += 14 * z;
+  drawText(c, `COST ${card.cost === 'all' ? 'ALL' : card.cost} ${resName(card)}`, x, yy, resInk(card), z); yy += 11 * z;
+  if (card.dmg !== '-') { drawText(c, `DAMAGE ${card.dmg.toUpperCase()}`, x, yy, RED_INK, z); yy += 11 * z; }
+  yy += 6 * z;
+  for (const line of wrap(card.short.toUpperCase(), chars)) { drawText(c, line, x, yy, INK, z); yy += 11 * z; }
   return yy;
 }
 

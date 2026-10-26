@@ -1,8 +1,8 @@
-import { W, H, UW, UH, P, view, setView, screenRect, spread, MIN_ASPECT, PORTRAIT_MIN_ASPECT, TALL_MIN_ASPECT } from './engine/gfx';
+import { W, H, UW, UH, P, view, setView, viewSize, splitLift, screenRect, spread, MIN_ASPECT, PORTRAIT_MIN_ASPECT, TALL_MIN_ASPECT } from './engine/gfx';
 import { drawTextCentered } from './engine/font';
 import { initInput, endFrame, wasPressed, page } from './engine/input';
 import { toggleMute } from './engine/audio';
-import { setScene, getScene, commitZones, hotZone, noteTouch } from './scenes/scene';
+import { setScene, getScene, commitZones, hotZone, noteTouch, shiftZones } from './scenes/scene';
 import { TitleScene } from './scenes/title';
 import { OnlineScene } from './scenes/online';
 import { DEV_TOOLS } from './flags';
@@ -46,6 +46,8 @@ function fit(): void {
   // menus spread into the spare height in portrait, at most 1.5x and clear of the footer strip
   spread.portrait = portrait;
   spread.tall = tall;
+  // split screens keep the half-screen game size on top (see splitLift)
+  spread.halfH = tall ? viewSize(bw / (vh * 0.5), PORTRAIT_MIN_ASPECT).h : view.h;
   spread.k = portrait && !tall ? Math.max(1, Math.min(1.5, (view.h * 2 - 28) / UH)) : 1;
   const s = Math.max(0.5, Math.min(bw / view.w, bh / view.h));
   document.body.classList.toggle('svs-portrait', portrait);
@@ -107,7 +109,21 @@ function frame(now: number): void {
   ui.clearRect(0, 0, view.w * 2, view.h * 2);
   world.setTransform(1, 0, 0, 1, view.ox, view.oy);
   ui.setTransform(1, 0, 0, 1, view.ox * 2, view.oy * 2);
-  getScene()?.draw(world, tick, ui);
+  const scene = getScene();
+  if (spread.tall && scene?.split?.()) {
+    // the game draws in the top part as if the screen were that size; its zones move to full-screen coordinates
+    const lift = splitLift(), full = { h: view.h, oy: view.oy };
+    Object.assign(view, { h: spread.halfH, oy: full.oy - lift });
+    world.setTransform(1, 0, 0, 1, view.ox, view.oy);
+    ui.setTransform(1, 0, 0, 1, view.ox * 2, view.oy * 2);
+    shiftZones(-lift * 2);
+    scene.draw(world, tick, ui);
+    shiftZones(0);
+    Object.assign(view, full);
+    world.setTransform(1, 0, 0, 1, view.ox, view.oy);
+    ui.setTransform(1, 0, 0, 1, view.ox * 2, view.oy * 2);
+    scene.drawBelow?.(ui, tick);
+  } else scene?.draw(world, tick, ui);
   if (!engaged) {
     const [sx, , sw] = screenRect(2);
     P(ui, '#000000', sx, 128, sw, 30);

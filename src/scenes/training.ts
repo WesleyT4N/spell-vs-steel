@@ -250,6 +250,9 @@ export class TrainingScene extends BattleScene {
     });
   }
 
+  /** Training draws its own pause menu (its settings), over the fight. */
+  protected tallPause(): boolean { return false; }
+
   protected updatePause(dt: number): void {
     if (this.statsOpen) { this.updateStats(dt); return; }
     const rows = this.rows, n = rows.length;

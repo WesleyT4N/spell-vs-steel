@@ -2,7 +2,7 @@
 // button for menus, a text box for typing room codes, and tap-friendly wording for the hints.
 // Menus themselves take taps on the canvas (see the finger handling in input.ts).
 import { virtualKey, releaseVirtual, getKey, keyName, type Bindable } from './input';
-import { view } from './gfx';
+import { view, spread } from './gfx';
 
 /** What the current screen needs: nothing, a back button, or the fight pad (`fight-ready` lights DRAW). */
 export type PadMode = 'none' | 'back' | 'fight' | 'fight-ready';
@@ -34,16 +34,17 @@ body.svs-portrait { align-items: flex-start; }
 .svs-pad [hidden] { display: none !important; }
 .svs-pad > * { position: absolute; pointer-events: auto; touch-action: none; box-sizing: border-box; }
 .svs-pad .over { opacity: 0.55; }
-.svs-dpad > div { position: absolute; background: #3c3c3c; border: 3px solid #fcfcfc; box-sizing: border-box; }
-.svs-dpad > .on { background: #f8b800; }
-.svs-dpad > .mid { border: 0; background: #3c3c3c; }
-.svs-btn { border-radius: 50%; border: 3px solid #fcfcfc; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
+.svs-dpad > div { position: absolute; background: #8c6020; border: 3px solid #fce0a8; box-sizing: border-box; box-shadow: inset 0 -4px 0 #503000; }
+.svs-dpad > .on { background: #f8b800; box-shadow: none; }
+.svs-dpad > .mid { border: 0; background: #8c6020; box-shadow: none; }
+.svs-btn { border-radius: 50%; border: 3px solid #fce0a8; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; box-shadow: inset 0 -5px 0 rgba(0,0,0,0.35); }
 .svs-btn small { font-size: 10px; margin-top: 3px; letter-spacing: 1px; }
-.svs-btn.on { filter: brightness(1.6); transform: scale(0.94); }
-.svs-pill { border-radius: 14px; border: 3px solid #7c7c7c; background: #000; display: flex; align-items: center; justify-content: center; font-size: 12px; letter-spacing: 1px; }
-.svs-pill.ready { border-color: #f8b800; color: #f8b800; }
-.svs-pill.on { background: #0000a8; }
-.svs-pill.big { font-size: 18px; letter-spacing: 2px; border-radius: 22px; }
+.svs-btn.on { filter: brightness(1.4); transform: scale(0.94); box-shadow: none; }
+.svs-pill { border-radius: 4px; border: 3px solid #503000; outline: 1px solid #000; background: #f0c880; color: #503000; display: flex; align-items: center; justify-content: center; font-size: 12px; letter-spacing: 1px; box-shadow: inset 0 -3px 0 #d8a060; }
+.svs-pill.ready { background: #a81000; color: #fce0a8; box-shadow: inset 0 -3px 0 #6c0800; }
+.svs-pill.on { filter: brightness(0.85); box-shadow: none; }
+.svs-pill.big { font-size: 18px; letter-spacing: 2px; }
+.svs-pill.big:not(.ready) { background: #503000; color: #ac7c00; border-color: #8c6020; box-shadow: none; }
 .svs-code { opacity: 0.01; font-size: 16px; border: 0; padding: 0; color: transparent; background: transparent; caret-color: transparent; }
 `;
 
@@ -129,9 +130,9 @@ function roundButton(code: string, bg: string): { e: HTMLDivElement; key: HTMLSp
   holdButton(e, code);
   return { e, key };
 }
-const attack = roundButton('PadAttack', '#a80020');
+const attack = roundButton('PadAttack', '#a81000');
 el('small', '', attack.e).textContent = 'ATTACK';
-const cast = roundButton('PadCast', '#0058f8');
+const cast = roundButton('PadCast', '#0028a8');
 el('small', '', cast.e).textContent = 'CAST';
 const pill = (code: string, label: string): HTMLDivElement => {
   const e = el('div', 'svs-pill', root);
@@ -210,10 +211,13 @@ export function layout(canvas = canvasEl): void {
   canvasEl = canvas;
   document.documentElement.classList.toggle('svs-touch', active);
   if (!canvas) return;
-  const screen = canvas.getBoundingClientRect();
+  const full = canvas.getBoundingClientRect();
+  // a full-height phone screen keeps the game in its top part (as tall as the half-screen layout) and the pad below it
+  const screen = spread.tall ? new DOMRect(full.left, full.top, full.width, full.height * spread.halfH / view.h) : full;
+  const oy = spread.tall ? (spread.halfH - 160) / 2 : view.oy;
   // the game itself, centered on a screen that may show extra stage around it; buttons keep off it
   const k = screen.width / view.w;
-  const r = new DOMRect(screen.left + view.ox * k, screen.top + view.oy * k, screen.width - 2 * view.ox * k, screen.height - 2 * view.oy * k);
+  const r = new DOMRect(screen.left + view.ox * k, screen.top + oy * k, screen.width - 2 * view.ox * k, screen.height - 2 * oy * k);
   const [vw, vh] = viewport();
   let size: number, cy: number, dx: number, ax: number;
   if (vh > vw) {
