@@ -13,6 +13,7 @@ import { trackStats, statsRollbackRoots } from '../src/game/stats';
 import { Rollback } from '../src/net/rollback';
 import { saveBattle, loadBattle } from '../src/net/snapshot';
 import type { NetInput } from '../src/net/protocol';
+import { recordRound, TapeWriter, type RoundTape } from '../src/game/replay';
 
 const N = Number(process.argv[2] ?? 25);
 const MAX_LAT = Number(process.argv[3] ?? 14);
@@ -30,6 +31,8 @@ for (let m = 0; m < N; m++) {
 
   // 1. the reference battle, straight through; CPUs make the inputs and picks
   const x = make(), xs = trackStats(x);
+  let xTape: RoundTape | null = null;
+  recordRound(x, t => { xTape = t; });
   const cpus = [new Cpu('normal'), new Cpu('normal')];
   const rng = seeded(seed * 13);
   const ins: Array<[NetInput, NetInput]> = [];
@@ -59,13 +62,16 @@ for (let m = 0; m < N; m++) {
       local: f => f < rb.frame + DELAY + 1 && f < ins.length ? ins[f][me] : null,
       remote: f => f < remoteKnown && f < ins.length ? ins[f][1 - me] : null,
     }, statsRollbackRoots(ys), (f, h) => { if (h !== hashes[f] && !bad) bad = `checksum differs at frame ${f}`; });
+    const w = new TapeWriter(y);
+    rb.onConfirmed = (kind, i) => { if (kind === 'draw') w.beginCustom(); else w.update(i); };
     let ticks = 0, spike = 0;
-    while (y.phase !== 'over' && rb.confirmed < ins.length && ticks < 60 * 600 && !bad) {
+    while (!(y.phase === 'over' && rb.settled) && rb.confirmed < ins.length && ticks < 60 * 600 && !bad) {
       ticks++;
       if (y.phase === 'custom') {
         if (!rb.settled) { bad = 'Draw screen on a guessed frame'; break; }
         const p = picks[y.turn];
         if (!p) { bad = `Draw screen ${y.turn} never opened in the reference`; break; }
+        w.endCustom([p[0].slice(), p[1].slice()]);
         y.endCustom([p[0].slice(), p[1].slice()]);
         rb.resave();
         // the other side sat on the Draw screen too: its inputs come in fresh
@@ -83,6 +89,7 @@ for (let m = 0; m < N; m++) {
     if (!bad && battleHash(y) !== hashes[hashes.length - 1]) bad = 'final state differs';
     if (!bad && y.winner !== x.winner) bad = 'different winner';
     if (!bad && JSON.stringify(ys) !== JSON.stringify(xs)) bad = 'post-match stats differ';
+    if (!bad && xTape && JSON.stringify({ ...w.finish(), hash: 0 }) !== JSON.stringify({ ...(xTape as RoundTape), hash: 0 })) { const a = w.finish(), c = xTape as RoundTape; bad = `replay tape differs: n ${a.n}/${c.n} ev ${JSON.stringify(a.events.slice(0,4))} vs ${JSON.stringify(c.events.slice(0,4))} fr ${a.frames.length}/${c.frames.length} hash ${a.hash === c.hash}`; }
     totalRb += rb.rollbacks;
     worstRb = Math.max(worstRb, rb.maxRollback);
     if (bad) { failures++; console.log(`match ${m} side ${me}: ${ca} (${da.name}) vs ${cb} (${db.name}): ${bad}`); }
