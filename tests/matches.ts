@@ -3,7 +3,7 @@
 // Each frame checks invariants that should never break whatever the balance is (HP and resources in range,
 // fighters on the grid and apart, nothing piling up), and each match must end in a KO within the time limit.
 // Usage: npx tsx tests/matches.ts [--quick] [--rounds 3] [--only warrior,mage] [--seed 123]
-import { Battle, COLS, ROWS, type Fighter } from '../src/game/battle';
+import { Battle, COLS, ROWS, NO_INTENT, type Fighter } from '../src/game/battle';
 import { Cpu } from '../src/game/ai';
 import { presetsFor, toList, validate, type DeckCounts } from '../src/game/deck';
 import { battleHash } from '../src/net/hash';
@@ -82,7 +82,8 @@ function play(c: Case): { b: Battle; hashes: number[] } | null {
       if (frame * DT > LIMIT) { fail(c, `no KO after ${LIMIT}s (HP ${Math.round(b.f[0].hp)}/${Math.round(b.f[1].hp)}, turn ${b.turn})`); return null; }
     }
     const w = b.winner;
-    if (w === null) { fail(c, 'match ended with no winner'); return null; }
+    // a double K.O. is a drawn round: both fighters down on the same frame
+    if (w === null) { if (!b.f.every(f => f.dead && f.hp <= 0)) { fail(c, 'match ended with no winner'); return null; } return { b, hashes }; }
     if (b.f[1 - w].hp > 0) { fail(c, `side ${w} won but the loser has ${b.f[1 - w].hp} HP`); return null; }
     if (b.f[w].hp <= 0) { fail(c, `side ${w} won with ${b.f[w].hp} HP`); return null; }
     if (b.turn < 1) { fail(c, 'the Draw screen never opened'); return null; }
@@ -108,6 +109,22 @@ for (let r = 0; r < rounds; r++) {
   for (const a of classes) for (const p of presetsFor(a).slice(1)) for (const bc of classes) {
     cases.push({ a: { cls: a, deck: p.cards, label: p.id }, b: starter(bc), cpu: ['normal', 'normal'], seed: next() });
   }
+}
+
+// a double K.O. (both fighters down on the same frame) is a drawn round, and a lone K.O. still has a winner
+{
+  const ko = (both: boolean): Battle => {
+    const b = new Battle({ cls: 'warrior', deck: toList(starter('warrior').deck), name: 'A' }, { cls: 'mage', deck: toList(starter('mage').deck), name: 'B' }, 99);
+    b.endCustom([[], []]);
+    b.f[1].hp = 0;
+    if (both) b.f[0].hp = 0;
+    b.update(DT, [NO_INTENT, NO_INTENT]);
+    for (let i = 0; i < 300 && b.phase !== 'over'; i++) b.update(DT, [NO_INTENT, NO_INTENT]);
+    return b;
+  };
+  const d = ko(true), one = ko(false);
+  if (d.phase !== 'over' || d.winner !== null || !d.f.every(f => f.dead)) { failures++; console.log(`FAIL double K.O.: phase ${d.phase}, winner ${d.winner}`); }
+  if (one.phase !== 'over' || one.winner !== 0 || one.f[0].dead) { failures++; console.log(`FAIL single K.O.: phase ${one.phase}, winner ${one.winner}`); }
 }
 
 const t0 = Date.now();
