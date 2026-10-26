@@ -2,7 +2,7 @@
 // button for menus, a text box for typing room codes, and tap-friendly wording for the hints.
 // Menus themselves take taps on the canvas (see the finger handling in input.ts).
 import { virtualKey, releaseVirtual, getKey, keyName, type Bindable } from './input';
-import { UW, UH } from './gfx';
+import { view } from './gfx';
 
 /** What the current screen needs: nothing, a back button, or the fight pad (`fight-ready` lights DRAW). */
 export type PadMode = 'none' | 'back' | 'fight' | 'fight-ready';
@@ -188,8 +188,6 @@ const place = (e: HTMLElement, x: number, y: number, w: number, h: number, canva
   e.classList.toggle('over', over);
 };
 
-/** Room the pad wants beside the screen in landscape, so the canvas can shrink a little to make space. */
-export function padSide(vh: number): number { return Math.min(160, vh * 0.38) * 0.8; }
 
 /** Visible screen size. Phones can grow the layout viewport past the screen when anything overflows, so trust the visual one. */
 export function viewport(): [number, number] {
@@ -202,18 +200,21 @@ export function layout(canvas = canvasEl): void {
   canvasEl = canvas;
   document.documentElement.classList.toggle('svs-touch', active);
   if (!canvas) return;
-  const r = canvas.getBoundingClientRect();
+  const screen = canvas.getBoundingClientRect();
+  // the game itself, centered on a screen that may show extra stage around it; buttons keep off it
+  const k = screen.width / view.w;
+  const r = new DOMRect(screen.left + view.ox * k, screen.top + view.oy * k, screen.width - 2 * view.ox * k, screen.height - 2 * view.oy * k);
   const [vw, vh] = viewport();
   let size: number, cy: number, dx: number, ax: number;
   if (vh > vw) {
     // portrait: the screen sits on top, the pad underneath like a handheld
-    const below = vh - r.bottom;
+    const below = vh - screen.bottom;
     size = Math.min(180, vw * 0.42, below * 0.62);
-    cy = r.bottom + below * 0.5;
+    cy = screen.bottom + below * 0.5;
     dx = 14 + size / 2;
     ax = vw - 14 - size / 2;
-    place(pause, vw / 2 - 36, r.bottom + 14, 72, 28, r);
-    place(back, 12, r.bottom + 10, 92, 32, r);
+    place(pause, vw / 2 - 36, screen.bottom + 14, 72, 28, r);
+    place(back, 12, screen.bottom + 10, 92, 32, r);
     place(draw, ax - size * 0.5, cy - size / 2 - 60, size, 46, r);
   } else {
     // landscape: thumbs on either side of the screen
@@ -244,9 +245,9 @@ export function layout(canvas = canvasEl): void {
     (b.e.lastElementChild as HTMLElement).style.fontSize = `${Math.min(10, Math.round(d * 0.11))}px`;
   }
   if (codeRect) {
-    const sx = r.width / UW, sy = r.height / UH;
+    const u = k / 2; // CSS pixels per UI pixel
     const [x, y, w, h] = codeRect;
-    code.style.cssText = `left:${r.left + x * sx}px;top:${r.top + y * sy}px;width:${w * sx}px;height:${h * sy}px`;
+    code.style.cssText = `left:${r.left + x * u}px;top:${r.top + y * u}px;width:${w * u}px;height:${h * u}px`;
   }
 }
 

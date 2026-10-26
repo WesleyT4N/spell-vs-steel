@@ -1,6 +1,7 @@
 import { hint, zone, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
-import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
+import { drawStage } from '../art/arena';
+import { P, UW, frame, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, BINDABLE, getKey, setKey, resetKeys, keyName, k, captureNextKey, RESERVED, mouse, type Bindable } from '../engine/input';
 import { sfx } from '../engine/audio';
@@ -47,9 +48,9 @@ export class ControlsScene implements Scene {
   private flash(s: string): void { this.msg = s; this.msgT = 2; }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    getArena().draw(c, tick, 0);
+    drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(0,0,24,0.6)';
-    c.fillRect(0, 0, W, H);
+    c.fillRect(...screenRect());
     frame(ui, PX - 16, 14, PW + 32, 286, '#000000', '#fcfcfc');
     drawTextCentered(ui, 'KEY MAPPING', UW / 2, 26, '#f8b800', 2, false);
     ROWS.forEach((row, i) => {

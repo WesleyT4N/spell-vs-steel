@@ -1,6 +1,6 @@
 // Scene switching, mouse hit zones and small UI widgets shared by the menus.
 import type { Ctx } from '../engine/gfx';
-import { P, UW, UH, frame } from '../engine/gfx';
+import { P, UW, UH, frame, screenRect, view } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { mouse } from '../engine/input';
 import { touchActive, touchText, type PadMode } from '../engine/touch';
@@ -69,7 +69,7 @@ export function listMouse(prefix: string, sel: number, onHover: (i: number) => v
 /** Darken the whole layer (for overlays). */
 export function dim(c: Ctx, a = 0.6): void {
   c.fillStyle = `rgba(0,0,0,${a})`;
-  c.fillRect(0, 0, c.canvas.width, c.canvas.height);
+  c.fillRect(...screenRect(c.canvas.width / view.w));
 }
 
 /** A vertical menu on the UI layer; each row is a clickable `menu:i` zone. */
@@ -92,7 +92,8 @@ export function drawMenu(c: Ctx, items: string[], sel: number, cx: number, y: nu
 
 /** Footer line of control hints on the UI layer. */
 export function hint(c: Ctx, s: string): void {
-  P(c, '#000000', 0, UH - 14, UW, 14);
+  const [x, , w, h] = screenRect(2);
+  P(c, '#000000', x, UH - 14, w, 14 + (h - UH) / 2);
   drawTextCentered(c, touchText(s), UW / 2, UH - 11, '#bcbcbc', 1, false);
 }
 

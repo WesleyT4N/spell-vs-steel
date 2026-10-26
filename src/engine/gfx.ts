@@ -6,6 +6,32 @@ export const H = 160;
 export const UW = W * 2;
 export const UH = H * 2;
 
+/**
+ * The visible screen in world pixels. Screens wider or taller than 3:2 show more than W×H: the game
+ * keeps drawing in W×H coordinates, centered at (ox, oy), and full-screen backgrounds reach into the margins.
+ */
+export const view = { w: W, h: H, ox: 0, oy: 0 };
+/** Narrowest and widest screen shapes; past these the window letterboxes. */
+export const MIN_ASPECT = 4 / 3, MAX_ASPECT = 7 / 3;
+/** Size the view for a window shape. Returns true when it changed. */
+export function setView(aspect: number): boolean {
+  const a = Math.min(MAX_ASPECT, Math.max(MIN_ASPECT, aspect));
+  // margins stay whole world pixels on both sides, so the content never lands between pixels
+  const w = a >= W / H ? W + 2 * Math.round((H * a - W) / 2) : W;
+  const h = a >= W / H ? H : H + 2 * Math.round((W / a - H) / 2);
+  if (w === view.w && h === view.h) return false;
+  Object.assign(view, { w, h, ox: (w - W) / 2, oy: (h - H) / 2 });
+  return true;
+}
+/** The whole visible screen as [x, y, w, h] in layer coordinates (`s` = 2 for the UI layer). */
+export const screenRect = (s = 1): [number, number, number, number] => [-view.ox * s, -view.oy * s, view.w * s, view.h * s];
+/** Fill the whole visible screen, margins included. */
+export function fillScreen(c: Ctx, color: string, s = 1): void {
+  const [x, y, w, h] = screenRect(s);
+  c.fillStyle = color;
+  c.fillRect(x, y, w, h);
+}
+
 export const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 
 export type Ctx = CanvasRenderingContext2D;

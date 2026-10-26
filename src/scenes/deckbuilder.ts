@@ -1,8 +1,9 @@
 // Grimoire builder: 30 spells, 4/2/1 copy limits, max 5 Legendaries, exactly 1 Mythic. Autosaves to the browser.
 import { hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
+import { drawStage } from '../art/arena';
 import { teamColor, type ClassId } from '../art/sprites';
-import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
+import { P, UW, frame, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, wrap } from '../engine/font';
 import { wasPressed, navPressed, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
@@ -125,9 +126,9 @@ export class DeckBuilderScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    getArena().draw(c, tick, 0);
+    drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(0,0,24,0.75)';
-    c.fillRect(0, 0, W, H);
+    c.fillRect(...screenRect());
 
     // header: class tabs, counts, done
     frame(ui, 8, 6, UW - 16, 38, '#000000', teamColor(this.cls, loadMatch().p1Skin[this.cls], false));
