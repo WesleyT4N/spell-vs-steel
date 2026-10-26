@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at 36deaa9 (2026-10-26).
+How the game is put together, one section per system. Describes `main` at 0915c83 (2026-10-26).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -104,7 +104,7 @@ Delay-based lockstep: both machines run the same seeded Battle and only trade co
 
 ```mermaid
 flowchart LR
-  read["Read input<br/>playerIntent + Draw"] --> sched["Schedule at frame + delay<br/>delay = RTT/2 + 2 (2..15)"]
+  read["Read input<br/>playerIntent + Draw"] --> sched["Schedule at frame + delay<br/>delay = RTT/2 + 2 (2..15),<br/>retuned from jitter while playing"]
   sched --> send["Send packet every frame<br/>unacked inputs, picks, ready, hash, ack"]
   send --> tr{{"Transport<br/>room / peer / local"}}
   tr --> recv["Receive<br/>store by frame, track contiguous, RTT"]
@@ -116,15 +116,18 @@ flowchart LR
 
 | File | Job |
 | --- | --- |
-| `net/session.ts` | `NetSession`: handshake, readiness, input buffers, RTT, delay, desync flag |
-| `net/protocol.ts` | `Packet`, `PROTOCOL = 3`, 10-bit input packing (2 chars per frame), room codes |
+| `net/session.ts` | `NetSession`: handshake, readiness, input buffers, RTT, delay, status (waiting / connected / reconnecting / lost), desync flag |
+| `net/lockstep.ts` | `Lockstep`: one online round, scheduling, stalls, Draw screen in step, checksums, delay retuning. No screen, so the online scene and the soak test run the same code |
+| `net/protocol.ts` | `Packet`, `PROTOCOL = 4`, 10-bit input packing (2 chars per frame), room codes |
 | `net/transport.ts` | `room` (claude.ai artifact presence), `peer` (WebRTC via PeerJS), `local` (BroadcastChannel, fake lag) |
 | `net/hash.ts` | `battleHash(b)`, FNV-1a over everything the rules read |
 | `scenes/online.ts`, `scenes/onlineBattle.ts` | Lobby and the lockstep-driven Versus scene |
 
 - Every packet is the sender's whole current state, never a one-off event, so drops and merges lose nothing (this is what lets it ride on room presence, which keeps only the latest value).
 - Draw picks travel in `packet.picks`; there is no pause online. Each round reseeds as `seed + r × 0x9e3779b9`.
-- Bump `PROTOCOL` whenever rules or packets change. 6 s of silence ends the match.
+- Bump `PROTOCOL` whenever rules or packets change.
+- Silence: after 1.5 s the screen says RECONNECTING and holds; after 30 s the match counts as dropped. A backgrounded tab sends `away` and only pings, so the rival waits longer instead of timing out.
+- `npm run netsoak` plays whole headless online matches over a fake bad network (lag, jitter, loss, duplicates, outages, latest-value-only delivery, hitches, background tabs) and compares every checksum.
 - Rollback (in progress): predict the rival's input, snapshot every frame, rewind and replay on a late input.
 
 ### Online services
@@ -180,7 +183,7 @@ flowchart LR
 | Ranger | 740 | 8 / 20 | Energy | Starts 2, +1 per Draw, grows standing still | `cardsRanger.ts` |
 | Priest | 700 | 6 / 28 | Mana | Starts 3, +3 per Draw (cap 5) | `cardsPriest.ts` |
 
-`tuning.ts` is the source of truth for numbers. Each class has 26 cards, a starter deck and 3 Mythic decks (`game/deck.ts`). Deck rules: exactly 30, 4 / 2 / 1 copies by rarity, max 5 Legendaries, exactly 1 Mythic. Custom decks save per class (`svs:deck:<class>`); `game/grimoireYaml.ts` imports and exports YAML.
+`tuning.ts` is the source of truth for numbers. Each class has 26 cards, a starter deck and 3 Mythic decks (`game/deck.ts`). Deck rules: exactly 30, 4 / 2 / 1 copies by rarity, max 5 Legendaries, exactly 1 Mythic. Custom decks save per class in `save.json`; `game/grimoireYaml.ts` imports and exports YAML.
 
 Adding a class today touches: `art/sprites.ts` (+ generated sprites and frames), `game/classes.ts`, a `tuning.ts` block, a `cardsX.ts` merged into `CARDS`, resource rules in `battle.ts`, decks in `deck.ts`, `game/fighterAnim.ts`, voice lines, and tutorial lessons (every new character gets tutorial support). The modularize pass will gather these into `src/content/classes/<id>/`.
 
@@ -245,7 +248,7 @@ flowchart LR
   mbus --> master["master (M mutes)"]
 ```
 
-The Battle calls `sfx()`, `sfxFx()` and `voiceLine()` directly; sounds never feed back into rules. `withoutSfx()` silences previews and sims. Volumes save in `svs:audio`, mute in `svs:muted`.
+The Battle calls `sfx()`, `sfxFx()` and `voiceLine()` directly; sounds never feed back into rules. `withoutSfx()` silences previews and sims. Volume and mute live in `save.json`.
 
 ## UI and screens
 
@@ -267,7 +270,7 @@ flowchart LR
 
 - `OnlineBattleScene` and `TrainingScene` extend `BattleScene`; `TutorialScene` drives one. Card previews run their own tiny muted Battle.
 - Menus are mouse-first: scenes register click zones while drawing (`zone(...)`), the next update reads `hotZone()`. Combat is keyboard or the touch pad (`engine/touch.ts`).
-- Saved in the browser: `svs:match`, `svs:deck:<class>`, key bindings, `svs:audio`, `svs:muted`, `svs:training`, `svs:tutorial`, `svs:arcade`, `svs:replays`, `svs:rating`, `svs:ranked-pending`. The save-module thread is moving all of these into one versioned save.
+- Everything kept between sessions goes through the save module (see Saves).
 
 ## CPU AI and styles
 
@@ -277,8 +280,18 @@ flowchart LR
 | --- | --- | --- | --- | --- |
 | Easy | 0.6 s | 0.55 | 0 | 3 s |
 | Normal | 0.22 s | 0.9 | 0.85 | 1.5 s |
+| Hard | 0.12 s | 1 | 1 | 0.4 s |
 
-PR #29 adds per-class styles (aggro, conservative, defensive), a Hard level that counter-picks, and ties difficulty to styles.
+Each class has 3 playstyles (aggro, conservative, defensive) in `game/playstyles.ts`, played at half strength. Difficulty sets both execution and which style shows up:
+
+```mermaid
+flowchart LR
+  e[Easy] --> ea[Class aggro style]
+  n[Normal] --> nr[Random of the 3]
+  h[Hard] --> hc["Counter-pick<br/>COUNTER table vs your class"]
+```
+
+Hard also holds heavies (not Ranger or Rogue) and sidesteps out of the row when it can't hit back.
 
 ## Balance tooling
 
@@ -287,11 +300,44 @@ PR #29 adds per-class styles (aggro, conservative, defensive), a Hard level that
 | Tool | Run | Gives |
 | --- | --- | --- |
 | Sim CLI | `npm run sim -- 100 --cards` | All class pairs with starters, per-card table |
-| Balance lab | dev build, `#lab` | The same in the browser, class matrix, live `TUNING` and card % edits |
+| Balance lab | dev build, `#lab` | The same in the browser: full grid on web workers, live `TUNING`, script box (`hp.mage = 700`, `card.power = 110%`) |
 | Sandbox | `#sandbox` | Cast anything, dummies, can't-die, slow time, frame step, hit log |
 | Encyclopedia | `#cards` | Every card face with filters |
+| Grid CLI | `npm run balance -- --pools starter,archetype --n 40` | Full matchup grid on worker threads (~750 matches/s), `--set` / `--script` tweaks |
+| Sweep | `npx tsx scripts/sweep.ts --out dir` | Every class pair at every CPU level over shipped decks, styles, starters and random decks |
+| Tuner | `npx tsx scripts/tune.ts --out dir` | Searches small HP / attack / power tweaks that put every wheel matchup in the target band |
 
-PR #29 adds `npm run balance` (worker-thread grid, ~750 matches/s), a script box, deck pools and CPU styles. Reports: project files `balance/2026-10-26/`.
+```mermaid
+flowchart LR
+  script["Balance script<br/>dev/script.ts"] --> pool["SimPool<br/>worker threads"]
+  decks["Deck pools<br/>dev/archetypes.ts"] --> pool
+  pool --> runMatch["runMatch x N<br/>two Cpus, 60 Hz"] --> lib["balancelib.ts<br/>class rates, band, loss"]
+  lib --> grid[Grid report]
+  lib --> tune["tune.ts<br/>least-squares step, recheck"]
+```
+
+Reports live in project files under `balance/`.
+
+## Saves
+
+One module, `engine/save.ts`, on top of the platform's file storage (`platform/storage.ts`). Nothing else touches `localStorage`. Full detail: [SAVES.md](SAVES.md).
+
+```mermaid
+flowchart LR
+  callers["input, audio, deck, match, arcade,<br/>training, tutorial, replay, net/rating"] -->|getSave / updateSave| S["save.ts<br/>in-memory SaveData"]
+  S -->|read once at boot<br/>flush at end of tick| P[PlatformStorage]
+  P --> web["webStorage<br/>localStorage svs:file:NAME"]
+  P -.later.-> native[Steam / Capacitor files]
+```
+
+| File | Holds |
+| --- | --- |
+| `save.json` | keys, P2 keys, pads, audio, mute, decks, last match, training, tutorial done, arcade, rating, pending ranked result, lab script |
+| `replays.json` | 20 recent + up to 20 starred replays, about 3 MB budget |
+
+- Each file is `{game, v, data}`. Changing the shape means bumping `SAVE_VERSION` and adding `MIGRATIONS[n]`; never edit a shipped one.
+- First load imports the 14 old `svs:*` keys and deletes them once the new file reads back. A corrupt file is kept as `save.json.bad`; a save from a newer build is read-only.
+- Native builds `await initSave(storage)` before the game starts; the browser loads on first use.
 
 ## Build and publish
 
@@ -316,7 +362,7 @@ Release: PR → Wes says "lgtm" → merge → rebuild from latest main → publi
 ```mermaid
 flowchart LR
   pr[Pull request] --> a["Job 1<br/>typecheck, dev build, prod build"]
-  a --> m["tests/matches.ts<br/>CPU vs CPU, every class pair"]
+  a --> sv["tests/saves.ts<br/>migrations, legacy import"] --> m["tests/matches.ts<br/>CPU vs CPU, every class pair"]
   m --> n["netcheck 25<br/>online determinism"]
   n --> c[combocheck]
   pr --> b["Job 2: screens<br/>Playwright, every screen at 7 shapes"]
@@ -326,12 +372,14 @@ flowchart LR
 | Command | Where | Fails on |
 | --- | --- | --- |
 | `npm run typecheck` | CI | Type errors, unused locals |
+| `npx tsx tests/saves.ts` | CI | Save migrations, legacy import, caps |
 | `npx tsx tests/matches.ts` | CI | Crashes, stuck or broken full matches |
 | `npm run netcheck` | CI | Two seeded battles with the same inputs drifting apart |
 | `npm run combocheck` | CI | Combo counter counting escapable hits |
 | `tests/screens/run.ts` | CI | Screens changing vs the base branch (report, not a hard fail) |
 | `npm run replaycheck`, `npm run rankedcheck` | By hand | Replays not reproducing, ranked flow broken |
 | `npm run fuzz`, `npm run fuzz:ui` | By hand | Random inputs crashing the sim or the menus |
+| `npm run netsoak` | By hand | Desyncs or hangs over a fake bad network |
 | `npm run perf` | By hand | Frame time regressions |
 | `npm run sim` | By hand | Surprising win rates |
 
@@ -342,5 +390,5 @@ New screens go in `tests/screens/harness.ts`.
 
 - Modularize (#35): `src/content/registry.ts` and `src/content/stages/`, plus `npm run golden`; class folders follow.
 - Rollback netcode (#44): snapshot restore in place, prediction, rewind and replay.
-- Engine primitives: scene stack and seeded CPU (#50), gamepads and platform layer (#49), one versioned save module (#48).
-- Touch UI (#51), balance tooling and CPU styles (#29), BN indicators (#32), hit feel (#34), soundtrack.
+- Engine primitives: scene stack and seeded CPU (#50), gamepads and platform layer (#49).
+- Touch UI (#51), BN indicators (#32), hit feel (#34), soundtrack, card pass on the outliers the balance sweep found.
