@@ -7,12 +7,13 @@ import { loadMatch } from '../game/match';
 import { battleHash } from '../net/hash';
 import { NO_INPUT, type NetInput } from '../net/protocol';
 import type { NetSession } from '../net/session';
-import { P, UW, type Ctx } from '../engine/gfx';
+import { UW, type Ctx } from '../engine/gfx';
 import { drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { RESULT_SONG } from '../engine/music';
 import { listMouse } from './scene';
+import { win, RED_INK } from './skin';
 
 const STEP = 1 / 60;
 
@@ -170,17 +171,17 @@ export class OnlineBattleScene extends BattleScene {
     if (b.phase === 'fight') drawTextOutlined(ui, ping, Math.round(UW / 2 - textWidth(ping) / 2), 48, '#bcbcbc');
     if (net.desync) drawTextCentered(ui, 'DESYNC: THE TWO GAMES DISAGREE', UW / 2, 270, '#f83800', 1);
     if (b.phase === 'custom' && this.locked) {
-      P(ui, '#000000', 300, 152, 116, 28);
-      drawTextCentered(ui, tick % 8 < 6 ? 'WAITING FOR' : '', 358, 157, '#f8b800', 1, false);
-      drawTextCentered(ui, 'RIVAL...', 358, 168, '#f8b800', 1, false);
+      win(ui, 300, 150, 116, 30, { burn: 3 });
+      drawTextCentered(ui, tick % 8 < 6 ? 'WAITING FOR' : '', 358, 157, RED_INK, 1, false);
+      drawTextCentered(ui, 'RIVAL...', 358, 168, RED_INK, 1, false);
     }
     if ((b.phase === 'fight' || b.phase === 'ko') && this.stall > 20) {
-      P(ui, '#000000', UW / 2 - 90, 140, 180, 18);
-      drawTextCentered(ui, 'WAITING FOR RIVAL...', UW / 2, 146, '#f8b800', 1, false);
+      win(ui, UW / 2 - 90, 139, 180, 20, { burn: 3 });
+      drawTextCentered(ui, 'WAITING FOR RIVAL...', UW / 2, 146, RED_INK, 1, false);
     }
     if (b.phase === 'over' && this.waitingNext) {
-      P(ui, '#000000', UW / 2 - 100, 220, 200, 18);
-      drawTextCentered(ui, 'WAITING FOR RIVAL...', UW / 2, 226, '#f8b800', 1, false);
+      win(ui, UW / 2 - 100, 219, 200, 20, { burn: 3 });
+      drawTextCentered(ui, 'WAITING FOR RIVAL...', UW / 2, 226, RED_INK, 1, false);
     }
     if (net.status === 'lost' || net.status === 'left' || net.status === 'error') {
       dim(ui, 0.7);

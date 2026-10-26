@@ -7,7 +7,7 @@ import { CARDS } from '../game/cards';
 import { CLASS_INFO } from '../game/classes';
 import { TUNING } from '../game/tuning';
 import type { MatchConfig } from '../game/match';
-import { P, UW, frame, type Ctx } from '../engine/gfx';
+import { UW, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { touchActive } from '../engine/touch';
@@ -15,6 +15,7 @@ import { sfx, stopMusic } from '../engine/audio';
 import { BattleScene } from './battle';
 import { CharSelectScene } from './select';
 import { TitleScene } from './title';
+import { win, selRow, banner, PAPER, INK, INK2, RED_INK, TRIM } from './skin';
 
 type DummyAct = 'stand' | 'move' | 'dodge' | 'attack' | 'easy' | 'normal';
 type HpMode = 'refill' | 'normal';
@@ -295,35 +296,35 @@ export class TrainingScene extends BattleScene {
   /** Fighting-game damage readout, under the Draw gauge. */
   private drawReadout(ui: Ctx, tick: number): void {
     const w = 208, x = Math.round(UW / 2 - w / 2), y = 34;
-    frame(ui, x, y, w, 26, 'rgba(0,0,0,0.75)', '#7c7c7c');
+    win(ui, x, y, w, 26, { burn: 3 });
     const recent = this.b.time - this.lastDmgT <= COMBO_GAP;
-    drawText(ui, `LAST HIT ${Math.round(this.lastDmg)}`, x + 6, y + 5, '#fcfcfc');
+    drawText(ui, `LAST HIT ${Math.round(this.lastDmg)}`, x + 7, y + 6, INK);
     const combo = `COMBO ${Math.round(this.combo)}${this.hits > 1 ? ` (${this.hits} HITS)` : ''}`;
-    drawText(ui, combo, x + w - 6 - textWidth(combo), y + 5, recent && tick % 4 < 3 ? '#f8b800' : '#fcfcfc');
-    drawText(ui, `BEST ${Math.round(this.best)}`, x + 6, y + 15, '#bcbcbc');
+    drawText(ui, combo, x + w - 7 - textWidth(combo), y + 6, recent && tick % 4 < 3 ? RED_INK : INK);
+    drawText(ui, `BEST ${Math.round(this.best)}`, x + 7, y + 15, INK2);
     const keys = touchActive() ? 'PAUSE: MENU' : `R: RESET  ${k('pause')}: MENU`;
-    drawText(ui, keys, x + w - 6 - textWidth(keys), y + 15, '#7c7c7c');
+    drawText(ui, keys, x + w - 7 - textWidth(keys), y + 15, TRIM);
   }
 
   private drawMenu(ui: Ctx, tick: number): void {
     dim(ui, 0.6);
     const rows = this.rows, x = 92, w = UW - 184, rh = 17, y0 = 46;
-    drawTextCentered(ui, 'TRAINING', UW / 2, 20, '#f8b800', 2);
-    frame(ui, x, y0 - 6, w, rows.length * rh + 10, '#000000', '#fcfcfc');
+    banner(ui, 'TRAINING', UW / 2, 8);
+    win(ui, x, y0 - 8, w, rows.length * rh + 14);
     rows.forEach((r, i) => {
       // a gap between the settings and the actions below them
       const yy = y0 + i * rh + (i >= 8 ? 4 : 0), on = i === this.menuSel && showSel();
       zone(`trow:${i}`, x + 2, yy - 3, w - 4, rh - 1);
-      if (on) P(ui, '#0000a8', x + 2, yy - 3, w - 4, rh - 2);
-      drawText(ui, r.label, x + 14, yy + 2, on ? '#fcfcfc' : '#bcbcbc');
-      if (on && tick % 8 < 6) drawText(ui, '→', x + 4, yy + 2, '#f8b800');
+      if (on) selRow(ui, x + 4, yy - 3, w - 8, rh - 2);
+      drawText(ui, r.label, x + 14, yy + 2, on ? INK : INK2);
+      if (on && tick % 8 < 6) drawText(ui, '→', x + 4, yy + 2, PAPER);
       if (r.value) {
         const v = r.value(), vx = x + w - 92;
-        drawTextCentered(ui, v, vx + 40, yy + 2, '#f8b800', 1, false);
+        drawTextCentered(ui, v, vx + 40, yy + 2, RED_INK, 1, false);
         zone(`tarrow:${i * 2}`, vx - 4, yy - 3, 14, rh - 1);
         zone(`tarrow:${i * 2 + 1}`, vx + 74, yy - 3, 14, rh - 1);
-        drawText(ui, '<', vx, yy + 2, hot('tarrow') === i * 2 ? '#fcfcfc' : '#7c7c7c');
-        drawText(ui, '>', vx + 78, yy + 2, hot('tarrow') === i * 2 + 1 ? '#fcfcfc' : '#7c7c7c');
+        drawText(ui, '<', vx, yy + 2, hot('tarrow') === i * 2 ? INK : TRIM);
+        drawText(ui, '>', vx + 78, yy + 2, hot('tarrow') === i * 2 + 1 ? INK : TRIM);
       }
     });
     hint(ui, `${k('up')}/${k('down')}: MOVE   ${k('left')}/${k('right')} OR CLICK: CHANGE   ${k('cast')} / RIGHT-CLICK: RESUME`);
