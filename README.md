@@ -1,125 +1,140 @@
-# Spell VS Steel
+<p align="center">
+  <img src="docs/media/logo.gif" alt="Spell VS Steel" width="720">
+</p>
 
-A fantasy, class-based take on Mega Man Battle Network: real-time fights on a 6x3 grid, broken up by a paused Draw screen where you draft spells from your grimoire.
+<p align="center"><b>A fantasy class-based battler in the spirit of Mega Man Battle Network.</b><br>
+Build a grimoire, pick a class, and duel another player on a 6×3 grid in real time.</p>
 
-How the code fits together: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+<p align="center">
+  <img src="docs/media/hero.gif" alt="A Mage and a Warrior trading fire, ice and steel on a snowy mountain pass" width="720">
+</p>
 
-This is the **Warrior vs Mage prototype**: title screen, an interactive tutorial, Versus CPU, match setup, a deck builder, all Warrior and Mage spells from the design doc, a CPU opponent (Easy and Normal), chiptune sound effects and two original 16-bit tracks.
+## The pitch
 
-## Play
+Spell VS Steel is a head-to-head card battler where the cards are thrown in real time. Two fighters face off on a grid of panels, three rows each, and dodge, slash and fire spells at each other. Every few seconds the action pauses so both players can draft fresh spells from the decks they built, then the fight picks right back up.
 
-```sh
-npm install
-npm run dev      # local dev server
-npm run build    # DEV build: type-check, then dist/index.html (one self-contained file)
-                 # and dist/artifact.html (the same game, shaped for a claude.ai artifact). Dev tools on.
-npm run build:prod  # player-facing build in dist-prod/: dev tools off and their code left out
-npm run sim      # headless CPU-vs-CPU matches; prints win rates, match length, damage sources
-npm run sim -- 100 --cards   # same, with per-card casts, damage and win rate when cast
-npm run netcheck # two seeded battles fed the same inputs must stay identical (online play depends on it)
-npm run rollcheck # battles played through rollback (late inputs, wrong guesses, replays) must end identical to straight play
-npm run netsoak -- 440  # whole online matches between two simulated machines over lag, jitter, loss, dropouts and tabbed-out players; fails on any desync or stuck match
-npm run fuzz -- 500   # rules fuzzer: random legal decks, mashing/random/CPU inputs, odd Draw picks, training
-                      # resets; checks invariants every frame and replays each match to prove determinism
-```
+- **Five classes, five ways to play.** A Warrior who gets stronger as they take hits, a glass-cannon Mage, a Rogue who chains cheap tricks, a Ranger with traps and pets, and a Priest who outlasts you with heals and curses.
+- **Your deck is your character.** Every class has its own pool of spells, each with a Legendary set and a Mythic signature card. You build a 30-spell grimoire and it shapes how you fight.
+- **Fast and readable.** Matches are best of 3 short rounds. Big area attacks flash their panels before they land, so a sharp player can always see them coming.
+- **Made for PvP.** Local versus for two players on one keyboard, and online play with room codes, ranked matches and rollback netcode that keeps fights smooth over a real connection.
+- **NES-style pixel art.** 24×24 fighters with hand-drawn frames, painted stages, spell effects colored by element, and parchment menus with wax-seal costs.
 
-Browser checks (need Playwright with Chromium; they create `dist-fuzz/` and `fuzz-out/`, both ignored):
+## How a fight works
 
-```
-npm run fuzz:ui -- 10 90      # random keys, clicks and taps on every screen at 5 screen shapes; reports thrown
-                              # errors, frozen frame loops and screens you can't back out of
-npm run perf -- 4 5           # CPU vs CPU on every stage at phone sizes with 4x CPU throttle: fps, canvas
-                              # calls and main-thread time per frame (opens #bench=stage,classA,classB)
-node scripts/pixeldiff.mjs old/index.html new/index.html   # golden frames: two builds on a fake clock and a
-                              # seeded Math.random must match pixel for pixel (use after rendering speedups)
-```
+New to Battle Network-style games? Here's the whole loop in five steps.
 
-## Tests
+### 1. Pick a class and a grimoire
 
-CI (`.github/workflows/ci.yml`) runs on every PR, against the PR merged into main, so two PRs that each pass alone but break each other once merged get caught. It also runs on every push to main.
+Choose one of the five classes and the deck of spells you'll bring. Every class comes with ready-made decks, and the deck builder lets you make your own: 30 spells, up to 4 copies of a common and 2 of an uncommon, up to 5 Legendaries, and exactly 1 Mythic.
 
-```sh
-npm run typecheck     # the game and the tests
-npm test              # full matches, online determinism, combo counter (a few seconds)
-npm run test:screens  # every screen at every screen shape, saved to test-results/screens
-```
+<p align="center"><img src="docs/media/select.gif" alt="Arcade mode character select: switching from Warrior to Mage" width="480"></p>
 
-- **Full matches** (`tests/matches.ts`): CPU vs CPU for every class pair (mirrors included) at every CPU level, plus every ready-made deck, three seeds each. Every frame checks rules that hold whatever the balance is (HP and resources in range, fighters on the grid and apart, nothing piling up), and every match must end in a KO. Ready-made decks must be legal. A failure prints its seed: `npx tsx tests/matches.ts --seed 123 --only warrior,mage` replays it.
-- **Screens** (`tests/screens/`): `harness.ts` opens each screen the way the game does (title, options, every select step, stage select, each deck builder, online lobby, the Draw screen, a fight, pause, a whole round to the results, training, each tutorial, dev tools), and `run.ts` shoots it at 4:3, 3:2, 16:9, 21:9, 32:9, phone portrait and phone landscape. A shot fails if the page throws or logs an error, the screen is blank, or it doesn't fill the window the way `fit()` promises. Shots are seeded with a frozen clock, so the same code always draws the same pixels. **Add new screens to `harness.ts`.**
-- **Visual diff**: on a PR, CI also shoots main and lists every screen whose pixels changed (in the job summary), with base, PR and diff images side by side in the `screens-report` artifact (`report/report.html`). Changes there are expected when a PR touches visuals, so they never fail the build; they're there to spot changes nobody meant to make.
+### 2. Fight on the grid
 
-## Dev tools
+The arena is 6 panels wide and 3 tall. The left half (red) is yours, the right half (blue) is your opponent's, and neither of you can step onto the other side. You move between your 9 panels to line up shots and dodge theirs.
 
-In dev builds (`npm run dev`, `npm run build`): **Title > DEV TOOLS**, or open the page with `#cards`, `#sandbox` or `#lab` (`#bench=stage,classA,classB` starts a CPU vs CPU match to watch, for profiling). The `DEV_TOOLS` flag (`src/flags.ts`, set per build in `vite.config.ts`) hides the menu item and routes in `npm run build:prod`, and since the tools load through a dynamic import, none of their code ships in that build. Gate any future dev-only feature on the same flag.
+Every class has the same basic kit: a **light attack** (tap) for quick chip damage and a **heavy attack** (hold and release) that hits harder. Each class also has its own resource bar that pays for spells: Rage for the Warrior, Mana for the Mage and Priest, Energy for the Rogue and Ranger.
 
-- **Card encyclopedia**: every spell of every class as card faces, filtered by class, rarity and element. Hover to read, J (or the button) tests the card in the sandbox. Classes come from `cards.ts`, so new classes show up on their own.
-- **Sandbox** (debug mode): a real fight with a panel docked on the right. Cast any spell for either side on demand or queue it for K, pick the enemy (still dummy, walker, turret, CPU easy/normal), turn on can't-die and free spells, slow time to 0.1×, pause and step frames (P, .), freeze or stun either side, set enemy HP, move fighters by clicking panels, and read live state plus a hit log that names the spell behind every hit.
-- **Balance lab**: CPU-vs-CPU matches in the browser. Win rate with a 95% range, match length, damage split, per-card stats (casts, damage per cast, share, win rate when cast) and a class-vs-class matrix. Every number in `tuning.ts` and a damage % per card can be edited live; edits apply to the whole game until reload, and "Copy overrides" gives the JSON to paste back or commit.
+<p align="center"><img src="docs/media/fight.gif" alt="Priest and Warrior trading blows on the grid at Elderwood Ruins" width="480"></p>
 
-Code lives in `src/dev/` (instrumentation, sims, tuning edits, DOM helpers) and `src/scenes/` (`devMenu`, `encyclopedia`, `sandbox`, `lab`). The instrumentation wraps one Battle instance, so `battle.ts` has no dev-only code.
+### 3. Fill the Draw gauge, then draft spells
 
-## Online Versus (prototype)
+The bar at the top of the screen is the **Draw gauge**. It fills in about 10 seconds. When it's full, either player can open the **Draw screen**: the fight freezes and both players are dealt 5 spells from their grimoire. Pick the ones you want and the order you'll cast them in, keeping an eye on what they cost, then hit **FIGHT!** to jump back in.
 
-Title > **Online Versus**. Pick your fighter, then **Create Room** and share the 5-letter code (or the link, `?room=CODE`), or **Join Room** and type a code. The host's match length is used. Either player can open the Draw screen; the fight waits until both have picked. There is no pause online.
+<p align="center"><img src="docs/media/draw.gif" alt="The Draw screen: reading cards and queueing Ice Wall and Fireball" width="480"></p>
 
-How it works: **rollback netcode** (GGPO style). Both machines run the same battle from a shared seed and only trade controls. Your press goes in a couple of frames ahead (a little more on a slow connection). The battle never waits for the other player's inputs: it guesses them (still holding what they held, pressing nothing new), and when the real ones arrive it rewinds to the last frame both inputs were known, replays, and runs forward again, so a wrong guess shows as a short correction instead of a freeze. Only a long silence (over 10 frames of guessing) makes it wait. The Draw screen opens and the round ends only on frames both sides agree on, and replayed frames are silent. Every packet repeats all inputs the other side hasn't confirmed, so lost or merged packets cost nothing. A checksum every half second flags a desync on screen. The readout during the fight shows ping, input delay and the latest correction length.
+### 4. Cast your spells
 
-Rollback rules for the sim (`src/net/snapshot.ts` saves and restores the battle in place, so closures in timers and projectiles stay valid): state a spell's timers share must live in `b.keep({...})`, not in a `let` the closure captures; anything that watches the battle and keeps its own state (like post-match stats) must hand that state to the rollback as an extra root; render-only effects (hit-stop, sparks, screen kick) stay out of the battle. `npm run rollcheck` catches slips.
+Back in the fight, your picks sit in a queue, and one button casts the next one. Spells are where the big plays happen: fireballs that set panels alight, ice walls that block shots, traps, pets, stuns and freezes. A frozen or stunned target takes 50% more damage from everything, so landing a freeze and following it up is the heart of a good combo.
 
-Connections (`src/net/transport.ts`):
+<p align="center"><img src="docs/media/cast.gif" alt="Ranger and Mage casting traps, beams and fire at Emberforge" width="480"></p>
 
-| Where | How | Notes |
-| --- | --- | --- |
-| claude.ai artifact | the artifact `room` capability (presence in a named room) | Publish with `capabilities: { room: {} }`. Both players need access to the artifact. |
-| Hosted build or `npm run dev` | WebRTC via PeerJS, signaling on the free public PeerJS server | `?peer=host:port` uses your own server instead (`npm run peerserver` runs one on 9000). |
-| Testing on one machine | `?net=local`: BroadcastChannel between two tabs | Add `&lag=80&jitter=30&drop=0.2` to fake a bad connection. |
+### 5. Knock them out
 
-`?net=room|peer|local` forces a transport. Rules or protocol changes should bump `PROTOCOL` in `src/net/protocol.ts` so mismatched builds refuse to play.
+Drop your opponent's HP to 0 to win the round. Win two rounds (best of 3) to take the match. After each round a stats screen breaks down damage, accuracy, crowd control and your best spell.
 
-Anything random in the rules must use the battle's generator (`b.rand()`, `shuffle(list, b.rand)`), never `Math.random`, or online games drift apart. `npm run netcheck` catches it.
+<p align="center"><img src="docs/media/ko.gif" alt="A Mage finishes a Warrior with a K.O., then the round stats screen" width="480"></p>
+
+Then it starts over: fight, draw, cast, repeat. A round usually lasts somewhere between 30 seconds and a minute.
+
+## The classes
+
+<table>
+  <tr>
+    <td width="50%" align="center"><img src="docs/media/class-warrior.gif" alt="Warrior" width="100%"><br><b>Warrior</b>: heavy armor, big hits. Builds Rage from heavy attacks and from getting hit, then spends it on brutal finishers and grid control.</td>
+    <td width="50%" align="center"><img src="docs/media/class-mage.gif" alt="Mage" width="100%"><br><b>Mage</b>: glass cannon. Mana grows every Draw, so the Mage scales into the hardest-hitting spells and the best crowd control in the game.</td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/media/class-rogue.gif" alt="Rogue" width="100%"><br><b>Rogue</b>: chains cheap cards, vanishes, strikes from behind and stacks poison.</td>
+    <td width="50%" align="center"><img src="docs/media/class-ranger.gif" alt="Ranger" width="100%"><br><b>Ranger</b>: arrows, traps and pets. Standing still builds Energy for big shots.</td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><img src="docs/media/class-priest.gif" alt="Priest" width="100%"><br><b>Priest</b>: outlasts and chips. Heals, shields and curses that burn hotter the longer you stand in them.</td>
+    <td width="50%" align="center"><img src="docs/media/title.gif" alt="The title screen" width="100%"><br>Every class counters two others and is countered by two, so no matchup is a lost cause.</td>
+  </tr>
+</table>
+
+## Modes
+
+| Mode | What it is |
+| --- | --- |
+| **Arcade** | Climb a ladder of four rivals from Easy to Hard, then face your Shadow Self. |
+| **Versus** | Two players on one keyboard, or you against the CPU. |
+| **Online** | Play a friend with a 5-letter room code, or play ranked matches. Rollback netcode keeps it responsive. |
+| **Training** | A sandbox for testing decks and practicing combos. |
+| **Tutorial** | Short lessons that teach the grid, attacks, the Draw screen and casting from zero. |
+| **Deck builder** | Build, save, import and export grimoires for every class. |
+| **Replays** | Watch your past matches. |
 
 ## Controls
 
 | Key | Action |
 | --- | --- |
-| WASD (arrows also work) | Move |
+| WASD or arrows | Move |
 | J (tap) | Light attack |
 | J (hold, release) | Heavy attack |
-| K | Cast the next spell (hold a direction to aim it) |
+| K | Cast the next spell |
 | Space | Open the Draw screen when the gauge is full |
-| Enter / Esc | Pause |
-| M | Mute |
+| Esc | Pause |
 
-### Phones and tablets
+Menus work with the mouse. Phones and tablets get an on-screen pad, and every key can be rebound in **Options**.
 
-On a touch screen the game shows an on-screen pad during fights: a d-pad (slide your thumb to change direction), **J / ATTACK** (tap for light, hold and release for heavy), **K / CAST** (hold a direction to aim), **DRAW** (lights up when the gauge is full) and **PAUSE**. Menus are tapped directly: a quick tap clicks, touching and holding a card reads it without picking it, dragging scrolls lists, and a **BACK** button stands in for right-click. On the Draw screen, tap a picked card again to undo it. Room codes are typed by tapping the code boxes. Portrait puts the pad under the screen; landscape puts it on either side.
+## Play it locally
 
-The pad follows the last input: a touch turns it on, a key press turns it off. `?touch=1` forces it on (handy for testing on a desktop), `?touch=0` forces it off. Code: `src/engine/touch.ts`; screens say which controls they want through `Scene.pad()`.
+You need [Node.js](https://nodejs.org/) 22 or newer.
 
-These are the defaults. **Options** (title menu or pause menu) has master, music and sound effect volume, music and sound effect on/off, and **Key Mapping**, which rebinds movement, attack, cast, Draw screen and pause. Settings save in the browser; arrows, Esc and M always work.
+```sh
+npm install
+npm run dev
+```
 
-**Menus are mouse-first.** Hover highlights, click picks, right-click backs out. Draw screen: the 5 drawn spells are a hand of cards; hover one to read it, click to queue it (cast order is pick order), right-click to undo, click FIGHT! to start. Deck builder: hover a spell to read it, click to add a copy, right-click to remove one, wheel to scroll, click the class tabs to switch. The keyboard still works everywhere (J picks, K undoes, Space fights; in the deck builder D/A add and remove, Q/E switch class). Combat is keyboard only.
+Then open the address Vite prints (usually http://localhost:5173).
 
-## Tutorial
+## Contributing
 
-**Tutorial** on the title menu teaches someone who has never played Battle Network, as Warrior or Mage, in 8 short lessons against a training dummy: the grid and moving, light attacks, heavy attacks (and Rage), dodging telegraphed shots, the Draw gauge, the Draw screen (costs, cast order, Mana growth), casting, then a final knockout with real draws from the starter grimoire. Each lesson opens with a page or two of explanation, then a goal box with a progress counter; arrows point at the HUD piece being taught. The pause menu can skip a step. The clock is stopped on the tutorial's Draw screens. It all lives in `src/scenes/tutorial.ts`, which drives a normal `BattleScene` with a scripted dummy in place of the CPU.
+Thanks for wanting to help! Here's how to get going.
 
-## Rules in the prototype
+1. **Set up.** Fork and clone the repo, then run `npm install` and `npm run dev`. Dev builds have a **DEV TOOLS** item on the title screen with a card encyclopedia, a sandbox for testing any spell, and a balance lab that runs CPU-vs-CPU matches.
+2. **Learn the layout.** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) shows how the systems fit together, with diagrams. [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) covers every script, the dev tools, online play internals and the code map.
+3. **Make your change on a branch** and open a pull request against `main`. Keep each PR to one idea.
+4. **Run the checks before you push.**
+   ```sh
+   npm run typecheck     # the game and the tests
+   npm test              # full CPU-vs-CPU matches, online determinism, saves
+   npm run test:screens  # every screen at every screen shape (needs Playwright's Chromium)
+   ```
+   CI runs the same checks on every PR, and posts a visual diff of any screen whose pixels changed so reviewers can see what moved.
 
-- One shared Draw gauge fills in 10s; only the player can open the Draw screen, and both sides draft when it opens. 5 spells drawn each time, 20s timer. Picked-but-uncast spells are discarded at the next Draw screen.
-- Spell costs are paid on cast. Warrior Rage (max 5) comes from heavy hits (+1.5) and taking damage (1 pip per 40, max 1 per hit); light attacks build none. Mage Mana starts at 1 max, +1 max per Draw screen (cap 5), and refills each turn.
-- Frozen or stunned targets take +50% damage. No slows.
-- Grimoires: exactly 30 spells, up to 4 copies of a common, 2 of an uncommon, 1 of each Legendary (max 5), exactly 1 Mythic. Custom decks save in the browser.
-- Skins: 8 fighting-game colors per class, picked on the setup screen for you and the CPU. If both pick the same class and color, the CPU takes the next color.
-- Matches are a single round, best of 3 (default) or best of 5, picked on the setup screen.
+### House rules
 
-Every number worth tuning is in [`src/game/tuning.ts`](src/game/tuning.ts). Spells live in [`src/game/cards.ts`](src/game/cards.ts), one entry each.
+- **The battle must stay deterministic.** Online play runs the same simulation on both machines, so anything random in the rules uses the battle's own generator (`b.rand()`), never `Math.random`. Sound and visual effects never live in the simulation: the battle emits events and the engine plays them. `npm run netcheck` and `npm run rollcheck` catch slips.
+- **Spells are data.** Each spell is one entry in its class's card file under `src/game/`, and every number worth tuning is in `src/game/tuning.ts`. A new spell also needs a 20×20 card icon in `src/art/cardIcons.ts`.
+- **Respect the pixel grid.** Fighters are 24×24 with hand-drawn frames. Never stretch sprites; pad them instead.
+- **Saves go through the save module** (`src/engine/save.ts`), never straight to `localStorage`.
+- **New screens get a screenshot test**: add them to `tests/screens/harness.ts`.
+- **New classes get tutorial lessons** and show up in every character select.
+- **Balance changes come with numbers.** `npm run sim` and `npm run balance` run thousands of CPU-vs-CPU matches; include the before and after win rates in your PR.
 
-## Code map
+## Credits
 
-- `src/main.ts` the loop. The fight (arena, panels, sprites, effects) draws at 240×160 and is scaled 2× under a sharp 480×320 UI layer for menus, cards, the battle HUD, status tags, damage numbers and cast callouts
-- `src/engine/` canvas helpers, bitmap font, keyboard and mouse input, sound effects and the music sequencer, song data
-- `src/art/` Cartridge NES sprites, the Grand Colosseum arena, the logo
-- `src/game/` battle rules (`battle.ts`), spells, decks, CPU, drawing (`battleView.ts`)
-- `src/scenes/` title, tutorial, setup, deck builder, battle (Draw screen, pause, results), online lobby and online battle, options, controls, card faces (`cardView.ts`); clickable zones live in `scene.ts`
-- `src/net/` online play: packets, transports, the session, rollback (`rollback.ts`, `snapshot.ts`), the desync checksum
+Designed by Wes, built with Claude.
