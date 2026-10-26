@@ -2,7 +2,6 @@
 // interpretations are called out in the `short` text or a comment.
 import type { Battle, CastCtx, Fighter } from './battle';
 import type { ClassId } from '../art/sprites';
-import { sfx } from '../engine/audio';
 import { shuffle } from './rng';
 import { TUNING } from './tuning';
 
@@ -335,7 +334,7 @@ const mage: CardDef[] = [
           homing: { p: 0, dur: 0.4, sx: x.f.col, sy: x.f.row, target: x.foe.side },
           onHit: (b, t) => { if (t) b.damage(t, 25 * x.mult, b.f[1 - t.side], { spell: true, element: 'arcane', noFlinch: true }); },
         });
-        sfx('missile');
+        x.b.sound('missile');
       });
     },
   },
@@ -464,7 +463,7 @@ const mage: CardDef[] = [
       x.b.warn(x.f, [[x.foe.col, x.foe.row]], 1);
       targeted(x, 1, (c, r) => {
         x.b.addFx('pillar', x.f.side, c, r, 0.45);
-        sfx('explode');
+        x.b.sound('explode');
         x.b.strike(x.f, [[c, r]], 155 * x.mult, { spell: true, element: 'fire' });
         for (let rr = 0; rr < 3; rr++) x.b.burn(c, rr, 5, 15);
       });
