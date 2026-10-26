@@ -36,6 +36,8 @@ export const TUNING = {
     heavyLock: 0.35,
     manaStart: 1,
     manaCap: 5,
+    /** Counterspell also silences the caster it cancels for this long. */
+    counterSilence: 3,
   },
 
   // Draft classes (Rogue, Ranger, Priest): basics follow the same x0.7 scale as Warrior and Mage.

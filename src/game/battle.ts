@@ -1191,6 +1191,7 @@ export class Battle {
     if (foe.st.counterspell > 0 && card.id !== 'counterspell') {
       foe.st.counterspell = 0;
       this.text(f, 'COUNTERED', '#f878f8');
+      if (TUNING.mage.counterSilence > 0) this.later(0.3, () => this.silence(f, TUNING.mage.counterSilence));
       const callout = this.fx.find(e => e.kind === 'castName' && e.side === f.side);
       if (callout?.data) callout.data.countered = 1;
       this.addFx('counter', f.side, f.col, f.row, 0.5);
@@ -1284,8 +1285,6 @@ export class Battle {
     if (!p || p.hole > 0) return;
     p.burn = Math.max(p.burn, secs);
     p.burnDps = Math.max(p.burnDps, dps);
-    // fire burns a blessing away
-    p.bless = 0;
   }
 
   placeWall(f: Fighter, col: number, row: number, hp: number, kind: Wall['kind'], t: number, invuln = false): boolean {

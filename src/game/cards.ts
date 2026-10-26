@@ -486,7 +486,7 @@ const mage: CardDef[] = [
   },
   {
     id: 'counterspell', name: 'Counterspell', cls: 'mage', cost: 2, rarity: 'legendary', element: 'arcane', damaging: false, lock: 0.2,
-    dmg: '-', short: 'For 4s, the next spell the enemy casts is cancelled.',
+    dmg: '-', short: 'For 4s, the next spell the enemy casts is cancelled and they are silenced for 3s.',
     cast: x => { x.f.st.counterspell = 4; x.b.addFx('counter', x.f.side, x.f.col, x.f.row, 0.5); },
     ai: (b, f) => b.foe(f).queue.length > 0,
   },
