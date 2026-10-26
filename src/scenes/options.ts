@@ -4,26 +4,43 @@ import { drawStage } from '../art/arena';
 import { P, UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
-import { sfx, getAudioSettings, setAudioSettings, isMuted, toggleMute } from '../engine/audio';
+import { sfx, getAudioSettings, setAudioSettings, isMuted, toggleMute, voiceLine, announce } from '../engine/audio';
+import { PLAYABLE } from '../game/classes';
 import { ControlsScene } from './controls';
 import { win, selRow, PAPER, BURN, INK, INK2, RED_INK, TRIM } from './skin';
 
-type Row = 'master' | 'musicOn' | 'music' | 'sfxOn' | 'sfx' | 'mute' | 'keys' | 'back';
+type Row = 'master' | 'musicOn' | 'music' | 'sfxOn' | 'sfx' | 'voice' | 'announcer' | 'mute' | 'keys' | 'back';
 const ROWS: Array<[Row, string]> = [
   ['master', 'MASTER VOLUME'],
   ['musicOn', 'MUSIC'],
   ['music', 'MUSIC VOLUME'],
   ['sfxOn', 'SOUND FX'],
   ['sfx', 'SFX VOLUME'],
+  ['voice', 'CHARACTER VOICES'],
+  ['announcer', 'ANNOUNCER VOICE'],
   ['mute', 'MUTE ALL (M)'],
   ['keys', 'KEY MAPPING'],
   ['back', 'BACK'],
 ];
-const isVol = (r: Row): r is 'master' | 'music' | 'sfx' => r === 'master' || r === 'music' || r === 'sfx';
+type Vol = 'master' | 'music' | 'sfx' | 'voice' | 'announcer';
+const isVol = (r: Row): r is Vol => r === 'master' || r === 'music' || r === 'sfx' || r === 'voice' || r === 'announcer';
+/** A volume row's bar is lit unless its ON/OFF switch is off. */
+const isLive = (r: Vol, s: ReturnType<typeof getAudioSettings>): boolean => (r === 'music' ? s.musicOn : r === 'sfx' ? s.sfxOn : true);
+
+/** After the voice or announcer level changes, a sample at the new level (once the player stops tapping). */
+let previewTimer = 0;
+function preview(row: Row): void {
+  if (row !== 'voice' && row !== 'announcer') return;
+  window.clearTimeout(previewTimer);
+  previewTimer = window.setTimeout(() => {
+    if (row === 'voice') voiceLine(PLAYABLE[Math.floor(Math.random() * PLAYABLE.length)], 'castBig');
+    else { announce('fight'); }
+  }, 300);
+}
 
 // layout (UI pixels)
-const PX = 64, PW = UW - 128, Y0 = 62, RH = 24, BAR_X = 236, BLOCK = 14;
-const rowY = (i: number): number => Y0 + i * RH + (i >= 6 ? 10 : 0);
+const PX = 64, PW = UW - 128, Y0 = 56, RH = 20, BAR_X = 236, BLOCK = 14;
+const rowY = (i: number): number => Y0 + i * RH + (i >= 8 ? 10 : 0);
 
 /** Audio settings and a door to the key mapping screen. Settings save in the browser. */
 export class OptionsScene implements Scene {
@@ -44,14 +61,14 @@ export class OptionsScene implements Scene {
       // clicking the only lit block turns that volume off
       if (isVol(row)) {
         const to = mouse.click && s[row] === 1 && v === 1 ? 0 : v;
-        if (s[row] !== to) { setAudioSettings({ [row]: to }); sfx('move'); }
+        if (s[row] !== to) { setAudioSettings({ [row]: to }); sfx('move'); preview(row); }
       }
       return;
     }
     const step = hot('step');
     if (step >= 0 && mouse.click) {
       const row = ROWS[step >> 1][0];
-      if (isVol(row)) { setAudioSettings({ [row]: Math.max(0, Math.min(10, s[row] + (step & 1 ? 1 : -1))) }); sfx('move'); }
+      if (isVol(row)) { setAudioSettings({ [row]: Math.max(0, Math.min(10, s[row] + (step & 1 ? 1 : -1))) }); sfx('move'); preview(row); }
       return;
     }
     const clicked = listMouse('row', this.sel, i => { this.sel = i; sfx('move'); });
@@ -64,6 +81,7 @@ export class OptionsScene implements Scene {
       const v = Math.max(0, Math.min(10, s[row] + (r ? 1 : l ? -1 : wheel)));
       setAudioSettings({ [row]: v });
       sfx('move');
+      preview(row);
     }
     const ok = wasPressed('confirm') || clicked >= 0;
     const toggle = ok || l || r;
@@ -85,17 +103,17 @@ export class OptionsScene implements Scene {
       const on = i === this.sel && showSel();
       zone(`row:${i}`, PX - 12, y, PW + 24, RH - 2);
       if (on) selRow(ui, PX - 12, y, PW + 24, RH - 2);
-      const ty = y + 8;
+      const ty = y + 6;
       if (on && tick % 8 < 6) drawText(ui, '→', PX - 4, ty, PAPER);
       drawText(ui, label, PX + 10, ty, on ? INK : INK2);
       if (isVol(row)) {
         const v = s[row];
-        const live = row === 'master' || (row === 'music' ? s.musicOn : s.sfxOn);
+        const live = isLive(row, s);
         drawText(ui, '←', BAR_X - 14, ty, on ? INK : TRIM);
         zone(`step:${i * 2}`, BAR_X - 18, y, 14, RH - 2);
         for (let n = 0; n < 10; n++) {
-          zone(`block:${i * 100 + n}`, BAR_X + n * BLOCK, y + 2, BLOCK, RH - 6);
-          P(ui, n < v ? (live ? RED_INK : TRIM) : BURN, BAR_X + n * BLOCK + 1, y + 5, BLOCK - 4, 12);
+          zone(`block:${i * 100 + n}`, BAR_X + n * BLOCK, y + 2, BLOCK, RH - 4);
+          P(ui, n < v ? (live ? RED_INK : TRIM) : BURN, BAR_X + n * BLOCK + 1, y + 4, BLOCK - 4, 10);
         }
         drawText(ui, '→', BAR_X + 10 * BLOCK + 2, ty, on ? INK : TRIM);
         zone(`step:${i * 2 + 1}`, BAR_X + 10 * BLOCK, y, 14, RH - 2);

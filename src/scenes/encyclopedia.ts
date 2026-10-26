@@ -10,17 +10,20 @@ import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { PLAYABLE } from '../game/classes';
 import { ALL_CARDS, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef, type Element, type Rarity } from '../game/cards';
-import { starterDeck, STARTER_NAME } from '../game/deck';
+import { presetsFor } from '../game/deck';
 import { drawCardDetail, drawCardFace, CARD_W, CARD_H } from './cardView';
 import { win, INK2, RED_INK, TRIM } from './skin';
+import { CardPreview } from './cardPreview';
 
 const RARITIES: Rarity[] = ['common', 'uncommon', 'legendary', 'mythic'];
 const RANK: Record<Rarity, number> = { common: 0, uncommon: 1, legendary: 2, mythic: 3 };
 
 // layout (UI pixels)
-const GX = 8, GY = 54, COLS = 4, PX = 80, PY = 112;
+const GX = 8, GY = 54, COLS = 3, PX = 80, PY = 112;
 const CLIP_Y = 50, CLIP_H = 252;
-const DX = 332, DW = UW - DX - 8;
+const DX = 252, DW = UW - DX - 8;
+/** The looping clip of the selected card, at the top of the detail window. */
+const CLIP_BOX = 84;
 
 const costNum = (c: CardDef): number => (c.cost === 'all' ? 6 : c.cost);
 
@@ -31,6 +34,7 @@ export class EncyclopediaScene implements Scene {
   element: Element | null = null;
   sel = 0;
   scroll = 0;
+  private preview = new CardPreview();
   private classes: ClassId[] = [...new Set(ALL_CARDS.map(c => c.cls))].filter(c => PLAYABLE.includes(c));
 
   constructor(private back: () => void, private test?: (card: CardDef) => void) {}
@@ -66,6 +70,8 @@ export class EncyclopediaScene implements Scene {
 
   update(dt: number): void {
     const cards = this.list();
+    this.preview.show(cards[this.sel] ?? null);
+    this.preview.update(dt);
     if (mouse.wheel) this.scroll = Math.max(0, Math.min(this.maxScroll(cards.length), this.scroll + mouse.wheel * 28));
 
     const tab = hot('tab');
@@ -167,12 +173,12 @@ export class EncyclopediaScene implements Scene {
     const card = cards[this.sel];
     win(ui, DX, CLIP_Y, DW, CLIP_H, { accent: card ? ELEMENT_COLOR[card.element] : undefined });
     if (card) {
-      let y = drawCardDetail(ui, card, DX + 6, CLIP_Y + 6, DW - 12) + 6;
+      this.preview.draw(ui, DX + 8, CLIP_Y + 8, DW - 16, CLIP_BOX);
+      let y = drawCardDetail(ui, card, DX + 6, CLIP_Y + CLIP_BOX + 16, DW - 12) + 4;
       const line = (s: string, col: string): void => { drawText(ui, s, DX + 6, y, col); y += 11; };
-      line(`CLASS ${card.cls.toUpperCase()}`, INK2);
-      line(`MAX ${MAX_COPIES[card.rarity]} PER DECK`, INK2);
-      const inStarter = starterDeck(card.cls)[card.id] ?? 0;
-      line(inStarter ? `${STARTER_NAME[card.cls].toUpperCase()}: ${inStarter}` : 'NOT IN STARTER', inStarter ? '#007800' : TRIM);
+      line(`${card.cls.toUpperCase()}   MAX ${MAX_COPIES[card.rarity]} PER DECK`, INK2);
+      const presets = presetsFor(card.cls), inDecks = presets.filter(p => p.cards[card.id]).length;
+      line(inDecks ? `IN ${inDecks} OF ${presets.length} READY DECKS` : 'IN NO READY DECK', inDecks ? '#007800' : TRIM);
       line(`CAST LOCK ${(card.lock ?? 0.3).toFixed(2)}S`, TRIM);
       if (this.test) button(ui, 'test', `${k('attack')}: TEST IN SANDBOX`, DX + 6, CLIP_Y + CLIP_H - 22, DW - 12, 16, false, RED_INK);
     }

@@ -1,5 +1,5 @@
 // Cartridge-style NES fighters, extracted from the round-3 sprite page (art/sprite-styles-round3.html).
-// Rogue, Ranger and Cleric are the Classic set (art/classic-sprites.ts); their skins recolor the tint letters b/c/d.
+// Rogue, Ranger and Priest are the Classic set (art/classic-sprites.ts); their skins recolor the tint letters b/c/d.
 import type { Ctx } from '../engine/gfx';
 import { HIRES } from './hiresSprites';
 import { FRAMES, type FrameId } from './fighterFrames';
@@ -9,7 +9,7 @@ export const USE_HIRES = true;
 /** Sprite pixels per world pixel (1: both sprite sets draw at world resolution). */
 const RES = 1;
 
-export type ClassId = 'warrior' | 'mage' | 'rogue' | 'ranger' | 'cleric';
+export type ClassId = 'warrior' | 'mage' | 'rogue' | 'ranger' | 'priest';
 
 interface SpriteDef { pal: string[]; rows: string[]; ax: number }
 
@@ -36,7 +36,7 @@ const DEFS: Record<ClassId, SpriteDef> = {
     rows: ['........ia..........', '.h....aaaia.aa......', 'ahaa.abbbcda.hfa....', 'ahgaabbcccdda.h.fa..', 'agfabcccccddah..fa..', '.afaaaeeelaa.h..fa..', '.afa.aeekea..h...fa.', '.afa.adeela..h...fa.', '.agaaccdddcaah...fa.', 'aaccbccccdcccccaaea.', 'acbbccccddaaaaaaaea.', 'acbcccgggga..h...fa.', '.adbccfjfda..h..fa..', '.adccdgggga..h..fa..', '..adddcdddca.h.fa...', '...adda.adda.hfa....', '...afga..afga.aa....', '..afggga.afgga......', '..aaaaa..aaaaa......'],
     ax: 8,
   },
-  cleric: {
+  priest: {
     pal: ['#000000', '#fcfcfc', '#bcbcbc', '#7c7c7c', '#fce0a8', '#f8b800', '#ac7c00', '#f8d878', '#fcfcfc', '#bcbcbc', '#000000', '#e4a060'],
     rows: ['....aaaaaa.......', '...ahhhhhfa..aaa.', '....aaaaaa..ajija', '....abbbca..ajjja', '...abbbbcca.ajija', '..acbfeeelfa.aga.', '..acbfeekefa.aga.', '..acbfeeelfa.aga.', '..acbbfeeffa..ga.', '.acbbbbffbbbccea.', 'acbcbbfgfbbcaaga.', 'acdcbbbffbcca.ga.', 'acdcbbfffbcca..a.', '.acdcbbfbbbcca...', '.acdcbbfbbbbcca..', 'acdccbbfbbbccda..', 'affffffffffffgga.', '.aaaaaaaaaaaaaa..'],
     ax: 8,
@@ -88,7 +88,7 @@ export const SKINS: Record<ClassId, Skin[]> = {
     { id: 'black', name: 'Black', set: { b: '#7c7c7c', c: '#3c3c3c', d: '#1c1c1c' } },
     { id: 'white', name: 'White', set: { b: '#fcfcfc', c: '#bcbcbc', d: '#7c7c7c' } },
   ],
-  cleric: [
+  priest: [
     { id: 'white', name: 'White', set: {} },
     { id: 'red', name: 'Red', set: { b: '#f87858', c: '#d82800', d: '#881400' } },
     { id: 'blue', name: 'Blue', set: { b: '#6888fc', c: '#0058f8', d: '#0000a8' } },
@@ -129,7 +129,7 @@ function skinned(cls: ClassId, skinId: string, alt: boolean): { pal: string[]; r
 const ALT: Record<ClassId, Record<number, string>> = {
   warrior: { 7: '#00a800', 10: '#005800', 8: '#58d854' },
   mage: { 1: '#f878f8', 2: '#d800cc', 7: '#940084' },
-  rogue: {}, ranger: {}, cleric: {},
+  rogue: {}, ranger: {}, priest: {},
 };
 
 export type Tint = 'none' | 'flash' | 'ice' | 'stun' | 'ghost';

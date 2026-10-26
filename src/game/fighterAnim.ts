@@ -16,7 +16,7 @@ const RAGE = ['#fcfcfc', '#f8b800', '#f83800', '#a81000'];
 const SMOKE = ['#bcbcbc', '#7c7c7c', '#3c3c3c'];
 
 /** How long each animation runs, in seconds. Steps finish inside TUNING.moveCooldown so the sprite is home before the next one. */
-const STEP = { warrior: 0.08, mage: 0.1, rogue: 0.12, ranger: 0.09, cleric: 0.09 } satisfies Record<ClassId, number>;
+const STEP = { warrior: 0.08, mage: 0.1, rogue: 0.12, ranger: 0.09, priest: 0.09 } satisfies Record<ClassId, number>;
 const HIT = 0.28;
 const CAST = 0.45;
 
@@ -96,7 +96,7 @@ export function lookOf(b: Battle, f: Fighter, s: State, held: boolean): Look {
   if (held) return L;
 
   // idle: each class breathes at its own pace
-  const rate = cls === 'rogue' ? 3.6 : cls === 'warrior' ? 1.6 : cls === 'cleric' ? 1.4 : cls === 'mage' ? 1.3 : 2.5;
+  const rate = cls === 'rogue' ? 3.6 : cls === 'warrior' ? 1.6 : cls === 'priest' ? 1.4 : cls === 'mage' ? 1.3 : 2.5;
   L.frame = Math.floor(t * rate) % 2 ? 'idle1' : 'idle0';
   if (cls === 'mage') L.oy = -1 - Math.round(Math.sin(t * 2.6));   // hovers on his magic
 
@@ -114,7 +114,7 @@ export function lookOf(b: Battle, f: Fighter, s: State, held: boolean): Look {
       // a light, springy leap
       L.ox += bx * (1 - ease(mp)); L.oy += by * (1 - ease(mp)) - Math.round(Math.sin(mp * Math.PI) * 5);
       L.frame = mp < 0.75 ? 'hop' : 'land';
-    } else if (cls === 'cleric') {
+    } else if (cls === 'priest') {
       // glides over the floor, robe trailing
       L.ox += bx * (1 - ease(mp)); L.oy += by * (1 - ease(mp)) - 1;
       L.frame = 'hop';
@@ -190,7 +190,7 @@ function deathLook(b: Battle, f: Fighter, s: State, L: Look): Look {
       else if (t < 0.5) { L.frame = 'kneel'; L.alpha = 0.4; }
       else L.hide = true;
       break;
-    case 'cleric':
+    case 'priest':
       // kneels, light falls on him, and he rises into it
       L.frame = 'kneel';
       if (t >= 0.35 && t < 0.55) L.white = Math.floor(t * 20) % 2 === 0;
@@ -207,7 +207,7 @@ export function drawUnder(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, x
   const t = b.time;
   if (f.dead) {
     const k = t - s.deadT;
-    if (f.cls === 'cleric' && k > 0.3 && k < 2.1) {
+    if (f.cls === 'priest' && k > 0.3 && k < 2.1) {
       // a column of light falls onto the panel, then thins away
       const a = k < 0.5 ? (k - 0.3) / 0.2 : k > 1.6 ? (2.1 - k) / 0.5 : 1;
       c.globalAlpha = 0.45 * a; P(c, HOLY[2], x - 7, 0, 14, y + 1); c.globalAlpha = 0.7 * a; P(c, HOLY[3], x - 3, 0, 6, y + 1); c.globalAlpha = 1;
@@ -295,7 +295,7 @@ function drawCastGlyph(c: Ctx, cls: ClassId, ramp: string[], p: number, x: numbe
       for (let i = 0; i < 3; i++) if (on(i)) P(c, ramp[2], x + d * (12 + i * 5 + Math.round(p * 8)) - (d < 0 ? 2 : 0), y - 10, 3, 1);
       break;
     }
-    case 'cleric': {
+    case 'priest': {
       // a glowing cross on the floor
       const r = Math.round(3 + 7 * grow);
       P(c, ramp[1], x - r, y, r * 2 + 1, 1);
@@ -329,9 +329,9 @@ export function drawOver(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, L:
       s.landed = true;
     } else if (mp >= 1) {
       // feet hit the floor: a dust puff each side (big for the Warrior's stomp and for knockbacks)
-      const n = cls === 'warrior' || s.knock ? 3 : cls === 'cleric' ? 0 : 1;
+      const n = cls === 'warrior' || s.knock ? 3 : cls === 'priest' ? 0 : 1;
       for (let i = 0; i < n; i++) for (const side of [-1, 1]) spawnPart(fx + side * rnd(3, 6), y, { vx: side * rnd(10, 22), vy: rnd(-8, -2), drag: 0.9, life: rnd(0.2, 0.35), ramp: DUST, size: 2, shrink: 0.5, dither: true });
-      if (cls === 'cleric' && !s.knock) for (let i = 0; i < 3; i++) spawnPart(fx + rnd(-6, 6), y - rnd(0, 3), { vy: rnd(-10, -4), life: rnd(0.3, 0.5), ramp: [HOLY[3], HOLY[2], HOLY[1]] });
+      if (cls === 'priest' && !s.knock) for (let i = 0; i < 3; i++) spawnPart(fx + rnd(-6, 6), y - rnd(0, 3), { vy: rnd(-10, -4), life: rnd(0.3, 0.5), ramp: [HOLY[3], HOLY[2], HOLY[1]] });
       s.landed = true;
     }
   }
@@ -353,7 +353,7 @@ export function drawOver(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, L:
   const cp = (t - s.castT) / CAST;
   if (cp >= 0 && cp < 1) {
     const ramp = ELEMENT_RAMP[s.castEl] ?? ARC, top = y - sp.h + spriteRows(sp).findIndex(r => r.length > 0);
-    if (cls === 'cleric' && cp < 0.8) {
+    if (cls === 'priest' && cp < 0.8) {
       // a halo over his head while he prays
       const col = cp < 0.1 || Math.floor(t * 20) % 4 ? ramp[2] : ramp[3];
       P(c, col, fx - 4, top - 3, 9, 1); P(c, col, fx - 5, top - 2, 1, 1); P(c, col, fx + 5, top - 2, 1, 1); P(c, col, fx - 4, top - 1, 9, 1);
@@ -416,7 +416,7 @@ function deathFx(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, L: Look, f
     case 'rogue':
       if (at(1, 0.42)) for (let i = 0; i < 16; i++) spawnPart(fx + rnd(-8, 8), y - rnd(0, 18), { vx: rnd(-20, 20), vy: rnd(-16, -2), drag: 0.92, life: rnd(0.5, 0.9), ramp: SMOKE, size: 3, shrink: 0.4, dither: true });
       break;
-    case 'cleric':
+    case 'priest':
       if (t > 0.55 && t < 1.45 && Math.random() < 0.6) spawnPart(fx + rnd(-6, 6), y + L.oy - rnd(0, 20), { vy: rnd(-24, -10), life: rnd(0.4, 0.7), ramp: [HOLY[3], HOLY[2], HOLY[1]] });
       break;
   }

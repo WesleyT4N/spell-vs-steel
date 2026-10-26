@@ -1303,7 +1303,7 @@ export const FRAMES: Record<ClassId, FrameSet> = {
       ],
     },
   },
-  cleric: {
+  priest: {
     ax: 10,
     frames: {
       idle0: [
