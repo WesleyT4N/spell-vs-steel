@@ -65,10 +65,10 @@ const BASIC_NAME: Record<ClassId, [string, string]> = {
   mage: ['ARCANE BOLT', 'CHARGED BOLT'],
   rogue: ['STAB', 'THROWING KNIFE'],
   ranger: ['ARROW', 'AIMED SHOT'],
-  cleric: ['HOLY SPARK', 'SMITE'],
+  priest: ['HOLY SPARK', 'SMITE'],
 };
 
-const DOT_NAME: Record<string, string> = { poison: 'POISON', fire: 'BURNING PANELS', holy: 'HOLY FIRE' };
+const DOT_NAME: Record<string, string> = { poison: 'POISON', fire: 'BURNING PANELS', holy: 'HOLY FIRE', shadow: 'CURSES' };
 
 /** Display name of a stats source for a class. */
 export function sourceLabel(id: string, cls: ClassId): string {
@@ -165,6 +165,20 @@ export function trackStats(b: Battle): BattleStats {
   const later = b.later.bind(b);
   b.later = (delay, fn) => later(delay, carry(fn));
 
+  const blessTag = new Map<Panel, Tag>();
+  const bless = b.bless.bind(b);
+  b.bless = (col, row, kind) => {
+    safe(() => { const p = b.panel(col, row); if (p && current) blessTag.set(p, current); });
+    bless(col, row, kind);
+  };
+
+  const curseTag = new Map<Panel, Tag>();
+  const curse = b.curse.bind(b);
+  b.curse = (side, col, row) => {
+    safe(() => { const p = b.panel(col, row); if (p && current) curseTag.set(p, current); });
+    curse(side, col, row);
+  };
+
   const burn = b.burn.bind(b);
   b.burn = (col, row, secs, dps) => {
     safe(() => { const p = b.panel(col, row); if (p && current) burnTag.set(p, current); });
@@ -178,6 +192,13 @@ export function trackStats(b: Battle): BattleStats {
       let tag = current;
       // burning panels carry the spell that lit them
       if (!tag && !from && opts.element === 'fire') tag = burnTag.get(b.panels[target.col][target.row]) ?? null;
+      // cursed panels carry the spell that cursed them; shadow DoTs are named by their card
+      if (!tag && opts.dot && opts.element === 'shadow' && from) {
+        if (opts.spell) {
+          const dot = target.dots.find(d => d.src === from.side && d.dps === base);
+          if (dot && CARDS[dot.id]) tag = { id: dot.id, side: from.side, hit: true, damaging: true };
+        } else tag = curseTag.get(b.panels[target.col][target.row]) ?? null;
+      }
       // a trap springing this frame (fired traps are cleared at the end of it)
       if (!tag && from && !opts.basic) { const trap = b.traps.find(t => t.fired && t.side === from.side); if (trap) tag = placed.get(trap) ?? null; }
       const by: Side = from ? from.side : tag ? tag.side : (1 - target.side) as Side;
@@ -216,7 +237,9 @@ export function trackStats(b: Battle): BattleStats {
       if (got <= 0) return;
       const s = out.side[f.side];
       s.healed += got;
-      src(s, current && current.side === f.side ? current.id : 'other').heal += got;
+      // blessed panels heal in the name of the spell that blessed them
+      const tag = current ?? blessTag.get(b.panels[f.col][f.row]) ?? null;
+      src(s, tag && tag.side === f.side ? tag.id : 'other').heal += got;
     });
   };
 

@@ -32,7 +32,7 @@ const BLURB: Record<ClassId, [string, string]> = {
   mage: ['GLASS CANNON', 'MANA GROWS EVERY DRAW'],
   rogue: ['CHAINS CHEAP CARDS', 'STRIKES FROM BEHIND'],
   ranger: ['ARROWS, TRAPS AND PETS', 'STAND STILL FOR ENERGY'],
-  cleric: ['OUTLASTS AND CHIPS', 'HEALS AND CURSES'],
+  priest: ['OUTLASTS AND CHIPS', 'HEALS AND CURSES'],
 };
 
 /** 0/1: picking YOUR fighter/skin, 2/3: the CPU's (skipped online), 4: options. */

@@ -22,8 +22,16 @@ const ICED = '#002c8c';
 // ---------- particles ----------
 interface Box { x0: number; x1: number; y0: number; y1: number }
 interface Part { x: number; y: number; vx: number; vy: number; g: number; drag: number; age: number; life: number; ramp: string[]; size: number; shrink: number; dither: boolean; box?: Box }
-let parts: Part[] = [];
-let lastTime = -1;
+// each Battle keeps its own particles, so a card preview drawn beside a fight doesn't disturb it
+interface Layer { parts: Part[]; lastTime: number }
+const layers = new WeakMap<Battle, Layer>();
+let cur: Layer = { parts: [], lastTime: -1 };
+/** Point the particle layer at `b`'s particles. Called before drawing a battle's effects. */
+export function useParticles(b: Battle): void {
+  let l = layers.get(b);
+  if (!l) { l = { parts: [], lastTime: -1 }; layers.set(b, l); }
+  cur = l;
+}
 const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
 /** A 24x24 box around a point, or standing on a panel foot. */
 const boxC = (x: number, y: number): Box => ({ x0: x - 12, x1: x + 12, y0: y - 12, y1: y + 12 });
@@ -31,7 +39,7 @@ const boxF = (x: number, y: number): Box => ({ x0: x - 12, x1: x + 12, y0: y - 2
 
 function part(x: number, y: number, o: Partial<Part>): Part {
   const p: Part = { x, y, vx: 0, vy: 0, g: 0, drag: 1, age: 0, life: 0.5, ramp: SNOW, size: 1, shrink: 0.6, dither: false, ...o };
-  parts.push(p);
+  cur.parts.push(p);
   return p;
 }
 const emit = (n: number, f: (i: number) => void): void => { for (let i = 0; i < n; i++) f(i); };
@@ -45,16 +53,17 @@ const mote = (x: number, y: number, ramp: string[], box: Box, o: Partial<Part> =
 
 /** Advance and draw the particle layer. Called once per frame after the effects. */
 export function drawParticles(c: Ctx, b: Battle): void {
-  let dt = lastTime < 0 ? 0 : b.time - lastTime;
-  if (dt < 0 || dt > 0.25) { dt = 0; if (b.time - lastTime < 0) parts = []; }
+  useParticles(b);
+  let dt = cur.lastTime < 0 ? 0 : b.time - cur.lastTime;
+  if (dt < 0 || dt > 0.25) { dt = 0; if (b.time - cur.lastTime < 0) cur.parts = []; }
   dt = Math.min(dt, 0.05);
-  lastTime = b.time;
-  for (const p of parts) {
+  cur.lastTime = b.time;
+  for (const p of cur.parts) {
     p.age += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += p.g * dt;
     if (p.drag !== 1) { p.vx *= p.drag; p.vy *= p.drag; }
   }
-  parts = parts.filter(p => p.age < p.life && (!p.box || (p.x >= p.box.x0 && p.x < p.box.x1 && p.y >= p.box.y0 && p.y < p.box.y1)));
-  for (const p of parts) {
+  cur.parts = cur.parts.filter(p => p.age < p.life && (!p.box || (p.x >= p.box.x0 && p.x < p.box.x1 && p.y >= p.box.y0 && p.y < p.box.y1)));
+  for (const p of cur.parts) {
     const k = p.age / p.life, col = p.ramp[Math.min(p.ramp.length - 1, Math.floor(k * p.ramp.length))];
     const s = Math.max(1, Math.round(p.size * (1 - k * p.shrink)));
     if (p.dither && ((Math.round(p.x) + Math.round(p.y)) & 1)) continue;
@@ -430,6 +439,13 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
       for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + p, r0 = r * 0.5; P(c, HOLY[3], x + Math.cos(a) * r0, y - 10 + Math.sin(a) * r0 * 0.8, 1, 2); }
       glow(c, x, y - 10, 12, '248,216,120', 0.6 * (1 - p));
       if (once(e, 'm')) emit(14, () => mote(x + rnd(-9, 9), y - rnd(0, 18), [HOLY[3], HOLY[2], HOLY[1]], boxF(x, y)));
+      break;
+    }
+    case 'shadowHit': {
+      // a shadow bolt landing: dark motes collapsing inward
+      const r = 14 * (1 - p);
+      for (let i = 0; i < 10; i++) { const ang = (i / 10) * Math.PI * 2; P(c, SHADOW[1 + (i % 3)], x + Math.cos(ang) * r, y - 10 + Math.sin(ang) * r * 0.7, 2, 2); }
+      glow(c, x, y - 10, 12, '152,120,248', 0.5 * (1 - p));
       break;
     }
     case 'healBurst': {
