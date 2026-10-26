@@ -155,12 +155,12 @@ export const ranger: CardDef[] = [
   },
   {
     id: 'spirit_bear', name: 'Spirit Bear', cls: 'ranger', cost: 3, rarity: 'uncommon', element: 'nature', damaging: true, lock: 0.3,
-    dmg: '40/swipe', short: 'A bear (120 HP) stands in front of you for 6s and blocks shots. Swipes an enemy right in front of it.',
+    dmg: '40/swipe', short: 'A bear (160 HP) stands in front of you for 8s and blocks shots. Swipes an enemy right in front of it.',
     cast: x => {
       const { b, f } = x;
       const c = f.col + x.dir, r = f.row;
-      if (!b.placeWall(f, c, r, 120, 'bear', 6)) { b.text(f, 'BLOCKED', '#bcbcbc'); return; }
-      b.pets.push({ side: f.side, kind: 'bear', row: r, col: c, t: 6, cd: 0.6, period: 1, dmg: 40 * x.mult });
+      if (!b.placeWall(f, c, r, 160, 'bear', 8)) { b.text(f, 'BLOCKED', '#bcbcbc'); return; }
+      b.pets.push({ side: f.side, kind: 'bear', row: r, col: c, t: 8, cd: 0.6, period: 1, dmg: 40 * x.mult });
     },
   },
   // Legendaries
@@ -213,11 +213,11 @@ export const ranger: CardDef[] = [
   },
   {
     id: 'kill_command', name: 'Kill Command', cls: 'ranger', cost: 3, rarity: 'legendary', element: 'nature', damaging: true, lock: 0.3,
-    dmg: '2x pet hit', short: 'Every companion you have out attacks right away for double damage, wherever the enemy is.',
+    dmg: '3x pet hit', short: 'Every companion you have out attacks right away for triple damage, wherever the enemy is.',
     cast: x => {
       const mine = x.b.pets.filter(p => p.side === x.f.side);
       if (!mine.length) { x.b.text(x.f, 'NO PETS', '#bcbcbc'); return; }
-      mine.forEach((p, i) => x.b.later(i * 0.12, () => x.b.petAttack(p, 2 * x.mult)));
+      mine.forEach((p, i) => x.b.later(i * 0.12, () => x.b.petAttack(p, 3 * x.mult)));
       x.b.addFx('shout', x.f.side, x.f.col, x.f.row, 0.5);
     },
     ai: (b, f) => b.pets.some(p => p.side === f.side),
