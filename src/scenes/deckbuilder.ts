@@ -8,7 +8,7 @@ import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { cardsFor, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef } from '../game/cards';
-import { canAdd, countRarity, deckSize, loadCustom, saveCustom, starterDeck, presetsFor, validate, DECK_SIZE, MAX_LEGENDARIES, type DeckCounts, type DeckPreset } from '../game/deck';
+import { canAdd, countRarity, deckSize, loadCustom, saveCustom, presetDeck, presetsFor, validate, DECK_SIZE, MAX_LEGENDARIES, type DeckCounts, type DeckPreset } from '../game/deck';
 import { loadMatch, saveMatch } from '../game/match';
 import { PLAYABLE } from '../game/classes';
 import { drawCardDetail, resInk } from './cardView';
@@ -41,16 +41,21 @@ export class DeckBuilderScene implements Scene {
 
   private load(): void {
     this.cards = cardsFor(this.cls).sort((a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity] || costNum(a) - costNum(b));
-    this.deck = loadCustom(this.cls) ?? starterDeck(this.cls);
-    this.sel = 0; this.scroll = 0;
+    // no saved deck yet: start from the ready-made deck picked on the character select
+    const m = loadMatch();
+    this.deck = loadCustom(this.cls) ?? presetDeck(this.cls, m.p1 === this.cls && m.p1Deck !== 'custom' ? m.p1Deck : 'starter');
+    // the START FROM rows sit above the cards, in view; the cursor starts on the first card
+    this.sel = this.top; this.scroll = 0;
   }
 
-  /** Rows under the cards: load each ready-made deck, then CLEAR ALL. */
+  /** Rows above the cards: start from each ready-made deck, then CLEAR ALL. */
   private get presets(): DeckPreset[] { return presetsFor(this.cls); }
-  private get rows(): number { return this.cards.length + this.presets.length + 1; }
+  private get top(): number { return this.presets.length + 1; }
+  private get rows(): number { return this.top + this.cards.length; }
+  private cardAt(idx: number): CardDef | undefined { return idx >= this.top ? this.cards[idx - this.top] : undefined; }
   private specialLabel(idx: number): string {
-    const p = this.presets[idx - this.cards.length];
-    return p ? `LOAD ${p.name.toUpperCase()}${p.id === 'starter' ? ' (STARTER)' : ''}` : 'CLEAR ALL';
+    const p = this.presets[idx];
+    return p ? `START FROM ${p.name.toUpperCase()}${p.id === 'starter' ? ' (STARTER)' : ''}` : 'CLEAR ALL';
   }
 
   private flash(s: string): void { this.msg = s; this.msgT = 1.6; }
@@ -78,7 +83,7 @@ export class DeckBuilderScene implements Scene {
   }
 
   private special(idx: number): void {
-    const p = this.presets[idx - this.cards.length];
+    const p = this.presets[idx];
     if (p) { this.deck = { ...p.cards }; this.flash(`LOADED ${p.name.toUpperCase()}`); }
     else { this.deck = {}; this.flash('CLEARED'); }
     saveCustom(this.cls, this.deck);
@@ -92,7 +97,7 @@ export class DeckBuilderScene implements Scene {
 
   update(dt: number): void {
     this.msgT = Math.max(0, this.msgT - dt);
-    this.preview.show(showSel() ? this.cards[this.sel] ?? null : null);
+    this.preview.show(showSel() ? this.cardAt(this.sel) ?? null : null);
     this.preview.update(dt);
 
     // mouse: hover reads a card, click adds, right-click removes, wheel scrolls
@@ -101,13 +106,13 @@ export class DeckBuilderScene implements Scene {
     if (tab >= 0 && mouse.click) { this.switchClass(CLASSES[tab]); return; }
     if (isHot('done') && mouse.click) { this.exit(); return; }
     const minus = hot('minus'), plus = hot('plus'), row = hot('row');
-    if (minus >= 0 && mouse.click) { this.sel = minus; this.change(this.cards[minus], -1); return; }
-    if (plus >= 0 && mouse.click) { this.sel = plus; this.change(this.cards[plus], 1); return; }
+    if (minus >= 0 && mouse.click) { this.sel = minus; this.change(this.cardAt(minus)!, -1); return; }
+    if (plus >= 0 && mouse.click) { this.sel = plus; this.change(this.cardAt(plus)!, 1); return; }
     const over = Math.max(row, minus, plus);
     if (over >= 0 && mouse.moved) this.sel = over;
     if (row >= 0 && (mouse.click || mouse.rclick)) {
       this.sel = row;
-      const card = this.cards[row];
+      const card = this.cardAt(row);
       if (card) this.change(card, mouse.click ? 1 : -1);
       else if (mouse.click) this.special(row);
       return;
@@ -121,7 +126,7 @@ export class DeckBuilderScene implements Scene {
       return;
     }
     if (wasPressed('pause')) { this.exit(); return; }
-    const card = this.cards[this.sel];
+    const card = this.cardAt(this.sel);
     if (card) {
       if (wasPressed('confirm') || navPressed('right', dt)) this.change(card, 1);
       else if (navPressed('left', dt)) this.change(card, -1);
@@ -167,7 +172,7 @@ export class DeckBuilderScene implements Scene {
       const on = idx === this.sel && showSel();
       zone(`row:${idx}`, LX + 1, y - 1, LW - 2, RH);
       if (on) selRow(ui, LX + 1, y - 1, LW - 2, RH);
-      const card = this.cards[idx];
+      const card = this.cardAt(idx);
       if (!card) {
         drawText(ui, this.specialLabel(idx), LX + 64, ty, on ? INK : INK2);
         continue;
@@ -192,7 +197,7 @@ export class DeckBuilderScene implements Scene {
     P(ui, INK2, LX + LW + 1, by - 2, 3, bh);
 
     // detail: the card's clip, then its numbers and rules
-    const card = showSel() ? this.cards[this.sel] : undefined;
+    const card = showSel() ? this.cardAt(this.sel) : undefined;
     const dh = VISIBLE * RH + 6;
     win(ui, DX, LY - 4, DW, dh, { accent: card ? ELEMENT_COLOR[card.element] : undefined });
     if (card) {
@@ -203,7 +208,7 @@ export class DeckBuilderScene implements Scene {
     } else if (!showSel()) {
       drawText(ui, 'TOUCH A CARD TO READ IT', DX + 8, LY + 8, INK2);
     } else {
-      const p = this.presets[this.sel - this.cards.length];
+      const p = this.presets[this.sel];
       if (!p) drawText(ui, 'REMOVE EVERY SPELL', DX + 8, LY + 8, INK2);
       else {
         // a ready-made deck to start from: its Mythic and what it runs
