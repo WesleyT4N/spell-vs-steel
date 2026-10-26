@@ -1,6 +1,6 @@
 // Online Versus lobby: create a room (and share its code or link) or join one. Fighters and the stage
 // are picked together once both players are in (see select.ts and stageSelect.ts).
-import { setScene, hint, zone, hot, listMouse, button, showSel, type Scene } from './scene';
+import { pushScene, replaceScene, popScene, hint, zone, hot, listMouse, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, skinOf } from '../art/sprites';
@@ -17,7 +17,6 @@ import { CharSelectScene } from './select';
 import { RankedScene } from './ranked';
 import { LobbyScene } from './lobby';
 import { TournamentScene } from './tournament';
-import { TitleScene } from './title';
 import { win, selRow, banner, PAPER, BURN, INK, INK2, RED_INK, TRIM } from './skin';
 
 const ROWS = ['LOBBY', 'RANKED MATCH', 'TOURNAMENT', 'MATCH', 'CREATE ROOM', 'JOIN ROOM'] as const;
@@ -59,9 +58,9 @@ export class OnlineScene implements Scene {
   }
 
   private activate(row: RowName): void {
-    if (row === 'LOBBY') { sfx('select'); saveMatch(this.m); setScene(new LobbyScene()); return; }
-    if (row === 'TOURNAMENT') { sfx('select'); saveMatch(this.m); setScene(new TournamentScene()); return; }
-    if (row === 'RANKED MATCH') { sfx('select'); saveMatch(this.m); setScene(new RankedScene()); return; }
+    if (row === 'LOBBY') { sfx('select'); saveMatch(this.m); pushScene(new LobbyScene()); return; }
+    if (row === 'TOURNAMENT') { sfx('select'); saveMatch(this.m); pushScene(new TournamentScene()); return; }
+    if (row === 'RANKED MATCH') { sfx('select'); saveMatch(this.m); pushScene(new RankedScene()); return; }
     if (row === 'CREATE ROOM') { this.code = newRoomCode(); this.connect('host'); return; }
     if (row === 'JOIN ROOM') { this.mode = 'code'; this.code = ''; this.typeCode(); sfx('select'); return; }
     this.change(row, 1);
@@ -137,13 +136,13 @@ export class OnlineScene implements Scene {
       const net = this.net!;
       net.tick();
       if (net.status === 'error' || net.status === 'left') { this.net = null; this.fail(net.status === 'left' ? 'THE OTHER PLAYER LEFT' : net.error); return; }
-      if (net.matched) { sfx('confirm'); setScene(new CharSelectScene(net)); return; }
+      if (net.matched) { sfx('confirm'); replaceScene(new CharSelectScene(net)); return; }
       if (mouse.click && hot('btn') === 1) this.copy();
       if (back || (mouse.click && hot('btn') === 2)) this.cancel();
       return;
     }
 
-    if (back) { sfx('back'); setScene(new TitleScene()); return; }
+    if (back) { sfx('back'); popScene(); return; }
     if (mouse.click) {
       const arrow = hot('arrow');
       if (arrow >= 0) { this.sel = arrow >> 1; this.change(ROWS[this.sel], arrow & 1 ? 1 : -1); return; }

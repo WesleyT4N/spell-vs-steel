@@ -29,8 +29,8 @@ export interface CardDef {
   /** One-line rules text (keep under ~90 chars, it has to fit a 240px screen). */
   short: string;
   cast: (x: CastCtx) => void;
-  /** CPU hint: is now a good moment to cast this? */
-  ai?: (b: Battle, f: Fighter) => boolean;
+  /** CPU hint: is now a good moment to cast this? Rolls use `rand` (the CPU's seeded generator), never Math.random. */
+  ai?: (b: Battle, f: Fighter, rand: () => number) => boolean;
 }
 
 export const MAX_COPIES: Record<Rarity, number> = { common: 4, uncommon: 2, legendary: 1, mythic: 1 };
@@ -58,7 +58,7 @@ const warrior: CardDef[] = [
     id: 'guard', name: 'Guard', cls: 'warrior', cost: 0, rarity: 'common', element: 'steel', damaging: false, lock: 0.2,
     dmg: '-', short: 'For 2s, block the next hit completely. A block gives 1 Rage.',
     cast: x => x.b.addShield(x.f, 'guard', 1, 2),
-    ai: (b, f) => b.projectiles.some(p => p.side !== f.side && p.row === f.row) || b.foe(f).lock > 0 || Math.random() < 0.3,
+    ai: (b, f, rand) => b.projectiles.some(p => p.side !== f.side && p.row === f.row) || b.foe(f).lock > 0 || rand() < 0.3,
   },
   {
     id: 'lunge', name: 'Lunge', cls: 'warrior', cost: 2, rarity: 'common', element: 'steel', damaging: true, lock: 0.45,

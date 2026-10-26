@@ -94,7 +94,8 @@ Determinism rules:
 
 - Rule randomness comes from `b.rand()` or `shuffle(list, b.rand)`, never `Math.random`. `npm run netcheck` catches drift.
 - Observers wrap methods on one instance and only read state.
-- The CPU and voice-line choice use `Math.random`; neither feeds the rules online.
+- Each CPU rolls from `substream(b.seed, side)` (`game/rng.ts`), a stream separate from `b.rand`, so a CPU match replays exactly from its seed. Card `ai` hints get that `rand`. `tests/matches.ts` gives `Math.random` a new stream on every play, so a leak fails its replay check. Voice-line choice still uses `Math.random` (sound only).
+- Double KO: if both fighters hit 0 HP on the same frame, the one with more HP going into it hangs on with 1 HP (ties go to the left side).
 - `timers` and `anims` still hold closures. Rollback works anyway because `net/snapshot.ts` restores the Battle in place, so the closures keep pointing at live objects. Delayed effects must keep their mutable state in `b.keep({...})`, and the RNG state is saved with `rand.setState`.
 - Replays (`game/replay.ts`): a match is a list of round tapes (seed, decks, per-frame inputs) plus a rules fingerprint, so playback just reruns the Battle. `npm run replaycheck` checks a replay ends with the same hash.
 
@@ -258,7 +259,18 @@ The Battle calls `sfx()`, `sfxFx()` and `voiceLine()` directly; sounds never fee
 
 ## UI and screens
 
-One `Scene` at a time (`scenes/scene.ts`: `update`, `draw(world, tick, ui)`, `enter?`, `pad?`). Switch with `setScene(new X())`; there is no stack yet (PR #50 adds one).
+Screens live on a stack (`scenes/stack.ts`, re-exported by `scenes/scene.ts`). A `Scene` has `update`, `draw(world, tick, ui)`, `enter?` (first open), `resume?` (shown again after the screen on top closes) and `pad?`.
+
+```mermaid
+flowchart LR
+  push["pushScene(s)<br/>open on top"] --> st[(stack<br/>title at the bottom)]
+  st --> pop["popScene()<br/>BACK: resume the one underneath as left"]
+  st --> rep["replaceScene(s)<br/>next round, rematch,<br/>fight replaces stage select"]
+  st --> to["popTo(pred, orElse)<br/>CHARACTER SELECT after a set"]
+  st --> home["goHome()<br/>TITLE / QUIT: fresh title"]
+```
+
+Scenes never import `TitleScene`; `main.ts` registers it with `setHome`. Screens with a `back` callback default it to `popScene`. `tests/scene-stack.ts` checks the rules.
 
 ```mermaid
 flowchart LR
@@ -369,7 +381,7 @@ Release: PR → Wes says "lgtm" → merge → rebuild from latest main → publi
 flowchart LR
   pr[Pull request] --> a["Job 1<br/>typecheck, dev build, prod build"]
   a --> sv["tests/saves.ts<br/>migrations, legacy import"] --> m["tests/matches.ts<br/>CPU vs CPU, every class pair"]
-  m --> n["netcheck 25<br/>online determinism"]
+  m --> ss["tests/scene-stack.ts<br/>BACK rules"] --> n["netcheck 25<br/>online determinism"]
   n --> c[combocheck] --> rc["rollcheck 25<br/>rollback = straight play"]
   pr --> b["Job 2: screens<br/>Playwright, every screen at 7 shapes"]
   b --> d["Pixel diff vs base branch<br/>screens-report artifact"]
@@ -380,7 +392,8 @@ flowchart LR
 | `npm run typecheck` | CI | Type errors, unused locals |
 | `npm run rollcheck` | CI | Rollback play ending differently from straight play |
 | `npx tsx tests/saves.ts` | CI | Save migrations, legacy import, caps |
-| `npx tsx tests/matches.ts` | CI | Crashes, stuck or broken full matches |
+| `npx tsx tests/matches.ts` | CI | Crashes, stuck or broken full matches, a seed not replaying (unseeded CPU or rule rolls) |
+| `npx tsx tests/scene-stack.ts` | CI | BACK not returning to the screen it came from |
 | `npm run netcheck` | CI | Two seeded battles with the same inputs drifting apart |
 | `npm run combocheck` | CI | Combo counter counting escapable hits |
 | `tests/screens/run.ts` | CI | Screens changing vs the base branch (report, not a hard fail) |
@@ -397,5 +410,5 @@ New screens go in `tests/screens/harness.ts`.
 
 - Modularize (#35): `src/content/registry.ts` and `src/content/stages/`, plus `npm run golden`; class folders follow.
 - Sim events: `BattleEvent` sink feeding `engine/battleAudio.ts` (rollback thread).
-- Engine primitives: scene stack and seeded CPU (#50), gamepads and platform layer (#49).
+- Engine primitives: gamepads and platform layer (#49).
 - Touch UI (#51), BN indicators (#32), hit feel (#34), soundtrack, card pass on the outliers the balance sweep found.

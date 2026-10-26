@@ -1,8 +1,7 @@
 // Replays: the list of saved matches (title > REPLAYS), and the player that watches one. Playback
 // runs the recorded controls through a fresh battle and skips the Draw screens, Battle Network style.
-import { setScene, hint, zone, hot, listMouse, showSel, resetSel, type Scene } from './scene';
+import { pushScene, popScene, replaceScene, popTo, hint, zone, hot, listMouse, showSel, resetSel, type Scene } from './scene';
 import { BattleScene } from './battle';
-import { TitleScene } from './title';
 import { getArena, useStage } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, defaultSkin } from '../art/sprites';
@@ -48,7 +47,7 @@ export class ReplaysScene implements Scene {
     if (this.sel >= this.top + SHOWN) this.top = this.sel - SHOWN + 1;
   }
 
-  private watch(r: Replay): void { sfx('confirm'); setScene(new ReplayScene(r)); }
+  private watch(r: Replay): void { sfx('confirm'); pushScene(new ReplayScene(r)); }
 
   private keep(r: Replay): void {
     if (!toggleKeep(r.id)) { this.msg = 'KEPT LIST IS FULL (20)'; this.msgT = 2; sfx('deny'); return; }
@@ -60,9 +59,9 @@ export class ReplaysScene implements Scene {
 
   update(dt: number): void {
     this.msgT = Math.max(0, this.msgT - dt);
-    if (wasPressed('back') || mouse.rclick) { sfx('back'); setScene(new TitleScene()); return; }
+    if (wasPressed('back') || mouse.rclick) { sfx('back'); popScene(); return; }
     const n = this.list.length;
-    if (!n) { if (mouse.click || wasPressed('confirm')) { sfx('back'); setScene(new TitleScene()); } return; }
+    if (!n) { if (mouse.click || wasPressed('confirm')) { sfx('back'); popScene(); } return; }
     if (mouse.wheel) { this.top = Math.max(0, Math.min(n - SHOWN, this.top + Math.sign(mouse.wheel))); }
     if (mouse.click && hot('keep') >= 0) { this.keep(this.list[hot('keep')]); return; }
     const clicked = listMouse('row', this.sel, i => { this.sel = i; sfx('move'); });
@@ -209,8 +208,8 @@ export class ReplayScene extends BattleScene {
       sfx('select');
       stopMusic();
       const choice = items[this.resultSel];
-      if (choice === 'NEXT ROUND') setScene(new ReplayScene(this.replay, this.roundNo + 1, this.score, this.rounds));
-      if (choice === 'WATCH AGAIN') setScene(new ReplayScene(this.replay));
+      if (choice === 'NEXT ROUND') replaceScene(new ReplayScene(this.replay, this.roundNo + 1, this.score, this.rounds));
+      if (choice === 'WATCH AGAIN') replaceScene(new ReplayScene(this.replay));
       if (choice === 'REPLAYS') this.exit();
     }
   }
@@ -219,7 +218,8 @@ export class ReplayScene extends BattleScene {
     for (const f of this.b.f) chargeHum(f.side, null);
     stopMusic();
     sfx('back');
-    setScene(new ReplaysScene(this.replay.id));
+    // back to the list, still on this replay
+    popTo(s => s instanceof ReplaysScene, () => new ReplaysScene(this.replay.id));
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {

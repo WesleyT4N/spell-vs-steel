@@ -421,6 +421,7 @@ export class Battle {
 
   // ---------- main update ----------
   update(dt: number, intents: [Intent, Intent]): void {
+    const hpBefore = [this.f[0].hp / this.f[0].maxHp, this.f[1].hp / this.f[1].maxHp];
     this.time += dt;
     this.shake = Math.max(0, this.shake - dt);
     this.cheer = Math.max(0, this.cheer - dt);
@@ -459,6 +460,8 @@ export class Battle {
     this.updateZones();
     this.combo.update(this, dt);
 
+    // double KO: whoever had more HP left going into this frame hangs on with 1 HP (ties go to the left side)
+    if (!this.noKo && this.f.every(f => !f.dead && f.hp <= 0)) this.f[hpBefore[0] >= hpBefore[1] ? 0 : 1].hp = 1;
     for (const f of this.f) {
       if (!f.dead && f.hp <= 0 && this.noKo) {
         f.hp = f.maxHp;

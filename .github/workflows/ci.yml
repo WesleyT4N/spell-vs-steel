@@ -34,6 +34,8 @@ jobs:
         run: npx tsx tests/saves.ts
       - name: CPU vs CPU matches, every class pair
         run: npx tsx tests/matches.ts
+      - name: Scene stack (BACK)
+        run: npx tsx tests/scene-stack.ts
       - name: Online determinism
         run: npx tsx scripts/netcheck.ts 25
       - name: Combo counter
