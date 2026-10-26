@@ -144,7 +144,7 @@ export class BattleScene implements Scene {
     if (b.phase === 'fight' && pause) { this.paused = true; this.pauseSel = 0; resetSel(); sfx('select'); return; }
 
     // a player opens the Draw screen when the gauge is full; with nobody playing, the CPUs do, a moment after
-    const wantsDraw = this.watching ? Math.random() < 0.02 : this.humans.some(s => this.pressedOf(s, 'custom'));
+    const wantsDraw = this.watching ? !!this.cpu0?.wantsDraw(b, b.f[0], dt) : this.humans.some(s => this.pressedOf(s, 'custom'));
     if (b.phase === 'fight' && wantsDraw && b.canOpenCustom()) {
       b.beginCustom();
       this.openCustom();
