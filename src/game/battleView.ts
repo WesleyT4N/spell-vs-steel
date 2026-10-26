@@ -1,6 +1,6 @@
 // Draws a Battle: arena, panels, fighters, spell effects and the HUD.
 import { k } from '../engine/input';
-import { drawPanel, drawStage, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState } from '../art/arena';
+import { drawPanel, drawStage, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, TEAM_RIM, type PanelState } from '../art/arena';
 import { getStage } from '../art/stages';
 import type { Stage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, type Tint } from '../art/sprites';
@@ -214,7 +214,7 @@ function drawHawk(c: Ctx, x: number, y: number, d: number, up: boolean): void {
 function drawHole(c: Ctx, col: number, row: number, owner: 0 | 1): void {
   const x = X0 + col * PW, y = Y0 + row * (FACE + LIP);
   P(c, '#000000', x, y - 1, PW, FACE + LIP + 1);
-  P(c, owner === 0 ? '#881400' : '#0058f8', x + 1, y, PW - 2, 1);
+  P(c, TEAM_RIM[owner][1], x + 1, y, PW - 2, 1);
   P(c, '#1a1218', x + 3, y + 2, PW - 6, FACE - 2);
 }
 
@@ -525,8 +525,14 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
 // ---------- HUD (sharp UI layer, 480×320) ----------
 const UI = 2; // world-to-UI scale
 
-/** Everything drawn over the fight at UI resolution: HP, resources, the Draw gauge, statuses, damage numbers, cast callouts. */
-export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0): void {
+/** Key labels for a shared screen (two players, or CPU vs CPU): each side's cast key (null: no key) and the Draw key. */
+export interface SharedKeys { cast: [string | null, string | null]; draw: string | null }
+
+/**
+ * Everything drawn over the fight at UI resolution: HP, resources, the Draw gauge, statuses, damage numbers, cast callouts.
+ * `shared` shows both sides' next spells instead of just `me`'s.
+ */
+export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0, shared?: SharedKeys): void {
   for (const t of b.texts) {
     const pc = panelFoot(t.x, t.y);
     const big = /^\d+$/.test(t.text);
@@ -539,9 +545,11 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0): vo
   const gx = UW / 2 - 70, gw = 140;
   const full = b.gauge >= 1;
   bar(ui, gx, 8, gw, 12, b.gauge, full ? (tick % 4 < 2 ? '#f8b800' : '#fce0a8') : '#3cbcfc');
-  drawTextCentered(ui, full ? `${k('custom')}: DRAW` : 'DRAW', UW / 2, 24, full ? '#f8b800' : '#bcbcbc');
+  const drawKey = shared ? shared.draw : k('custom');
+  drawTextCentered(ui, full && drawKey ? `${drawKey}: DRAW` : 'DRAW', UW / 2, 24, full ? '#f8b800' : '#bcbcbc');
   for (const e of b.fx) if (e.kind === 'castName') drawCastCallout(ui, e);
-  drawNextSpell(ui, b, b.f[me]);
+  if (shared) for (const f of b.f) drawNextSpell(ui, b, f, shared.cast[f.side], f.side === 1);
+  else drawNextSpell(ui, b, b.f[me], k('cast'), me === 1);
 }
 
 function drawFighterHud(ui: Ctx, b: Battle, f: Fighter, tick: number): void {
@@ -675,24 +683,29 @@ function drawCastCallout(ui: Ctx, e: Fx): void {
 }
 
 /** What the cast key will do next, bottom left. */
-function drawNextSpell(ui: Ctx, b: Battle, f: Fighter): void {
+/** The plate naming `f`'s next spell, bottom left (bottom right for the right side on a shared screen). */
+function drawNextSpell(ui: Ctx, b: Battle, f: Fighter, key: string | null = k('cast'), right = false): void {
   if (b.phase !== 'fight' || !f.queue.length) return;
   const card = CARDS[f.queue[0]], ok = b.canAfford(f, card);
   const more = f.queue.length - 1;
-  const s = `${k('cast')}: ${card.name.toUpperCase()}`;
+  const s = `${key ?? 'NEXT'}: ${card.name.toUpperCase()}`;
   const tw = textWidth(s) + (more ? textWidth(`  +${more}`) : 0);
-  win(ui, 8, UH - 23, tw + 28, 18, { burn: 3 });
-  P(ui, '#000000', 11, UH - 19, 10, 10);
-  P(ui, ok ? ELEMENT_COLOR[card.element] : '#7c7c7c', 12, UH - 18, 8, 8);
-  drawText(ui, s, 25, UH - 18, ok ? INK : TRIM);
-  if (more) drawText(ui, `+${more}`, 25 + textWidth(s) + 12, UH - 18, INK2);
-  if (!ok) drawTextOutlined(ui, f.st.silenced > 0 ? 'SILENCED' : `NEED ${CLASS_INFO[card.cls].res}`, tw + 44, UH - 18, '#f83800');
+  const x = right ? UW - 16 - (tw + 28) : 0;
+  win(ui, x + 8, UH - 23, tw + 28, 18, { burn: 3 });
+  P(ui, '#000000', x + 11, UH - 19, 10, 10);
+  P(ui, ok ? ELEMENT_COLOR[card.element] : '#7c7c7c', x + 12, UH - 18, 8, 8);
+  drawText(ui, s, x + 25, UH - 18, ok ? INK : TRIM);
+  if (more) drawText(ui, `+${more}`, x + 25 + textWidth(s) + 12, UH - 18, INK2);
+  if (!ok) {
+    const need = f.st.silenced > 0 ? 'SILENCED' : `NEED ${CLASS_INFO[card.cls].res}`;
+    drawTextOutlined(ui, need, right ? x - textWidth(need) : tw + 44, UH - 18, '#f83800');
+  }
   // global cooldown: a bar along the bottom of the plate fills back up between casts
   if (f.castCd > 0) {
     const p = 1 - f.castCd / TUNING.castCooldown;
-    ui.globalAlpha = 0.45; P(ui, '#503000', 10, UH - 21, tw + 24, 14); ui.globalAlpha = 1;
-    P(ui, '#d8a060', 10, UH - 9, tw + 24, 2);
-    P(ui, '#a81000', 10, UH - 9, Math.round((tw + 24) * p), 2);
+    ui.globalAlpha = 0.45; P(ui, '#503000', x + 10, UH - 21, tw + 24, 14); ui.globalAlpha = 1;
+    P(ui, '#d8a060', x + 10, UH - 9, tw + 24, 2);
+    P(ui, '#a81000', x + 10, UH - 9, Math.round((tw + 24) * p), 2);
   }
 }
 
