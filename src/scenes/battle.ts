@@ -44,6 +44,8 @@ export class BattleScene implements Scene {
   ended = false;
   /** Which side this screen plays: 0 (left) against the CPU, either side online. */
   me: Side = 0;
+  /** False in training: the Draw screen waits for you. */
+  protected timed = true;
 
   /** Rounds won in the current set, by side. `battle` lets online play hand in a seeded battle. */
   constructor(public m: MatchConfig, public score: [number, number] = [0, 0], battle?: Battle) {
@@ -130,8 +132,10 @@ export class BattleScene implements Scene {
       const cur = this.lift[i] ?? 0, to = this.level(i) * LIFT;
       this.lift[i] = Math.abs(to - cur) < 0.5 ? to : cur + (to - cur) * Math.min(1, dt * 18);
     }
-    this.timer -= dt;
-    if (this.timer <= 0) { this.confirmCustom(); return; }
+    if (this.timed) {
+      this.timer -= dt;
+      if (this.timer <= 0) { this.confirmCustom(); return; }
+    }
     // mouse: hover a card to read it, click to pick or unpick, right-click to undo
     const over = isHot('fight') ? offer.length : hot('card');
     if (mouse.moved) this.mouseMode = true;
@@ -264,7 +268,8 @@ export class BattleScene implements Scene {
     P(ui, '#0000a8', sx, 0, sw, 26);
     drawText(ui, `DRAW   TURN ${b.turn}`, 10, 10, '#fcfcfc');
     const secs = Math.ceil(this.timer);
-    drawTextCentered(ui, String(secs).padStart(2, '0'), UW / 2, 6, secs <= 5 && tick % 4 < 2 ? '#f83800' : '#f8b800', 2);
+    if (this.timed) drawTextCentered(ui, String(secs).padStart(2, '0'), UW / 2, 6, secs <= 5 && tick % 4 < 2 ? '#f83800' : '#f8b800', 2);
+    else drawTextCentered(ui, 'NO TIME LIMIT', UW / 2, 10, '#bcbcbc');
     const total = this.picks.reduce((a, i) => { const cc = CARDS[offer[i]].cost; return a + (cc === 'all' ? 1 : cc); }, 0);
     this.drawResourcePreview(ui, tick);
     const short = this.shortfalls();
