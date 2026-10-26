@@ -319,7 +319,7 @@ export class TitleScene implements Scene {
 }
 
 /** Shorter names for the two-column phone menu. */
-const TALL_LABEL: Record<string, string> = { 'ARCADE MODE': 'ARCADE', 'VERSUS MODE': 'VERSUS', 'ONLINE MODE': 'ONLINE', 'DECK BUILDER': 'DECKS' };
+const TALL_LABEL: Record<string, string> = { 'ARCADE MODE': 'ARCADE', 'VERSUS MODE': 'VERSUS', 'ONLINE MODE': 'ONLINE', 'TRAINING MODE': 'TRAINING', 'DECK BUILDER': 'DECKS' };
 /** The phone menu's rows: ARCADE alone and tall, the rest in pairs. */
 function tallRows(): Array<{ items: string[]; h: number }> {
   const rest = ITEMS.filter(i => i !== 'ARCADE MODE');
