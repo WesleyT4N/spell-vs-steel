@@ -14,13 +14,15 @@ export interface MatchConfig {
   cpuSkin: Record<ClassId, string>;
   /** Rounds in a set: 1 (single match), 3 or 5. */
   bestOf: 1 | 3 | 5;
+  /** Last stage tile picked: a stage id or 'random'. */
+  stage: string;
 }
 
 const KEY = 'svs:match';
 
 export function loadMatch(): MatchConfig {
   const skins = (): Record<ClassId, string> => Object.fromEntries(CLASS_IDS.map(c => [c, defaultSkin(c)])) as Record<ClassId, string>;
-  const def: MatchConfig = { p1: 'warrior', p1Deck: 'starter', cpu: 'mage', difficulty: 'normal', bestOf: 3, p1Skin: skins(), cpuSkin: skins() };
+  const def: MatchConfig = { p1: 'warrior', p1Deck: 'starter', cpu: 'mage', difficulty: 'normal', bestOf: 3, stage: 'colosseum', p1Skin: skins(), cpuSkin: skins() };
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return def;

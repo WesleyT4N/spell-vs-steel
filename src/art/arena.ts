@@ -1,4 +1,5 @@
 // Grand Colosseum, ported from art/arenas.html. 16-bit backdrop, 8-bit NES panels.
+// The other stages live in stages.ts and share the panel grid drawn here.
 import { P, W, H, rng, shade, vgrad, vnoise, sphere, glow, mix, layer, type Ctx } from '../engine/gfx';
 
 export const COLS = 6, ROWS = 3, PW = 38, FACE = 15, LIP = 4, X0 = 6, Y0 = 98;
@@ -30,13 +31,13 @@ function bricks(c: Ctx, x0: number, y0: number, w: number, h: number, bw: number
   }
 }
 
-function cloud(c: Ctx, x: number, y: number, s: number): void {
+export function cloud(c: Ctx, x: number, y: number, s: number): void {
   const R = ['#8aa2d0', '#b4c8ea', '#dce8f8', '#ffffff'];
   for (const [dx, dy, r] of [[-9, 2, 4], [-3, -1, 6], [5, -3, 7], [13, 0, 5], [19, 2, 3.5]]) sphere(c, x + dx * s, y + dy * s, r * s, r * s * 0.85, R);
   P(c, R[0], x - 12 * s, y + 4 * s, 34 * s, 1);
 }
 
-function banner(c: Ctx, x: number, y: number, w: number, h: number, ramp: string[], trim: string, t: number): void {
+export function banner(c: Ctx, x: number, y: number, w: number, h: number, ramp: string[], trim: string, t: number): void {
   for (let i = 0; i < h; i++) {
     const off = Math.round(Math.sin(t * 0.5 + i * 0.35 + x) * 0.8);
     const tail = i >= h - 3 ? h - i : 0;
@@ -51,7 +52,7 @@ function banner(c: Ctx, x: number, y: number, w: number, h: number, ramp: string
   P(c, '#8a6a3a', x - 1, y - 2, w + 2, 1);
 }
 
-function torch(c: Ctx, x: number, y: number, t: number, i: number): void {
+export function torch(c: Ctx, x: number, y: number, t: number, i: number): void {
   P(c, '#2a2a30', x, y + 4, 2, 6); P(c, '#5a5a66', x - 1, y + 3, 4, 2); P(c, '#8a8a96', x - 1, y + 3, 4, 1);
   const f = (t + i) % 3;
   glow(c, x + 1, y, 16, '255,140,40', 0.35);
@@ -63,7 +64,38 @@ const k = (x: number): number => -Math.round(6 * ((x - 120) / 120) ** 2);
 
 type Fan = [number, number, string[], string[], number];
 
-export class Colosseum {
+/** Colors of a clean panel face and its front lip. */
+export interface PanelLook { face: string; hi: string; lo: string; lip: string; lipLo: string }
+
+/** A battle stage: an animated backdrop plus the look of its panels. Stages are scenery only and play the same. */
+export interface Stage {
+  id: string;
+  name: string;
+  /** One-line flavor shown on the stage select. */
+  tag: string;
+  panel: PanelLook;
+  /** Seed for the per-panel texture marks. */
+  panelSeed: number;
+  /** Marks on a clean panel face (`r` is seeded per panel). */
+  tex(c: Ctx, x: number, y: number, w: number, h: number, r: () => number): void;
+  /** Draw the full backdrop. `t` is an animation tick (about 8 per second); `cheer` livens up any crowd. */
+  draw(c: Ctx, t: number, cheer?: number): void;
+}
+
+const STONE: PanelLook = { face: '#bcbcbc', hi: '#fcfcfc', lo: '#7c7c7c', lip: '#7c7c7c', lipLo: '#000000' };
+/** Grey stone face: one seam and a few pits. */
+export function stoneTex(c: Ctx, x: number, y: number, w: number, h: number, r: () => number): void {
+  P(c, '#7c7c7c', x + 8 + Math.floor(r() * 18), y + 1, 1, h - 2);
+  for (let i = 0; i < 4; i++) P(c, '#7c7c7c', x + r() * w, y + 1 + r() * (h - 2));
+}
+
+export class Colosseum implements Stage {
+  id = 'colosseum';
+  name = 'GRAND COLOSSEUM';
+  tag = 'THE CLASSIC PROVING GROUND';
+  panel = STONE;
+  panelSeed = 1010;
+  tex = stoneTex;
   back: HTMLCanvasElement;
   front: HTMLCanvasElement;
   crowd: Fan[] = [];
@@ -184,7 +216,6 @@ export class Colosseum {
     }
   }
 
-  /** Draw the full backdrop. `t` is an animation tick (about 8 per second); `cheer` makes the crowd hop more. */
   draw(c: Ctx, t: number, cheer = 0): void {
     c.drawImage(this.back, 0, 0);
     [[30, 5, 0.8], [150, 2, 0.6], [230, 8, 0.7]].forEach(([cx, cy, s], i) => cloud(c, ((cx + t * 0.2 * (1 + i * 0.3)) % 300) - 30, cy, s));
@@ -211,24 +242,19 @@ export class Colosseum {
 
 export type PanelState = 'clean' | 'burning' | 'cracked';
 
-const PANEL = { face: '#bcbcbc', hi: '#fcfcfc', lo: '#7c7c7c', lip: '#7c7c7c', lipLo: '#000000' };
-
-export function drawPanel(c: Ctx, col: number, row: number, state: PanelState, _t: number, owner: 0 | 1, highlight?: string): void {
+export function drawPanel(c: Ctx, col: number, row: number, state: PanelState, _t: number, owner: 0 | 1, highlight: string | undefined, stage: Stage): void {
   const x = X0 + col * PW, y = Y0 + row * (FACE + LIP);
   const team = owner === 0 ? LEFT_EDGE : RIGHT_EDGE;
   const fx = x + 2, fy = y + 1, fw = PW - 4, fh = FACE - 2;
+  const look = stage.panel;
   P(c, '#000000', x, y - 1, PW, FACE + LIP + 1);
   P(c, team, x + 1, y, PW - 2, FACE);
-  let face = PANEL.face, hi = PANEL.hi, lo = PANEL.lo;
+  let face = look.face, hi = look.hi, lo = look.lo;
   if (state === 'burning') { face = '#000000'; hi = '#a81000'; lo = '#000000'; }
   if (highlight) { face = mix(face, highlight, 0.55); }
   P(c, face, fx, fy, fw, fh); P(c, hi, fx, fy, fw, 1); P(c, lo, fx, fy + fh - 1, fw, 1);
-  P(c, PANEL.lip, x + 1, y + FACE, PW - 2, LIP); P(c, PANEL.lipLo, x + 1, y + FACE + LIP - 1, PW - 2, 1);
-  const r = rng(col * 31 + row * 7 + 1010);
-  if (state !== 'burning') {
-    P(c, '#7c7c7c', fx + 8 + Math.floor(r() * 18), fy + 1, 1, fh - 2);
-    for (let i = 0; i < 4; i++) P(c, '#7c7c7c', fx + r() * fw, fy + 1 + r() * (fh - 2));
-  }
+  P(c, look.lip, x + 1, y + FACE, PW - 2, LIP); P(c, look.lipLo, x + 1, y + FACE + LIP - 1, PW - 2, 1);
+  if (state !== 'burning') stage.tex(c, fx, fy, fw, fh, rng(col * 31 + row * 7 + stage.panelSeed));
   if (state === 'cracked') {
     const cr = rng(col * 13 + row * 5 + 9);
     let cx = fx + 4 + Math.floor(cr() * 6), cy = fy + 1;
