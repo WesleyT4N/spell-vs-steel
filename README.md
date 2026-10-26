@@ -10,7 +10,7 @@
 
 ## About this game
 
-**Spell VS Steel** is a real-time grid battler where your deck is your weapon. Two fighters square off across a field of panels, dodging, slashing and hurling spells in a fast duel, and every few seconds the action freezes so both sides can draw fresh spells from the grimoires they built. Pick a class, master its cards, and outplay your rival one panel at a time.
+**Spell VS Steel** is a real-time grid battler where your deck is your weapon. Two fighters square off across a field of panels, dodging, slashing and hurling spells in a fast duel, and every few seconds the action freezes so both sides can draw fresh spells from the decks they built. Pick a class, master its cards, and outplay your rival one panel at a time.
 
 Inspired by the Mega Man Battle Network series and rebuilt for fantasy heroes and head-to-head play.
 
