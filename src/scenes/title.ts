@@ -14,15 +14,16 @@ import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { OptionsScene } from './options';
 import { OnlineScene } from './online';
+import { ReplaysScene } from './replays';
 import { tutorialDone } from './tutorial';
 import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
 import { RED_INK } from './skin';
 
-const ITEMS = ['VERSUS MODE', 'ONLINE MODE', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
+const ITEMS = ['VERSUS MODE', 'ONLINE MODE', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'REPLAYS', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
 
-// seven rows in dev builds still clear the version line
-const MENU_Y = ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 6 ? 16 : 18;
+// seven or eight rows still clear the version line
+const MENU_Y = ITEMS.length > 7 ? 160 : ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 7 ? 15 : ITEMS.length > 6 ? 16 : 18;
 // taller screens (phone portrait) have room under the stage: rows grow into it, with double-size text once they fit
 const MAX_GAP = 36, BIG_GAP = 24;
 
@@ -90,6 +91,7 @@ export class TitleScene implements Scene {
       if (item === 'TRAINING') setScene(new CharSelectScene(undefined, 0, 'training'));
       if (item === 'TUTORIAL') setScene(new CharSelectScene(undefined, 0, 'tutorial'));
       if (item === 'DECK BUILDER') setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
+      if (item === 'REPLAYS') setScene(new ReplaysScene());
       if (item === 'OPTIONS') setScene(new OptionsScene(() => setScene(new TitleScene())));
       // loaded on demand, so the prod build (DEV_TOOLS off) carries none of the dev tools code
       if (item === 'DEV TOOLS' && DEV_TOOLS) void import('./devMenu').then(m => setScene(new m.DevMenuScene(() => setScene(new TitleScene()))));

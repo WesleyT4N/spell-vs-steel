@@ -8,6 +8,7 @@ import { battleHash } from '../net/hash';
 import { NO_INPUT, type NetInput } from '../net/protocol';
 import type { NetSession } from '../net/session';
 import { roundRecord, type RoundRecord } from '../game/stats';
+import type { ReplayMode } from '../game/replay';
 import { UW, type Ctx } from '../engine/gfx';
 import { drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
@@ -44,6 +45,8 @@ export class OnlineBattleScene extends BattleScene {
     this.pauseItems = ['RESUME', 'LEAVE MATCH'];
     net.beginRound(roundNo);
   }
+
+  protected get replayMode(): ReplayMode { return 'online'; }
 
   protected rivalDeckText(): string { return `RIVAL: ${this.net.rival?.cls.toUpperCase() ?? ''}`; }
 
