@@ -6,7 +6,7 @@ import type { ClassId } from '../art/sprites';
 import type { Dir, Intent } from '../game/battle';
 
 /** Bump when the rules or the protocol change, so mismatched builds refuse to play each other. */
-export const PROTOCOL = 6;
+export const PROTOCOL = 7;
 
 export interface Hello { cls: ClassId; skin: string; deck: string[] }
 

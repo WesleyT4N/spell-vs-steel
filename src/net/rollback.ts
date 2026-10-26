@@ -12,9 +12,8 @@
 //  - the Draw screen opens on a confirmed frame, so it never opens on a guess and closes again;
 //  - the round ends on a confirmed frame (a guessed K.O. can still be undone);
 //  - desync checksums are taken on confirmed frames.
-// Sounds play when a frame runs for the first time; replays run silent.
+// Events (sounds, hits, casts) go out when a frame runs for the first time; replays send none.
 import { Battle } from '../game/battle';
-import { withoutSfx } from '../engine/audio';
 import { NO_INPUT, type NetInput } from './protocol';
 import { loadBattle, saveBattle, type Snapshot } from './snapshot';
 import { battleHash } from './hash';
@@ -106,7 +105,7 @@ export class Rollback {
     const target = this.frame, from = this.confirmed;
     loadBattle(this.b, this.snap);
     this.frame = from;
-    withoutSfx(() => {
+    this.quietly(() => {
       while (this.frame < upto && this.b.phase !== 'custom' && this.b.phase !== 'over') this.runConfirmed(this.frame);
       this.snap = saveBattle(this.b, this.extra);
       if (this.b.phase === 'custom' || this.b.phase === 'over') return;
@@ -114,6 +113,13 @@ export class Rollback {
     });
     this.lastRollback = wrong ? target - from : 0;
     if (wrong) { this.rollbacks++; this.maxRollback = Math.max(this.maxRollback, this.lastRollback); }
+  }
+
+  /** Run `fn` with the battle's events switched off (replays). */
+  private quietly(fn: () => void): void {
+    const sink = this.b.sink;
+    this.b.sink = null;
+    try { fn(); } finally { this.b.sink = sink; }
   }
 
   /** Run frame `frame` on known inputs (Draw presses count) and confirm it. */

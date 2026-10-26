@@ -397,7 +397,7 @@ export class BattleScene implements Scene {
       const s = this.fightBanner > 0.45 ? 'READY' : 'FIGHT!';
       drawTextCentered(ui, s, UW / 2, 124, s === 'FIGHT!' ? '#f8b800' : '#fcfcfc', 6);
     }
-    if (b.phase === 'ko' && b.koT > 0.4) drawTextCentered(ui, 'K.O.', UW / 2, 116, '#f83800', 6);
+    if (b.phase === 'ko' && b.koT > 0.4) drawTextCentered(ui, b.winner === null ? 'DOUBLE K.O.' : 'K.O.', UW / 2, 116, '#f83800', b.winner === null ? 4 : 6);
     if (b.phase === 'over') this.drawResult(ui, tick);
     if (this.paused) {
       dim(ui, 0.55);
