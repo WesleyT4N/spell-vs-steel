@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at fdafc4e (2026-10-26).
+How the game is put together, one section per system. Describes `main` at 114e66f (2026-10-26).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -124,7 +124,7 @@ flowchart LR
 | `net/rollback.ts` | `Rollback`: one confirmed snapshot, guesses up to `MAX_ROLLBACK = 10` frames, rewind and replay, `onConfirmed` feeds the replay `TapeWriter` |
 | `net/snapshot.ts` | Snapshots the Battle object graph and restores it in place; watchers (post-match stats) pass extra roots |
 | `net/session.ts` | `NetSession`: handshake, readiness, input buffers, RTT, status (waiting / connected / reconnecting / lost), desync flag |
-| `net/protocol.ts` | `Packet`, `PROTOCOL = 5`, 10-bit input packing (2 chars per frame), room codes |
+| `net/protocol.ts` | `Packet`, `PROTOCOL = 6`, 10-bit input packing (2 chars per frame), room codes |
 | `net/transport.ts` | `room` (claude.ai artifact presence), `peer` (WebRTC via PeerJS), `local` (BroadcastChannel, fake lag) |
 | `net/hash.ts` | `battleHash(b)`, FNV-1a over everything the rules read |
 | `scenes/online.ts`, `scenes/onlineBattle.ts` | Online menu and the Versus scene driven by `Netplay` |
