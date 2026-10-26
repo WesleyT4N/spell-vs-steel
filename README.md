@@ -12,7 +12,7 @@
 
 **Spell VS Steel** is a real-time grid battler where your deck is your weapon. Two fighters square off across a field of panels, dodging, slashing and hurling spells in a fast duel, and every few seconds the action freezes so both sides can draw fresh spells from the decks they built. Pick a class, master its cards, and outplay your rival one panel at a time.
 
-Inspired by the Mega Man Battle Network series and rebuilt for fantasy heroes and head-to-head play.
+Inspired by the Mega Man Battle Network series and rebuilt for fantasy combat and head-to-head play.
 
 ### ⚔️ Five heroes, five ways to fight
 
@@ -52,8 +52,6 @@ Duel a friend on the same keyboard, challenge them online with a room code, or c
 
 ## How to play
 
-New to this kind of game? A match is one simple loop, repeated until someone falls.
-
 **1. Pick your hero and spell deck.** Choose one of the five classes and the deck of spells you'll bring.
 
 <p align="center"><img src="docs/media/select.gif" alt="Arcade mode character select: switching from Warrior to Mage" width="480"></p>
@@ -70,19 +68,19 @@ New to this kind of game? A match is one simple loop, repeated until someone fal
 
 <p align="center"><img src="docs/media/ko.gif" alt="A Mage finishes a Warrior with a K.O., then the round stats screen" width="480"></p>
 
-Never played before? The in-game **Tutorial** walks you through all of this against a training dummy.
+Never played before? The in-game **Tutorial** walks you through all of this!
 
 ## Key features
 
 - **5 playable classes**, each with its own resource, playstyle and 26-card spell pool
 - **Deck building** with Legendaries, Mythics, ready-made decks, and import and export to share your builds
-- **Arcade mode**: four rivals of rising difficulty, then a duel against your own Shadow Self
-- **Local versus** for two players on one keyboard
+- **Arcade mode**: four rivals of rising difficulty, then a duel against your own Shadow!
+- **Local versus** for two players on the same couch
 - **Online play** with room codes, ranked matches and rollback netcode
 - **Training mode** to test decks and practice combos, plus a step-by-step tutorial
 - **Replays** and a detailed stats screen after every round
 - **6 animated stages**, from a snowy mountain pass to a dwarven forge inside a volcano
-- **NES-inspired pixel art** with fully animated fighters and spell effects colored by element
+- **Retro-inspired pixel art** with fully animated fighters and spell effects colored by element
 - **Keyboard, mouse and touch** controls, all keys rebindable
 
 ## Controls
