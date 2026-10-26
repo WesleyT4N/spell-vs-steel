@@ -38,6 +38,8 @@ jobs:
         run: npx tsx scripts/netcheck.ts 25
       - name: Combo counter
         run: npx tsx scripts/combo-check.ts
+      - name: Rollback matches straight play
+        run: npx tsx scripts/rollcheck.ts 25
 
   screens:
     name: Screens at every aspect ratio
