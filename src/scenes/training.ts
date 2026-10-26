@@ -149,6 +149,8 @@ export class TrainingScene extends BattleScene {
     this.prevHp = [this.b.f[0].hp, this.b.f[1].hp];
   }
 
+  protected get keepsReplays(): boolean { return false; }
+
   protected rivalDeckText(): string { return `DUMMY: ${ACTS.find(a => a[0] === this.s.act)![1]}${this.s.spells ? ', CASTS SPELLS' : ''}`; }
 
   private get rows(): Row[] {

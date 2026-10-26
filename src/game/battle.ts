@@ -257,7 +257,13 @@ export class Battle {
   /** Every random roll in the rules comes from here, so two machines given the same seed play the same battle. */
   rand: ReturnType<typeof seeded>;
 
-  constructor(a: FighterSpec, bSpec: FighterSpec, readonly seed: number = randomSeed()) {
+  /** The seed and fighters this battle was built from, so a replay can build it again. */
+  readonly seed: number;
+  readonly specs: [FighterSpec, FighterSpec];
+
+  constructor(a: FighterSpec, bSpec: FighterSpec, seed: number = randomSeed()) {
+    this.seed = seed;
+    this.specs = [{ ...a, deck: a.deck.slice() }, { ...bSpec, deck: bSpec.deck.slice() }];
     this.rand = seeded(seed);
     // same class in the same color: the second fighter takes the next color
     const aSkin = a.skin ?? defaultSkin(a.cls);
