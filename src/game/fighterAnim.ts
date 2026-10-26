@@ -158,28 +158,26 @@ export function lookOf(b: Battle, f: Fighter, s: State, held: boolean): Look {
 function deathLook(b: Battle, f: Fighter, s: State, L: Look): Look {
   const t = b.time - s.deadT, d = b.dir(f);
   switch (f.cls) {
-    case 'warrior': {
-      // reels back two steps, crashes to a knee, sags, then topples forward and bounces once on the floor
-      const bounce = t >= 0.84 ? (t < 0.9 ? -2 : t < 0.95 ? -1 : 0) : 0;
+    case 'warrior':
+      // reels back, crashes to a knee, sags, pitches forward onto his hands, then flat on his face (one bounce)
+      L.ox = -3 * d;
       if (t < 0.15) { L.ox = -Math.round(ease(t / 0.15) * 2) * d; L.frame = 'hit'; }
-      else if (t < 0.32) { L.ox = -3 * d; L.frame = 'stagger'; }
-      else if (t < 0.62) { L.ox = -3 * d; L.frame = 'kneel'; L.oy = t < 0.36 ? 1 : 0; }
-      else if (t < 0.72) { L.ox = -3 * d; L.frame = 'slump'; }
-      else if (t < 0.78) { L.ox = -2 * d; L.frame = 'fall1'; }
-      else if (t < 0.84) { L.ox = -1 * d; L.frame = 'fall2'; }
-      else { L.ox = -2 * d; L.oy = bounce; L.frame = 'down'; }
+      else if (t < 0.32) L.frame = 'stagger';
+      else if (t < 0.62) { L.frame = 'kneel'; L.oy = t < 0.36 ? 1 : 0; }
+      else if (t < 0.72) L.frame = 'slump';
+      else if (t < 0.82) L.frame = 'fall1';
+      else L.frame = t >= 0.86 && t < 0.92 ? 'fall2' : 'down';
       break;
-    }
-    case 'ranger': {
-      // blown off his feet: hops back, tips over backward and bounces once
-      const bounce = t >= 0.48 ? (t < 0.56 ? -2 : t < 0.6 ? -1 : 0) : 0;
+    case 'ranger':
+      // blown off his feet: hops back, sits down hard, tips onto his back (one bounce)
+      L.ox = -4 * d;
       if (t < 0.2) { const p = t / 0.2; L.ox = -Math.round(ease(p) * 3) * d; L.oy = -Math.round(Math.sin(p * Math.PI) * 4); L.frame = 'hit'; }
-      else if (t < 0.32) { L.ox = -4 * d; L.frame = 'stagger'; }
-      else if (t < 0.4) { L.ox = -4 * d; L.frame = 'fall1'; }
-      else if (t < 0.48) { L.ox = -5 * d; L.frame = 'fall2'; }
-      else { L.ox = -5 * d; L.oy = bounce; L.frame = 'down'; }
+      else if (t < 0.3) L.frame = 'stagger';
+      else if (t < 0.42) { L.frame = 'fall1'; L.oy = t < 0.34 ? 1 : 0; }
+      else if (t < 0.5) L.frame = 'fall2';
+      else L.frame = 'down';
+      if (t >= 0.54 && t < 0.6) L.oy = -1;
       break;
-    }
     case 'mage':
       // reels, sinks to his knees, then unravels into arcane motes from the hat down
       if (t < 0.3) { L.frame = 'hit'; L.oy = -Math.round(Math.sin((t / 0.3) * Math.PI) * 3); }
@@ -382,7 +380,7 @@ function deathFx(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, L: Look, f
   switch (f.cls) {
     case 'warrior':
       if (at(1, 0.32)) for (let i = 0; i < 4; i++) spawnPart(fx + rnd(-6, 6), y, { vx: rnd(-18, 18), vy: rnd(-8, -2), drag: 0.9, life: rnd(0.2, 0.35), ramp: DUST, size: 2, shrink: 0.5, dither: true });   // the knee hits the floor
-      if (at(2, 0.84)) {
+      if (at(2, 0.82)) {
         // the thud: dust along his length and the sword clattering
         for (let i = 0; i < 12; i++) spawnPart(fx + d * rnd(-4, 16), y - rnd(0, 2), { vx: rnd(-30, 30), vy: rnd(-16, -4), drag: 0.9, life: rnd(0.3, 0.55), ramp: DUST, size: 2, shrink: 0.5, dither: true });
         for (let i = 0; i < 6; i++) spawnPart(fx - d * 8, y - 2, { vx: rnd(-30, 30), vy: rnd(-60, -25), g: 170, life: rnd(0.2, 0.4), ramp: [STEEL[3], '#f8d878', STEEL[2]] });
@@ -390,11 +388,12 @@ function deathFx(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, L: Look, f
       if (at(3, 0.92)) for (let i = 0; i < 3; i++) spawnPart(fx + d * rnd(0, 12), y, { vx: rnd(-12, 12), vy: rnd(-6, -2), drag: 0.9, life: 0.3, ramp: DUST, size: 1, dither: true });   // settling after the bounce
       break;
     case 'ranger':
-      if (at(1, 0.48)) {
+      if (at(1, 0.3)) for (let i = 0; i < 5; i++) spawnPart(fx + rnd(-8, 4) * d, y, { vx: rnd(-18, 18), vy: rnd(-8, -2), drag: 0.9, life: rnd(0.2, 0.35), ramp: DUST, size: 2, shrink: 0.5, dither: true });   // sits down hard
+      if (at(2, 0.5)) {
         for (let i = 0; i < 10; i++) spawnPart(fx - d * rnd(-4, 14), y - rnd(0, 2), { vx: rnd(-25, 25), vy: rnd(-14, -4), drag: 0.9, life: rnd(0.3, 0.5), ramp: DUST, size: 2, shrink: 0.5, dither: true });
         for (let i = 0; i < 7; i++) spawnPart(fx - d * rnd(0, 12), y - rnd(6, 16), { vx: rnd(-14, 14), vy: rnd(-24, -8), g: 25, drag: 0.96, life: rnd(0.9, 1.3), ramp: LEAF });
       }
-      if (at(2, 0.58)) for (let i = 0; i < 3; i++) spawnPart(fx - d * rnd(0, 10), y, { vx: rnd(-12, 12), vy: rnd(-6, -2), drag: 0.9, life: 0.3, ramp: DUST, size: 1, dither: true });
+      if (at(3, 0.6)) for (let i = 0; i < 3; i++) spawnPart(fx - d * rnd(0, 10), y, { vx: rnd(-12, 12), vy: rnd(-6, -2), drag: 0.9, life: 0.3, ramp: DUST, size: 1, dither: true });
       break;
     case 'mage': {
       // the killing blow scatters his ward in a ring of sparks
