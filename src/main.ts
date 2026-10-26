@@ -6,6 +6,7 @@ import { setScene, getScene, commitZones, hotZone, noteTouch } from './scenes/sc
 import { TitleScene } from './scenes/title';
 import { OnlineScene } from './scenes/online';
 import { DEV_TOOLS } from './flags';
+import { endTextFields } from './engine/textField';
 import { touchActive, onTouchChange, layout as layoutPad, syncPad, touchText, viewport } from './engine/touch';
 
 // The game screen is the sharp UI resolution. The world draws at 240×160 offscreen and is scaled up 2×
@@ -110,6 +111,7 @@ function frame(now: number): void {
   c.drawImage(ui.canvas, 0, 0, canvas.width, canvas.height);
   commitZones();
   syncPad(getScene()?.pad?.() ?? 'back');
+  endTextFields();
   canvas.style.cursor = hotZone() ? 'pointer' : 'default';
   requestAnimationFrame(frame);
 }

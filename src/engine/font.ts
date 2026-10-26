@@ -67,6 +67,9 @@ const G: Record<string, string> = {
 const BITS: Record<string, number[][]> = {};
 for (const [ch, s] of Object.entries(G)) BITS[ch] = s.split('|').map(r => [...r].map(c => (c === '#' ? 1 : 0)));
 
+/** The font can draw this character (lowercase counts as uppercase). */
+export const hasGlyph = (ch: string): boolean => !!BITS[ch.toUpperCase()];
+
 export const CHAR_W = 6;
 export const LINE_H = 8;
 
