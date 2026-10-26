@@ -11,10 +11,10 @@ import { win, bar, pip as skinPip, toInk, PAPER, PAPER2, INK, INK2, TRIM, WAX_HI
 import { CARDS, ELEMENT_COLOR } from './cards';
 import { TUNING } from './tuning';
 import { heavyChargeOf } from './battle';
-import type { Battle, Fighter, Fx, Pet, Projectile, Side, StatusKey, Trap, Wall } from './battle';
+import type { Battle, BlessKind, Fighter, Fx, Pet, Projectile, Side, StatusKey, Trap, Wall } from './battle';
 import { CLASS_INFO } from './classes';
 
-import { ARC, HOLY, TOX, drawBurn, drawFrozen, drawFx, drawParticles, drawShot } from './fxView';
+import { ARC, FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, useParticles } from './fxView';
 
 /** Whose hidden things (traps, a stealthed fighter) are visible: one side's, or everything in the dev sandbox. */
 export type Viewer = Side | 'all';
@@ -27,6 +27,7 @@ export function useStage(id: string): void { arena = getStage(id); }
 
 export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): void {
   const a = getArena();
+  useParticles(b);
   c.save();
   if (b.shake > 0) c.translate(Math.round((Math.random() - 0.5) * 4 * Math.min(1, b.shake * 4)), Math.round((Math.random() - 0.5) * 3 * Math.min(1, b.shake * 4)));
   drawStage(c, a, tick, b.cheer);
@@ -94,19 +95,30 @@ function drawPanelEffects(c: Ctx, b: Battle, col: number, row: number, tick: num
     }
   }
   if (p.bless > 0) {
+    // the sparkle color says which blessing: gold heals, blue Mana, white shield, orange damage, all four cycle
+    const pal = BLESS_PAL[p.blessKind];
     for (let i = 0; i < 5; i++) {
       const t = (b.time * 0.7 + i / 5 + row * 0.2) % 1;
-      if ((i + tick) % 3) P(c, t < 0.5 ? HOLY[3] : HOLY[2], pc.x - 13 + i * 6, pc.y + 3 - Math.floor(t * 10), 1, 2);
+      const ring = p.blessKind === 'all' ? BLESS_PAL[ALL_KINDS[(i + Math.floor(b.time * 2)) % 4]] : pal;
+      if ((i + tick) % 3) P(c, t < 0.5 ? ring[1] : ring[0], pc.x - 13 + i * 6, pc.y + 3 - Math.floor(t * 10), 1, 2);
     }
-    P(c, HOLY[2], pc.x - PW / 2 + 3, pc.y + 4, PW - 6, 1);
+    P(c, pal[0], pc.x - PW / 2 + 3, pc.y + 4, PW - 6, 1);
   }
-  if (p.smite > 0) {
-    for (let i = 0; i < 6; i++) {
-      const h = 3 + ((i * 5 + tick) % 6);
-      P(c, HOLY[(i + tick) % 3 + 1], pc.x - 14 + i * 5, pc.y + 4 - h, 3, h);
+  if (p.curse > 0) {
+    // a dark-purple haze with shadow motes sinking into it
+    c.globalAlpha = 0.4; P(c, SHADOW[0], pc.x - PW / 2 + 3, pc.y - 3, PW - 6, 8); c.globalAlpha = 1;
+    for (let i = 0; i < 4; i++) {
+      const t = (b.time * 0.8 + i / 4 + col * 0.17) % 1;
+      P(c, t > 0.6 ? SHADOW[1] : SHADOW[2], pc.x - 11 + i * 7, pc.y - 10 + Math.floor(t * 12), 2, 2);
     }
+    P(c, SHADOW[1], pc.x - PW / 2 + 3, pc.y + 4, PW - 6, 1);
   }
 }
+
+const BLESS_PAL: Record<BlessKind, [string, string]> = {
+  heal: [HOLY[2], HOLY[3]], mana: [ICE[1], ICE[2]], shield: [STEEL[2], STEEL[3]], power: [FIRE[1], FIRE[2]], all: [HOLY[2], HOLY[3]],
+};
+const ALL_KINDS: BlessKind[] = ['heal', 'mana', 'shield', 'power'];
 
 /** A hidden trap, drawn only for its owner: a faint snare outline that brightens once armed. */
 function drawTrap(c: Ctx, t: Trap, tick: number): void {
@@ -431,7 +443,12 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
   if (f.st.silenced > 0) { P(c, '#000000', fx - 10, y - s.h - 5, 7, 4); P(c, '#9878f8', fx - 9, y - s.h - 4, 5, 2); }
   if (f.st.sleep > 0) drawText(c, 'Z', fx + 5 + (tick % 8 < 4 ? 0 : 1), y - s.h - 6 - (tick % 8), '#fcfcfc');
   if (f.st.rooted > 0 || f.st.deadeye > 0) { P(c, '#503000', fx - 6, y - 1, 12, 2); P(c, '#58d854', fx - 5, y - 3, 2, 2); P(c, '#58d854', fx + 3, y - 3, 2, 2); }
-  if (f.st.channel > 0 || f.st.avatarLight > 0 || f.st.ascension > 0) for (let i = 0; i < 4; i++) P(c, HOLY[2 + (i % 2)], fx - 8 + ((tick * 3 + i * 5) % 16), y - 4 - ((tick * 2 + i * 7) % 20), 1, 2);
+  if (f.st.halo > 0) for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2 + b.time * 3;
+    P(c, HOLY[2 + (i % 2)], fx + Math.cos(ang) * 10, y - 22 + Math.sin(ang) * 3, 2, 1);
+  }
+  if (f.dots.length) for (let i = 0; i < f.dots.length * 2; i++) { const t = (b.time * 1.2 + i / (f.dots.length * 2)) % 1; P(c, t > 0.7 ? SHADOW[1] : SHADOW[2], fx - 6 + i * 4, y - 8 - Math.floor(t * 14), 2, 2); }
+  if (f.st.channel > 0) for (let i = 0; i < 4; i++) P(c, HOLY[2 + (i % 2)], fx - 8 + ((tick * 3 + i * 5) % 16), y - 4 - ((tick * 2 + i * 7) % 20), 1, 2);
   if (f.st.untargetable > 0 && tick % 2) { c.globalAlpha = 0.5; drawFighterSprite(c, s, fx, y + 2, flip, 'ghost'); c.globalAlpha = 1; }
   if (f.st.deathMark > 0 && tick % 8 < 5) drawText(c, '×', fx - 2, y - s.h - 16, '#9878f8');
   if (f.st.hunted > 0 && tick % 8 < 5) { P(c, '#f83800', fx - 1, y - s.h - 14, 3, 1); P(c, '#f83800', fx, y - s.h - 15, 1, 3); }
@@ -552,7 +569,7 @@ function drawResource(ui: Ctx, f: Fighter, x: number, y: number, tick: number): 
       else { pip(i, '#503000', null, ''); if (v >= 0.5) P(ui, '#a81000', x + 37 + i * 11, y + 4, 7, 4); }
     }
   } else if (f.cls !== 'mage') {
-    // Energy (Rogue, Ranger) and Cleric Mana: five pips, no max to grow
+    // Energy (Rogue, Ranger) and Priest Mana: five pips, no max to grow
     const info = CLASS_INFO[f.cls];
     drawTextOutlined(ui, info.res === 'ENERGY' ? 'NRG' : 'MANA', x, y + 1, info.resColor);
     for (let i = 0; i < 5; i++) pip(i, info.pipBase, i < f.res ? info.pip : null, '#fcfcfc');
@@ -580,8 +597,8 @@ const STATUS_TAGS: Partial<Record<StatusKey, [string, string]>> = {
   untargetable: ['UNTARGETABLE', '#bcbcbc'], evasion: ['EVASION', '#fcfcfc'], spellImmune: ['CLOAK', '#9878f8'], deadlyPoison: ['DEADLY POISON', '#b8f818'],
   deathMark: ['DEATH MARK', '#9878f8'], hunted: ['HUNTED', '#f83800'], revealed: ['REVEALED', '#f8b800'], shadowDance: ['SHADOW DANCE', '#9878f8'],
   nightsEmbrace: ["NIGHT'S EMBRACE", '#9878f8'], pandemic: ['PANDEMIC', '#b8f818'], focus: ['FOCUS', '#58d854'], lightFoot: ['LIGHT FOOTED', '#58d854'], rapidFire: ['RAPID FIRE', '#fcfcfc'], deadeye: ['DEADEYE', '#fcfcfc'],
-  tripwire: ['TRIPWIRE', '#58d854'], painSup: ['PAIN SUPP', '#f8d878'], guardian: ['GUARDIAN', '#f8d878'], ascension: ['ASCENSION', '#f8d878'],
-  avatarLight: ['AVATAR', '#f8d878'], purified: ['PURIFIED', '#f8d878'], mending: ['MENDING', '#58d854'], channel: ['HYMN', '#f8d878'],
+  tripwire: ['TRIPWIRE', '#58d854'], channel: ['HYMN', '#f8d878'], weakened: ['WEAKENED', '#9878f8'], powerInfusion: ['POWER INFUSION', '#f8d878'],
+  halo: ['HALO', '#f8d878'], shadowform: ['SHADOWFORM', '#9878f8'],
   vanishStun: ['STUN READY', '#f8b800'], backstab: ['BACKSTAB', '#9878f8'], riposte: ['RIPOSTE', '#fcfcfc'], adrenaline: ['ADRENALINE', '#f8d878'], decoy: ['DECOY', '#bcbcbc'],
 };
 const SHIELD_TAG: Record<string, string> = { guard: 'GUARD', ironSkin: 'IRON SKIN', barrier: 'BARRIER', unbreakable: 'UNBREAKABLE', holy: 'SHIELD' };
