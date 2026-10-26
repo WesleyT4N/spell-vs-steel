@@ -32,9 +32,9 @@ Inspired by the Mega Man Battle Network series and rebuilt for fantasy heroes an
 
 Every class beats two others and struggles against two, so every matchup is a battle of wits, never a lost cause.
 
-### 📜 Build your grimoire
+### 📜 Build your spell deck
 
-Each class has its own pool of spells: commons, uncommons, a set of Legendaries and three Mythic signature cards. Shape a 30-spell grimoire around the way you like to win, or start from a ready-made deck and tweak it.
+Each class has its own pool of spells: commons, uncommons, a set of Legendaries and three Mythic signature cards. Shape a 30-spell deck around the way you like to win, or start from a ready-made deck and tweak it.
 
 <p align="center"><img src="docs/media/draw.gif" alt="The Draw screen: reading cards and queueing Ice Wall and Fireball" width="600"></p>
 
@@ -44,7 +44,7 @@ No turns, no waiting. Move across your side of the grid, dodge telegraphed attac
 
 <p align="center"><img src="docs/media/cast.gif" alt="Ranger and Mage casting traps, beams and fire at Emberforge" width="600"></p>
 
-### 🏆 Built for rivals
+### 🏆 Built for PvP
 
 Duel a friend on the same keyboard, challenge them online with a room code, or climb the ranked ladder. Rollback netcode keeps online fights smooth, even over a shaky connection.
 
@@ -54,7 +54,7 @@ Duel a friend on the same keyboard, challenge them online with a room code, or c
 
 New to this kind of game? A match is one simple loop, repeated until someone falls.
 
-**1. Pick your hero and grimoire.** Choose one of the five classes and the deck of spells you'll bring.
+**1. Pick your hero and spell deck.** Choose one of the five classes and the deck of spells you'll bring.
 
 <p align="center"><img src="docs/media/select.gif" alt="Arcade mode character select: switching from Warrior to Mage" width="480"></p>
 
@@ -81,8 +81,8 @@ Never played before? The in-game **Tutorial** walks you through all of this agai
 - **Online play** with room codes, ranked matches and rollback netcode
 - **Training mode** to test decks and practice combos, plus a step-by-step tutorial
 - **Replays** and a detailed stats screen after every round
-- **6 hand-drawn stages**, from a snowy mountain pass to a dwarven forge inside a volcano
-- **NES-inspired pixel art** with hand-drawn animation frames and spell effects colored by element
+- **6 animated stages**, from a snowy mountain pass to a dwarven forge inside a volcano
+- **NES-inspired pixel art** with fully animated fighters and spell effects colored by element
 - **Keyboard, mouse and touch** controls, all keys rebindable
 
 ## Controls
@@ -128,7 +128,7 @@ Thanks for wanting to help! Here's how to get going.
 
 - **The battle must stay deterministic.** Online play runs the same simulation on both machines, so anything random in the rules uses the battle's own generator (`b.rand()`), never `Math.random`. Sound and visual effects never live in the simulation: the battle emits events and the engine plays them. `npm run netcheck` and `npm run rollcheck` catch slips.
 - **Spells are data.** Each spell is one entry in its class's card file under `src/game/`, and every number worth tuning is in `src/game/tuning.ts`. A new spell also needs a 20×20 card icon in `src/art/cardIcons.ts`.
-- **Respect the pixel grid.** Fighters are 24×24 with hand-drawn frames. Never stretch sprites; pad them instead.
+- **Respect the pixel grid.** Fighters are 24×24 with their own animation frames. Never stretch sprites; pad them instead.
 - **Saves go through the save module** (`src/engine/save.ts`), never straight to `localStorage`.
 - **New screens get a screenshot test**: add them to `tests/screens/harness.ts`.
 - **New classes get tutorial lessons** and show up in every character select.

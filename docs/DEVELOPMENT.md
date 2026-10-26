@@ -98,14 +98,14 @@ These are the defaults. **Options** (title menu or pause menu) has master, music
 
 ## Tutorial
 
-**Tutorial** on the title menu teaches someone who has never played Battle Network, with any class, in short lessons against a training dummy: the grid and moving, light attacks, heavy attacks (and Rage), dodging telegraphed shots, the Draw gauge, the Draw screen (costs, cast order, Mana growth), casting, then a final knockout with real draws from the starter grimoire. Each lesson opens with a page or two of explanation, then a goal box with a progress counter; arrows point at the HUD piece being taught. The pause menu can skip a step. The clock is stopped on the tutorial's Draw screens. It all lives in `src/scenes/tutorial.ts`, which drives a normal `BattleScene` with a scripted dummy in place of the CPU.
+**Tutorial** on the title menu teaches someone who has never played Battle Network, with any class, in short lessons against a training dummy: the grid and moving, light attacks, heavy attacks (and Rage), dodging telegraphed shots, the Draw gauge, the Draw screen (costs, cast order, Mana growth), casting, then a final knockout with real draws from the starter spell deck. Each lesson opens with a page or two of explanation, then a goal box with a progress counter; arrows point at the HUD piece being taught. The pause menu can skip a step. The clock is stopped on the tutorial's Draw screens. It all lives in `src/scenes/tutorial.ts`, which drives a normal `BattleScene` with a scripted dummy in place of the CPU.
 
 ## Rules in the prototype
 
 - One shared Draw gauge fills in 10s; only the player can open the Draw screen, and both sides draft when it opens. 5 spells drawn each time, 20s timer. Picked-but-uncast spells are discarded at the next Draw screen.
 - Spell costs are paid on cast. Warrior Rage (max 5) comes from heavy hits (+1.5) and taking damage (1 pip per 40, max 1 per hit); light attacks build none. Mage Mana starts at 1 max, +1 max per Draw screen (cap 5), and refills each turn.
 - Frozen or stunned targets take +50% damage. No slows.
-- Grimoires: exactly 30 spells, up to 4 copies of a common, 2 of an uncommon, 1 of each Legendary (max 5), exactly 1 Mythic. Custom decks save in the browser.
+- Spell decks: exactly 30 spells, up to 4 copies of a common, 2 of an uncommon, 1 of each Legendary (max 5), exactly 1 Mythic. Custom decks save in the browser.
 - Skins: 8 fighting-game colors per class, picked on the setup screen for you and the CPU. If both pick the same class and color, the CPU takes the next color.
 - Matches are a single round, best of 3 (default) or best of 5, picked on the setup screen.
 

@@ -340,7 +340,7 @@ export class BattleScene implements Scene {
   protected pauseItems = ['RESUME', 'OPTIONS', 'RESTART', 'QUIT TO TITLE'];
   protected rivalDeckText(): string {
     const foe: Side = this.me === 0 ? 1 : 0, f = this.b.f[foe];
-    return `${f.name} DECK: ${deckLabel(f.cls, this.decks[foe])}`;
+    return `${f.name} SPELL DECK: ${deckLabel(f.cls, this.decks[foe])}`;
   }
 
   /** The next round (or a fresh set) of this match; arcade fights carry their run along. */
