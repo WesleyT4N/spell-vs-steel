@@ -43,16 +43,20 @@ rebuild();
 
 export const getKey = (a: Bindable): string => keys[a];
 
-/** Bind `code` to `a`. If another action used that key, the two swap keys. */
+/** Bind `code` to `a`. If another action (or player 2) used that key, the two swap keys. */
 export function setKey(a: Bindable, code: string): void {
   const other = BINDABLE.find(b => b !== a && keys[b] === code);
   if (other) keys[other] = keys[a];
+  // a key player 2 uses goes to them in exchange
+  const p2 = LOCAL_ACTS.find(b => p2Keys[b] === code);
+  if (p2) { p2Keys[p2] = keys[a]; saveP2(); }
   keys[a] = code;
   save();
 }
 export function resetKeys(): void { keys = { ...DEFAULT_KEYS }; save(); }
 function save(): void {
   rebuild();
+  rebuildLocal();
   try { localStorage.setItem(STORE, JSON.stringify(keys)); } catch { /* storage blocked */ }
 }
 
@@ -74,6 +78,85 @@ export const k = (a: Bindable): string => keyName(keys[a]);
 
 // Keys the rebinding screen refuses (they are reserved for menus and muting).
 export const RESERVED = new Set(['Escape', 'KeyM', 'KeyQ', 'KeyE', 'KeyR', 'Backspace']);
+
+// ---------- local versus: two players on one keyboard ----------
+export type LocalAct = 'up' | 'down' | 'left' | 'right' | 'attack' | 'cast' | 'custom';
+export const LOCAL_ACTS = ['up', 'down', 'left', 'right', 'attack', 'cast', 'custom'] as const;
+/**
+ * When two players share a keyboard, player 1 plays on the usual bindings (without the arrow keys, which
+ * are player 2's) and player 2 on their own, rebindable on the controls screen: by default the arrows
+ * with . / and right Shift just above them. Pause stays on Enter/Esc for both.
+ */
+export const DEFAULT_P2_KEYS: Record<LocalAct, string> = {
+  up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', attack: 'Period', cast: 'Slash', custom: 'ShiftRight',
+};
+/** Fixed extras on top of the bindings: the touch pad plays as player 1, the numpad as player 2. */
+const LOCAL_EXTRA: [Record<LocalAct, string>, Record<LocalAct, string>] = [
+  { up: 'PadUp', down: 'PadDown', left: 'PadLeft', right: 'PadRight', attack: 'PadAttack', cast: 'PadCast', custom: 'PadDraw' },
+  { up: 'Numpad8', down: 'Numpad5', left: 'Numpad4', right: 'Numpad6', attack: 'Numpad1', cast: 'Numpad2', custom: 'Numpad3' },
+];
+const P2_STORE = 'svs:p2keys';
+let p2Keys: Record<LocalAct, string> = { ...DEFAULT_P2_KEYS };
+try {
+  const raw = localStorage.getItem(P2_STORE);
+  if (raw) p2Keys = { ...DEFAULT_P2_KEYS, ...(JSON.parse(raw) as Partial<Record<LocalAct, string>>) };
+} catch { /* storage blocked */ }
+let LOCAL_KEYS: [Record<LocalAct, string[]>, Record<LocalAct, string[]>] = [{} as Record<LocalAct, string[]>, {} as Record<LocalAct, string[]>];
+let LOCAL_CODES = new Set<string>();
+function rebuildLocal(): void {
+  const mine = [keys, p2Keys] as const;
+  LOCAL_KEYS = [0, 1].map(p => Object.fromEntries(LOCAL_ACTS.map(a => [a, [mine[p][a], LOCAL_EXTRA[p][a]]]))) as typeof LOCAL_KEYS;
+  LOCAL_CODES = new Set(LOCAL_KEYS.flatMap(l => Object.values(l).flat()));
+}
+rebuildLocal();
+
+export const getP2Key = (a: LocalAct): string => p2Keys[a];
+/** Bind `code` to player 2's action `a`. If one of player 1's actions used it, the two players swap keys. */
+export function setP2Key(a: LocalAct, code: string): void {
+  const mine = LOCAL_ACTS.find(b => b !== a && p2Keys[b] === code);
+  if (mine) p2Keys[mine] = p2Keys[a];
+  const theirs = BINDABLE.find(b => keys[b] === code);
+  if (theirs) { keys[theirs] = p2Keys[a]; save(); }
+  p2Keys[a] = code;
+  saveP2();
+}
+export function resetP2Keys(): void { p2Keys = { ...DEFAULT_P2_KEYS }; saveP2(); }
+function saveP2(): void {
+  rebuildLocal();
+  try { localStorage.setItem(P2_STORE, JSON.stringify(p2Keys)); } catch { /* storage blocked */ }
+}
+const rawHeld = new Set<string>();
+const rawPressed = new Set<string>();
+/** Held local-versus codes in the order they went down, so each player's latest direction wins. */
+const rawOrder: string[] = [];
+function pressRaw(code: string, isDown: boolean): void {
+  const i = rawOrder.indexOf(code);
+  if (i >= 0) rawOrder.splice(i, 1);
+  if (isDown) { if (!rawHeld.has(code)) rawPressed.add(code); rawHeld.add(code); rawOrder.push(code); }
+  else rawHeld.delete(code);
+}
+export const localDown = (p: 0 | 1, a: LocalAct): boolean => LOCAL_KEYS[p][a].some(c => rawHeld.has(c));
+export const localPressed = (p: 0 | 1, a: LocalAct): boolean => LOCAL_KEYS[p][a].some(c => rawPressed.has(c));
+/** Player `p`'s most recently pressed direction that is still held. */
+export function localDir(p: 0 | 1): 'up' | 'down' | 'left' | 'right' | null {
+  const l = LOCAL_KEYS[p];
+  for (let i = rawOrder.length - 1; i >= 0; i--) {
+    for (const d of ['up', 'down', 'left', 'right'] as const) if (l[d].includes(rawOrder[i])) return d;
+  }
+  return null;
+}
+/** Like navPressed, for one local player's keys. */
+const localRepeat: Record<string, number> = {};
+export function localNav(p: 0 | 1, a: 'up' | 'down' | 'left' | 'right', dt: number, delay = 0.32, rate = 0.08): boolean {
+  const id = `${p}${a}`;
+  if (localPressed(p, a)) { localRepeat[id] = delay; return true; }
+  if (!localDown(p, a)) { localRepeat[id] = 0; return false; }
+  localRepeat[id] -= dt;
+  if (localRepeat[id] <= 0) { localRepeat[id] = rate; return true; }
+  return false;
+}
+/** On-screen name of local player `p`'s key for an action. */
+export const localKey = (p: 0 | 1, a: LocalAct): string => keyName(p === 0 ? keys[a] : p2Keys[a]);
 
 const down = new Set<Action>();
 const pressed = new Set<Action>();
@@ -97,7 +180,7 @@ function onKey(e: KeyboardEvent, isDown: boolean): void {
     cb(e.code);
     return;
   }
-  if (!BINDINGS[e.code]) return;
+  if (!BINDINGS[e.code] && !LOCAL_CODES.has(e.code)) return;
   e.preventDefault();
   if (isDown && e.repeat) return;
   press(e.code, isDown);
@@ -105,6 +188,7 @@ function onKey(e: KeyboardEvent, isDown: boolean): void {
 
 /** Press or release a key code (a real key, or one of the touch pad's Pad codes). */
 function press(code: string, isDown: boolean): void {
+  if (LOCAL_CODES.has(code)) pressRaw(code, isDown);
   const acts = BINDINGS[code];
   if (!acts) return;
   if (isDown) heldCodes.add(code); else heldCodes.delete(code);
@@ -203,7 +287,7 @@ export function initInput(canvas?: HTMLCanvasElement): void {
   if (canvas) initMouse(canvas);
   window.addEventListener('keydown', e => onKey(e, true));
   window.addEventListener('keyup', e => onKey(e, false));
-  window.addEventListener('blur', () => { down.clear(); heldCodes.clear(); dirOrder.length = 0; });
+  window.addEventListener('blur', () => { down.clear(); heldCodes.clear(); dirOrder.length = 0; rawHeld.clear(); rawOrder.length = 0; });
   // iOS only lets sound start from the end of a touch
   for (const ev of ['pointerdown', 'pointerup', 'touchend']) window.addEventListener(ev, () => unlockAudio());
 }
@@ -218,7 +302,7 @@ export function heldDir(): 'up' | 'down' | 'left' | 'right' | null {
 }
 /** Call once at the end of every frame. */
 export function endFrame(): void {
-  pressed.clear(); released.clear();
+  pressed.clear(); released.clear(); rawPressed.clear();
   mouse.click = mouse.rclick = mouse.moved = mouse.touched = false; mouse.wheel = 0;
 }
 

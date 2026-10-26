@@ -1,6 +1,6 @@
 // The Parchment UI skin: aged scroll windows, brown ink, red wax and ribbons.
 // Every menu, card and HUD plate is built from these parts, so they draw at any size and layout.
-import { P, UW, UH, dith, hash, mix, screenRect, view, type Ctx } from '../engine/gfx';
+import { P, UW, dith, hash, mix, screenRect, view, type Ctx } from '../engine/gfx';
 import { drawText, textWidth } from '../engine/font';
 
 /** Paper and ink colors. Text on parchment uses the inks; text over the arena keeps the bright colors. */
@@ -136,11 +136,13 @@ export function pip(c: Ctx, x: number, y: number, fill: string | null, empty = B
   if (fill) P(c, mix(fill, '#fcfcfc', 0.5), x + 2, y + 2, 2, 1);
 }
 
-/** Control hints along the bottom of the UI layer: an ink-brown strip with parchment text, reaching into the margins. */
+/** Control hints along the bottom of the visible screen: an ink-brown strip with parchment text, full width. */
 export function footer(c: Ctx, text: string): void {
-  const [x, , w, h] = screenRect(2);
-  P(c, FRAME, x, UH - 14, w, 14 + (h - UH) / 2); P(c, TRIM, x, UH - 14, w, 1);
-  drawText(c, text, Math.round(UW / 2 - textWidth(text) / 2), UH - 10, PAPER);
+  const [x, y, w, h] = screenRect(2);
+  // tall screens (phone portrait) put it at the real bottom edge instead of under the 480x320 area
+  const top = y + h - 14;
+  P(c, FRAME, x, top, w, 14); P(c, TRIM, x, top, w, 1);
+  drawText(c, text, Math.round(UW / 2 - textWidth(text) / 2), top + 4, PAPER);
 }
 
 /** Warm sepia wash for overlays (pause, results, the Draw screen), instead of a black dim. */

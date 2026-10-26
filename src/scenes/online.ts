@@ -153,7 +153,7 @@ export class OnlineScene implements Scene {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.35)';
     c.fillRect(...screenRect());
-    banner(ui, 'ONLINE VERSUS', UW / 2, 3);
+    banner(ui, 'ONLINE MODE', UW / 2, 3);
 
     // your fighter
     const skin = skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id;

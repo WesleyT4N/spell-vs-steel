@@ -40,8 +40,8 @@ const HEAVY_MIN = 18;
 
 interface Page { title: string; body: string[] }
 
-/** Every playable class (the tutorial follows PLAYABLE; the Cleric joins once it has lessons). */
-export type TutorialClass = Exclude<ClassId, 'cleric'>;
+/** Every playable class (the tutorial follows PLAYABLE). */
+export type TutorialClass = ClassId;
 
 /** What changes per class: how the basics reach, how the resource works, and the spells shown off. */
 interface ClassLessons {
@@ -173,6 +173,32 @@ const LESSONS: Record<TutorialClass, ClassLessons> = {
     short: 'NEED ENERGY: STAND STILL TO BUILD IT',
     refillsAtDraw: false,
     ccLine: 'RANGER TRAPS LIKE FREEZING TRAP FREEZE. TRAP THEIR PATH, THEN SHOOT.',
+  },
+  priest: {
+    dummyCol: 4,
+    hand: ['hallowed_ground', 'holy_fire', 'shadow_word_pain', 'flash_heal', 'penance'],
+    tryText: 'TRY HALLOWED GROUND, THEN HOLY FIRE',
+    light: [
+      `TAP {attack} TO CAST A HOLY SPARK. IT FLIES DOWN YOUR WHOLE ROW AND HITS THE FIRST THING IN ITS WAY.`,
+      'ALL THAT MATTERS IS BEING IN THE SAME ROW AS YOUR TARGET, SO YOU CAN STAY BACK WHERE IT IS SAFE.',
+      'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. FOLLOW IT!',
+    ],
+    lightTip: 'GET IN ITS ROW AND TAP {attack}',
+    resLine: 'PRIESTS RUN ON MANA (TOP LEFT). YOUR HEAVY IS SMITE: A PILLAR OF LIGHT THAT DROPS EXACTLY 3 PANELS AHEAD AND HEALS YOU WHEN IT HITS. STAND IN YOUR MIDDLE COLUMN TO REACH THE DUMMY.',
+    heavyTip: 'STAND 3 PANELS FROM THE DUMMY, HOLD {attack} UNTIL HEAVY!, THEN RELEASE',
+    pointRes: false,
+    spend: {
+      title: 'SPENDING MANA',
+      body: [
+        'EVERY SPELL COSTS MANA (TOP RIGHT). YOU GET 3 MORE EACH TIME YOU OPEN THIS SCREEN, UP TO 5, AND UNSPENT MANA CARRIES OVER.',
+        'SKIPPING A SPELL BANKS MANA FOR THE BIG 5-COST MIRACLES. KEEP THE TOTAL COST OF YOUR PICKS WITHIN WHAT YOU HAVE: IT TURNS RED WHEN YOU GO OVER.',
+        'HALLOWED GROUND BLESSES THE PANEL YOU STAND ON. BLESSINGS ONLY WORK WHILE YOU STAY ON THEM, AND LAST UNTIL THE NEXT DRAW.',
+      ],
+    },
+    castLine: 'HALLOWED GROUND MAKES YOUR HITS 35% STRONGER WHILE YOU STAND ON IT. HOLY FIRE BURNS THE DUMMY WHEREVER IT IS.',
+    short: 'NOT ENOUGH MANA. YOU GET 3 MORE AT THE NEXT DRAW',
+    refillsAtDraw: true,
+    ccLine: 'PRIEST SPELLS LIKE PSYCHIC SCREAM STUN. CURSED PANELS HURT MORE EVERY SECOND THE ENEMY STAYS ON ONE.',
   },
 };
 
@@ -694,7 +720,7 @@ export class TutorialScene implements Scene {
     }
   }
 
-  private static DONE = ['VERSUS CPU', 'DECK BUILDER', 'TRY ANOTHER CLASS', 'TITLE'];
+  private static DONE = ['VERSUS MODE', 'DECK BUILDER', 'TRY ANOTHER CLASS', 'TITLE'];
   private updateDone(dt: number): void {
     const items = TutorialScene.DONE.length;
     const clicked = listMouse('menu', this.doneSel, i => { this.doneSel = i; sfx('move'); });
@@ -705,7 +731,7 @@ export class TutorialScene implements Scene {
       sfx('select');
       stopMusic();
       const choice = TutorialScene.DONE[this.doneSel];
-      if (choice === 'VERSUS CPU') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); setScene(new CharSelectScene()); }
+      if (choice === 'VERSUS MODE') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); setScene(new CharSelectScene()); }
       if (choice === 'DECK BUILDER') setScene(new DeckBuilderScene(this.cls, () => setScene(new TitleScene())));
       if (choice === 'TRY ANOTHER CLASS') setScene(new CharSelectScene(undefined, 0, 'tutorial'));
       if (choice === 'TITLE') setScene(new TitleScene());
