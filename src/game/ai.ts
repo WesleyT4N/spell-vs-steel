@@ -123,12 +123,12 @@ export class Cpu {
     return null;
   }
 
-  private inDanger(b: Battle, f: Fighter): boolean {
+  inDanger(b: Battle, f: Fighter): boolean {
     if (b.marks.some(m => m.col === f.col && m.row === f.row)) return true;
     return b.projectiles.some(p => p.side !== f.side && !p.homing && p.row === f.row && Math.abs(p.x - f.col) < 3 && Math.sign(f.col - p.x) === Math.sign(p.speed));
   }
 
-  private safeStep(b: Battle, f: Fighter): Dir | null {
+  safeStep(b: Battle, f: Fighter): Dir | null {
     const dirs: Array<[Dir, number, number]> = [['up', 0, -1], ['down', 0, 1], ['left', -1, 0], ['right', 1, 0]];
     const safe = dirs.filter(([, dc, dr]) => {
       const c = f.col + dc, r = f.row + dr;

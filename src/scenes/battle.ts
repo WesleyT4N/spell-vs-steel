@@ -4,7 +4,7 @@ import { CLASS_INFO } from '../game/classes';
 import { Battle, NO_INTENT, heavyChargeOf, type Dir, type Intent, type Side } from '../game/battle';
 import { drawBattle, drawBattleUi } from '../game/battleView';
 import { Cpu } from '../game/ai';
-import { CARDS, ELEMENT_COLOR, RARITY_COLOR } from '../game/cards';
+import { CARDS, ELEMENT_COLOR } from '../game/cards';
 
 // Draw screen layout (UI pixels): the hand fans along the bottom, details and cast order above it.
 const HAND_Y = 194, HAND_GAP = 84;
@@ -14,13 +14,14 @@ const LIFT = 12;
 import { starterDeck, toList, STARTER_NAME } from '../game/deck';
 import { playerDeck, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
-import { P, UW, frame, screenRect, type Ctx } from '../engine/gfx';
+import { P, UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
-import { drawCardDetail, drawCardFace, resName, resColor, CARD_W, CARD_H, PICKED } from './cardView';
+import { drawCardDetail, drawCardFace, resName, resInk, RES_INK, CARD_W, CARD_H, PICKED } from './cardView';
+import { win, plaque, pip, disc, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, WAX_HI, GOLD } from './skin';
 import { CharSelectScene } from './select';
 import { TitleScene } from './title';
 import { OptionsScene } from './options';
@@ -44,6 +45,8 @@ export class BattleScene implements Scene {
   ended = false;
   /** Which side this screen plays: 0 (left) against the CPU, either side online. */
   me: Side = 0;
+  /** False in training: the Draw screen waits for you. */
+  protected timed = true;
 
   /** Rounds won in the current set, by side. `battle` lets online play hand in a seeded battle. */
   constructor(public m: MatchConfig, public score: [number, number] = [0, 0], battle?: Battle) {
@@ -130,8 +133,10 @@ export class BattleScene implements Scene {
       const cur = this.lift[i] ?? 0, to = this.level(i) * LIFT;
       this.lift[i] = Math.abs(to - cur) < 0.5 ? to : cur + (to - cur) * Math.min(1, dt * 18);
     }
-    this.timer -= dt;
-    if (this.timer <= 0) { this.confirmCustom(); return; }
+    if (this.timed) {
+      this.timer -= dt;
+      if (this.timer <= 0) { this.confirmCustom(); return; }
+    }
     // mouse: hover a card to read it, click to pick or unpick, right-click to undo
     const over = isHot('fight') ? offer.length : hot('card');
     if (mouse.moved) this.mouseMode = true;
@@ -255,66 +260,66 @@ export class BattleScene implements Scene {
   private drawCustom(c: Ctx, tick: number, ui: Ctx): void {
     const b = this.b, f = b.f[this.me];
     const offer = b.offer[this.me];
-    dim(c, 0.5);
+    dim(c, 0.45);
 
-    // header: turn, timer, resource
-    // the header bar reaches the screen's sides
+    // header: turn, timer, resource, on a parchment strip that reaches the screen's sides
     const [sx, , sw] = screenRect(2);
-    P(ui, '#000000', sx, 0, sw, 28);
-    P(ui, '#0000a8', sx, 0, sw, 26);
-    drawText(ui, `DRAW   TURN ${b.turn}`, 10, 10, '#fcfcfc');
+    win(ui, sx + 4, 2, sw - 8, 26, { burn: 3 });
+    drawText(ui, `DRAW   TURN ${b.turn}`, 14, 11, INK);
     const secs = Math.ceil(this.timer);
-    drawTextCentered(ui, String(secs).padStart(2, '0'), UW / 2, 6, secs <= 5 && tick % 4 < 2 ? '#f83800' : '#f8b800', 2);
+    if (this.timed) drawTextCentered(ui, String(secs).padStart(2, '0'), UW / 2, 8, secs <= 5 && tick % 4 < 2 ? WAX_HI : RED_INK, 2, false);
+    else drawTextCentered(ui, 'NO TIME LIMIT', UW / 2, 11, INK2, 1, false);
     const total = this.picks.reduce((a, i) => { const cc = CARDS[offer[i]].cost; return a + (cc === 'all' ? 1 : cc); }, 0);
     this.drawResourcePreview(ui, tick);
     const short = this.shortfalls();
     // Rage is earned in the fight and paid on cast, so a short Warrior card is "later", not "can't"
     const builds = f.cls === 'warrior';
 
-    // left: the card being read
+    // left: the card being read, with its element as a ribbon across the top
     const card = showSel() && offer[this.cursor] ? CARDS[offer[this.cursor]] : null;
-    frame(ui, 8, 34, 228, 130, '#000000', card ? ELEMENT_COLOR[card.element] : '#7c7c7c');
+    win(ui, 8, 34, 228, 130, { accent: card ? ELEMENT_COLOR[card.element] : undefined });
     if (card) {
-      drawCardDetail(ui, card, 16, 42, 212);
+      drawCardDetail(ui, card, 18, 44, 208);
       const need = short[this.cursor];
       if (need > 0) {
-        if (builds) drawText(ui, `BUILD ${need} MORE ${resName(card)} IN THE FIGHT`, 16, 152, resColor(card));
-        else drawText(ui, `NEED ${need} MORE ${resName(card)}`, 16, 152, '#f83800');
+        if (builds) drawText(ui, `BUILD ${need} MORE ${resName(card)} IN THE FIGHT`, 18, 150, resInk(card));
+        else drawText(ui, `NEED ${need} MORE ${resName(card)}`, 18, 150, RED_INK);
       }
     } else if (!showSel()) {
-      drawText(ui, 'YOUR HAND', 16, 42, '#f8b800', 2);
-      drawText(ui, 'TOUCH AND HOLD A CARD TO READ IT', 16, 64, '#fcfcfc');
-      drawText(ui, 'TAP CARDS TO PICK THEM, IN CAST ORDER', 16, 78, '#bcbcbc');
-      drawText(ui, this.rivalDeckText(), 16, 100, '#7c7c7c');
+      drawText(ui, 'YOUR HAND', 18, 44, RED_INK, 2);
+      drawText(ui, 'TOUCH AND HOLD A CARD TO READ IT', 18, 66, INK);
+      drawText(ui, 'TAP CARDS TO PICK THEM, IN CAST ORDER', 18, 80, INK2);
+      drawText(ui, this.rivalDeckText(), 18, 102, TRIM);
     } else {
-      drawText(ui, 'START THE FIGHT', 16, 42, '#f8b800', 2);
-      drawText(ui, `${this.picks.length} SPELL${this.picks.length === 1 ? '' : 'S'} PICKED`, 16, 64, '#fcfcfc');
-      drawText(ui, `CAST THEM IN ORDER WITH ${k('cast')}`, 16, 78, '#bcbcbc');
-      drawText(ui, this.rivalDeckText(), 16, 100, '#7c7c7c');
+      drawText(ui, 'START THE FIGHT', 18, 44, RED_INK, 2);
+      drawText(ui, `${this.picks.length} SPELL${this.picks.length === 1 ? '' : 'S'} PICKED`, 18, 66, INK);
+      drawText(ui, `CAST THEM IN ORDER WITH ${k('cast')}`, 18, 80, INK2);
+      drawText(ui, this.rivalDeckText(), 18, 102, TRIM);
     }
 
     // right: cast order
-    frame(ui, 244, 34, 228, 98, '#000000', PICKED);
-    drawText(ui, 'CAST ORDER', 252, 42, PICKED);
-    if (!this.picks.length) drawText(ui, touchText('CLICK CARDS TO QUEUE THEM'), 252, 58, '#7c7c7c');
+    win(ui, 244, 34, 228, 98);
+    drawText(ui, 'CAST ORDER', 254, 44, PICKED);
+    if (!this.picks.length) drawText(ui, touchText('CLICK CARDS TO QUEUE THEM'), 254, 60, TRIM);
     this.picks.slice(0, 5).forEach((i, n) => {
-      const cd = CARDS[offer[i]], y = 56 + n * 12;
-      drawText(ui, `${n + 1}`, 252, y, PICKED);
-      P(ui, ELEMENT_COLOR[cd.element], 264, y, 3, 7);
-      drawText(ui, cd.name.toUpperCase(), 272, y, RARITY_COLOR[cd.rarity]);
-      drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, short[i] > 0 ? (builds ? resColor(cd) : '#f83800') : '#fcfcfc');
+      const cd = CARDS[offer[i]], y = 58 + n * 12;
+      drawText(ui, `${n + 1}`, 254, y, PICKED);
+      P(ui, ELEMENT_COLOR[cd.element], 266, y, 3, 7);
+      drawText(ui, cd.name.toUpperCase(), 274, y, INK);
+      drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, short[i] > 0 ? (builds ? resInk(cd) : RED_INK) : INK);
     });
     const info = CLASS_INFO[f.cls];
     const over = !builds && this.picks.some(i => short[i] > 0);
-    drawText(ui, `TOTAL COST ${total}`, 252, 120, over ? '#f83800' : '#bcbcbc');
-    drawText(ui, info.refill, 464 - info.refill.length * 6, 120, '#7c7c7c');
+    drawText(ui, `TOTAL COST ${total}`, 254, 118, over ? RED_INK : INK2);
+    drawText(ui, info.refill, 462 - info.refill.length * 6, 118, TRIM);
 
-    // fight button
+    // fight button: red wax, ringed in gold when it has the cursor
     const onOk = this.cursor === offer.length && showSel();
     // sits above the highest a raised card can reach (HAND_Y - 2 * LIFT)
     zone('fight', 300, 138, 116, 24);
-    frame(ui, 300, 138, 116, 24, onOk ? '#f8b800' : '#000000', '#fcfcfc');
-    drawTextCentered(ui, 'FIGHT!', 358, 143, onOk ? '#000000' : '#f8b800', 2, false);
+    plaque(ui, 300, 138, 116, 24, true);
+    if (onOk) { P(ui, GOLD, 300, 138, 116, 2); P(ui, GOLD, 300, 160, 116, 2); P(ui, GOLD, 300, 138, 2, 24); P(ui, GOLD, 414, 138, 2, 24); }
+    drawTextCentered(ui, 'FIGHT!', 358, 143, onOk ? GOLD : PAPER, 2, false);
 
     // the hand
     offer.forEach((id, i) => {
@@ -324,7 +329,7 @@ export class BattleScene implements Scene {
       zone(`card:${i}`, x, HAND_Y - 2 * LIFT, CARD_W, CARD_H + 2 * LIFT);
       const y = HAND_Y - Math.round(this.lift[i] ?? 0);
       drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1 || (lvl === 2 && this.cursor === i && showSel()), short: short[i], builds });
-      if (!this.mouseMode && this.cursor === i && showSel() && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, '#f8b800', 1, false);
+      if (!this.mouseMode && this.cursor === i && showSel() && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, GOLD, 1, true);
     });
     hint(ui, `CLICK: PICK  RIGHT-CLICK: UNDO   KEYS: ${k('left')}/${k('right')} + ${k('attack')}  ${k('cast')} UNDO  ${k('custom')} FIGHT`);
   }
@@ -363,18 +368,18 @@ export class BattleScene implements Scene {
     const blink = tick % 4 < 3;
     const x0 = UW - 10 - slots * 11;
     for (let i = 0; i < slots; i++) {
-      const px = x0 + i * 11, py = 8;
+      const px = x0 + i * 11, py = 10;
       const isSlot = i < max, newSlot = !isSlot && i < newMax;
-      P(ui, '#000000', px - 1, py - 1, 10, 12);
-      P(ui, isSlot ? info.pipBase : newSlot ? '#3c3c3c' : '#181818', px, py, 8, 10);
-      if (i < now) { P(ui, i >= max ? '#f878f8' : info.pip, px, py, 8, 10); P(ui, '#fcfcfc', px, py, 8, 2); }
-      else if (i < after && blink) { P(ui, i >= newMax ? '#f878f8' : '#a4e4fc', px + 1, py + 1, 6, 8); }
-      if (newSlot && blink) { P(ui, '#f8b800', px - 1, py - 1, 10, 1); P(ui, '#f8b800', px - 1, py + 10, 10, 1); }
+      if (newSlot && blink) disc(ui, px + 4, py + 4, 6, GOLD);
+      const empty = isSlot ? BURN : newSlot ? PAPER2 : PAPER;
+      if (i < now) pip(ui, px, py, i >= max ? '#f878f8' : info.pip);
+      else if (i < after && blink) pip(ui, px, py, i >= newMax ? '#f8b8f8' : '#a4e4fc');
+      else pip(ui, px, py, null, empty);
     }
-    drawText(ui, info.res, x0 - info.res.length * 6 - 6, 10, info.resColor);
+    drawText(ui, info.res, x0 - info.res.length * 6 - 6, 11, RES_INK[info.res]);
     const parts: string[] = [];
     if (newMax > max) parts.push(`+${newMax - max} MAX`);
     if (after > now) parts.push(refill && after - now > gainRes ? 'REFILL' : `+${after - now}`);
-    if (parts.length) drawText(ui, parts.join(' '), x0 - info.res.length * 6 - 12 - textWidth(parts.join(' ')), 10, '#f8b800');
+    if (parts.length) drawText(ui, parts.join(' '), x0 - info.res.length * 6 - 12 - textWidth(parts.join(' ')), 11, RED_INK);
   }
 }

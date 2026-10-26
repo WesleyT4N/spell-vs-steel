@@ -3,7 +3,7 @@ import { hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { teamColor, type ClassId } from '../art/sprites';
-import { P, UW, frame, screenRect, type Ctx } from '../engine/gfx';
+import { P, UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, wrap } from '../engine/font';
 import { wasPressed, navPressed, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
@@ -11,7 +11,8 @@ import { cardsFor, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef } from 
 import { canAdd, countRarity, deckSize, loadCustom, saveCustom, starterDeck, validate, DECK_SIZE, MAX_LEGENDARIES, type DeckCounts } from '../game/deck';
 import { loadMatch, saveMatch } from '../game/match';
 import { PLAYABLE } from '../game/classes';
-import { drawCardFace, resColor, resName, CARD_W, CARD_H } from './cardView';
+import { drawCardFace, resInk, resName, CARD_W, CARD_H } from './cardView';
+import { win, selRow, ink, PAPER, BURN, INK, INK2, RED_INK, GOLD, TRIM } from './skin';
 
 const RARITY_ORDER = { common: 0, uncommon: 1, legendary: 2, mythic: 3 };
 const CLASSES: ClassId[] = PLAYABLE;
@@ -128,78 +129,78 @@ export class DeckBuilderScene implements Scene {
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
     drawStage(c, getArena(), tick);
-    c.fillStyle = 'rgba(0,0,24,0.75)';
+    c.fillStyle = 'rgba(40,20,0,0.5)';
     c.fillRect(...screenRect());
 
     // header: class tabs, counts, done
-    frame(ui, 8, 6, UW - 16, 38, '#000000', teamColor(this.cls, loadMatch().p1Skin[this.cls], false));
-    CLASSES.forEach((cl, i) => button(ui, `tab:${i}`, cl.toUpperCase(), 14 + i * 54, 11, 52, 14, cl === this.cls, cl === this.cls ? '#f8b800' : '#bcbcbc'));
-    drawText(ui, 'GRIMOIRE', 300, 11, '#fcfcfc');
+    win(ui, 8, 4, UW - 16, 40, { accent: teamColor(this.cls, loadMatch().p1Skin[this.cls], false), burn: 3 });
+    CLASSES.forEach((cl, i) => button(ui, `tab:${i}`, cl.toUpperCase(), 14 + i * 54, 12, 52, 14, cl === this.cls, cl === this.cls ? RED_INK : INK2));
+    drawText(ui, 'GRIMOIRE', 300, 11, INK);
     const n = deckSize(this.deck), leg = countRarity(this.deck, 'legendary'), myth = countRarity(this.deck, 'mythic');
-    drawText(ui, `SPELLS ${n}/${DECK_SIZE}`, 14, 31, n === DECK_SIZE ? '#58d854' : '#f8b800');
-    drawText(ui, `LEGENDARY ${leg}/${MAX_LEGENDARIES}`, 104, 31, leg <= MAX_LEGENDARIES ? RARITY_COLOR.legendary : '#f83800');
-    drawText(ui, `MYTHIC ${myth}/1`, 212, 31, myth === 1 ? RARITY_COLOR.mythic : '#f83800');
+    drawText(ui, `SPELLS ${n}/${DECK_SIZE}`, 14, 31, n === DECK_SIZE ? '#007800' : RED_INK);
+    drawText(ui, `LEGENDARY ${leg}/${MAX_LEGENDARIES}`, 104, 31, leg <= MAX_LEGENDARIES ? ink(RARITY_COLOR.legendary) : RED_INK);
+    drawText(ui, `MYTHIC ${myth}/1`, 212, 31, myth === 1 ? ink(RARITY_COLOR.mythic) : RED_INK);
     const ok = validate(this.deck).length === 0;
-    drawText(ui, ok ? 'READY' : 'NOT READY', 300, 23, ok ? '#58d854' : '#f83800');
-    button(ui, 'done', 'DONE', UW - 86, 13, 70, 24, false, '#f8b800');
+    drawText(ui, ok ? 'READY' : 'NOT READY', 300, 23, ok ? '#007800' : RED_INK);
+    button(ui, 'done', 'DONE', UW - 86, 13, 70, 24, false, RED_INK);
 
     // list
-    frame(ui, LX, LY - 4, LW, VISIBLE * RH + 6, '#000000', '#7c7c7c');
+    win(ui, LX, LY - 4, LW, VISIBLE * RH + 6);
     for (let i = 0; i < VISIBLE; i++) {
       const idx = this.scroll + i;
       if (idx >= this.rows) break;
       const y = LY + i * RH, ty = y + 3;
       const on = idx === this.sel && showSel();
       zone(`row:${idx}`, LX + 1, y - 1, LW - 2, RH);
-      if (on) P(ui, '#0000a8', LX + 1, y - 1, LW - 2, RH);
+      if (on) selRow(ui, LX + 1, y - 1, LW - 2, RH);
       const card = this.cards[idx];
       if (!card) {
-        drawText(ui, idx === this.cards.length ? 'RESET TO STARTER' : 'CLEAR ALL', LX + 64, ty, on ? '#fcfcfc' : '#bcbcbc');
+        drawText(ui, idx === this.cards.length ? 'RESET TO STARTER' : 'CLEAR ALL', LX + 64, ty, on ? INK : INK2);
         continue;
       }
       const have = this.deck[card.id] ?? 0, max = MAX_COPIES[card.rarity];
       zone(`minus:${idx}`, LX + 2, y - 1, 14, RH);
       zone(`plus:${idx}`, LX + 42, y - 1, 14, RH);
       if (on) {
-        drawText(ui, '-', LX + 6, ty, hot('minus') === idx ? '#f8b800' : have ? '#fcfcfc' : '#3c3c3c');
-        drawText(ui, '+', LX + 46, ty, hot('plus') === idx ? '#f8b800' : have < max ? '#fcfcfc' : '#3c3c3c');
+        drawText(ui, '-', LX + 6, ty, hot('minus') === idx ? GOLD : have ? PAPER : BURN);
+        drawText(ui, '+', LX + 46, ty, hot('plus') === idx ? RED_INK : have < max ? INK : BURN);
       }
-      drawText(ui, `${have}/${max}`, LX + 18, ty, have ? '#fcfcfc' : '#7c7c7c');
+      drawText(ui, `${have}/${max}`, LX + 18, ty, have ? INK : TRIM);
       P(ui, ELEMENT_COLOR[card.element], LX + 58, y + 2, 3, 8);
-      drawText(ui, card.name.toUpperCase(), LX + 66, ty, RARITY_COLOR[card.rarity]);
-      drawText(ui, card.cost === 'all' ? 'A' : String(card.cost), LX + LW - 14, ty, resColor(card));
+      drawText(ui, card.name.toUpperCase(), LX + 66, ty, card.rarity === 'common' ? INK : ink(RARITY_COLOR[card.rarity]));
+      drawText(ui, card.cost === 'all' ? 'A' : String(card.cost), LX + LW - 14, ty, resInk(card));
     }
     // scrollbar
     const total = this.rows, trackH = VISIBLE * RH;
     const bh = Math.max(10, Math.round((VISIBLE / total) * trackH));
     const by = LY + Math.round((this.scroll / Math.max(1, total - VISIBLE)) * (trackH - bh));
-    P(ui, '#3c3c3c', LX + LW + 1, LY - 2, 3, trackH);
-    P(ui, '#bcbcbc', LX + LW + 1, by - 2, 3, bh);
+    P(ui, BURN, LX + LW + 1, LY - 2, 3, trackH);
+    P(ui, INK2, LX + LW + 1, by - 2, 3, bh);
 
     // detail: the card itself, its numbers, then its rules
     const card = showSel() ? this.cards[this.sel] : undefined;
     const dh = VISIBLE * RH + 6;
-    frame(ui, DX, LY - 4, DW, dh, '#000000', card ? ELEMENT_COLOR[card.element] : '#7c7c7c');
+    win(ui, DX, LY - 4, DW, dh, { accent: card ? ELEMENT_COLOR[card.element] : undefined });
     if (card) {
       const have = this.deck[card.id] ?? 0;
       drawCardFace(ui, card, DX + 8, LY + 4, { lit: true });
       const cx = DX + CARD_W + 18;
       let y = LY + 8;
       const line = (s: string, col: string): void => { drawText(ui, s, cx, y, col); y += 12; };
-      line(card.rarity.toUpperCase(), RARITY_COLOR[card.rarity]);
-      line(card.element.toUpperCase(), ELEMENT_COLOR[card.element]);
-      line(`${card.cost === 'all' ? 'ALL' : card.cost} ${resName(card)}`, resColor(card));
-      if (card.dmg !== '-') line(`DMG ${card.dmg.toUpperCase()}`, '#f8b800');
+      line(card.rarity.toUpperCase(), ink(RARITY_COLOR[card.rarity]));
+      line(card.element.toUpperCase(), ink(ELEMENT_COLOR[card.element]));
+      line(`${card.cost === 'all' ? 'ALL' : card.cost} ${resName(card)}`, resInk(card));
+      if (card.dmg !== '-') line(`DMG ${card.dmg.toUpperCase()}`, RED_INK);
       y += 6;
-      line('IN DECK', '#7c7c7c');
-      line(`${have} / ${MAX_COPIES[card.rarity]}`, have ? '#fcfcfc' : '#7c7c7c');
+      line('IN DECK', TRIM);
+      line(`${have} / ${MAX_COPIES[card.rarity]}`, have ? INK : TRIM);
       let ry = LY + CARD_H + 16;
-      drawText(ui, card.name.toUpperCase(), DX + 8, ry, '#fcfcfc'); ry += 14;
-      for (const l of wrap(card.short.toUpperCase(), Math.floor((DW - 16) / 6))) { drawText(ui, l, DX + 8, ry, '#bcbcbc'); ry += 11; }
+      drawText(ui, card.name.toUpperCase(), DX + 8, ry, INK); ry += 14;
+      for (const l of wrap(card.short.toUpperCase(), Math.floor((DW - 16) / 6))) { drawText(ui, l, DX + 8, ry, INK2); ry += 11; }
     } else if (!showSel()) {
-      drawText(ui, 'TOUCH A CARD TO READ IT', DX + 8, LY + 8, '#bcbcbc');
+      drawText(ui, 'TOUCH A CARD TO READ IT', DX + 8, LY + 8, INK2);
     } else {
-      drawText(ui, this.sel === this.cards.length ? 'PUT THE STARTER DECK BACK' : 'REMOVE EVERY SPELL', DX + 8, LY + 8, '#bcbcbc');
+      drawText(ui, this.sel === this.cards.length ? 'PUT THE STARTER DECK BACK' : 'REMOVE EVERY SPELL', DX + 8, LY + 8, INK2);
     }
 
     // footer
