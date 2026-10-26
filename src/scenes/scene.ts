@@ -1,8 +1,5 @@
 // Scene switching, mouse hit zones and small UI widgets shared by the menus.
-import { stretch, type Ctx } from '../engine/gfx';
-
-/** How much taller menu rows get in phone portrait on screens that don't stretch (fights). */
-export const PORTRAIT_ROWS = 1.5;
+import { spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { win, selRow, plaque, footer, sepia, toInk, INK, INK2, TRIM } from './skin';
 import { mouse } from '../engine/input';
@@ -15,8 +12,6 @@ export interface Scene {
   enter?(): void;
   /** Which touch controls this screen shows on phones (a BACK button when left out). */
   pad?(): PadMode;
-  /** True for menu screens drawn wholly on the UI layer: in phone portrait they stretch taller (see stretch in gfx.ts). */
-  tall?(): boolean;
 }
 
 let current: Scene | null = null;
@@ -78,8 +73,8 @@ export function dim(c: Ctx, a = 0.6): void { sepia(c, a); }
 export function drawMenu(c: Ctx, items: string[], sel: number, cx: number, y: number, tick: number, opts: { gap?: number; width?: number; disabled?: boolean[]; scale?: number; grow?: boolean } = {}): void {
   const s = opts.scale ?? 1;
   let gap = opts.gap ?? 20;
-  // phone portrait, on screens that aren't stretched (fights): rows grow taller, downward into the spare height
-  if (stretch.portrait && stretch.k === 1 && opts.grow !== false) gap = Math.round(gap * PORTRAIT_ROWS);
+  // phone portrait: rows grow taller, downward into the spare height
+  if (opts.grow !== false) gap = Math.round(gap * spread.k);
   const w = opts.width ?? Math.max(...items.map(t => textWidth(t, s))) + 48;
   const x = Math.round(cx - w / 2);
   win(c, x, y - 8, w, items.length * gap + 10);

@@ -4,7 +4,7 @@ import { setScene, hint, zone, hot, listMouse, button, showSel, type Scene } fro
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, skinOf } from '../art/sprites';
-import { P, UW, frame, screenRect, type Ctx } from '../engine/gfx';
+import { P, UW, frame, screenRect, spread, vy, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, captureNextKey, k, mouse } from '../engine/input';
 import { touchActive, touchCodeBox, touchText } from '../engine/touch';
@@ -25,6 +25,8 @@ const RX = 140, RW = UW - 164, Y0 = 44, RH = 18;
 const NET_NAME: Record<TransportKind, string> = { room: 'CLAUDE.AI ROOM', peer: 'PEER TO PEER (WEBRTC)', local: 'LOCAL TABS (TEST)' };
 
 export class OnlineScene implements Scene {
+  /** How far the top half of the screen moves in phone portrait (set each draw). */
+  private dy = 0;
   m: MatchConfig = loadMatch();
   sel: number = ROWS.indexOf('CREATE ROOM');
   mode: Mode = 'menu';
@@ -149,27 +151,27 @@ export class OnlineScene implements Scene {
     if (wasPressed('confirm')) this.activate(ROWS[this.sel]);
   }
 
-  tall(): boolean { return true; }
-
   draw(c: Ctx, tick: number, ui: Ctx): void {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.35)';
     c.fillRect(...screenRect());
-    banner(ui, 'ONLINE MODE', UW / 2, 3);
+    banner(ui, 'ONLINE MODE', UW / 2, vy(3));
+    // phone portrait: the top half moves up and the help box down into the spare height, and rows grow taller
+    const dy = this.dy = vy(36) - 36, db = vy(288) - 288;
 
     // your fighter
     const skin = skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id;
     const bob = Math.floor(tick / 4) % 2;
-    win(ui, 16, 36, 104, 124, { accent: teamColor(this.m.p1, skin, false) });
-    drawTextCentered(ui, 'YOU', 68, 46, RED_INK, 1, false);
-    drawFighterSprite(ui, getSprite(this.m.p1, skin, false), 68, 140 - bob * 2, false, 'none', 4);
+    win(ui, 16, 36 + dy, 104, 124, { accent: teamColor(this.m.p1, skin, false) });
+    drawTextCentered(ui, 'YOU', 68, 46 + dy, RED_INK, 1, false);
+    drawFighterSprite(ui, getSprite(this.m.p1, skin, false), 68, 140 + dy - bob * 2, false, 'none', 4);
 
     if (this.mode === 'menu') this.drawRows(ui, tick);
     else this.drawPanel(ui, tick);
 
     // how it connects
-    win(ui, 16, 176, UW - 32, 112);
-    drawText(ui, 'HOW IT WORKS', 26, 184, RED_INK);
+    win(ui, 16, 176 + db, UW - 32, 112);
+    drawText(ui, 'HOW IT WORKS', 26, 184 + db, RED_INK);
     const lines = [
       'ONE PLAYER PICKS CREATE ROOM AND SHARES THE 5-LETTER CODE.',
       'THE OTHER OPENS THIS SAME PAGE, PICKS JOIN ROOM, TYPES IT IN.',
@@ -177,20 +179,21 @@ export class OnlineScene implements Scene {
       'FLIP A COIN). THE HOST\'S MATCH LENGTH IS USED. EITHER PLAYER',
       'CAN OPEN THE DRAW SCREEN. THERE IS NO PAUSE ONLINE.',
     ];
-    lines.forEach((l, i) => drawText(ui, l, 26, 198 + i * 12, INK2));
-    drawText(ui, `NETWORK: ${this.kind ? NET_NAME[this.kind] : 'CHECKING...'}`, 26, 266, TRIM);
+    lines.forEach((l, i) => drawText(ui, l, 26, 198 + db + i * 12, INK2));
+    drawText(ui, `NETWORK: ${this.kind ? NET_NAME[this.kind] : 'CHECKING...'}`, 26, 266 + db, TRIM);
     hint(ui, this.mode === 'code' ? (touchActive() ? 'TYPE THE CODE, THEN TAP JOIN' : 'TYPE THE CODE   ENTER: JOIN   ESC: BACK')
       : this.mode === 'menu' ? `CLICK OR ${k('attack')}: SELECT   ${k('left')}/${k('right')}: CHANGE   ${k('cast')} / RIGHT-CLICK: BACK`
         : `${k('cast')} / RIGHT-CLICK: BACK`);
   }
 
   private drawRows(ui: Ctx, tick: number): void {
-    win(ui, RX - 8, Y0 - 8, RW + 16, ROWS.length * RH + 12);
+    const rh = Math.round(RH * spread.k), y0 = Y0 + this.dy;
+    win(ui, RX - 8, y0 - 8, RW + 16, ROWS.length * rh + 12);
     ROWS.forEach((row, i) => {
-      const y = Y0 + i * RH, ty = y + 5;
+      const y = y0 + i * rh, ty = y + 5 + Math.round((rh - RH) / 2);
       const on = i === this.sel && showSel();
-      zone(`row:${i}`, RX - 6, y - 1, RW + 12, RH - 1);
-      if (on) selRow(ui, RX - 6, y - 1, RW + 12, RH - 2);
+      zone(`row:${i}`, RX - 6, y - 1, RW + 12, rh - 1);
+      if (on) selRow(ui, RX - 6, y - 1, RW + 12, rh - 2);
       if (on && tick % 8 < 6) drawText(ui, '→', RX, ty, PAPER);
       if (row === 'CREATE ROOM' || row === 'JOIN ROOM') {
         drawTextCentered(ui, row, RX + RW / 2, ty, RED_INK, 1, false);
@@ -202,51 +205,51 @@ export class OnlineScene implements Scene {
       const vx = RX + RW - 16, vw = textWidth(value);
       drawText(ui, value, vx - vw, ty, INK);
       const ax = vx - vw - 16;
-      zone(`arrow:${i * 2}`, ax - 4, y - 1, 14, RH - 2);
-      zone(`arrow:${i * 2 + 1}`, vx + 2, y - 1, 14, RH - 2);
+      zone(`arrow:${i * 2}`, ax - 4, y - 1, 14, rh - 2);
+      zone(`arrow:${i * 2 + 1}`, vx + 2, y - 1, 14, rh - 2);
       drawText(ui, '←', ax, ty, hot('arrow') === i * 2 ? RED_INK : on ? INK : BURN);
       drawText(ui, '→', vx + 6, ty, hot('arrow') === i * 2 + 1 ? RED_INK : on ? INK : BURN);
     });
   }
 
   private drawPanel(ui: Ctx, tick: number): void {
-    const x = RX - 8, w = RW + 16;
-    win(ui, x, 36, w, 124);
+    const x = RX - 8, w = RW + 16, dy = this.dy;
+    win(ui, x, 36 + dy, w, 124);
     const cx = x + w / 2;
     if (this.mode === 'code') {
-      drawTextCentered(ui, 'ENTER ROOM CODE', cx, 48, INK, 1, false);
+      drawTextCentered(ui, 'ENTER ROOM CODE', cx, 48 + dy, INK, 1, false);
       for (let i = 0; i < CODE_LEN; i++) {
         const bx = cx - (CODE_LEN * 30) / 2 + i * 30;
-        frame(ui, bx, 66, 26, 30, '#f0c880', i === this.code.length && tick % 8 < 5 ? RED_INK : TRIM);
-        if (this.code[i]) drawTextCentered(ui, this.code[i], bx + 13, 73, RED_INK, 2, false);
+        frame(ui, bx, 66 + dy, 26, 30, '#f0c880', i === this.code.length && tick % 8 < 5 ? RED_INK : TRIM);
+        if (this.code[i]) drawTextCentered(ui, this.code[i], bx + 13, 73 + dy, RED_INK, 2, false);
       }
       // phones type into a hidden text box over the code boxes
-      touchCodeBox(cx - (CODE_LEN * 30) / 2, 66, CODE_LEN * 30, 30, this.code,
+      touchCodeBox(cx - (CODE_LEN * 30) / 2, 66 + dy, CODE_LEN * 30, 30, this.code,
         v => [...v.toUpperCase()].filter(isCodeChar).join('').slice(0, CODE_LEN),
         v => { if (v.length > this.code.length) sfx('move'); this.code = v; },
         () => { if (this.code.length === CODE_LEN) { captureNextKey(null); this.connect('guest'); } });
-      if (touchActive()) drawTextCentered(ui, this.code.length === CODE_LEN ? '' : 'TAP THE BOXES TO TYPE', cx, 102, TRIM, 1, false);
-      if (this.code.length === CODE_LEN) button(ui, 'btn:0', 'JOIN', cx - 40, 112, 80, 20, false, RED_INK);
+      if (touchActive()) drawTextCentered(ui, this.code.length === CODE_LEN ? '' : 'TAP THE BOXES TO TYPE', cx, 102 + dy, TRIM, 1, false);
+      if (this.code.length === CODE_LEN) button(ui, 'btn:0', 'JOIN', cx - 40, 112 + dy, 80, 20, false, RED_INK);
       return;
     }
-    if (this.mode === 'busy') { drawTextCentered(ui, this.msg, cx, 92, RED_INK, 1, false); return; }
+    if (this.mode === 'busy') { drawTextCentered(ui, this.msg, cx, 92 + dy, RED_INK, 1, false); return; }
     if (this.mode === 'error') {
-      drawTextCentered(ui, this.msg, cx, 84, RED_INK, 1, false);
-      drawTextCentered(ui, touchText('CLICK TO GO BACK'), cx, 104, TRIM, 1, false);
+      drawTextCentered(ui, this.msg, cx, 84 + dy, RED_INK, 1, false);
+      drawTextCentered(ui, touchText('CLICK TO GO BACK'), cx, 104 + dy, TRIM, 1, false);
       return;
     }
     const net = this.net!;
     const host = net.role === 'host';
-    drawTextCentered(ui, host ? 'ROOM CODE' : 'JOINED ROOM', cx, 46, INK2, 1, false);
-    drawTextCentered(ui, this.code, cx, 60, RED_INK, 4, false);
+    drawTextCentered(ui, host ? 'ROOM CODE' : 'JOINED ROOM', cx, 46 + dy, INK2, 1, false);
+    drawTextCentered(ui, this.code, cx, 60 + dy, RED_INK, 4, false);
     const rival = net.rival;
     let status: string;
     if (!net.matched) status = host ? 'WAITING FOR A RIVAL TO JOIN' : this.waitT > 12 ? 'NO HOST YET: CHECK THE CODE' : 'WAITING FOR THE HOST';
     else status = `RIVAL: ${rival!.cls.toUpperCase()}   STARTING...`;
-    drawTextCentered(ui, tick % 8 < 6 || net.matched ? status : '', cx, 100, net.matched ? '#007800' : INK, 1, false);
-    if (rival) P(ui, teamColor(rival.cls, rival.skin, false), cx - textWidth(status) / 2 - 12, 100, 7, 7);
-    if (host) button(ui, 'btn:1', this.copied > 0 ? 'COPIED!' : this.kind === 'room' ? 'COPY CODE' : 'COPY LINK', cx - 104, 128, 100, 20, false, INK);
-    button(ui, 'btn:2', 'CANCEL', host ? cx + 4 : cx - 50, 128, 100, 20, false, INK2);
+    drawTextCentered(ui, tick % 8 < 6 || net.matched ? status : '', cx, 100 + dy, net.matched ? '#007800' : INK, 1, false);
+    if (rival) P(ui, teamColor(rival.cls, rival.skin, false), cx - textWidth(status) / 2 - 12, 100 + dy, 7, 7);
+    if (host) button(ui, 'btn:1', this.copied > 0 ? 'COPIED!' : this.kind === 'room' ? 'COPY CODE' : 'COPY LINK', cx - 104, 128 + dy, 100, 20, false, INK);
+    button(ui, 'btn:2', 'CANCEL', host ? cx + 4 : cx - 50, 128 + dy, 100, 20, false, INK2);
   }
 }
 

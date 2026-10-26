@@ -6,7 +6,7 @@ import { getStage, STAGE_IDS } from '../art/stages';
 import { drawPanel, drawStage, panelFoot } from '../art/arena';
 import { useStage } from '../game/battleView';
 import { getSprite, drawFighterSprite, skinOf, mirrorSkin } from '../art/sprites';
-import { P, W, H, UW, rng, screenRect, fillScreen, type Ctx } from '../engine/gfx';
+import { P, W, H, UW, rng, screenRect, fillScreen, vy, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { win, plaque, banner, FRAME, GOLD, PAPER, INK, INK2, RED_INK } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
@@ -24,8 +24,8 @@ const TILES = [...STAGE_IDS, 'random'];
 const ROULETTE = 2.4, REVEAL = 1.2;
 
 // layout (UI pixels)
-const VX = 120, VY = 28;              // live preview, 240x160 (half the fight's size)
-const TW = 60, TH = 40, TGAP = 4, TY = 238;
+const VX = 120, PREVIEW_Y = 28;              // live preview, 240x160 (half the fight's size)
+const TW = 60, TH = 40, TGAP = 4, TILE_Y = 238;
 const TX0 = Math.round(UW / 2 - (TILES.length * TW + (TILES.length - 1) * TGAP) / 2);
 
 /**
@@ -172,8 +172,6 @@ export class StageSelectScene implements Scene {
   /** A vote as a stage to show ('random' shows a cycling stage). */
   private tileStage(v: string): string { return v === 'random' ? STAGE_IDS[Math.floor(this.t * 6) % STAGE_IDS.length] : v; }
 
-  tall(): boolean { return true; }
-
   draw(c: Ctx, tick: number, ui: Ctx): void {
     const st = getStage(this.view);
     // the full-size stage behind everything, dimmed, and a sharp half-size preview with the fighters on it
@@ -188,39 +186,41 @@ export class StageSelectScene implements Scene {
       const foot = panelFoot(col, 1);
       drawFighterSprite(pc, getSprite(f.cls, f.skin, false), foot.x, foot.y - (flip ? bob : 1 - bob), flip);
     }
+    // phone portrait spreads the screen into the spare height
+    const previewY = vy(PREVIEW_Y), tileY = vy(TILE_Y), ny = vy(192);
     // the preview sits in a parchment mat, like a framed painting
-    win(ui, VX - 5, VY - 5, W + 10, H + 10, { burn: 2 });
-    P(ui, FRAME, VX - 1, VY - 1, W + 2, H + 2);
-    ui.drawImage(this.preview, VX, VY);
+    win(ui, VX - 5, previewY - 5, W + 10, H + 10, { burn: 2 });
+    P(ui, FRAME, VX - 1, previewY - 1, W + 2, H + 2);
+    ui.drawImage(this.preview, VX, previewY);
 
-    banner(ui, 'SELECT STAGE', UW / 2, 2);
-    win(ui, UW / 2 - 130, 192, 260, 36, { burn: 3 });
-    drawTextCentered(ui, st.name.toUpperCase(), UW / 2, 197, INK, 2, false);
-    drawTextCentered(ui, st.tag.toUpperCase(), UW / 2, 215, INK2, 1, false);
+    banner(ui, 'SELECT STAGE', UW / 2, vy(2));
+    win(ui, UW / 2 - 130, ny, 260, 36, { burn: 3 });
+    drawTextCentered(ui, st.name.toUpperCase(), UW / 2, ny + 5, INK, 2, false);
+    drawTextCentered(ui, st.tag.toUpperCase(), UW / 2, ny + 23, INK2, 1, false);
 
     const net = this.net, rl = net?.rivalLobby;
     TILES.forEach((id, n) => {
       const x = TX0 + n * (TW + TGAP);
-      zone(`stile:${n}`, x, TY, TW, TH);
+      zone(`stile:${n}`, x, tileY, TW, TH);
       const mine = net ? TILES.indexOf(net.lobby.stage) === n : this.cur === n;
       const theirs = !!rl && TILES.indexOf(rl.stage) === n;
       const lit = (this.final && this.view === id) || (!this.final && mine && showSel());
       const edge = lit ? GOLD : hot('stile') === n ? PAPER : FRAME;
-      plaque(ui, x, TY, TW, TH, false, edge);
+      plaque(ui, x, tileY, TW, TH, false, edge);
       if (id === 'random') {
-        drawTextCentered(ui, '?', x + TW / 2, TY + 6, RED_INK, 3, false);
-        drawTextCentered(ui, 'RANDOM', x + TW / 2, TY + 30, INK, 1, false);
+        drawTextCentered(ui, '?', x + TW / 2, tileY + 6, RED_INK, 3, false);
+        drawTextCentered(ui, 'RANDOM', x + TW / 2, tileY + 30, INK, 1, false);
       } else {
-        ui.drawImage(thumb(id), x, TY);
-        P(ui, edge, x, TY, TW, 1); P(ui, edge, x, TY + TH - 1, TW, 1); P(ui, edge, x, TY, 1, TH); P(ui, edge, x + TW - 1, TY, 1, TH);
+        ui.drawImage(thumb(id), x, tileY);
+        P(ui, edge, x, tileY, TW, 1); P(ui, edge, x, tileY + TH - 1, TW, 1); P(ui, edge, x, tileY, 1, TH); P(ui, edge, x + TW - 1, tileY, 1, TH);
       }
-      if (lit) { P(ui, GOLD, x - 2, TY - 2, TW + 4, 2); P(ui, GOLD, x - 2, TY + TH, TW + 4, 2); P(ui, GOLD, x - 2, TY, 2, TH); P(ui, GOLD, x + TW, TY, 2, TH); }
+      if (lit) { P(ui, GOLD, x - 2, tileY - 2, TW + 4, 2); P(ui, GOLD, x - 2, tileY + TH, TW + 4, 2); P(ui, GOLD, x - 2, tileY, 2, TH); P(ui, GOLD, x + TW, tileY, 2, TH); }
       // vote tags under the tile: yours left, theirs right
       const tag = (label: string, color: string, right: boolean, solid: boolean): void => {
         const tw = label.length * 6 + 3, tx = right ? x + TW - tw : x;
-        P(ui, solid ? color : '#000000', tx, TY + TH + 2, tw, 10);
-        if (!solid) { P(ui, color, tx, TY + TH + 2, tw, 1); P(ui, color, tx, TY + TH + 11, tw, 1); }
-        drawText(ui, label, tx + 2, TY + TH + 4, '#fcfcfc');
+        P(ui, solid ? color : '#000000', tx, tileY + TH + 2, tw, 10);
+        if (!solid) { P(ui, color, tx, tileY + TH + 2, tw, 1); P(ui, color, tx, tileY + TH + 11, tw, 1); }
+        drawText(ui, label, tx + 2, tileY + TH + 4, '#fcfcfc');
       };
       if (net) {
         if (mine && (showSel() || net.lobby.voted)) tag('YOU', '#d82800', false, net.lobby.voted);
@@ -233,7 +233,7 @@ export class StageSelectScene implements Scene {
     else if (this.final) status = 'VOTES SPLIT: FLIPPING A COIN...';
     else if (net && net.lobby.voted) status = rl?.voted ? '' : tick % 16 < 12 ? 'WAITING FOR RIVAL TO VOTE...' : '';
     else if (net) status = rl?.voted ? 'RIVAL HAS VOTED' : 'VOTE FOR A STAGE';
-    if (status) drawTextCentered(ui, status, UW / 2, 294, '#f8b800', 1);
+    if (status) drawTextCentered(ui, status, UW / 2, vy(294), '#f8b800', 1);
 
     if (net && (net.status === 'error' || net.status === 'left' || net.status === 'lost')) {
       fillScreen(ui, 'rgba(0,0,0,0.8)', 2);
