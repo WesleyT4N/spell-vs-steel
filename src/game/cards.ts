@@ -4,6 +4,7 @@ import type { Battle, CastCtx, Fighter } from './battle';
 import type { ClassId } from '../art/sprites';
 import { sfx } from '../engine/audio';
 import { shuffle } from './rng';
+import { TUNING } from './tuning';
 
 export type Element = 'steel' | 'fire' | 'frost' | 'arcane' | 'shadow' | 'poison' | 'nature' | 'holy';
 export type Rarity = 'common' | 'uncommon' | 'legendary' | 'mythic';
@@ -72,12 +73,13 @@ const warrior: CardDef[] = [
     id: 'leap_strike', name: 'Leap Strike', cls: 'warrior', cost: 3, rarity: 'uncommon', element: 'steel', damaging: true, lock: 0.8,
     dmg: '120', short: 'Leap in front of the enemy and smash their panel plus above and below.',
     cast: x => {
-      const tc = x.foe.col, tr = x.foe.row;
-      lunge(x, tc - x.dir, tr, 0.3, 0.2, 0.25, 14);
-      x.b.later(0.3, () => {
+      const tc = x.foe.col, tr = x.foe.row, w = TUNING.warnTime;
+      const cells: Array<[number, number]> = [[tc, tr - 1], [tc, tr], [tc, tr + 1]];
+      lunge(x, tc - x.dir, tr, 0.3, w - 0.3 + 0.2, 0.25, 14);
+      x.b.warn(x.f, cells, w, () => {
         x.b.addFx('smash', x.f.side, tc, tr, 0.3);
         x.b.shake = 0.2;
-        x.b.strike(x.f, [[tc, tr - 1], [tc, tr], [tc, tr + 1]], 120 * x.mult, { spell: true, element: 'steel' });
+        x.b.strike(x.f, cells, 120 * x.mult, { spell: true, element: 'steel' });
       });
     },
   },
@@ -173,8 +175,11 @@ const warrior: CardDef[] = [
     dmg: '90', short: 'Sweeping slash hits all 3 panels of the enemy front column.',
     cast: x => {
       const col = x.b.frontCol(x.foe.side);
-      x.b.addFx('wide', x.f.side, col, 1, 0.3);
-      x.b.strike(x.f, [[col, 0], [col, 1], [col, 2]], 90 * x.mult, { spell: true, element: 'steel' });
+      const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
+      x.b.warn(x.f, cells, TUNING.warnTime, () => {
+        x.b.addFx('wide', x.f.side, col, 1, 0.3);
+        x.b.strike(x.f, cells, 90 * x.mult, { spell: true, element: 'steel' });
+      });
     },
     ai: (b, f) => b.foe(f).col === b.frontCol(b.foe(f).side),
   },
@@ -183,10 +188,13 @@ const warrior: CardDef[] = [
     dmg: '60', short: 'Shockwave hits the enemy front column and cracks those panels.',
     cast: x => {
       const col = x.b.frontCol(x.foe.side);
-      x.b.addFx('shockwave', x.f.side, col, 1, 0.4);
-      x.b.shake = 0.2;
-      x.b.strike(x.f, [[col, 0], [col, 1], [col, 2]], 60 * x.mult, { spell: true, element: 'steel' });
-      for (let r = 0; r < 3; r++) x.b.panels[col][r].cracked = true;
+      const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
+      x.b.warn(x.f, cells, TUNING.warnTime, () => {
+        x.b.addFx('shockwave', x.f.side, col, 1, 0.4);
+        x.b.shake = 0.2;
+        x.b.strike(x.f, cells, 60 * x.mult, { spell: true, element: 'steel' });
+        for (let r = 0; r < 3; r++) x.b.panels[col][r].cracked = true;
+      });
     },
   },
   {
@@ -196,7 +204,8 @@ const warrior: CardDef[] = [
       const { b, f, foe } = x;
       const r = f.row, front = b.frontCol(foe.side), d = x.dir;
       const waves: Array<Array<[number, number]>> = [[[front, r]], [[front + d, r - 1], [front + d, r], [front + d, r + 1]], [[front + 2 * d, r - 1], [front + 2 * d, r + 1]]];
-      waves.forEach((cells, i) => b.later(0.1 * i, () => {
+      // the whole cone flashes first, then the quake rolls through it wave by wave
+      waves.forEach((cells, i) => b.warn(f, cells, TUNING.warnTime + 0.1 * i, () => {
         for (const [c, rr] of cells) if (b.inGrid(c, rr)) b.addFx('quake', f.side, c, rr, 0.3);
         b.strike(f, cells, 60 * x.mult, { spell: true, element: 'steel' });
       }));
@@ -232,12 +241,15 @@ const warrior: CardDef[] = [
       const { b, f, foe } = x;
       const col = b.frontCol(foe.side);
       if (col === b.backCol(foe.side)) { b.text(f, 'NO ROOM', '#bcbcbc'); return; }
-      b.shake = 0.3;
-      b.addFx('shockwave', f.side, col, 1, 0.4);
-      b.strike(f, [[col, 0], [col, 1], [col, 2]], 80 * x.mult, { spell: true, element: 'steel' });
-      b.walls = b.walls.filter(w => w.col !== col);
-      for (let r = 0; r < 3; r++) b.panels[col][r].hole = 8;
-      if (foe.col === col) { if (!b.knockback(foe, 1)) b.relocate(foe); }
+      const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
+      b.warn(f, cells, TUNING.warnTime, () => {
+        b.shake = 0.3;
+        b.addFx('shockwave', f.side, col, 1, 0.4);
+        b.strike(f, cells, 80 * x.mult, { spell: true, element: 'steel' });
+        b.walls = b.walls.filter(w => w.col !== col);
+        for (let r = 0; r < 3; r++) b.panels[col][r].hole = 8;
+        if (foe.col === col) { if (!b.knockback(foe, 1)) b.relocate(foe); }
+      });
     },
   },
   {
@@ -293,10 +305,10 @@ const warrior: CardDef[] = [
       const { b, f, foe } = x;
       const mid = b.frontCol(foe.side) + x.dir;
       lunge(x, mid, 1, 0.45, 0.25, 0.3, 30);
-      b.later(0.45, () => {
+      const cells = allEnemyPanels(b, f.side);
+      b.warn(f, cells, 0.45, () => {
         b.shake = 0.5;
         b.cheer = 2;
-        const cells = allEnemyPanels(b, f.side);
         for (const [c, r] of cells) { b.addFx('quake', f.side, c, r, 0.4); b.panels[c][r].cracked = true; }
         b.strike(f, cells, 200 * x.mult, { spell: true, element: 'steel' });
       });
@@ -411,8 +423,10 @@ const mage: CardDef[] = [
     cast: x => {
       const cells: Array<[number, number]> = [];
       for (let c = 0; c < 6; c++) for (let r = 0; r < 3; r++) if (x.b.panels[c][r].burn > 0 && x.b.panels[c][r].owner !== x.f.side) cells.push([c, r]);
-      for (const [c, r] of cells) x.b.addFx('explode', x.f.side, c, r, 0.35);
-      x.b.strike(x.f, cells, 60 * x.mult, { spell: true, element: 'fire' });
+      x.b.warn(x.f, cells, TUNING.warnTime, () => {
+        for (const [c, r] of cells) x.b.addFx('explode', x.f.side, c, r, 0.35);
+        x.b.strike(x.f, cells, 60 * x.mult, { spell: true, element: 'fire' });
+      });
     },
     ai: (b, f) => { const foe = b.foe(f); return b.panels[foe.col][foe.row].burn > 0.4; },
   },
@@ -447,7 +461,7 @@ const mage: CardDef[] = [
     id: 'flamestrike', name: 'Flamestrike', cls: 'mage', cost: 3, rarity: 'uncommon', element: 'fire', damaging: true, lock: 0.35,
     dmg: '130', short: 'After 1s, a fire pillar hits their panel and sets that whole column burning.',
     cast: x => {
-      x.b.mark(x.foe.col, x.foe.row, 1, '#f83800');
+      x.b.warn(x.f, [[x.foe.col, x.foe.row]], 1);
       targeted(x, 1, (c, r) => {
         x.b.addFx('pillar', x.f.side, c, r, 0.45);
         x.b.strike(x.f, [[c, r]], 130 * x.mult, { spell: true, element: 'fire' });
@@ -466,8 +480,7 @@ const mage: CardDef[] = [
         const cells = allEnemyPanels(b, f.side);
         const aim = b.rand() < 0.4;
         const [c, r] = aim ? [foe.col, foe.row] : cells[Math.floor(b.rand() * cells.length)];
-        b.mark(c, r, 0.5, '#3cbcfc');
-        b.later(0.5, () => {
+        b.warn(f, [[c, r]], 0.5, () => {
           b.addFx('shard', f.side, c, r, 0.3);
           const res = b.strike(f, [[c, r]], 25 * x.mult, { spell: true, element: 'frost', noFlinch: true });
           if (res.fighter && ++hits === 3) b.freeze(foe, 2);
@@ -479,7 +492,7 @@ const mage: CardDef[] = [
     id: 'ice_block', name: 'Ice Block', cls: 'mage', cost: 2, rarity: 'uncommon', element: 'frost', damaging: false, lock: 0,
     dmg: '-', short: 'Immune to everything for 2s, but you cannot move or act.',
     cast: x => { x.f.st.iceBlock = 2; },
-    ai: (b, f) => b.marks.some(m => m.col === f.col && m.row === f.row) || (lowHp(f, 0.3) && Math.abs(b.foe(f).col - f.col) <= 2),
+    ai: (b, f) => b.warned(f.col, f.row, f.side) || (lowHp(f, 0.3) && Math.abs(b.foe(f).col - f.col) <= 2),
   },
   {
     id: 'counterspell', name: 'Counterspell', cls: 'mage', cost: 2, rarity: 'legendary', element: 'arcane', damaging: false, lock: 0.2,
@@ -493,9 +506,8 @@ const mage: CardDef[] = [
     cast: x => {
       const c0 = x.foe.col, r0 = x.foe.row;
       const cells: Array<[number, number]> = [[c0, r0], [c0 - 1, r0], [c0 + 1, r0], [c0, r0 - 1], [c0, r0 + 1]];
-      for (const [c, r] of cells) x.b.mark(c, r, 1.5, '#f83800');
       x.b.addFx('meteorFall', x.f.side, c0, r0, 1.5);
-      x.b.later(1.5, () => {
+      x.b.warn(x.f, cells, 1.5, () => {
         x.b.shake = 0.5;
         x.b.cheer = 2;
         for (const [c, r] of cells) { x.b.addFx('explode', x.f.side, c, r, 0.5); x.b.burn(c, r, 5, 15); }
@@ -535,8 +547,10 @@ const mage: CardDef[] = [
       const c1 = b.frontCol(foe.side), c2 = c1 + x.dir;
       const cells: Array<[number, number]> = [];
       for (const c of [c1, c2]) for (let r = 0; r < 3; r++) cells.push([c, r]);
-      for (const [c, r] of cells) { b.addFx('explode', f.side, c, r, 0.4); b.burn(c, r, 5, 15); }
-      b.strike(f, cells, 100 * x.mult, { spell: true, element: 'fire' });
+      b.warn(f, cells, TUNING.warnTime, () => {
+        for (const [c, r] of cells) { b.addFx('explode', f.side, c, r, 0.4); b.burn(c, r, 5, 15); }
+        b.strike(f, cells, 100 * x.mult, { spell: true, element: 'fire' });
+      });
     },
     ai: (b, f) => { const foe = b.foe(f); return Math.abs(foe.col - b.frontCol(foe.side)) <= 1; },
   },
@@ -547,12 +561,11 @@ const mage: CardDef[] = [
       const { b, f } = x;
       const cells = shuffle(allEnemyPanels(b, f.side), b.rand).slice(0, 6);
       cells.forEach(([c, r], i) => {
-        b.later(i * 0.25, () => b.mark(c, r, 0.5, '#f83800'));
-        b.later(i * 0.25 + 0.5, () => {
+        b.later(i * 0.25, () => b.warn(f, [[c, r]], 0.5, () => {
           b.addFx('explode', f.side, c, r, 0.35);
           b.burn(c, r, 5, 15);
           b.strike(f, [[c, r]], 50 * x.mult, { spell: true, element: 'fire', noFlinch: true });
-        });
+        }));
       });
     },
   },

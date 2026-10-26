@@ -16,6 +16,9 @@ export const TUNING = {
   moveCooldown: 0.1,
   /** Global cooldown: minimum seconds between two spell casts. */
   castCooldown: 0.5,
+  /** Area spells (columns, rows, zones, rains) flash their panels this long before the hit lands, BN style.
+   *  Long enough to step out of after online input delay; spells with their own longer telegraph keep it. */
+  warnTime: 0.5,
   /** Shortest freeze or stun in seconds, so the attacker always gets a follow-up cast in. */
   ccMin: 2,
 

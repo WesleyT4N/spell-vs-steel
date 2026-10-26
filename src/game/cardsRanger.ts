@@ -4,6 +4,7 @@ import type { CardDef } from './cards';
 import { sfx } from '../engine/audio';
 import { shuffle } from './rng';
 import { allEnemyPanels, sameRow } from './cardUtil';
+import { TUNING } from './tuning';
 
 /** Hide a trap on a panel until the next Draw screen. It arms after `arm` seconds and only its owner can see it. */
 function trap(b: Battle, f: Fighter, col: number, row: number, kind: Trap['kind'], arm = 1, group?: number): void {
@@ -143,8 +144,7 @@ export const ranger: CardDef[] = [
       const front = b.frontCol(x.foe.side);
       const cells: Array<[number, number]> = [];
       for (const c of [front + x.dir, front + 2 * x.dir]) for (let r = 0; r < 3; r++) if (b.inGrid(c, r)) cells.push([c, r]);
-      for (const [c, r] of cells) b.mark(c, r, 1, '#fcfcfc');
-      b.later(1, () => {
+      b.warn(f, cells, 1, () => {
         for (const [c, r] of cells) b.addFx('arrowRain', f.side, c, r, 0.35);
         b.strike(f, cells, 50 * x.mult, { spell: true, element: 'steel' });
       });
@@ -184,8 +184,7 @@ export const ranger: CardDef[] = [
       for (let i = 0; i < 12; i++) b.later(i * 0.25, () => {
         const cells = allEnemyPanels(b, f.side);
         const [c, r] = b.rand() < 0.35 ? [foe.col, foe.row] : cells[Math.floor(b.rand() * cells.length)];
-        b.mark(c, r, 0.4, '#fcfcfc');
-        b.later(0.4, () => {
+        b.warn(f, [[c, r]], 0.4, () => {
           b.addFx('arrowRain', f.side, c, r, 0.3);
           b.strike(f, [[c, r]], 30 * x.mult, { spell: true, element: 'steel', noFlinch: true });
         });
@@ -198,11 +197,14 @@ export const ranger: CardDef[] = [
     cast: x => arrow(x, 'arrow', 16, (b, t) => {
       if (b.damage(t, 40 * x.mult, x.f, { spell: true, element: 'fire' }).dealt <= 0) return;
       b.text(t, 'STUCK', '#f87800');
-      b.later(2, () => {
+      // the arrow ticks on them, then the blast locks onto where they stand and flashes before it goes off
+      b.later(2 - TUNING.warnTime, () => {
         const cells: Array<[number, number]> = [[t.col, t.row], [t.col - 1, t.row], [t.col + 1, t.row], [t.col, t.row - 1], [t.col, t.row + 1]];
-        b.shake = 0.25;
-        for (const [c, r] of cells) if (b.inGrid(c, r)) b.addFx('explode', x.f.side, c, r, 0.4);
-        b.strike(x.f, cells, 120 * x.mult, { spell: true, element: 'fire' });
+        b.warn(x.f, cells, TUNING.warnTime, () => {
+          b.shake = 0.25;
+          for (const [c, r] of cells) if (b.inGrid(c, r)) b.addFx('explode', x.f.side, c, r, 0.4);
+          b.strike(x.f, cells, 120 * x.mult, { spell: true, element: 'fire' });
+        });
       });
     }),
     ai: (b, f) => sameRow(b, f),
@@ -250,7 +252,7 @@ export const ranger: CardDef[] = [
       x.b.projectiles = x.b.projectiles.filter(p => !(p.homing && p.homing.target === x.f.side));
       x.b.gainRes(x.f, 2);
     },
-    ai: (b, f) => b.marks.some(m => m.col === f.col && m.row === f.row) || b.projectiles.some(p => p.side !== f.side),
+    ai: (b, f) => b.warned(f.col, f.row, f.side) || b.projectiles.some(p => p.side !== f.side),
   },
   // Mythics
   {

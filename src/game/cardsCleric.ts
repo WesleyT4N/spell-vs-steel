@@ -158,8 +158,7 @@ export const cleric: CardDef[] = [
     cast: x => {
       const { b, f } = x;
       const cells = allEnemyPanels(b, f.side);
-      for (const [c, r] of cells) b.mark(c, r, 1.5, '#f8d878');
-      b.later(1.5, () => {
+      b.warn(f, cells, 1.5, () => {
         b.shake = 0.4; b.cheer = 2;
         for (const [c, r] of cells) b.addFx('holyPillar', f.side, c, r, 0.45);
         const res = b.strike(f, cells, 80 * x.mult, { spell: true, element: 'holy' });
@@ -245,8 +244,7 @@ export const cleric: CardDef[] = [
       b.cheer = 2;
       for (let i = 0; i < 10; i++) b.later(i * 0.4, () => {
         const c = foe.col, r = foe.row;
-        b.mark(c, r, 0.4, '#f8d878');
-        b.later(0.4, () => {
+        b.warn(f, [[c, r]], 0.4, () => {
           b.addFx('holyPillar', f.side, c, r, 0.35);
           if (b.strike(f, [[c, r]], 40 * x.mult, { spell: true, element: 'holy', noFlinch: true }).dealt > 0) b.heal(f, 20);
         });
