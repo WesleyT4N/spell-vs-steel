@@ -190,6 +190,83 @@ export function drawFighterSprite(c: Ctx, s: Sprite, footX: number, footY: numbe
   c.restore();
 }
 
+/** A pose for drawFighterPosed. Pixel art stays crisp: rows are resampled or shifted whole, never blended. */
+export interface Pose {
+  /** Vertical scale, feet planted (0.8 = crouch, 1.1 = stretch). */
+  sy?: number;
+  /** Pixels the top row shifts toward the facing direction (negative leans back); lower rows shift less. */
+  lean?: number;
+  /** Fall: 0 standing, 0.5 halfway, 1 flat on the ground. Positive falls forward, negative backward. */
+  fall?: number;
+  /** Rows hidden from the top (a dissolve eating down the body). */
+  cut?: number;
+  /** Interlace: draw only every other row, offset by `scan` (0 or 1). */
+  scan?: number;
+}
+
+const flipped = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+function mirrored(img: HTMLCanvasElement): HTMLCanvasElement {
+  let m = flipped.get(img);
+  if (!m) {
+    m = document.createElement('canvas'); m.width = img.width; m.height = img.height;
+    const c = m.getContext('2d')!;
+    c.translate(img.width, 0); c.scale(-1, 1); c.drawImage(img, 0, 0);
+    flipped.set(img, m);
+  }
+  return m;
+}
+
+/** drawFighterSprite with a pose: squash and stretch, lean, fall over, dissolve. */
+export function drawFighterPosed(c: Ctx, s: Sprite, footX: number, footY: number, flip: boolean, tint: Tint = 'none', pose: Pose = {}): void {
+  const src = flip ? mirrored(s.img[tint]) : s.img[tint];
+  const w = src.width, h = src.height, px = 1 / s.res;
+  const ax = (flip ? w - 1 - s.ax * s.res : s.ax * s.res) * px;
+  const fx = Math.round(footX), fy = Math.round(footY), d = flip ? -1 : 1;
+  const fall = pose.fall ?? 0;
+  if (Math.abs(fall) >= 0.25) {
+    // pivot on the feet like a falling tree; snapped to 45 or 90 degrees so the pixels stay legible
+    const a = (Math.abs(fall) >= 0.75 ? Math.PI / 2 : Math.PI / 4) * Math.sign(fall) * d;
+    const flat = Math.abs(fall) >= 0.75;
+    c.save();
+    // lying down, the body's far side would sink under the floor: lift it back onto the panel
+    c.translate(fx - (flat ? Math.sign(fall) * d * 4 : 0), fy - (flat ? Math.round((w * px - ax) * 0.5) : 0));
+    c.rotate(a);
+    c.drawImage(src, -ax, -h * px, w * px, h * px);
+    c.restore();
+    return;
+  }
+  const sy = pose.sy ?? 1, lean = pose.lean ?? 0, cut = pose.cut ?? 0;
+  const dh = Math.max(1, Math.round(h * sy));
+  for (let r = 0; r < dh; r++) {
+    const row = Math.min(h - 1, Math.floor((r * h) / dh));
+    if (row < cut) continue;
+    if (pose.scan !== undefined && (r & 1) !== pose.scan) continue;
+    const t = dh > 1 ? (dh - 1 - r) / (dh - 1) : 0;
+    const off = Math.round(lean * t) * d;
+    c.drawImage(src, 0, row, w, 1, fx - ax + off * px, fy - (dh - r) * px, w * px, px);
+  }
+}
+
+const pixCache = new WeakMap<Sprite, Array<Array<[number, string]>>>();
+/** The opaque pixels of each row of a sprite (x from its left edge, css color), for dissolves. */
+export function spriteRows(s: Sprite): Array<Array<[number, string]>> {
+  let rows = pixCache.get(s);
+  if (!rows) {
+    const img = s.img.none, d = img.getContext('2d')!.getImageData(0, 0, img.width, img.height).data;
+    rows = [];
+    for (let y = 0; y < img.height; y++) {
+      const row: Array<[number, string]> = [];
+      for (let x = 0; x < img.width; x++) {
+        const i = (y * img.width + x) * 4;
+        if (d[i + 3] > 0) row.push([x, `rgb(${d[i]},${d[i + 1]},${d[i + 2]})`]);
+      }
+      rows.push(row);
+    }
+    pixCache.set(s, rows);
+  }
+  return rows;
+}
+
 /** The main team color of a fighter, for HUD accents. */
 export function teamColor(cls: ClassId, skin: string, alt: boolean): string {
   // the tabard (Warrior h), robe (Mage c) or the mid tint tone (c) of the Classic set
