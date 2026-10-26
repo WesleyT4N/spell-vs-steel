@@ -77,16 +77,53 @@ export const RESERVED = new Set(['Escape', 'KeyM', 'KeyQ', 'KeyE', 'KeyR', 'Back
 
 // ---------- local versus: two players on one keyboard ----------
 export type LocalAct = 'up' | 'down' | 'left' | 'right' | 'attack' | 'cast' | 'custom';
+export const LOCAL_ACTS = ['up', 'down', 'left', 'right', 'attack', 'cast', 'custom'] as const;
 /**
- * Fixed layouts for two players sharing a keyboard: the left player on WASD with F/G/H under the right hand,
- * the right player on the arrows with . / and right Shift just above them (or the numpad). The touch pad
- * plays as the left player. These ignore the rebinding screen, which stays for single-player keys.
+ * Two players sharing a keyboard each get their own keys, rebindable apart from the single-player ones:
+ * by default the left player on WASD with F/G/H under the right hand, the right player on the arrows
+ * with . / and right Shift just above them. Pause stays on Enter/Esc for both.
  */
-export const LOCAL_KEYS: [Record<LocalAct, string[]>, Record<LocalAct, string[]>] = [
-  { up: ['KeyW', 'PadUp'], down: ['KeyS', 'PadDown'], left: ['KeyA', 'PadLeft'], right: ['KeyD', 'PadRight'], attack: ['KeyF', 'PadAttack'], cast: ['KeyG', 'PadCast'], custom: ['KeyH', 'PadDraw'] },
-  { up: ['ArrowUp', 'Numpad8'], down: ['ArrowDown', 'Numpad5'], left: ['ArrowLeft', 'Numpad4'], right: ['ArrowRight', 'Numpad6'], attack: ['Period', 'Numpad1'], cast: ['Slash', 'Numpad2'], custom: ['ShiftRight', 'Numpad3'] },
+export const DEFAULT_LOCAL_KEYS: [Record<LocalAct, string>, Record<LocalAct, string>] = [
+  { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', attack: 'KeyF', cast: 'KeyG', custom: 'KeyH' },
+  { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', attack: 'Period', cast: 'Slash', custom: 'ShiftRight' },
 ];
-const LOCAL_CODES = new Set(LOCAL_KEYS.flatMap(l => Object.values(l).flat()));
+/** Fixed extras on top of the bindings: the touch pad plays as the left player, the numpad as the right. */
+const LOCAL_EXTRA: [Record<LocalAct, string>, Record<LocalAct, string>] = [
+  { up: 'PadUp', down: 'PadDown', left: 'PadLeft', right: 'PadRight', attack: 'PadAttack', cast: 'PadCast', custom: 'PadDraw' },
+  { up: 'Numpad8', down: 'Numpad5', left: 'Numpad4', right: 'Numpad6', attack: 'Numpad1', cast: 'Numpad2', custom: 'Numpad3' },
+];
+const LOCAL_STORE = 'svs:localkeys';
+let localKeys: [Record<LocalAct, string>, Record<LocalAct, string>] = [{ ...DEFAULT_LOCAL_KEYS[0] }, { ...DEFAULT_LOCAL_KEYS[1] }];
+try {
+  const raw = localStorage.getItem(LOCAL_STORE);
+  if (raw) {
+    const saved = JSON.parse(raw) as Array<Partial<Record<LocalAct, string>>>;
+    localKeys = [{ ...DEFAULT_LOCAL_KEYS[0], ...saved[0] }, { ...DEFAULT_LOCAL_KEYS[1], ...saved[1] }];
+  }
+} catch { /* storage blocked */ }
+let LOCAL_KEYS: [Record<LocalAct, string[]>, Record<LocalAct, string[]>] = [{} as Record<LocalAct, string[]>, {} as Record<LocalAct, string[]>];
+let LOCAL_CODES = new Set<string>();
+function rebuildLocal(): void {
+  LOCAL_KEYS = [0, 1].map(p => Object.fromEntries(LOCAL_ACTS.map(a => [a, [localKeys[p][a], LOCAL_EXTRA[p][a]]]))) as typeof LOCAL_KEYS;
+  LOCAL_CODES = new Set(LOCAL_KEYS.flatMap(l => Object.values(l).flat()));
+}
+rebuildLocal();
+
+export const getLocalKey = (p: 0 | 1, a: LocalAct): string => localKeys[p][a];
+/** Bind `code` to player `p`'s action `a`. If another local action (either player's) used it, the two swap keys. */
+export function setLocalKey(p: 0 | 1, a: LocalAct, code: string): void {
+  for (const q of [0, 1] as const) {
+    const other = LOCAL_ACTS.find(b => (q !== p || b !== a) && localKeys[q][b] === code);
+    if (other) { localKeys[q][other] = localKeys[p][a]; break; }
+  }
+  localKeys[p][a] = code;
+  saveLocal();
+}
+export function resetLocalKeys(p: 0 | 1): void { localKeys[p] = { ...DEFAULT_LOCAL_KEYS[p] }; saveLocal(); }
+function saveLocal(): void {
+  rebuildLocal();
+  try { localStorage.setItem(LOCAL_STORE, JSON.stringify(localKeys)); } catch { /* storage blocked */ }
+}
 const rawHeld = new Set<string>();
 const rawPressed = new Set<string>();
 /** Held local-versus codes in the order they went down, so each player's latest direction wins. */
@@ -118,7 +155,7 @@ export function localNav(p: 0 | 1, a: 'up' | 'down' | 'left' | 'right', dt: numb
   return false;
 }
 /** On-screen name of local player `p`'s key for an action. */
-export const localKey = (p: 0 | 1, a: LocalAct): string => keyName(LOCAL_KEYS[p][a][0]);
+export const localKey = (p: 0 | 1, a: LocalAct): string => keyName(localKeys[p][a]);
 
 const down = new Set<Action>();
 const pressed = new Set<Action>();
