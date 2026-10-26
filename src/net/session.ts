@@ -121,7 +121,7 @@ export class NetSession {
       this.lastSeq = -1;
     }
     if (p.seq <= this.lastSeq) return; // late, out-of-order packet
-    if (!validHello(p.hello)) { this.status = 'error'; this.error = 'THE OTHER PLAYER SENT A BAD DECK'; return; }
+    if (!validHello(p.hello)) { this.status = 'error'; this.error = 'THE OTHER PLAYER SENT A BAD SPELL DECK'; return; }
     this.lastSeq = p.seq;
     const now = clock.now();
     if (p.et > 0) {
