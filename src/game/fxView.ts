@@ -432,6 +432,13 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
       if (once(e, 'm')) emit(14, () => mote(x + rnd(-9, 9), y - rnd(0, 18), [HOLY[3], HOLY[2], HOLY[1]], boxF(x, y)));
       break;
     }
+    case 'shadowHit': {
+      // a shadow bolt landing: dark motes collapsing inward
+      const r = 14 * (1 - p);
+      for (let i = 0; i < 10; i++) { const ang = (i / 10) * Math.PI * 2; P(c, SHADOW[1 + (i % 3)], x + Math.cos(ang) * r, y - 10 + Math.sin(ang) * r * 0.7, 2, 2); }
+      glow(c, x, y - 10, 12, '152,120,248', 0.5 * (1 - p));
+      break;
+    }
     case 'healBurst': {
       // green crosses and light motes rising around the fighter
       for (let i = 0; i < 5; i++) {
