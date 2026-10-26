@@ -186,7 +186,10 @@ export interface Projectile {
   dead?: boolean;
 }
 
+/** A tutorial highlight on a panel (lesson guidance, not danger). */
 export interface Mark { col: number; row: number; t: number; color: string }
+/** A danger telegraph: a panel an area spell is about to hit. Every class's area spells use the same flash (BN style). */
+export interface Warn { col: number; row: number; t: number; dur: number; side: Side }
 /** A hidden Ranger trap. Only its owner sees it. */
 /** Traps last until the next Draw screen. A Tripwire is one trap per panel of a column, sharing a `group`. */
 export interface Trap { side: Side; col: number; row: number; arm: number; kind: 'freeze' | 'explode' | 'mine' | 'blast' | 'wire'; group?: number; fired?: boolean }
@@ -225,6 +228,7 @@ export class Battle {
   walls: Wall[] = [];
   projectiles: Projectile[] = [];
   marks: Mark[] = [];
+  warns: Warn[] = [];
   traps: Trap[] = [];
   pets: Pet[] = [];
   texts: FloatText[] = [];
@@ -280,7 +284,7 @@ export class Battle {
       const fresh = makeFighter(f.side, { cls: f.cls, deck: [], name: f.name, skin: f.skin }, f.alt, this.rand);
       return { ...fresh, deck: f.deck, discard: f.discard, resMax: f.resMax };
     }) as [Fighter, Fighter];
-    this.walls = []; this.projectiles = []; this.marks = []; this.traps = []; this.pets = [];
+    this.walls = []; this.projectiles = []; this.marks = []; this.warns = []; this.traps = []; this.pets = [];
     this.texts = []; this.fx = []; this.timers = []; this.anims = [];
     this.clearPanels();
     this.shake = 0; this.cheer = 0;
@@ -320,7 +324,17 @@ export class Battle {
     this.fx.push({ t: 0, dur, kind, side, col, row, data });
     sfxFx(kind, { pan: panOf(col), dur, data: { ...data, d: side === 0 ? 1 : -1 } });
   }
-  mark(col: number, row: number, dur: number, color: string): void { if (this.inGrid(col, row)) this.marks.push({ col, row, t: dur, color }); }
+  /**
+   * The standard area-spell telegraph: `cells` flash for `delay` seconds, then `hit` runs. Pass TUNING.warnTime unless the
+   * spell has a longer telegraph of its own. Everything here runs on the battle clock, so it stays in lockstep online.
+   */
+  warn(att: Fighter | Side, cells: Array<[number, number]>, delay: number, hit?: () => void): void {
+    const side = typeof att === 'number' ? att : att.side;
+    for (const [col, row] of cells) if (this.inGrid(col, row)) this.warns.push({ col, row, t: delay, dur: delay, side });
+    if (hit) this.later(delay, hit);
+  }
+  /** Is this panel about to be hit by `side`'s enemy? */
+  warned(col: number, row: number, side?: Side): boolean { return this.warns.some(w => w.col === col && w.row === row && w.side !== side); }
   text(f: Fighter, s: string, color: string): void {
     this.texts.push({ x: f.col, y: f.row, text: s, color, t: 0 });
   }
@@ -413,6 +427,8 @@ export class Battle {
     this.anims = this.anims.filter(a => a.t < a.dur);
     for (const m of this.marks) m.t -= dt;
     this.marks = this.marks.filter(m => m.t > 0);
+    for (const w of this.warns) w.t -= dt;
+    this.warns = this.warns.filter(w => w.t > 0);
 
     this.updatePanels(dt);
     this.updateWalls(dt);
