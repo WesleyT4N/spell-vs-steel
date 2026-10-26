@@ -79,9 +79,9 @@ const MYTHIC_DECKS: Record<ClassId, DeckPreset[]> = {
   mage: [
     {
       id: 'pyromancer', name: 'Pyromancer', mythic: 'inferno', cards: {
-        arcane_missiles: 3, arcane_focus: 4, arcane_barrier: 2, blink: 2, ignite: 4, fireball: 4, scorch: 3, frost_nova: 1,
-        flamestrike: 2, arcane_intellect: 1,
-        dragons_breath: 1, meteor: 1, evocation: 1,
+        arcane_missiles: 4, arcane_focus: 3, arcane_barrier: 2, blink: 2, ignite: 4, fireball: 4, scorch: 3, frost_nova: 1,
+        flamestrike: 2, arcane_blast: 1,
+        dragons_breath: 1, meteor: 1, deep_freeze: 1,
         inferno: 1,
       },
     },
@@ -113,7 +113,7 @@ const MYTHIC_DECKS: Record<ClassId, DeckPreset[]> = {
     },
     {
       id: 'plaguebringer', name: 'Plaguebringer', mythic: 'pandemic', cards: {
-        shadowstep: 4, shiv: 4, envenom: 4, deadly_poison: 4, poison_vial: 3, vanish: 2, kick: 1,
+        shadowstep: 4, shiv: 3, envenom: 4, deadly_poison: 4, poison_vial: 3, vanish: 2, kick: 2,
         pickpocket: 2, cold_blood: 2,
         eviscerate: 1, kidney_shot: 1, adrenaline_rush: 1,
         pandemic: 1,
@@ -139,7 +139,7 @@ const MYTHIC_DECKS: Record<ClassId, DeckPreset[]> = {
     },
     {
       id: 'trapper', name: 'Trapper', mythic: 'hunters_domain', cards: {
-        freezing_trap: 3, explosive_trap: 4, power_shot: 4, hawk_strike: 4, multi_shot: 3, steady_focus: 3, net: 1, disengage: 1,
+        freezing_trap: 3, explosive_trap: 4, power_shot: 3, hawk_strike: 4, multi_shot: 3, steady_focus: 3, net: 2, disengage: 1,
         tripwire: 2, rapid_fire: 1,
         explosive_shot: 1, minefield: 1, kill_shot: 1,
         hunters_domain: 1,
@@ -154,8 +154,32 @@ const MYTHIC_DECKS: Record<ClassId, DeckPreset[]> = {
       },
     },
   ],
-  // the Cleric is hidden until its kit is final; its Mythic decks come with it
-  cleric: [],
+  priest: [
+    {
+      id: 'lightbringer', name: 'Lightbringer', mythic: 'wrath_of_heaven', cards: {
+        prayer: 3, flash_heal: 2, holy_fire: 4, penance: 4, power_word_shield: 2, hallowed_ground: 4, sanctuary: 2, shadow_word_pain: 2,
+        wellspring: 2, holy_nova: 1,
+        halo: 1, power_infusion: 1, shadow_word_death: 1,
+        wrath_of_heaven: 1,
+      },
+    },
+    {
+      id: 'sanctifier', name: 'Sanctifier', mythic: 'holy_sanctum', cards: {
+        prayer: 3, flash_heal: 3, holy_fire: 3, penance: 3, power_word_shield: 2, hallowed_ground: 3, sanctuary: 3, shadow_word_pain: 3,
+        wellspring: 2, holy_wall: 1,
+        aegis_field: 1, sacred_ground: 1, halo: 1,
+        holy_sanctum: 1,
+      },
+    },
+    {
+      id: 'voidcaller', name: 'Voidcaller', mythic: 'shadowform', cards: {
+        prayer: 2, flash_heal: 1, holy_fire: 3, penance: 3, power_word_shield: 2, shadow_word_pain: 4, devouring_plague: 4, desecrate: 3, hallowed_ground: 1,
+        mind_sear: 1, hex: 1, wellspring: 1,
+        void_rift: 1, shadow_word_death: 1, halo: 1,
+        shadowform: 1,
+      },
+    },
+  ],
 };
 
 /** Every ready-made deck for a class: the starter first, then the Mythic decks. */
