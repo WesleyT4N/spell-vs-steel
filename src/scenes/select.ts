@@ -1,6 +1,7 @@
 // Character select: a roster row of fighters, your pick on the left and the CPU's (or your rival's) on the right.
 // Pick a fighter, then a skin; against the CPU you then pick its fighter the same way. Stage select comes next.
-// The tutorial uses it too, to pick the class to learn (the right side shows the training dummy).
+// The tutorial uses it too, to pick the class to learn (the right side shows the training dummy),
+// and so does training mode, where the right side picks the dummy's class.
 import { setScene, hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
 import { PLAYABLE, CLASS_INFO } from '../game/classes';
 import { getArena } from '../game/battleView';
@@ -17,6 +18,9 @@ import { DeckBuilderScene } from './deckbuilder';
 import { StageSelectScene } from './stageSelect';
 import { TitleScene } from './title';
 import { TutorialScene, type TutorialClass } from './tutorial';
+import { TrainingScene } from './training';
+import { useStage } from '../game/battleView';
+import { STAGE_IDS } from '../art/stages';
 
 /** Roster tiles: every playable class, then RANDOM. */
 const TILES = PLAYABLE.length + 1;
@@ -33,6 +37,8 @@ const BLURB: Record<ClassId, [string, string]> = {
 /** 0/1: picking YOUR fighter/skin, 2/3: the CPU's (skipped online), 4: options. */
 type Step = 0 | 1 | 2 | 3 | 4;
 type Chip = 'DECK' | 'EDIT DECK' | 'CPU LEVEL' | 'MATCH' | 'NEXT';
+/** What the screen leads to: a match against the CPU, the tutorial, or training mode. */
+export type SelectMode = 'versus' | 'tutorial' | 'training';
 
 // layout (UI pixels)
 const PX = [12, UW - 152], PY = 30, PW = 140, PH = 164;
@@ -51,13 +57,15 @@ export class CharSelectScene implements Scene {
   msg = '';
   msgT = 0;
   /** Online: the session whose rival fills the right-hand slot. `tutorial`: pick the class to learn, then start it. */
-  constructor(private net?: NetSession, startAt: Step = 0, private tutorial = false) {
+  constructor(private net?: NetSession, startAt: Step = 0, private mode: SelectMode = 'versus') {
     this.step = net ? 0 : startAt;
     this.cur = this.tileOf(this.slotClass(this.step >= 2 && !net ? 1 : 0));
     if (net) this.sync();
   }
 
-  private get chips(): Chip[] { return this.net ? ['DECK', 'NEXT'] : ['DECK', 'EDIT DECK', 'CPU LEVEL', 'MATCH', 'NEXT']; }
+  private get tutorial(): boolean { return this.mode === 'tutorial'; }
+  private get training(): boolean { return this.mode === 'training'; }
+  private get chips(): Chip[] { return this.net ? ['DECK', 'NEXT'] : this.training ? ['DECK', 'EDIT DECK', 'NEXT'] : ['DECK', 'EDIT DECK', 'CPU LEVEL', 'MATCH', 'NEXT']; }
   private get slot(): 0 | 1 { return !this.net && (this.step === 2 || this.step === 3) ? 1 : 0; }
   private slotClass(s: 0 | 1): ClassId { return s === 0 ? this.m.p1 : this.m.cpu; }
   private tileOf(cls: ClassId): number { const i = PLAYABLE.indexOf(cls); return i < 0 ? 0 : i; }
@@ -126,7 +134,7 @@ export class CharSelectScene implements Scene {
 
   private activateChip(c: Chip): void {
     if (c === 'DECK') { this.m.p1Deck = this.m.p1Deck === 'starter' ? 'custom' : 'starter'; sfx('move'); }
-    else if (c === 'EDIT DECK') { sfx('select'); saveMatch(this.m); setScene(new DeckBuilderScene(this.m.p1, () => setScene(new CharSelectScene(undefined, 4)))); return; }
+    else if (c === 'EDIT DECK') { sfx('select'); saveMatch(this.m); setScene(new DeckBuilderScene(this.m.p1, () => setScene(new CharSelectScene(undefined, 4, this.mode)))); return; }
     else if (c === 'CPU LEVEL') { this.m.difficulty = this.m.difficulty === 'easy' ? 'normal' : 'easy'; sfx('move'); }
     else if (c === 'MATCH') { const o = [1, 3, 5] as const; this.m.bestOf = o[(o.indexOf(this.m.bestOf) + 1) % o.length]; sfx('move'); }
     else if (c === 'NEXT') { this.next(); return; }
@@ -142,6 +150,12 @@ export class CharSelectScene implements Scene {
     saveMatch(this.m);
     if (this.net) { this.locked = true; sfx('confirm'); this.sync(); return; }
     sfx('select');
+    if (this.training) {
+      // training skips the stage select and uses the last stage picked
+      useStage(this.m.stage === 'random' || !STAGE_IDS.includes(this.m.stage) ? STAGE_IDS[Math.floor(Math.random() * STAGE_IDS.length)] : this.m.stage);
+      setScene(new TrainingScene(this.m));
+      return;
+    }
     setScene(new StageSelectScene());
   }
 
@@ -209,7 +223,7 @@ export class CharSelectScene implements Scene {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(0,0,24,0.6)';
     c.fillRect(...screenRect());
-    drawTextCentered(ui, this.tutorial ? 'TUTORIAL' : 'CHOOSE YOUR FIGHTER', UW / 2, 8, '#f8b800', 2);
+    drawTextCentered(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING' : 'CHOOSE YOUR FIGHTER', UW / 2, 8, '#f8b800', 2);
 
     const net = this.net, rl = net?.rivalLobby, rival = net?.rival;
     // what each slot shows: the hovered tile while choosing, the pick after
@@ -253,11 +267,11 @@ export class CharSelectScene implements Scene {
         P(ui, color, tx, TY - 10, tw, 10);
         drawText(ui, label, tx + 2, TY - 8, '#fcfcfc');
       };
-      if (mine && (this.slot === 0 || tick % 8 < 6)) tag(this.slot === 0 ? 'YOU' : 'CPU', this.slot === 0 ? '#d82800' : '#0058f8', this.slot === 1);
+      if (mine && (this.slot === 0 || tick % 8 < 6)) tag(this.slot === 0 ? 'YOU' : this.training ? 'DUMMY' : 'CPU', this.slot === 0 ? '#d82800' : '#0058f8', this.slot === 1);
       else if (picked0) tag('YOU', '#881400', false);
       if (theirs) tag('RIVAL', '#0058f8', true);
       else if (net && rl && rl.step > 0 && rival && n === PLAYABLE.indexOf(rival.cls)) tag('RIVAL', '#0000a8', true);
-      else if (picked1) tag('CPU', '#0000a8', true);
+      else if (picked1) tag(this.training ? 'DUMMY' : 'CPU', '#0000a8', true);
     }
 
     // option chips
@@ -269,7 +283,7 @@ export class CharSelectScene implements Scene {
         if (ch === 'DECK') label = this.m.p1Deck === 'starter' ? 'STARTER DECK' : `CUSTOM DECK${this.customValid() ? '' : '!'}`;
         if (ch === 'CPU LEVEL') label = `CPU: ${this.m.difficulty.toUpperCase()}`;
         if (ch === 'MATCH') label = this.m.bestOf === 1 ? '1 ROUND' : `BEST OF ${this.m.bestOf}`;
-        if (ch === 'NEXT') label = net ? (this.locked ? 'LOCKED IN' : 'LOCK IN') : 'STAGE →';
+        if (ch === 'NEXT') label = net ? (this.locked ? 'LOCKED IN' : 'LOCK IN') : this.training ? 'START →' : 'STAGE →';
         button(ui, `chip:${i}`, label, x, CY, cw, CH, on, ch === 'NEXT' ? (this.step === 4 ? '#f8b800' : '#7c7c7c') : '#fcfcfc');
       });
     }
@@ -298,7 +312,7 @@ export class CharSelectScene implements Scene {
     }
     if (this.tutorial) return { text: this.step === 0 ? 'PICK A CLASS TO LEARN' : 'PICK A COLOR TO START', color: '#fcfcfc', blink: this.step === 0 };
     if (this.step === 0) return { text: 'PICK YOUR FIGHTER', color: '#fcfcfc', blink: true };
-    if (this.step === 2) return { text: 'PICK THE CPU FIGHTER', color: '#fcfcfc', blink: true };
+    if (this.step === 2) return { text: this.training ? 'PICK THE DUMMY' : 'PICK THE CPU FIGHTER', color: '#fcfcfc', blink: true };
     if (this.step === 1 || this.step === 3) return { text: 'PICK A COLOR', color: '#fcfcfc', blink: true };
     return null;
   }
@@ -321,7 +335,7 @@ export class CharSelectScene implements Scene {
     const active = s === this.slot && this.step < 4;
     frame(ui, x, PY, PW, PH, '#000000', cls ? teamColor(cls, skin, false) : '#7c7c7c');
     if (active && tick % 8 < 6) frame(ui, x + 2, PY + 2, PW - 4, PH - 4, '#000000', s === 0 ? '#f83800' : '#3cbcfc');
-    const who = s === 0 ? 'YOU' : net ? 'RIVAL' : 'CPU';
+    const who = s === 0 ? 'YOU' : net ? 'RIVAL' : this.training ? 'DUMMY' : 'CPU';
     drawTextCentered(ui, who, x + PW / 2, PY + 8, s === 0 ? '#f87858' : '#6888fc', 1, false);
     const cx = x + PW / 2, bob = Math.floor(tick / 4 + s) % 2;
     if (!cls) {

@@ -225,6 +225,8 @@ export class Battle {
   anims: Anim[] = [];
   phase: Phase = 'custom';
   gauge = 0;
+  /** Training mode: a fighter brought to 0 HP refills instead of losing. */
+  noKo = false;
   turn = 0;
   time = 0;
   koT = 0;
@@ -245,6 +247,11 @@ export class Battle {
     const aSkin = a.skin ?? defaultSkin(a.cls);
     const bSkin = a.cls === bSpec.cls ? mirrorSkin(a.cls, aSkin, bSpec.skin ?? defaultSkin(bSpec.cls)) : bSpec.skin;
     this.f = [makeFighter(0, { ...a, skin: aSkin }, false, this.rand), makeFighter(1, { ...bSpec, skin: bSkin }, false, this.rand)];
+    this.clearPanels();
+    this.beginCustom();
+  }
+
+  private clearPanels(): void {
     for (let c = 0; c < COLS; c++) {
       this.panels[c] = [];
       for (let r = 0; r < ROWS; r++) {
@@ -252,7 +259,21 @@ export class Battle {
         this.panels[c][r] = { owner, baseOwner: owner, ownerT: 0, burn: 0, burnDps: 0, burnAcc: 0, cracked: false, hole: 0, toxic: 0, toxicSide: 0, toxicAcc: 0, bless: 0, blessAcc: 0, smite: 0, smiteDps: 0, smiteAcc: 0, smoke: 0, smokeSide: 0 };
       }
     }
-    this.beginCustom();
+  }
+
+  /**
+   * Training mode's quick reset: both fighters back on their start panels at full HP with no statuses,
+   * and the field cleared. Decks and discards are kept; the caller restores queues and resources.
+   */
+  resetField(): void {
+    this.f = this.f.map(f => {
+      const fresh = makeFighter(f.side, { cls: f.cls, deck: [], name: f.name, skin: f.skin }, f.alt, this.rand);
+      return { ...fresh, deck: f.deck, discard: f.discard, resMax: f.resMax };
+    }) as [Fighter, Fighter];
+    this.walls = []; this.projectiles = []; this.marks = []; this.traps = []; this.pets = [];
+    this.texts = []; this.fx = []; this.timers = []; this.anims = [];
+    this.clearPanels();
+    this.shake = 0; this.cheer = 0;
   }
 
   foe(f: Fighter): Fighter { return this.f[1 - f.side]; }
@@ -388,7 +409,10 @@ export class Battle {
     this.updateZones();
 
     for (const f of this.f) {
-      if (!f.dead && f.hp <= 0) {
+      if (!f.dead && f.hp <= 0 && this.noKo) {
+        f.hp = f.maxHp;
+        this.text(f, 'REFILL', '#58d854');
+      } else if (!f.dead && f.hp <= 0) {
         f.dead = true;
         this.phase = 'ko';
         this.koT = 0;
