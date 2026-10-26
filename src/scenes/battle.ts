@@ -22,6 +22,7 @@ import { touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
 import { drawCardDetail, drawCardFace, resName, resInk, RES_INK, CARD_W, CARD_H, PICKED } from './cardView';
+import { CardPreview } from './cardPreview';
 import { win, plaque, pip, disc, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, BLUE_INK, WAX_HI, GOLD } from './skin';
 import { CharSelectScene } from './select';
 import { TitleScene } from './title';
@@ -53,6 +54,8 @@ export class BattleScene implements Scene {
   private sidePicks: [number[], number[]] = [[], []];
   /** False in training: the Draw screen waits for you. */
   protected timed = true;
+  /** The clip of the card being read on the Draw screen. */
+  private preview = new CardPreview();
 
   /** Rounds won in the current set, by side. `battle` lets online play hand in a seeded battle. */
   /** Rounds won in the current set, by side. `battle` lets online play hand in a seeded battle. `ctl`: who plays each side. */
@@ -174,6 +177,9 @@ export class BattleScene implements Scene {
     // nobody to pick: the CPUs pick and the fight goes on
     if (this.watching) { this.confirmCustom(); return; }
     const offer = this.b.offer[this.me];
+    const reading = this.reading();
+    this.preview.show(reading >= 0 ? CARDS[offer[reading]] : null);
+    this.preview.update(dt);
     const rows = offer.length + 1;
     for (let i = 0; i < offer.length; i++) {
       const cur = this.lift[i] ?? 0, to = this.level(i) * LIFT;
@@ -204,6 +210,13 @@ export class BattleScene implements Scene {
     if (this.pressedOf(s, 'custom') || (wasPressed('pause') && !wasPressed('confirm'))) { this.confirmCustom(); return; }
     if (ok) { this.choose(true); return; }
     if (this.pressedOf(s, 'cast') && this.picks.length) { this.picks.pop(); sfx('back'); }
+  }
+
+  /** The hand card under the pointer, or under the key cursor; -1 when none is being read. */
+  private reading(): number {
+    const n = this.b.offer[this.me].length;
+    const i = this.mouseMode ? hot('card') : showSel() ? this.cursor : -1;
+    return i >= 0 && i < n ? i : -1;
   }
 
   /** Raise level of hand card `i`: 0 resting, 1 hovered, 2 picked. */
@@ -368,21 +381,10 @@ export class BattleScene implements Scene {
       drawText(ui, this.rivalDeckText(), 18, 102, TRIM);
     }
 
-    // right: cast order
+    // right: the clip of the card being read, else the cast order
     win(ui, 244, 34, 228, 98);
-    drawText(ui, 'CAST ORDER', 254, 44, PICKED);
-    if (!this.picks.length) drawText(ui, touchText('CLICK CARDS TO QUEUE THEM'), 254, 60, TRIM);
-    this.picks.slice(0, 5).forEach((i, n) => {
-      const cd = CARDS[offer[i]], y = 58 + n * 12;
-      drawText(ui, `${n + 1}`, 254, y, PICKED);
-      P(ui, ELEMENT_COLOR[cd.element], 266, y, 3, 7);
-      drawText(ui, cd.name.toUpperCase(), 274, y, INK);
-      drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, short[i] > 0 ? (builds ? resInk(cd) : RED_INK) : INK);
-    });
-    const info = CLASS_INFO[f.cls];
-    const over = !builds && this.picks.some(i => short[i] > 0);
-    drawText(ui, `TOTAL COST ${total}`, 254, 118, over ? RED_INK : INK2);
-    drawText(ui, info.refill, 462 - info.refill.length * 6, 118, TRIM);
+    if (this.reading() >= 0) this.preview.draw(ui, 252, 41, 212, 84);
+    else this.drawCastOrder(ui, short, builds, total);
 
     // fight button: red wax, ringed in gold when it has the cursor
     const onOk = this.cursor === offer.length && showSel();
@@ -404,6 +406,23 @@ export class BattleScene implements Scene {
     });
     const s = this.me, done = this.twoPlayer && s === 0 ? 'DONE' : 'FIGHT';
     hint(ui, `CLICK: PICK  RIGHT-CLICK: UNDO   KEYS: ${this.keyOf(s, 'left')}/${this.keyOf(s, 'right')} + ${this.keyOf(s, 'attack')}  ${this.keyOf(s, 'cast')} UNDO  ${this.keyOf(s, 'custom')} ${done}`);
+  }
+
+  private drawCastOrder(ui: Ctx, short: number[], builds: boolean, total: number): void {
+    const f = this.b.f[this.me], offer = this.b.offer[this.me];
+    drawText(ui, 'CAST ORDER', 254, 44, PICKED);
+    if (!this.picks.length) drawText(ui, touchText('CLICK CARDS TO QUEUE THEM'), 254, 60, TRIM);
+    this.picks.slice(0, 5).forEach((i, n) => {
+      const cd = CARDS[offer[i]], y = 58 + n * 12;
+      drawText(ui, `${n + 1}`, 254, y, PICKED);
+      P(ui, ELEMENT_COLOR[cd.element], 266, y, 3, 7);
+      drawText(ui, cd.name.toUpperCase(), 274, y, INK);
+      drawText(ui, cd.cost === 'all' ? 'A' : String(cd.cost), 456, y, short[i] > 0 ? (builds ? resInk(cd) : RED_INK) : INK);
+    });
+    const info = CLASS_INFO[f.cls];
+    const over = !builds && this.picks.some(i => short[i] > 0);
+    drawText(ui, `TOTAL COST ${total}`, 254, 118, over ? RED_INK : INK2);
+    drawText(ui, info.refill, 462 - info.refill.length * 6, 118, TRIM);
   }
 
   /**
