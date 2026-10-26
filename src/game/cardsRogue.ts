@@ -77,8 +77,9 @@ export const rogue: CardDef[] = [
       const { b, f } = x;
       const c = f.col + 3 * x.dir, r = f.row, r2 = r < 2 ? r + 1 : r - 1;
       const cells: Array<[number, number]> = [[c, r], [c + x.dir, r], [c, r2], [c + x.dir, r2]];
-      b.addFx('lob', f.side, f.col, r, TUNING.warnTime, { to: c, color: '#b8f818' });
-      b.warn(f, cells, TUNING.warnTime, () => {
+      // a lobbed shot you can see in the air, like BN's MiniBomb: no panel warning
+      b.addFx('lob', f.side, f.col, r, 0.4, { to: c, color: '#b8f818' });
+      b.later(0.4, () => {
         for (const [cc, rr] of cells) {
           const p = b.panel(cc, rr);
           if (!p) continue;
