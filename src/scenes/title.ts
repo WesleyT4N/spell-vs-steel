@@ -21,7 +21,7 @@ import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
 import { RED_INK } from './skin';
 
-const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
+const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
 
 // seven rows (eight in dev builds) still clear the version line
 const MENU_Y = ITEMS.length > 7 ? 162 : ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 7 ? 15 : ITEMS.length > 6 ? 16 : 18;
@@ -181,7 +181,7 @@ export class TitleScene implements Scene {
       if (item === 'ARCADE MODE') setScene(new CharSelectScene(undefined, 0, 'arcade'));
       if (item === 'VERSUS MODE') setScene(new CharSelectScene());
       if (item === 'ONLINE MODE') setScene(new OnlineScene());
-      if (item === 'TRAINING') setScene(new CharSelectScene(undefined, 0, 'training'));
+      if (item === 'TRAINING MODE') setScene(new CharSelectScene(undefined, 0, 'training'));
       if (item === 'TUTORIAL') setScene(new CharSelectScene(undefined, 0, 'tutorial'));
       if (item === 'DECK BUILDER') setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
       if (item === 'OPTIONS') setScene(new OptionsScene(() => setScene(new TitleScene())));
