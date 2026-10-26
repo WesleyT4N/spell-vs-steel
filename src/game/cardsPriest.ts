@@ -175,13 +175,13 @@ export const priest: CardDef[] = [
   },
   {
     id: 'psychic_scream', name: 'Psychic Scream', cls: 'priest', cost: 3, rarity: 'legendary', element: 'shadow', damaging: true, lock: 0.3,
-    dmg: '20', short: 'Knock the enemy to their back column and stun them for 1.5s.',
+    dmg: '20', short: 'Knock the enemy to their back column and stun them for 2s.',
     cast: x => {
       const { b, f, foe } = x;
       if (!b.targetable(foe)) { b.text(foe, 'MISS', '#bcbcbc'); return; }
       b.addFx('shout', f.side, f.col, f.row, 0.5);
       b.knockback(foe, 3);
-      b.damage(foe, 20 * x.mult, f, { spell: true, element: 'shadow', stun: 1.5 });
+      b.damage(foe, 20 * x.mult, f, { spell: true, element: 'shadow', stun: 2 });
     },
     ai: (b, f) => canPick(b, f) && Math.abs(b.foe(f).col - f.col) <= 2,
   },

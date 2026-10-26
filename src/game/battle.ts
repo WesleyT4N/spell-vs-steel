@@ -2,7 +2,13 @@
 import { TUNING } from './tuning';
 import { CARDS, type CardDef, type Element } from './cards';
 import { defaultSkin, mirrorSkin, type ClassId } from '../art/sprites';
-import { sfx } from '../engine/audio';
+import { sfx, sfxFx } from '../engine/audio';
+
+/** Sound a shot makes leaving the caster (the light Arrow plays its own). */
+const SHOT_SOUND: Partial<Record<string, string>> = { fireball: 'shot_fireball', hook: 'shot_chain', gust: 'shot_wind', knife: 'shot_knife', arrow: 'shot_arrow', sting: 'shot_arrow', net: 'shot_net', wolf: 'shot_beast', hammer: 'shot_spin', vial: 'shot_net' };
+
+/** Stereo position of a column: -1 left edge to +1 right edge. */
+export const panOf = (col: number): number => (col - 2.5) / 3;
 import { seeded, randomSeed, shuffle } from './rng';
 import { CLASS_INFO } from './classes';
 export { shuffle };
@@ -42,6 +48,12 @@ export interface Fighter {
   /** Seconds of action lock (attacks, casts). */
   lock: number;
   moveCd: number;
+  /** Seconds until the next step is allowed (TUNING.moveCooldown). */
+  stepCd: number;
+  /** A step tapped during stepCd, taken as soon as it ends. */
+  moveBuf: Dir | null;
+  /** Seconds left on the global cooldown between spell casts (TUNING.castCooldown). */
+  castCd: number;
   charging: boolean;
   charge: number;
   /** Rage pips (Warrior) or current Mana (Mage). */
@@ -220,6 +232,8 @@ export class Battle {
   anims: Anim[] = [];
   phase: Phase = 'custom';
   gauge = 0;
+  /** Training mode: a fighter brought to 0 HP refills instead of losing. */
+  noKo = false;
   turn = 0;
   time = 0;
   koT = 0;
@@ -240,6 +254,11 @@ export class Battle {
     const aSkin = a.skin ?? defaultSkin(a.cls);
     const bSkin = a.cls === bSpec.cls ? mirrorSkin(a.cls, aSkin, bSpec.skin ?? defaultSkin(bSpec.cls)) : bSpec.skin;
     this.f = [makeFighter(0, { ...a, skin: aSkin }, false, this.rand), makeFighter(1, { ...bSpec, skin: bSkin }, false, this.rand)];
+    this.clearPanels();
+    this.beginCustom();
+  }
+
+  private clearPanels(): void {
     for (let c = 0; c < COLS; c++) {
       this.panels[c] = [];
       for (let r = 0; r < ROWS; r++) {
@@ -247,7 +266,21 @@ export class Battle {
         this.panels[c][r] = { owner, baseOwner: owner, ownerT: 0, burn: 0, burnDps: 0, burnAcc: 0, cracked: false, hole: 0, toxic: 0, toxicSide: 0, toxicAcc: 0, bless: 0, blessKind: 'heal', blessAcc: 0, manaAcc: 0, curse: 0, curseSide: 0, curseAcc: 0, curseTicks: 0, smoke: 0, smokeSide: 0 };
       }
     }
-    this.beginCustom();
+  }
+
+  /**
+   * Training mode's quick reset: both fighters back on their start panels at full HP with no statuses,
+   * and the field cleared. Decks and discards are kept; the caller restores queues and resources.
+   */
+  resetField(): void {
+    this.f = this.f.map(f => {
+      const fresh = makeFighter(f.side, { cls: f.cls, deck: [], name: f.name, skin: f.skin }, f.alt, this.rand);
+      return { ...fresh, deck: f.deck, discard: f.discard, resMax: f.resMax };
+    }) as [Fighter, Fighter];
+    this.walls = []; this.projectiles = []; this.marks = []; this.traps = []; this.pets = [];
+    this.texts = []; this.fx = []; this.timers = []; this.anims = [];
+    this.clearPanels();
+    this.shake = 0; this.cheer = 0;
   }
 
   foe(f: Fighter): Fighter { return this.f[1 - f.side]; }
@@ -281,6 +314,7 @@ export class Battle {
   anim(dur: number, fn: (p: number) => void): void { fn(0); this.anims.push({ t: 0, dur, fn }); }
   addFx(kind: string, side: Side, col: number, row: number, dur: number, data?: Record<string, number | string>): void {
     this.fx.push({ t: 0, dur, kind, side, col, row, data });
+    sfxFx(kind, { pan: panOf(col), dur, data: { ...data, d: side === 0 ? 1 : -1 } });
   }
   mark(col: number, row: number, dur: number, color: string): void { if (this.inGrid(col, row)) this.marks.push({ col, row, t: dur, color }); }
   text(f: Fighter, s: string, color: string): void {
@@ -385,13 +419,16 @@ export class Battle {
     this.updateZones();
 
     for (const f of this.f) {
-      if (!f.dead && f.hp <= 0) {
+      if (!f.dead && f.hp <= 0 && this.noKo) {
+        f.hp = f.maxHp;
+        this.text(f, 'REFILL', '#58d854');
+      } else if (!f.dead && f.hp <= 0) {
         f.dead = true;
         this.phase = 'ko';
         this.koT = 0;
         this.winner = (1 - f.side) as Side;
         this.cheer = 3;
-        sfx('ko');
+        sfx('ko', { pan: panOf(f.col) });
       }
     }
   }
@@ -482,14 +519,13 @@ export class Battle {
         continue;
       }
       this.addFx('trapPop', t.side, t.col, t.row, 0.5, { kind: t.kind });
-      if (t.kind === 'freeze') { this.damage(v, 20, src, { spell: true, element: 'frost' }); this.freeze(v, 1.5); }
+      if (t.kind === 'freeze') { this.damage(v, 20, src, { spell: true, element: 'frost' }); this.freeze(v, 2); }
       else if (t.kind === 'explode') {
-        sfx('explode');
         const cells: Array<[number, number]> = [[t.col, t.row], [t.col - 1, t.row], [t.col + 1, t.row], [t.col, t.row - 1], [t.col, t.row + 1]];
         for (const [c, r] of cells) if (this.inGrid(c, r)) this.addFx('explode', t.side, c, r, 0.35);
         this.strike(src, cells, 90, { spell: true, element: 'fire' });
-      } else if (t.kind === 'mine') { sfx('explode'); this.damage(v, 50, src, { spell: true, element: 'nature', knockback: true }); }
-      else { sfx('explode'); this.addFx('explode', t.side, t.col, t.row, 0.35); this.damage(v, 60, src, { spell: true, element: 'fire' }); }
+      } else if (t.kind === 'mine') { this.damage(v, 50, src, { spell: true, element: 'nature', knockback: true }); }
+      else { this.addFx('explode', t.side, t.col, t.row, 0.35); this.damage(v, 60, src, { spell: true, element: 'fire' }); }
     }
     this.traps = this.traps.filter(t => !t.fired);
   }
@@ -563,6 +599,8 @@ export class Battle {
     f.shields = f.shields.filter(s => s.t > 0 && s.hp > 0);
     f.lock = Math.max(0, f.lock - dt);
     f.moveCd = Math.max(0, f.moveCd - dt);
+    f.stepCd = Math.max(0, f.stepCd - dt);
+    f.castCd = Math.max(0, f.castCd - dt);
     f.flash = Math.max(0, f.flash - dt);
     f.poseT = Math.max(0, f.poseT - dt);
     if (f.poseT === 0) f.pose = 'idle';
@@ -586,11 +624,18 @@ export class Battle {
     if (sp.smoke > 0 && sp.smokeSide === f.side && f.st.revealed <= 0 && f.st.hunted <= 0) f.st.stealth = Math.max(f.st.stealth, 0.1);
 
     const disabled = f.st.frozen > 0 || f.st.stunned > 0 || f.st.iceBlock > 0 || f.st.sleep > 0 || f.st.channel > 0;
-    if (disabled) { f.charging = false; f.charge = 0; return; }
+    if (disabled) { f.charging = false; f.charge = 0; f.moveBuf = null; return; }
     const busy = f.lock > 0 || f.st.flinch > 0;
 
     // any move during a backstab window blinks the Rogue home instead
-    if (intent.move && !busy) { if (f.st.backstab > 0) { this.blinkHome(f); f.moveCd = TUNING.moveRepeat; } else this.tryMove(f, intent.move); }
+    if (intent.move) f.moveBuf = intent.move;
+    if (f.moveBuf && f.stepCd <= 0) {
+      const d = f.moveBuf;
+      f.moveBuf = null;
+      if (!busy) {
+        if (f.st.backstab > 0) { this.blinkHome(f); f.moveCd = TUNING.moveRepeat; f.stepCd = TUNING.moveCooldown; } else this.tryMove(f, d);
+      }
+    }
 
     if (intent.attackPressed && !busy) {
       this.basicAttack(f, 'light');
@@ -601,7 +646,7 @@ export class Battle {
         const before = f.charge;
         f.charge += dt;
         const need = heavyChargeOf(f);
-        if (before < need && f.charge >= need) sfx('charged');
+        if (before < need && f.charge >= need) sfx('charged', { pan: panOf(f.col) });
       } else {
         if (f.charge >= heavyChargeOf(f) && f.lock <= 0 && f.st.flinch <= 0) this.basicAttack(f, 'heavy');
         f.charging = false;
@@ -613,6 +658,7 @@ export class Battle {
   }
 
   private onStatusEnd(f: Fighter, k: StatusKey): void {
+    if (k === 'frozen' || k === 'iceBlock') sfx('thaw', { pan: panOf(f.col) });
     if (k === 'lastStand') {
       const dmg = Math.round(f.lastStandAbsorbed);
       f.lastStandAbsorbed = 0;
@@ -639,7 +685,8 @@ export class Battle {
     this.leavePanel(f.col, f.row);
     f.col = nc; f.row = nr;
     f.moveCd = TUNING.moveRepeat;
-    sfx('step');
+    f.stepCd = TUNING.moveCooldown;
+    sfx('step', { pan: panOf(nc) });
     return true;
   }
 
@@ -748,14 +795,12 @@ export class Battle {
         if (res.fighter && kind === 'heavy') this.gainRage(f, T.rageHeavyHit * (f.st.berserk > 0 ? 2 : 1));
         if (res.fighter && kind === 'light' && T.rageLightHit) this.gainRage(f, T.rageLightHit * (f.st.berserk > 0 ? 2 : 1));
       };
-      sfx(kind === 'light' ? 'slash' : 'slashHeavy');
       swing();
       if (f.st.avatar > 0) this.later(0.12, swing);
     } else if (f.cls === 'mage') {
       const T = TUNING.mage;
       const dmg = kind === 'light' ? T.lightDamage : T.heavyDamage;
       f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
-      sfx(kind === 'light' ? 'bolt' : 'boltHeavy');
       const end = this.rowShot(f, dmg, { basic: kind, element: 'arcane' });
       this.addFx(kind === 'light' ? 'bolt' : 'boltHeavy', f.side, f.col, f.row, kind === 'light' ? 0.2 : 0.32, { to: end.col });
     } else if (f.cls === 'rogue') {
@@ -763,14 +808,12 @@ export class Battle {
       f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
       if (kind === 'light') {
         // Stab: a dagger thrust that reaches the panels ahead
-        sfx('slash');
         const cells: Array<[number, number]> = [];
         for (let i = 1; i <= T.stabReach; i++) cells.push([f.col + i * d, f.row]);
         this.addFx('dagger', f.side, f.col, f.row, 0.18, { reach: T.stabReach });
         this.strike(f, cells, T.lightDamage, { basic: kind, element: 'steel' });
       } else {
         // Throwing Knife: a heavy knife down the row
-        sfx('slashHeavy');
         const end = this.rowShot(f, T.heavyDamage, { basic: kind, element: 'steel' });
         this.addFx('knifeHeavy', f.side, f.col, f.row, 0.22, { to: end.col });
       }
@@ -781,10 +824,10 @@ export class Battle {
       if (kind === 'light') {
         // Arrow: a visible, dodgeable shot with travel time
         f.lock = f.st.rapidFire > 0 ? T.lightLock / 2 : T.lightLock;
-        sfx('bolt');
         const dmg = T.lightDamage * (f.st.deadeye > 0 ? 3 : 1);
         const opts: HitOpts = { basic: kind, element: 'steel' };
         if (homing) {
+          sfx('shot_arrow', { pan: panOf(f.col), data: { dir: d } });
           this.projectiles.push({
             side: f.side, row: f.row, x: f.col, speed: 0, kind: 'arrow', reflectable: true,
             homing: { p: 0, dur: Math.max(0.15, Math.abs(foe.col - f.col) / T.arrowSpeed), sx: f.col, sy: f.row, target: foe.side },
@@ -799,7 +842,6 @@ export class Battle {
       } else {
         // Aimed Shot: instant, pierces during Deadeye
         f.lock = T.heavyLock;
-        sfx('boltHeavy');
         if (homing) {
           this.addFx('aimed', f.side, f.col, f.row, 0.3, { to: foe.col, toRow: foe.row });
           this.damage(foe, T.heavyDamage, f, { basic: kind, element: 'steel', targeted: true });
@@ -812,12 +854,10 @@ export class Battle {
       const T = TUNING.priest;
       f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
       if (kind === 'light') {
-        sfx('bolt');
         const end = this.rowShot(f, T.lightDamage, { basic: kind, element: 'holy' });
         this.addFx('holySpark', f.side, f.col, f.row, 0.2, { to: end.col });
       } else {
         // Smite: a pillar of light a fixed distance ahead
-        sfx('boltHeavy');
         const c = f.col + T.smiteRange * d;
         this.addFx('holyPillar', f.side, c, f.row, 0.4);
         const res = this.strike(f, [[c, f.row]], T.heavyDamage, { basic: kind, element: 'holy', knockback: T.smiteKnock > 0 });
@@ -1016,20 +1056,19 @@ export class Battle {
     if (w.invuln) { this.addFx('spark', w.side, w.col, w.row, 0.2); return; }
     w.hp -= dmg;
     this.addFx('spark', w.side, w.col, w.row, 0.2);
-    sfx('block');
   }
 
   freeze(f: Fighter, t: number): void {
     if (f.dead || f.st.iceBlock > 0) return;
-    f.st.frozen = Math.max(f.st.frozen, t);
+    f.st.frozen = Math.max(f.st.frozen, t, TUNING.ccMin);
     f.charging = false;
     this.text(f, 'FROZEN', '#3cbcfc');
-    sfx('freeze');
+    sfx('freeze', { pan: panOf(f.col) });
   }
 
   stun(f: Fighter, t: number): void {
     if (f.dead || f.st.iceBlock > 0) return;
-    f.st.stunned = Math.max(f.st.stunned, t);
+    f.st.stunned = Math.max(f.st.stunned, t, TUNING.ccMin);
     f.charging = false;
     this.text(f, 'STUN', '#f8b800');
   }
@@ -1040,7 +1079,7 @@ export class Battle {
     amt = Math.round(amt);
     f.hp = Math.min(f.maxHp, f.hp + amt);
     this.text(f, '+' + amt, '#58d854');
-    sfx('heal');
+    sfx('heal', { pan: panOf(f.col) });
   }
 
   /** Core damage pipeline: immunity, guard, multipliers, shields, last stand, Rage. */
@@ -1062,7 +1101,6 @@ export class Battle {
       out.blocked = true;
       this.text(target, 'PARRY', '#fcfcfc');
       this.addFx('guard', target.side, target.col, target.row, 0.3);
-      sfx('block');
       if (src && src !== target) this.later(0.08, () => {
         this.addFx('stab', target.side, src.col, src.row, 0.25);
         this.damage(src, TUNING.rogue.riposteDamage, target, { spell: true, element: 'steel' });
@@ -1095,7 +1133,7 @@ export class Battle {
         out.broke = true;
         amt *= 2;
         this.text(target, 'BREAK', '#fcfcfc');
-        sfx('break');
+        sfx('break', { pan: panOf(target.col) });
       }
     }
 
@@ -1106,7 +1144,6 @@ export class Battle {
       this.gainRage(target, 1, true);
       this.addFx('guard', target.side, target.col, target.row, 0.3);
       this.text(target, 'BLOCK', '#fcfcfc');
-      sfx('block');
       return out;
     }
 
@@ -1122,7 +1159,7 @@ export class Battle {
       if (s.kind === 'barrier' && s.hp <= 0) { target.bonusManaNext += 1; this.text(target, '+1 MANA NEXT', '#f878f8'); }
       this.addFx('shieldHit', target.side, target.col, target.row, 0.25);
     }
-    if (amt <= 0) { out.blocked = true; sfx('block'); return out; }
+    if (amt <= 0) { out.blocked = true; sfx('block', { pan: panOf(target.col) }); return out; }
 
     if (target.st.lastStand > 0) {
       target.lastStandAbsorbed += amt;
@@ -1157,13 +1194,13 @@ export class Battle {
     if (vanishStun) this.stun(target, vanishStun);
     if (opts.freeze) this.freeze(target, opts.freeze);
     if (opts.knockback) this.knockback(target, 1);
-    sfx(opts.basic === 'heavy' ? 'heavyImpact' : amt >= 60 ? 'hitBig' : 'hit');
+    sfx(opts.basic === 'heavy' ? 'heavyImpact' : 'hit', { pan: panOf(target.col), amt, element: opts.element });
     return out;
   }
 
   // ---------- spells ----------
   castTop(f: Fighter, held: Dir | null): void {
-    if (!f.queue.length) return;
+    if (!f.queue.length || f.castCd > 0) return;
     const card = CARDS[f.queue[0]];
     if (f.st.evoLock > 0) { this.text(f, 'CAN\'T CAST', '#bcbcbc'); return; }
     if (f.st.silenced > 0) { this.text(f, 'SILENCED', '#9878f8'); sfx('deny'); f.lock = 0.15; return; }
@@ -1176,6 +1213,7 @@ export class Battle {
     }
     f.queue.shift();
     f.discard.push(card.id);
+    f.castCd = TUNING.castCooldown;
     const cost = this.costOf(f, card);
     const spent = card.cost === 'all' ? (f.st.ascendance > 0 ? Math.max(1, f.resMax) : f.res) : cost;
     if (!(f.st.avatar > 0 || f.st.ascendance > 0)) f.res -= card.cost === 'all' ? f.res : cost;
@@ -1214,7 +1252,8 @@ export class Battle {
       if (f.coldBlood) { mult *= 2; f.coldBlood = false; }
       if (f.st.vanishStun > 0) { f.st.vanishStun = 0; f.castStun = TUNING.rogue.vanishStun; }
     }
-    sfx(card.element === 'fire' ? 'fire' : card.element === 'frost' ? 'frost' : card.element === 'arcane' ? 'arcane' : 'cast');
+    sfx('cast_' + card.element, { pan: panOf(f.col) });
+    this.addFx('cast', f.side, f.col, f.row, 0.3, { el: card.element });
     const now = this.time;
     const castsWithin = (secs: number): number => prior.filter(t => now - t <= secs).length;
     const ctx: CastCtx = { b: this, f, foe, mult, dir: this.dir(f), held, spent, stealthed, castsWithin };
@@ -1224,6 +1263,8 @@ export class Battle {
 
   /** Spawn a projectile from `f` down its row. */
   shoot(f: Fighter, p: Omit<Projectile, 'side' | 'row' | 'x'> & { row?: number }): void {
+    const reach = Math.max(1, f.side === 0 ? 5 - f.col : f.col);
+    sfx(SHOT_SOUND[p.kind] ?? 'shot_magic', { pan: panOf(f.col), dur: Math.min(1.2, reach / Math.max(1, Math.abs(p.speed))), data: { dir: this.dir(f) } });
     this.projectiles.push({ side: f.side, row: p.row ?? f.row, x: f.col + this.dir(f) * 0.5, ...p });
   }
 
@@ -1276,7 +1317,7 @@ export class Battle {
   private reflect(p: Projectile, by: Fighter): void {
     by.st.reflect = 0;
     this.text(by, 'REFLECT', '#fcfcfc');
-    sfx('reflect');
+    sfx('reflect', { pan: panOf(by.col) });
     const back: Projectile = { ...p, dead: false, side: by.side, reflectable: false };
     if (p.homing) {
       back.homing = { p: 0, dur: p.homing.dur, sx: by.col, sy: by.row, target: (1 - by.side) as Side };
@@ -1348,7 +1389,7 @@ function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => nu
   return {
     side, cls, skin: spec.skin ?? defaultSkin(cls), alt, name, hp: maxHp, maxHp,
     col: side === 0 ? 1 : 4, row: 1, dx: 0, dy: 0,
-    lock: 0, moveCd: 0, charging: false, charge: 0,
+    lock: 0, moveCd: 0, stepCd: 0, moveBuf: null, castCd: 0, charging: false, charge: 0,
     res: START_RES[cls],
     resMax: cls === 'mage' ? TUNING.mage.manaStart : cls === 'warrior' ? TUNING.warrior.rageMax : 5,
     bonusManaNext: 0,

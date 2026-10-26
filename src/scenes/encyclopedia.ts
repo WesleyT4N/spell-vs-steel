@@ -2,8 +2,9 @@
 // Classes come from the card list itself, so new classes appear here as soon as their cards exist.
 import { hint, zone, hot, isHot, button, type Scene } from './scene';
 import { getArena } from '../game/battleView';
+import { drawStage } from '../art/arena';
 import type { ClassId } from '../art/sprites';
-import { P, W, H, UW, frame, type Ctx } from '../engine/gfx';
+import { P, UW, frame, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { sfx } from '../engine/audio';
@@ -11,6 +12,7 @@ import { PLAYABLE } from '../game/classes';
 import { ALL_CARDS, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef, type Element, type Rarity } from '../game/cards';
 import { starterDeck, STARTER_NAME } from '../game/deck';
 import { drawCardDetail, drawCardFace, CARD_W, CARD_H } from './cardView';
+import { win, INK2, RED_INK, TRIM } from './skin';
 
 const RARITIES: Rarity[] = ['common', 'uncommon', 'legendary', 'mythic'];
 const RANK: Record<Rarity, number> = { common: 0, uncommon: 1, legendary: 2, mythic: 3 };
@@ -102,9 +104,9 @@ export class EncyclopediaScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    getArena().draw(c, tick, 0);
+    drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(0,0,24,0.8)';
-    c.fillRect(0, 0, W, H);
+    c.fillRect(...screenRect());
     const cards = this.list();
     if (this.sel >= cards.length) this.sel = Math.max(0, cards.length - 1);
 
@@ -163,16 +165,16 @@ export class EncyclopediaScene implements Scene {
 
     // detail
     const card = cards[this.sel];
-    frame(ui, DX, CLIP_Y, DW, CLIP_H, '#000000', card ? ELEMENT_COLOR[card.element] : '#7c7c7c');
+    win(ui, DX, CLIP_Y, DW, CLIP_H, { accent: card ? ELEMENT_COLOR[card.element] : undefined });
     if (card) {
       let y = drawCardDetail(ui, card, DX + 6, CLIP_Y + 6, DW - 12) + 6;
       const line = (s: string, col: string): void => { drawText(ui, s, DX + 6, y, col); y += 11; };
-      line(`CLASS ${card.cls.toUpperCase()}`, '#bcbcbc');
-      line(`MAX ${MAX_COPIES[card.rarity]} PER DECK`, '#bcbcbc');
+      line(`CLASS ${card.cls.toUpperCase()}`, INK2);
+      line(`MAX ${MAX_COPIES[card.rarity]} PER DECK`, INK2);
       const inStarter = starterDeck(card.cls)[card.id] ?? 0;
-      line(inStarter ? `${STARTER_NAME[card.cls].toUpperCase()}: ${inStarter}` : 'NOT IN STARTER', inStarter ? '#58d854' : '#7c7c7c');
-      line(`CAST LOCK ${(card.lock ?? 0.3).toFixed(2)}S`, '#7c7c7c');
-      if (this.test) button(ui, 'test', `${k('attack')}: TEST IN SANDBOX`, DX + 6, CLIP_Y + CLIP_H - 22, DW - 12, 16, false, '#f8b800');
+      line(inStarter ? `${STARTER_NAME[card.cls].toUpperCase()}: ${inStarter}` : 'NOT IN STARTER', inStarter ? '#007800' : TRIM);
+      line(`CAST LOCK ${(card.lock ?? 0.3).toFixed(2)}S`, TRIM);
+      if (this.test) button(ui, 'test', `${k('attack')}: TEST IN SANDBOX`, DX + 6, CLIP_Y + CLIP_H - 22, DW - 12, 16, false, RED_INK);
     }
     hint(ui, `HOVER TO READ   WHEEL: SCROLL   Q/E: CLASS   ${k('attack')}: TEST   ${k('cast')}: BACK`);
   }

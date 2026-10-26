@@ -8,7 +8,7 @@
 // same delay (fair, and in keeping with "no tight timing windows").
 import { CARDS } from '../game/cards';
 import { SKINS, type ClassId } from '../art/sprites';
-import { PROTOCOL, decodeInput, encodeInput, type Hello, type NetInput, type Packet } from './protocol';
+import { PROTOCOL, decodeInput, encodeInput, type Hello, type Lobby, type NetInput, type Packet } from './protocol';
 import type { Transport } from './transport';
 
 const WINDOW = 600;        // most frames of inputs re-sent per packet (10s)
@@ -30,6 +30,8 @@ export class NetSession {
   /** Smoothed round-trip time in ms (0 until measured). */
   rtt = 0;
   desync = false;
+  /** This side's character and stage select state. */
+  lobby: Lobby = { step: 0, tile: 0, stage: 'colosseum', voted: false };
 
   private seq = 0;
   private lastSeq = -1;
@@ -46,7 +48,7 @@ export class NetSession {
   private hashes = new Map<number, number>();
   private bye = false;
 
-  constructor(readonly role: 'host' | 'guest', readonly code: string, readonly hello: Hello, readonly transport: Transport, bestOf: 1 | 3 | 5) {
+  constructor(readonly role: 'host' | 'guest', readonly code: string, public hello: Hello, readonly transport: Transport, bestOf: 1 | 3 | 5) {
     if (role === 'host') this.start = { seed: Math.floor(Math.random() * 4294967296), bestOf };
     transport.onPacket(p => this.receive(p));
     transport.onClose(reason => { if (this.status !== 'left') { this.status = 'error'; this.error = reason; } });
@@ -54,6 +56,7 @@ export class NetSession {
 
   get side(): 0 | 1 { return this.role === 'host' ? 0 : 1; }
   get rival(): Hello | null { return this.remote?.hello ?? null; }
+  get rivalLobby(): Lobby | null { return this.remote?.lobby ?? null; }
   get remoteReady(): number { return this.remote?.ready ?? 0; }
   get remoteDelay(): number { return this.remote?.delay ?? this.delay; }
   /** Both sides have said hello and the host's match settings are known. */
@@ -68,7 +71,7 @@ export class NetSession {
     const p: Packet = {
       v: PROTOCOL, id: this.id, role: this.role, seq: ++this.seq,
       t: Math.round(now), et: this.remoteT, ed: this.remoteT ? Math.round(now - this.remoteAt) : 0,
-      hello: this.hello, start: this.role === 'host' ? this.start : undefined,
+      hello: this.hello, lobby: this.lobby, start: this.role === 'host' ? this.start : undefined,
       ready: this.myReady, round: this.round, delay: this.delay,
       base: from, inp: this.local.slice(from).join(''), ack: this.remoteContig,
       picks: this.picks, hash: this.hash, bye: this.bye || undefined,

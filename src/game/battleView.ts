@@ -1,35 +1,35 @@
 // Draws a Battle: arena, panels, fighters, spell effects and the HUD.
 import { k } from '../engine/input';
-import { Colosseum, drawPanel, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState } from '../art/arena';
+import { drawPanel, drawStage, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState } from '../art/arena';
+import { getStage } from '../art/stages';
+import type { Stage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, type Tint } from '../art/sprites';
-import { P, UW, UH, blob, frame, glow, type Ctx } from '../engine/gfx';
+import { P, UW, UH, blob, frame, glow, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '../engine/font';
-import { drawCardIcon } from '../scenes/cardView';
+import { drawCardIcon, RES_INK } from '../scenes/cardView';
+import { win, bar, pip as skinPip, toInk, PAPER, PAPER2, INK, INK2, TRIM, WAX_HI } from '../scenes/skin';
 import { CARDS, ELEMENT_COLOR } from './cards';
 import { TUNING } from './tuning';
 import { heavyChargeOf } from './battle';
 import type { Battle, BlessKind, Fighter, Fx, Pet, Projectile, Side, StatusKey, Trap, Wall } from './battle';
 import { CLASS_INFO } from './classes';
 
-const FIRE = ['#f83800', '#fca044', '#f8b800', '#fce0a8'];
-const ICE = ['#0058f8', '#3cbcfc', '#a4e4fc', '#fcfcfc'];
-const ARC = ['#940084', '#d800cc', '#f878f8', '#fcfcfc'];
-const HOLY = ['#ac7c00', '#f8b800', '#f8d878', '#fcfcfc'];
-const TOX = ['#005800', '#58d854', '#b8f818', '#fcfcfc'];
-const SHADOW = ['#4428bc', '#6844fc', '#9878f8', '#fcfcfc'];
-const STEEL = ['#3c3c3c', '#7c7c7c', '#bcbcbc', '#fcfcfc'];
+import { ARC, FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawBurn, drawFrozen, drawFx, drawParticles, drawShot } from './fxView';
 
 /** Whose hidden things (traps, a stealthed fighter) are visible: one side's, or everything in the dev sandbox. */
 export type Viewer = Side | 'all';
 
-let arena: Colosseum | null = null;
-export const getArena = (): Colosseum => (arena ??= new Colosseum());
+let arena: Stage | null = null;
+/** The current stage: the one picked for the latest match, which the menus show behind them too. */
+export const getArena = (): Stage => (arena ??= getStage('colosseum'));
+/** Switch the stage that fights (and menus) are drawn on. */
+export function useStage(id: string): void { arena = getStage(id); }
 
 export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): void {
   const a = getArena();
   c.save();
   if (b.shake > 0) c.translate(Math.round((Math.random() - 0.5) * 4 * Math.min(1, b.shake * 4)), Math.round((Math.random() - 0.5) * 3 * Math.min(1, b.shake * 4)));
-  a.draw(c, tick, b.cheer);
+  drawStage(c, a, tick, b.cheer);
 
   // panels
   for (let r = 0; r < 3; r++) for (let col = 0; col < 6; col++) {
@@ -44,7 +44,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): voi
         if (f.st.frostNova > 0 && !f.frostNovaUsed && p.owner !== f.side && Math.abs(col - f.col) <= TUNING.frostNovaRange) hl = '#a4e4fc';
       }
     }
-    drawPanel(c, col, r, state, tick, p.owner, hl);
+    drawPanel(c, col, r, state, tick, p.owner, hl, a);
   }
   // Frost Nova / Glacial zones get a frosty tint on the trigger columns
   for (const f of b.f) {
@@ -68,6 +68,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): voi
   for (const p of b.pets) drawPet(c, b, p, tick);
   for (const pr of b.projectiles) drawProjectile(c, b, pr);
   for (const e of b.fx) drawFx(c, b, e);
+  drawParticles(c, b);
   c.restore();
 }
 
@@ -75,6 +76,7 @@ function drawPanelEffects(c: Ctx, b: Battle, col: number, row: number, tick: num
   const p = b.panels[col][row];
   if (p.hole > 0) return;
   const pc = panelCenter(col, row);
+  if (p.burn > 0) drawBurn(c, b, col, row);
   if (p.toxic > 0) {
     // bubbles rising out of a green haze
     c.globalAlpha = 0.35; P(c, TOX[1], pc.x - PW / 2 + 3, pc.y - 4, PW - 6, 8); c.globalAlpha = 1;
@@ -405,7 +407,6 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
   }
   let tint: Tint = 'none';
   if (f.flash > 0 || (ready && tick % 4 === 0)) tint = 'flash';
-  else if (f.st.frozen > 0) tint = 'ice';
   else if ((f.st.stunned > 0 || f.st.sleep > 0) && tick % 2) tint = 'stun';
   const bob = f.pose === 'idle' && Math.floor(b.time * 2.5) % 2 ? 1 : 0;
   const castLift = f.pose === 'cast' ? 1 : 0;
@@ -416,12 +417,7 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
     const col = f.st.avatar > 0 ? '#f8b800' : '#f878f8';
     for (let i = 0; i < 4; i++) P(c, col, fx - 8 + ((tick * 3 + i * 5) % 16), y - 4 - ((tick * 2 + i * 7) % 20), 1, 2);
   }
-  if (f.st.iceBlock > 0) {
-    P(c, '#3cbcfc', fx - 10, y - s.h - 2, 20, s.h + 3);
-    P(c, '#a4e4fc', fx - 9, y - s.h - 1, 6, s.h + 1);
-    P(c, '#fcfcfc', fx - 8, y - s.h, 2, 4);
-    c.globalAlpha = 0.6; drawFighterSprite(c, s, fx, y + 2, flip, 'ice'); c.globalAlpha = 1;
-  }
+  drawFrozen(c, b, f, s, fx, y, flip);
   // shields
   for (const sh of f.shields) {
     if (sh.hp <= 0) continue;
@@ -465,6 +461,11 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
     P(c, '#000000', cx - 1, cy - 1, 10, 9);
     P(c, ok ? ELEMENT_COLOR[card.element] : '#7c7c7c', cx, cy, 8, 7);
     if (i === 0) drawText(c, card.cost === 'all' ? 'A' : String(card.cost), cx + 1, cy, '#000000');
+    // global cooldown: a shade over the top chip that drains away as it recharges
+    if (i === 0 && f.castCd > 0) {
+      const sh = Math.ceil(7 * f.castCd / TUNING.castCooldown);
+      c.globalAlpha = 0.65; P(c, '#000000', cx, cy, 8, sh); c.globalAlpha = 1;
+    }
   }
 }
 
@@ -486,28 +487,23 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
       P(c, '#000000', x - dd * 6, y - 1, 9, 3); P(c, '#ac7c00', x - dd * 5, y, 7, 1); P(c, '#fcfcfc', x + dd * 2, y - 1, 2, 3);
       return;
     }
+    const back = e.x - s.x > 0 ? -1 : 1;
+    glow(c, x, y, 7, '248,120,248', 0.5);
     P(c, '#000000', x - 2, y - 2, 5, 5);
     P(c, ARC[2], x - 1, y - 1, 3, 3);
     P(c, ARC[3], x, y, 1, 1);
-    P(c, ARC[1], x - (e.x - s.x > 0 ? 3 : -3), y, 2, 1);
+    for (let i = 1; i <= 3; i++) P(c, ARC[3 - Math.min(2, i)], x + back * (i * 2 + 1), y + ((i + Math.floor(b.time * 20)) % 3) - 1, 1, 1);
     return;
   }
   const base = panelFoot(0, p.row);
   const x = X0 + p.x * PW + PW / 2, y = base.y - 9;
   const dir = Math.sign(p.speed);
-  if (p.kind === 'fireball') {
-    for (let i = 1; i <= 4; i++) P(c, FIRE[Math.min(3, i - 1)], x - dir * i * 3, y - 1 + (i % 2), 3, 2);
-    blob(c, '#000000', x, y, 5); blob(c, FIRE[0], x, y, 4); blob(c, FIRE[1], x, y, 3); blob(c, FIRE[2], x + dir, y - 1, 1);
-  } else if (p.kind === 'hook') {
+  if (drawShot(c, b, p, x, y, dir)) return;
+  if (p.kind === 'hook') {
     const owner = b.f[p.side];
     const ox = panelFoot(owner.col, owner.row).x;
     for (let xx = ox; dir > 0 ? xx < x : xx > x; xx += dir * 3) P(c, '#7c7c7c', xx, y + ((xx >> 1) % 2), 2, 1);
     P(c, '#000000', x - 3, y - 3, 7, 7); P(c, '#bcbcbc', x - 2, y - 2, 5, 5); P(c, '#fcfcfc', x - 1 + dir, y - 1, 2, 2);
-  } else if (p.kind === 'arrow' || p.kind === 'sting') {
-    P(c, '#000000', x - dir * 8, y - 1, 12, 3);
-    P(c, '#ac7c00', x - dir * 7, y, 10, 1);
-    P(c, p.kind === 'sting' ? TOX[2] : '#fcfcfc', x + dir * 2, y - 1, 2, 3);
-    P(c, '#fcfcfc', x - dir * 8, y - 1, 2, 1); P(c, '#fcfcfc', x - dir * 8, y + 1, 2, 1);
   } else if (p.kind === 'net') {
     for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if ((i + j) % 2 === 0) P(c, '#bcbcbc', x - 4 + i * 2, y - 5 + j * 3, 1, 1);
     P(c, '#7c7c7c', x - 5, y - 6, 1, 11); P(c, '#7c7c7c', x + 4, y - 6, 1, 11);
@@ -519,297 +515,8 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
     P(c, HOLY[1], x - 3, y - 3, 7, 7); P(c, HOLY[3], x - 2, y - 2, 2, 2);
     P(c, '#503000', x + (spin % 2 ? 0 : spin === 0 ? 4 : -5), y + (spin % 2 ? (spin === 1 ? 4 : -5) : 0), 2, 2);
     glow(c, x, y, 10, '248,216,120', 0.35);
-  } else if (p.kind === 'gust') {
-    for (let i = 0; i < 3; i++) { P(c, '#fcfcfc', x - dir * i * 4, y - 4 + i * 3, 6, 1); P(c, '#f878f8', x - dir * i * 4 - dir * 2, y - 3 + i * 3, 3, 1); }
   } else {
     blob(c, '#fcfcfc', x, y, 3);
-  }
-}
-
-function cellPx(col: number, row: number): { x: number; y: number } { return panelFoot(col, row); }
-
-/** Color ramps for the quick row shots (basic attacks and arrows). */
-const DART: Record<string, string[]> = { knife: STEEL, knifeHeavy: STEEL, arrow: ['#503000', '#ac7c00', '#bcbcbc', '#fcfcfc'], aimed: STEEL, holySpark: HOLY };
-
-function drawFx(c: Ctx, _b: Battle, e: Fx): void {
-  const p = e.t / e.dur;
-  const { x, y } = cellPx(e.col, e.row);
-  const d = e.side === 0 ? 1 : -1;
-  switch (e.kind) {
-    case 'cleave': {
-      // light: a quick crescent swipe across the panel ahead, bright edge leading a fading trail
-      const cx = x + d * 4, cy = y - 10, r = 12;
-      const sweep = Math.min(1, p * 1.8);
-      for (let i = 0; i < 18; i++) {
-        const k = i / 17;
-        if (k > sweep) break;
-        const ang = -1.3 + k * 2.4;
-        const age = sweep - k;                       // 0 at the leading edge
-        const px = cx + d * Math.cos(ang) * r, py = cy + Math.sin(ang) * r * 0.85;
-        const col = age < 0.12 ? '#fcfcfc' : age < 0.35 ? '#bcbcbc' : '#7c7c7c';
-        if (age < 0.6 * (1 - p) + 0.15) P(c, col, px - 1, py - 1, age < 0.12 ? 3 : 2, 2);
-      }
-      if (p > 0.45 && p < 0.8) for (let i = 0; i < 3; i++) P(c, '#fcfcfc', cx + d * (r + 2 + i * 2), cy - 3 + i * 3, 2, 1);
-      break;
-    }
-    case 'dagger': {
-      // a quick dagger thrust: the blade shoots out across the panels ahead and snaps back
-      const reach = Number(e.data?.reach ?? 2);
-      const len = reach * PW * (p < 0.5 ? p * 2 : 1 - (p - 0.5) * 1.2);
-      const x0 = x + d * 6, by = y - 10, tip = x0 + d * len;
-      P(c, '#000000', Math.min(x0, tip), by - 2, Math.abs(tip - x0), 3);
-      P(c, '#bcbcbc', Math.min(x0, tip), by - 1, Math.abs(tip - x0), 1);
-      P(c, '#fcfcfc', tip - (d > 0 ? 3 : 0), by - 2, 3, 3);
-      if (p > 0.35 && p < 0.65) glow(c, tip, by, 6, '252,252,252', 0.6);
-      break;
-    }
-    case 'cleaveHeavy': {
-      // heavy: a big overhead chop that lands on both panels ahead with a gold flash, dust and a crack
-      const cx = x + d * (PW * 0.5), cy = y - 12, r = 18;
-      const swing = Math.min(1, p * 2.2);
-      if (p < 0.6) {
-        for (let i = 0; i < 24; i++) {
-          const k = i / 23;
-          if (k > swing) break;
-          const ang = -2.2 + k * 2.9;                  // from over the shoulder down to the floor
-          const age = swing - k;
-          const px = cx + d * Math.cos(ang) * r * 0.9, py = cy + Math.sin(ang) * r;
-          const col = age < 0.1 ? '#fcfcfc' : age < 0.3 ? '#f8b800' : '#fca044';
-          if (age < 0.45) P(c, col, px - 1, py - 1, age < 0.1 ? 4 : 3, 3);
-        }
-      }
-      if (p >= 0.4) {
-        const q = (p - 0.4) / 0.6;
-        for (const col of [e.col, e.col + d]) {
-          const pc = cellPx(col, e.row);
-          if (q < 0.35) glow(c, pc.x, pc.y - 4, 14, '248,184,0', 0.6 * (1 - q / 0.35));
-          for (let i = 0; i < 5; i++) {                // dust puffs drift outward
-            const dx = (i - 2) * (4 + q * 8), dy = -2 - q * 6 * (1 - Math.abs(i - 2) / 3);
-            P(c, q < 0.5 ? '#fce0a8' : '#bcbcbc', pc.x + dx - 1, pc.y + dy, 3, 2);
-          }
-          P(c, '#000000', pc.x - 6, pc.y - 1, 12, 1);  // crack in the panel
-          P(c, '#000000', pc.x - 2, pc.y, 4, 1);
-        }
-      }
-      break;
-    }
-    case 'bolt': case 'boltHeavy': case 'knife': case 'knifeHeavy': case 'arrow': case 'aimed': case 'holySpark': {
-      const heavy = e.kind === 'boltHeavy';
-      const to = Number(e.data?.to ?? e.col);
-      const x0 = x + d * 8, x1 = cellPx(to, e.row).x, by = y - 10;
-      const ramp = heavy ? ARC : DART[e.kind] ?? ['#0058f8', '#3cbcfc', '#a4e4fc', '#fcfcfc'];
-      if (e.kind === 'aimed') {
-        // a heavy arrow: a long white streak with a shock ring where it lands
-        const q = Math.min(1, p * 2.5), head = x0 + (x1 - x0) * q;
-        P(c, '#000000', Math.min(x0, head), by - 2, Math.abs(head - x0), 4);
-        P(c, ramp[2], Math.min(x0, head), by - 1, Math.abs(head - x0), 2);
-        P(c, ramp[3], Math.min(x0, head), by - 1, Math.abs(head - x0), 1);
-        if (q >= 1) { const rr = 3 + p * 10; for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; P(c, ramp[3], x1 + Math.cos(a) * rr, by + Math.sin(a) * rr * 0.7, 2, 1); } }
-        break;
-      }
-      // staff-tip flash
-      if (p < 0.4) { glow(c, x0, by, heavy ? 12 : 7, heavy ? '248,120,248' : '60,188,252', 0.7 * (1 - p / 0.4)); blob(c, ramp[3], x0, by, heavy ? 3 : 2); }
-      if (!heavy) {
-        // a dart: bright head racing down the row with a sparkling tail
-        const head = x0 + (x1 - x0) * Math.min(1, p * 2.2);
-        const tail = x0 + (x1 - x0) * Math.max(0, p * 2.2 - 0.5);
-        const xa = Math.min(head, tail), xb = Math.max(head, tail);
-        P(c, ramp[1], xa, by - 1, xb - xa, 3);
-        P(c, ramp[3], xa, by, xb - xa, 1);
-        for (let i = 0; i < 4; i++) P(c, ramp[2], tail + (head - tail) * (i / 4), by + ((i * 7 + Math.floor(p * 20)) % 5) - 2, 1, 1);
-        blob(c, ramp[3], head, by, 2);
-        if (p * 2.2 >= 1) for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; P(c, ramp[2], x1 + Math.cos(a) * (3 + p * 6), by + Math.sin(a) * (3 + p * 6), 1, 1); }
-      } else {
-        // a thick, wobbling arcane beam with a burst where it lands
-        const w = p < 0.7 ? 1 : 1 - (p - 0.7) / 0.3;
-        const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
-        for (let xx = xa; xx < xb; xx += 2) {
-          const wob = Math.round(Math.sin(xx * 0.5 + p * 30) * 1.5);
-          const hh = Math.max(1, Math.round(4 * w));
-          P(c, ramp[1], xx, by - hh + wob, 2, hh * 2 + 1);
-          P(c, ramp[2], xx, by - Math.ceil(hh / 2) + wob, 2, Math.ceil(hh / 2) * 2 + 1);
-        }
-        P(c, ramp[3], xa, by, xb - xa, 1);
-        glow(c, x1, by, 14, '248,120,248', 0.5 * w);
-        for (let i = 0; i < 8; i++) {
-          const a = (i / 8) * Math.PI * 2 + p * 4, rr = 4 + p * 12;
-          P(c, i % 2 ? ramp[3] : ramp[2], x1 + Math.cos(a) * rr, by + Math.sin(a) * rr * 0.8, 2, 2);
-        }
-      }
-      break;
-    }
-    case 'thrust': {
-      const len = Number(e.data?.len ?? 3) * PW * Math.min(1, p * 3);
-      P(c, '#000000', x + (d > 0 ? 6 : -6 - len), y - 11, len, 4);
-      P(c, '#fcfcfc', x + (d > 0 ? 6 : -6 - len), y - 10, len, 2);
-      break;
-    }
-    case 'smash': case 'quake': case 'shockwave': case 'wide': {
-      const cols = e.kind === 'smash' ? ['#fcfcfc', '#f8b800'] : ['#bcbcbc', '#7c7c7c'];
-      const rows = e.kind === 'shockwave' || e.kind === 'wide' ? [0, 1, 2] : [e.row];
-      for (const r of rows) {
-        const pc = cellPx(e.col, r);
-        for (let i = 0; i < 8; i++) {
-          const ang = (i / 8) * Math.PI * 2;
-          const rr = 4 + p * 14;
-          P(c, cols[i % 2], pc.x + Math.cos(ang) * rr, pc.y - 4 + Math.sin(ang) * rr * 0.4 - (1 - p) * 4, 2, 2);
-        }
-        if (e.kind === 'wide') P(c, '#fcfcfc', pc.x - d * 12 + d * p * 20, pc.y - 14, 2, 14);
-      }
-      break;
-    }
-    case 'explode': case 'pillar': {
-      const r = e.kind === 'pillar' ? 4 : 3 + p * 9;
-      if (e.kind === 'pillar') {
-        for (let yy = 0; yy < 50 * (1 - p * 0.5); yy += 2) P(c, FIRE[(yy >> 2) % 3], x - 6 + ((yy * 7) % 5), y - yy, 12 - ((yy * 3) % 4), 2);
-      }
-      blob(c, FIRE[0], x, y - 6, Math.round(r));
-      blob(c, FIRE[1], x, y - 6, Math.round(r * 0.7));
-      blob(c, FIRE[2], x, y - 6, Math.round(r * 0.35));
-      break;
-    }
-    case 'meteorFall': {
-      const mx = x + 40 * (1 - p) * d * -1, my = y - 120 * (1 - p);
-      blob(c, '#000000', mx, my, 7); blob(c, FIRE[0], mx, my, 6); blob(c, FIRE[1], mx, my, 4); blob(c, FIRE[3], mx - 1, my - 1, 1);
-      for (let i = 1; i < 6; i++) P(c, FIRE[i % 3], mx + d * i * 3, my - i * 6, 3, 3);
-      break;
-    }
-    case 'shard': {
-      const sy = y - 40 * (1 - Math.min(1, p * 2));
-      P(c, '#0058f8', x - 2, sy - 10, 5, 10); P(c, '#a4e4fc', x - 1, sy - 10, 3, 9); P(c, '#fcfcfc', x, sy - 2, 1, 2);
-      if (p > 0.5) for (let i = 0; i < 6; i++) P(c, ICE[i % 4], x + Math.cos(i) * 10 * p, y - 3 + Math.sin(i) * 4 * p, 2, 1);
-      break;
-    }
-    case 'arcaneHit': {
-      const r = 2 + p * 12;
-      for (let i = 0; i < 12; i++) { const ang = (i / 12) * Math.PI * 2 + p * 3; P(c, ARC[i % 3 + 1], x + Math.cos(ang) * r, y - 10 + Math.sin(ang) * r, 2, 2); }
-      blob(c, ARC[3], x, y - 10, Math.round(4 * (1 - p)));
-      break;
-    }
-    case 'blink': {
-      for (let i = 0; i < 10; i++) P(c, ARC[2 + (i % 2)], x - 8 + ((i * 7) % 16), y - 2 - p * 20 - ((i * 5) % 14), 1, 2);
-      break;
-    }
-    case 'nova': case 'novaZone': {
-      const r = 4 + p * 22;
-      for (let i = 0; i < 16; i++) { const ang = (i / 16) * Math.PI * 2; P(c, ICE[1 + (i % 3)], x + Math.cos(ang) * r, y - 6 + Math.sin(ang) * r * 0.5, 2, 1); }
-      break;
-    }
-    case 'guard': case 'shieldHit': case 'spark': {
-      for (let i = 0; i < 6; i++) P(c, '#fcfcfc', x + d * 8 + Math.cos(i) * p * 8, y - 10 + Math.sin(i * 2) * p * 8, 1, 1);
-      break;
-    }
-    case 'shout': case 'transform': {
-      const col = e.kind === 'transform' ? '#f8b800' : '#fcfcfc';
-      for (let k = 0; k < 2; k++) {
-        const r = 6 + (p + k * 0.3) * 18;
-        for (let i = 0; i < 14; i++) { const ang = (i / 14) * Math.PI * 2; if (i % 2) P(c, col, x + Math.cos(ang) * r, y - 10 + Math.sin(ang) * r * 0.7, 1, 1); }
-      }
-      break;
-    }
-    case 'counter': {
-      drawTextCentered(c, '×', x, y - 30 - p * 6, '#f878f8', 2);
-      break;
-    }
-    case 'banner': {
-      for (let r = 0; r < 3; r++) {
-        const pc = cellPx(e.col, r);
-        P(c, '#503000', pc.x, pc.y - 18, 1, 16);
-        P(c, e.side === 0 ? '#d82800' : '#0058f8', pc.x + 1, pc.y - 18, 6, 5);
-      }
-      break;
-    }
-    case 'holyPillar': {
-      const w = Math.round(10 * (1 - p * 0.6));
-      for (let yy = 0; yy < 60; yy += 2) P(c, HOLY[1 + ((yy >> 2) + Math.floor(p * 10)) % 3], x - w / 2, y - yy - 4, w, 2);
-      P(c, HOLY[3], x - 1, y - 60, 2, 56);
-      glow(c, x, y - 6, 16, '248,216,120', 0.6 * (1 - p));
-      break;
-    }
-    case 'holyNova': {
-      const r = 4 + p * 30;
-      for (let i = 0; i < 20; i++) { const ang = (i / 20) * Math.PI * 2; P(c, HOLY[1 + (i % 3)], x + Math.cos(ang) * r, y - 8 + Math.sin(ang) * r * 0.55, 2, 2); }
-      glow(c, x, y - 8, 18, '248,216,120', 0.5 * (1 - p));
-      break;
-    }
-    case 'shadowHit': {
-      // a shadow bolt landing: dark motes collapsing inward
-      const r = 14 * (1 - p);
-      for (let i = 0; i < 10; i++) { const ang = (i / 10) * Math.PI * 2; P(c, SHADOW[1 + (i % 3)], x + Math.cos(ang) * r, y - 10 + Math.sin(ang) * r * 0.7, 2, 2); }
-      glow(c, x, y - 10, 12, '152,120,248', 0.5 * (1 - p));
-      break;
-    }
-    case 'healBurst': {
-      for (let i = 0; i < 6; i++) {
-        const px = x - 10 + ((i * 7) % 20), py = y - 4 - p * 22 - ((i * 5) % 8);
-        P(c, '#58d854', px - 1, py, 3, 1); P(c, '#58d854', px, py - 1, 1, 3);
-      }
-      break;
-    }
-    case 'stab': {
-      // a quick shadow slash: two crossing dark streaks over the panel
-      const k = Math.min(1, p * 3), cx = x, cy = y - 10;
-      for (let i = 0; i < 7; i++) {
-        if (i / 6 > k) break;
-        P(c, SHADOW[2 + (i % 2)], cx - 9 + i * 3, cy - 8 + i * 3, 2, 2);
-        P(c, SHADOW[1], cx + 9 - i * 3, cy - 8 + i * 3, 2, 1);
-      }
-      break;
-    }
-    case 'smoke': {
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2, r = 3 + p * 10;
-        P(c, i % 2 ? '#7c7c7c' : '#3c3c3c', x + Math.cos(a) * r, y - 8 + Math.sin(a) * r * 0.6 - p * 4, 3, 2);
-      }
-      break;
-    }
-    case 'toxicPuff': {
-      for (let i = 0; i < 9; i++) {
-        const a = (i / 9) * Math.PI * 2 + p, r = 2 + p * 11;
-        P(c, TOX[1 + (i % 3)], x + Math.cos(a) * r, y - 6 + Math.sin(a) * r * 0.6 - p * 6, 2, 2);
-      }
-      break;
-    }
-    case 'lob': {
-      // a vial arcing to its target panel
-      const to = Number(e.data?.to ?? e.col), x1 = cellPx(to, e.row).x;
-      const vx = x + (x1 - x) * p, vy = y - 12 - Math.sin(p * Math.PI) * 26;
-      P(c, '#000000', vx - 2, vy - 3, 5, 6); P(c, String(e.data?.color ?? TOX[2]), vx - 1, vy - 1, 3, 3); P(c, '#fcfcfc', vx - 1, vy - 3, 3, 1);
-      break;
-    }
-    case 'trapPop': {
-      const col = e.data?.kind === 'freeze' ? ICE : e.data?.kind === 'mine' ? TOX : FIRE;
-      for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; P(c, col[1 + (i % 3)], x + Math.cos(a) * p * 14, y - 4 + Math.sin(a) * p * 6 - p * 6, 2, 2); }
-      P(c, '#bcbcbc', x - 6, y - 1, 12, 1);
-      break;
-    }
-    case 'hawkDive': case 'bite': case 'claw': {
-      // three slash marks raking across the target
-      const n = e.kind === 'claw' ? 4 : 3, k = Math.min(1, p * 3);
-      for (let i = 0; i < n; i++) for (let j = 0; j < 6; j++) if (j / 5 <= k) P(c, j > 3 ? '#fcfcfc' : '#bcbcbc', x - 6 + i * 4 + j, y - 16 + j * 2, 1, 2);
-      break;
-    }
-    case 'flare': {
-      if (p < 0.5) glow(c, x, y - 6, 14, '248,184,0', 0.5 * (1 - p * 2));
-      P(c, '#fce0a8', x - 1, y - 4 - p * 10, 2, 2);
-      break;
-    }
-    case 'arrowRain': {
-      const yy = y - 30 * (1 - Math.min(1, p * 2));
-      for (let i = 0; i < 3; i++) { P(c, '#ac7c00', x - 6 + i * 5, yy - 10 - i * 2, 1, 7); P(c, '#fcfcfc', x - 6 + i * 5, yy - 3 - i * 2, 1, 2); }
-      break;
-    }
-    case 'laser': {
-      // Kill Shot lock-on: a red line from the bow to the enemy, blinking faster as it fires
-      const t = _b.f[1 - e.side], tp = fighterPos(_b, t);
-      if (Math.floor(e.t * (8 + p * 20)) % 2 === 0) {
-        const steps = 24;
-        for (let i = 0; i <= steps; i++) P(c, '#f83800', x + (tp.x - x) * (i / steps), y - 12 + (tp.y - 12 - (y - 12)) * (i / steps), 1, 1);
-        P(c, '#f83800', tp.x - 4, tp.y - 12, 9, 1); P(c, '#f83800', tp.x, tp.y - 16, 1, 9);
-      }
-      break;
-    }
-    case 'castName': break; // drawn on the UI layer by drawCastCallout
   }
 }
 
@@ -827,10 +534,8 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0): vo
   for (const f of b.f) drawChargeBar(ui, b, f, tick);
   // Draw gauge
   const gx = UW / 2 - 70, gw = 140;
-  frame(ui, gx, 8, gw, 12, '#000000', '#fcfcfc');
   const full = b.gauge >= 1;
-  P(ui, full ? (tick % 4 < 2 ? '#f8b800' : '#fcfcfc') : '#3cbcfc', gx + 1, 9, Math.round((gw - 2) * b.gauge), 10);
-  if (!full) P(ui, '#a4e4fc', gx + 1, 9, Math.round((gw - 2) * b.gauge), 2);
+  bar(ui, gx, 8, gw, 12, b.gauge, full ? (tick % 4 < 2 ? '#f8b800' : '#fce0a8') : '#3cbcfc');
   drawTextCentered(ui, full ? `${k('custom')}: DRAW` : 'DRAW', UW / 2, 24, full ? '#f8b800' : '#bcbcbc');
   for (const e of b.fx) if (e.kind === 'castName') drawCastCallout(ui, e);
   drawNextSpell(ui, b, b.f[me]);
@@ -839,33 +544,28 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0): vo
 function drawFighterHud(ui: Ctx, b: Battle, f: Fighter, tick: number): void {
   const right = f.side === 1, w = 132;
   const x = right ? UW - w - 8 : 8;
-  // HP box with a bar
-  frame(ui, x, 6, w, 30, '#000000', teamColor(f.cls, f.skin, f.alt));
-  drawText(ui, f.name, x + 6, 10, '#fcfcfc');
-  drawText(ui, CLASS_INFO[f.cls].name, x + 6, 20, '#7c7c7c');
+  // a parchment nameplate with a ribbon in the fighter's color, and an HP bar
+  win(ui, x, 4, w, 34, { accent: teamColor(f.cls, f.skin, f.alt), burn: 3 });
+  drawText(ui, f.name, x + 7, 11, INK);
+  drawText(ui, CLASS_INFO[f.cls].name, x + 7, 20, INK2);
   const hp = String(Math.max(0, Math.ceil(f.hp)));
   const low = f.hp / f.maxHp < 0.3;
-  drawText(ui, hp, x + w - 6 - textWidth(hp, 2), 9, low && tick % 4 < 2 ? '#f83800' : '#fcfcfc', 2);
+  drawText(ui, hp, x + w - 7 - textWidth(hp, 2), 10, low && tick % 4 < 2 ? WAX_HI : INK, 2);
   const ratio = Math.max(0, f.hp / f.maxHp);
-  P(ui, '#3c3c3c', x + 2, 31, w - 4, 3);
-  P(ui, low ? '#f83800' : ratio < 0.6 ? '#f8b800' : '#58d854', right ? x + 2 + Math.round((w - 4) * (1 - ratio)) : x + 2, 31, Math.round((w - 4) * ratio), 3);
+  bar(ui, x + 5, 29, w - 10, 5, ratio, low ? '#f83800' : ratio < 0.6 ? '#f8b800' : '#58d854', right);
   drawResource(ui, f, right ? x + w - 92 : x, 42, tick);
   drawStatuses(ui, b, f, right ? x + w : x, 58, right);
 }
 
 function drawResource(ui: Ctx, f: Fighter, x: number, y: number, tick: number): void {
-  const pip = (i: number, base: string, fill: string | null, hi: string): void => {
-    const px = x + 36 + i * 11;
-    P(ui, '#000000', px - 1, y - 1, 10, 11);
-    P(ui, base, px, y, 8, 9);
-    if (fill) { P(ui, fill, px, y, 8, 9); P(ui, hi, px, y, 8, 2); }
-  };
+  // round wax pips; `base` tints the empty socket
+  const pip = (i: number, base: string, fill: string | null, _hi: string): void => skinPip(ui, x + 36 + i * 11, y, fill, mix(base, '#d8a060', 0.6));
   if (f.cls === 'warrior') {
     drawTextOutlined(ui, 'RAGE', x, y + 1, '#f87858');
     for (let i = 0; i < 5; i++) {
       const v = f.res - i;
       if (v >= 1) pip(i, '#503000', f.st.avatar > 0 ? '#f8b800' : '#d82800', '#f87858');
-      else { pip(i, '#503000', null, ''); if (v >= 0.5) P(ui, '#881400', x + 36 + i * 11, y + 4, 8, 5); }
+      else { pip(i, '#503000', null, ''); if (v >= 0.5) P(ui, '#a81000', x + 37 + i * 11, y + 4, 7, 4); }
     }
   } else if (f.cls !== 'mage') {
     // Energy (Rogue, Ranger) and Priest Mana: five pips, no max to grow
@@ -920,11 +620,14 @@ function drawStatuses(ui: Ctx, b: Battle, f: Fighter, edge: number, y: number, r
   if (p.burn > 0) tags.push(['ON FIRE', '#fca044']);
   let cx = edge, cy = y;
   for (const [s, col] of tags.slice(0, 8)) {
-    const tw = textWidth(s) + 8;
+    const tw = textWidth(s) + 10;
     if (right ? cx - tw < edge - 200 : cx + tw > edge + 200) { cx = edge; cy += 13; }
     const tx = right ? cx - tw : cx;
-    frame(ui, tx, cy, tw, 11, '#000000', col);
-    drawText(ui, s, tx + 4, cy + 2, col);
+    // a parchment tag with a colored tab
+    P(ui, '#000000', tx - 1, cy - 1, tw + 2, 13);
+    P(ui, PAPER, tx, cy, tw, 11); P(ui, PAPER2, tx, cy + 10, tw, 1);
+    P(ui, col, tx, cy, 3, 11);
+    drawText(ui, s, tx + 6, cy + 2, toInk(col));
     cx = right ? tx - 3 : tx + tw + 3;
   }
 }
@@ -933,21 +636,21 @@ function drawStatuses(ui: Ctx, b: Battle, f: Fighter, edge: number, y: number, r
 function drawCastCallout(ui: Ctx, e: Fx): void {
   const card = CARDS[String(e.data?.id)];
   if (!card || e.t > 2) return;
-  const w = 188, h = 58, right = e.side === 1;
+  const w = 188, h = 62, right = e.side === 1;
   const slide = Math.min(1, e.t / 0.12), fade = e.t > 1.7 ? (2 - e.t) / 0.3 : 1;
   const x = right ? UW - 8 - w + Math.round((1 - slide) * (w + 8)) : 8 - Math.round((1 - slide) * (w + 8)), y = 86;
   ui.save();
   ui.globalAlpha = Math.max(0, fade);
-  frame(ui, x, y, w, h, '#000000', ELEMENT_COLOR[card.element]);
-  drawCardIcon(ui, card, x + 6, y + 6, 32);
-  const tx = x + 44;
-  drawText(ui, card.name.toUpperCase(), tx, y + 6, '#fcfcfc');
+  win(ui, x, y, w, h, { accent: ELEMENT_COLOR[card.element], burn: 4 });
+  drawCardIcon(ui, card, x + 7, y + 10, 32);
+  const tx = x + 45;
+  drawText(ui, card.name.toUpperCase(), tx, y + 9, INK);
   const info = CLASS_INFO[card.cls];
   const meta = `${card.cost === 'all' ? 'ALL' : card.cost} ${info.res}${card.dmg !== '-' ? `  DMG ${card.dmg.toUpperCase()}` : ''}`;
-  drawText(ui, meta, tx, y + 17, info.resColor);
-  wrap(card.short.toUpperCase(), Math.floor((w - 50) / 6)).slice(0, 3).forEach((l, i) => drawText(ui, l, tx, y + 29 + i * 9, '#bcbcbc'));
+  drawText(ui, meta, tx, y + 19, RES_INK[info.res]);
+  wrap(card.short.toUpperCase(), Math.floor((w - 52) / 6)).slice(0, 3).forEach((l, i) => drawText(ui, l, tx, y + 30 + i * 9, INK2));
   if (e.data?.countered) {
-    ui.fillStyle = 'rgba(0,0,0,0.55)'; ui.fillRect(x, y, w, h);
+    ui.fillStyle = 'rgba(40,20,0,0.6)'; ui.fillRect(x, y, w, h);
     drawTextCentered(ui, 'COUNTERED', x + w / 2, y + h / 2 - 7, '#f878f8', 2);
   }
   ui.restore();
@@ -960,11 +663,19 @@ function drawNextSpell(ui: Ctx, b: Battle, f: Fighter): void {
   const more = f.queue.length - 1;
   const s = `${k('cast')}: ${card.name.toUpperCase()}`;
   const tw = textWidth(s) + (more ? textWidth(`  +${more}`) : 0);
-  frame(ui, 8, UH - 22, tw + 28, 16, '#000000', ok ? ELEMENT_COLOR[card.element] : '#7c7c7c');
-  P(ui, ok ? ELEMENT_COLOR[card.element] : '#3c3c3c', 12, UH - 18, 8, 8);
-  drawText(ui, s, 24, UH - 18, ok ? '#fcfcfc' : '#7c7c7c');
-  if (more) drawText(ui, `+${more}`, 24 + textWidth(s) + 12, UH - 18, '#7c7c7c');
-  if (!ok) drawText(ui, f.st.silenced > 0 ? 'SILENCED' : `NEED ${CLASS_INFO[card.cls].res}`, tw + 44, UH - 18, '#f83800');
+  win(ui, 8, UH - 23, tw + 28, 18, { burn: 3 });
+  P(ui, '#000000', 11, UH - 19, 10, 10);
+  P(ui, ok ? ELEMENT_COLOR[card.element] : '#7c7c7c', 12, UH - 18, 8, 8);
+  drawText(ui, s, 25, UH - 18, ok ? INK : TRIM);
+  if (more) drawText(ui, `+${more}`, 25 + textWidth(s) + 12, UH - 18, INK2);
+  if (!ok) drawTextOutlined(ui, f.st.silenced > 0 ? 'SILENCED' : `NEED ${CLASS_INFO[card.cls].res}`, tw + 44, UH - 18, '#f83800');
+  // global cooldown: a bar along the bottom of the plate fills back up between casts
+  if (f.castCd > 0) {
+    const p = 1 - f.castCd / TUNING.castCooldown;
+    ui.globalAlpha = 0.45; P(ui, '#503000', 10, UH - 21, tw + 24, 14); ui.globalAlpha = 1;
+    P(ui, '#d8a060', 10, UH - 9, tw + 24, 2);
+    P(ui, '#a81000', 10, UH - 9, Math.round((tw + 24) * p), 2);
+  }
 }
 
 /** A charge meter under a fighter's feet while a heavy winds up; flashes READY when full. */
