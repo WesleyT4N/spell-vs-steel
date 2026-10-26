@@ -172,6 +172,8 @@ export class StageSelectScene implements Scene {
   /** A vote as a stage to show ('random' shows a cycling stage). */
   private tileStage(v: string): string { return v === 'random' ? STAGE_IDS[Math.floor(this.t * 6) % STAGE_IDS.length] : v; }
 
+  tall(): boolean { return true; }
+
   draw(c: Ctx, tick: number, ui: Ctx): void {
     const st = getStage(this.view);
     // the full-size stage behind everything, dimmed, and a sharp half-size preview with the fighters on it

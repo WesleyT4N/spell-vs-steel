@@ -25,6 +25,14 @@ export function setView(aspect: number, min = MIN_ASPECT): boolean {
   Object.assign(view, { w, h, ox: (w - W) / 2, oy: (h - H) / 2 });
   return true;
 }
+/**
+ * Phone portrait: `portrait` is set while the screen sits on top of the touch pad. Menu screens there stretch the
+ * UI layer vertically by `k` about the middle when it is shown (main.ts), so rows and buttons grow into the spare height.
+ * Scenes keep drawing in 480×320; only the final blit and the pointer mapping use `k`.
+ */
+export const stretch = { portrait: false, k: 1 };
+/** Where a UI-layer y lands on screen once stretched (still in UI-layer coordinates). */
+export const stretchY = (y: number): number => UH / 2 + (y - UH / 2) * stretch.k;
 /** The whole visible screen as [x, y, w, h] in layer coordinates (`s` = 2 for the UI layer). */
 export const screenRect = (s = 1): [number, number, number, number] => [-view.ox * s, -view.oy * s, view.w * s, view.h * s];
 /** Fill the whole visible screen, margins included. */

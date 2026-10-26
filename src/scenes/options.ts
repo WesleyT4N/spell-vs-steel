@@ -73,6 +73,8 @@ export class OptionsScene implements Scene {
     if (ok && row === 'back') { sfx('back'); this.back(); }
   }
 
+  tall(): boolean { return true; }
+
   draw(c: Ctx, tick: number, ui: Ctx): void {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.35)';

@@ -1,6 +1,6 @@
 // Training mode: a fight that never ends, for testing decks. The dummy's behavior, both sides' HP and
 // resources, and the Draw gauge are set from the pause menu; R puts both fighters back to the start of the turn.
-import { setScene, dim, hint, zone, hot, showSel, drawMenu, listMouse } from './scene';
+import { setScene, dim, hint, zone, hot, showSel, drawMenu, listMouse, PORTRAIT_ROWS } from './scene';
 import { clearStats } from '../game/stats';
 import type { StatsData } from './statsView';
 import { NO_INTENT, heavyChargeOf, type Battle, type Dir, type Fighter, type Intent } from '../game/battle';
@@ -9,7 +9,7 @@ import { CARDS } from '../game/cards';
 import { CLASS_INFO } from '../game/classes';
 import { TUNING } from '../game/tuning';
 import type { MatchConfig } from '../game/match';
-import { UW, type Ctx } from '../engine/gfx';
+import { UW, stretch, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { touchActive } from '../engine/touch';
@@ -340,23 +340,24 @@ export class TrainingScene extends BattleScene {
 
   private drawMenu(ui: Ctx, tick: number): void {
     dim(ui, 0.6);
-    const rows = this.rows, x = 92, w = UW - 184, rh = 17, y0 = 46;
+    const rows = this.rows, x = 92, w = UW - 184, rh = stretch.portrait ? Math.round(17 * PORTRAIT_ROWS) : 17, y0 = 46;
     banner(ui, 'TRAINING', UW / 2, 8);
     win(ui, x, y0 - 8, w, rows.length * rh + 14);
     rows.forEach((r, i) => {
       // a gap between the settings and the actions below them
       const yy = y0 + i * rh + (i >= 8 ? 4 : 0), on = i === this.menuSel && showSel();
+      const ty = yy + 2 + Math.round((rh - 17) / 2);
       zone(`trow:${i}`, x + 2, yy - 3, w - 4, rh - 1);
       if (on) selRow(ui, x + 4, yy - 3, w - 8, rh - 2);
-      drawText(ui, r.label, x + 14, yy + 2, on ? INK : INK2);
-      if (on && tick % 8 < 6) drawText(ui, '→', x + 4, yy + 2, PAPER);
+      drawText(ui, r.label, x + 14, ty, on ? INK : INK2);
+      if (on && tick % 8 < 6) drawText(ui, '→', x + 4, ty, PAPER);
       if (r.value) {
         const v = r.value(), vx = x + w - 92;
-        drawTextCentered(ui, v, vx + 40, yy + 2, RED_INK, 1, false);
+        drawTextCentered(ui, v, vx + 40, ty, RED_INK, 1, false);
         zone(`tarrow:${i * 2}`, vx - 4, yy - 3, 14, rh - 1);
         zone(`tarrow:${i * 2 + 1}`, vx + 74, yy - 3, 14, rh - 1);
-        drawText(ui, '<', vx, yy + 2, hot('tarrow') === i * 2 ? INK : TRIM);
-        drawText(ui, '>', vx + 78, yy + 2, hot('tarrow') === i * 2 + 1 ? INK : TRIM);
+        drawText(ui, '<', vx, ty, hot('tarrow') === i * 2 ? INK : TRIM);
+        drawText(ui, '>', vx + 78, ty, hot('tarrow') === i * 2 + 1 ? INK : TRIM);
       }
     });
     hint(ui, `${k('up')}/${k('down')}: MOVE   ${k('left')}/${k('right')} OR CLICK: CHANGE   ${k('cast')} / RIGHT-CLICK: RESUME`);
