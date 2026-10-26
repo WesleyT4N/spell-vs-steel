@@ -8,7 +8,7 @@ import { drawText, drawTextCentered, wrap } from '../engine/font';
 import { wasPressed, navPressed, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { cardsFor, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef } from '../game/cards';
-import { canAdd, countRarity, deckSize, loadCustom, saveCustom, starterDeck, validate, DECK_SIZE, MAX_LEGENDARIES, type DeckCounts } from '../game/deck';
+import { canAdd, countRarity, deckSize, loadCustom, saveCustom, starterDeck, presetsFor, validate, DECK_SIZE, MAX_LEGENDARIES, type DeckCounts, type DeckPreset } from '../game/deck';
 import { loadMatch, saveMatch } from '../game/match';
 import { PLAYABLE } from '../game/classes';
 import { drawCardFace, resInk, resName, CARD_W, CARD_H } from './cardView';
@@ -40,7 +40,13 @@ export class DeckBuilderScene implements Scene {
     this.sel = 0; this.scroll = 0;
   }
 
-  private get rows(): number { return this.cards.length + 2; }
+  /** Rows under the cards: load each ready-made deck, then CLEAR ALL. */
+  private get presets(): DeckPreset[] { return presetsFor(this.cls); }
+  private get rows(): number { return this.cards.length + this.presets.length + 1; }
+  private specialLabel(idx: number): string {
+    const p = this.presets[idx - this.cards.length];
+    return p ? `LOAD ${p.name.toUpperCase()}${p.id === 'starter' ? ' (STARTER)' : ''}` : 'CLEAR ALL';
+  }
 
   private flash(s: string): void { this.msg = s; this.msgT = 1.6; }
 
@@ -67,7 +73,8 @@ export class DeckBuilderScene implements Scene {
   }
 
   private special(idx: number): void {
-    if (idx === this.cards.length) { this.deck = starterDeck(this.cls); this.flash('RESET TO STARTER'); }
+    const p = this.presets[idx - this.cards.length];
+    if (p) { this.deck = { ...p.cards }; this.flash(`LOADED ${p.name.toUpperCase()}`); }
     else { this.deck = {}; this.flash('CLEARED'); }
     saveCustom(this.cls, this.deck);
     sfx('select');
@@ -155,7 +162,7 @@ export class DeckBuilderScene implements Scene {
       if (on) selRow(ui, LX + 1, y - 1, LW - 2, RH);
       const card = this.cards[idx];
       if (!card) {
-        drawText(ui, idx === this.cards.length ? 'RESET TO STARTER' : 'CLEAR ALL', LX + 64, ty, on ? INK : INK2);
+        drawText(ui, this.specialLabel(idx), LX + 64, ty, on ? INK : INK2);
         continue;
       }
       const have = this.deck[card.id] ?? 0, max = MAX_COPIES[card.rarity];
@@ -200,7 +207,17 @@ export class DeckBuilderScene implements Scene {
     } else if (!showSel()) {
       drawText(ui, 'TOUCH A CARD TO READ IT', DX + 8, LY + 8, INK2);
     } else {
-      drawText(ui, this.sel === this.cards.length ? 'PUT THE STARTER DECK BACK' : 'REMOVE EVERY SPELL', DX + 8, LY + 8, INK2);
+      const p = this.presets[this.sel - this.cards.length];
+      if (!p) drawText(ui, 'REMOVE EVERY SPELL', DX + 8, LY + 8, INK2);
+      else {
+        // a ready-made deck to start from: its Mythic and what it runs
+        drawText(ui, 'REPLACE YOUR DECK WITH', DX + 8, LY + 8, INK2);
+        drawText(ui, p.name.toUpperCase(), DX + 8, LY + 22, INK);
+        const myth = this.cards.find(c => c.id === p.mythic);
+        if (myth) drawText(ui, `MYTHIC: ${myth.name.toUpperCase()}`, DX + 8, LY + 36, ink(RARITY_COLOR.mythic));
+        const list = this.cards.filter(c => p.cards[c.id]);
+        list.forEach((c, i) => drawText(ui, `${p.cards[c.id]}X ${c.name.toUpperCase()}`, DX + 8, LY + 52 + i * 11, c.rarity === 'common' ? INK2 : ink(RARITY_COLOR[c.rarity])));
+      }
     }
 
     // footer
