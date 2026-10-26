@@ -554,7 +554,7 @@ function drawCombo(ui: Ctx, b: Battle, f: Fighter): void {
   win(ui, x, y, w, h, { accent: teamColor(f.cls, f.skin, f.alt), burn: 3 });
   const hits = `${c.hits} HITS`;
   drawText(ui, hits, x + Math.round((w - textWidth(hits, 2)) / 2), y + 9, c.live ? RED_INK : INK2, 2);
-  const dmg = `COMBO ${Math.round(c.dmg)}`;
+  const dmg = `${Math.round(c.dmg)} DMG`;
   drawText(ui, dmg, x + Math.round((w - textWidth(dmg)) / 2), y + 24, c.live ? INK : INK2);
 }
 
