@@ -10,8 +10,9 @@ import { CLASS_IDS, CLASS_INFO } from '../game/classes';
 import type { VoiceKind } from '../engine/voice';
 import type { Call } from '../engine/announcer';
 
-const KINDS: VoiceKind[] = ['grunt', 'cast', 'castBig', 'hurt', 'hurtBig', 'death', 'win'];
-const KIND_LABEL = ['GRUNT', 'CAST', 'BIG CAST', 'HURT', 'BIG HURT', 'DEATH', 'WIN'];
+// grunt and hurt banks are empty until there are recorded clips for them (TTS reads them as words)
+const KINDS: VoiceKind[] = ['cast', 'castBig', 'death', 'win'];
+const KIND_LABEL = ['CAST', 'BIG CAST', 'DEATH', 'WIN'];
 const CALLS: Call[] = ['round', 'final', 'fight', 'ko', 'perfect', 'wins', 'match'];
 const CALL_LABEL = ['ROUND 2', 'FINAL', 'FIGHT', 'K.O.', 'PERFECT', 'WINS', 'MATCH'];
 
@@ -23,7 +24,7 @@ export class VoiceTestScene implements Scene {
   constructor(private back: () => void) {}
 
   private play(): void {
-    if (this.row < CLASS_IDS.length) voiceLine(CLASS_IDS[this.row], KINDS[this.col], 0, 0, this.row === 1 && this.col === 1 ? ['fire', 'frost', 'arcane'][Math.floor(Math.random() * 3)] : undefined);
+    if (this.row < CLASS_IDS.length) voiceLine(CLASS_IDS[this.row], KINDS[this.col], 0, 0, this.row === 1 && this.col === 0 ? ['fire', 'frost', 'arcane'][Math.floor(Math.random() * 3)] : undefined);
     else { announce(CALLS[this.col], { n: 2, who: CLASS_INFO[CLASS_IDS[Math.floor(Math.random() * 4)]].name }); }
   }
 
@@ -31,8 +32,10 @@ export class VoiceTestScene implements Scene {
     const rows = CLASS_IDS.length + 1;
     if (navPressed('up', dt)) { this.row = (this.row + rows - 1) % rows; sfx('move'); }
     if (navPressed('down', dt)) { this.row = (this.row + 1) % rows; sfx('move'); }
-    if (navPressed('left', dt)) this.col = (this.col + 6) % 7;
-    if (navPressed('right', dt)) this.col = (this.col + 1) % 7;
+    const cols = this.row < CLASS_IDS.length ? KINDS.length : CALLS.length;
+    if (navPressed('left', dt)) this.col = (this.col + cols - 1) % cols;
+    if (navPressed('right', dt)) this.col = (this.col + 1) % cols;
+    this.col = Math.min(this.col, cols - 1);
     const h = hot('cell');
     if (h >= 0 && mouse.click) { this.row = Math.floor(h / 10); this.col = h % 10; this.play(); return; }
     if (wasPressed('confirm')) this.play();
