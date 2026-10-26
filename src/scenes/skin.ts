@@ -1,6 +1,6 @@
 // The Parchment UI skin: aged scroll windows, brown ink, red wax and ribbons.
 // Every menu, card and HUD plate is built from these parts, so they draw at any size and layout.
-import { P, UW, dith, hash, mix, screenRect, view, type Ctx } from '../engine/gfx';
+import { P, UW, dith, hash, mix, screenRect, view, plain, piece, type Ctx } from '../engine/gfx';
 import { drawText, textWidth } from '../engine/font';
 
 /** Paper and ink colors. Text on parchment uses the inks; text over the arena keeps the bright colors. */
@@ -131,9 +131,14 @@ export function seal(c: Ctx, cx: number, cy: number, r: number, col: string): vo
 
 /** One round resource pip, 9x9. `fill` null draws an empty socket. */
 export function pip(c: Ctx, x: number, y: number, fill: string | null, empty = BURN): void {
-  disc(c, x + 4, y + 4, 4, BLACK);
-  disc(c, x + 4, y + 4, 3, fill ?? empty);
-  if (fill) P(c, mix(fill, '#fcfcfc', 0.5), x + 2, y + 2, 2, 1);
+  const paint = (c: Ctx, x: number, y: number): void => {
+    disc(c, x + 4, y + 4, 4, BLACK);
+    disc(c, x + 4, y + 4, 3, fill ?? empty);
+    if (fill) P(c, mix(fill, '#fcfcfc', 0.5), x + 2, y + 2, 2, 1);
+  };
+  // HUD pips redraw every frame, so each look is painted once into a 9x9 piece and stamped
+  if (plain(c)) c.drawImage(piece(`pip|${fill}|${empty}`, 9, 9, p => paint(p, 0, 0)), Math.round(x), Math.round(y));
+  else paint(c, x, y);
 }
 
 /** Control hints along the bottom of the visible screen: an ink-brown strip with parchment text, full width. */
