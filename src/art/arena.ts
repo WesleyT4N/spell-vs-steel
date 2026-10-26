@@ -1,6 +1,6 @@
 // Grand Colosseum and the panel grid every stage shares. Stages are drawn "Inked" like the 24px fighters:
 // outlined pieces, flat cel shading, no dithering (toolkit in ink.ts). The other stages live in stages.ts.
-import { P, view, rng, mix, type Ctx } from '../engine/gfx';
+import { P, view, rng, mix, plain, piece, type Ctx } from '../engine/gfx';
 import { inked, wide, put, sky, mod, disc, blocks, inkBanner, inkTorch, inkCloud, bird, MX, MY, LIFT, BW, BH, XL, XR, YT, YB } from './ink';
 
 export const COLS = 6, ROWS = 3, PW = 38, FACE = 15, LIP = 4, X0 = 6, Y0 = 98;
@@ -40,8 +40,11 @@ export interface Stage {
 }
 
 // Stages are painted larger than the world (see MX/MY in ink.ts), so a wider or taller screen just shows
-// more of the arena. Each frame the stage draws into one oversized buffer and the visible part is copied out.
+// more of the arena. The stage draws into one oversized buffer and the visible part is copied out each frame.
+// Stage animation only moves on the ~8/s tick (and the crowd only cares whether it is cheering), so the
+// buffer is repainted only when one of those changes; the other frames reuse it, pixel for pixel.
 let big: Ctx | null = null;
+let painted: { st: Stage; t: number; cheer: boolean } | null = null;
 
 /** Draw a stage's backdrop over the whole visible screen. */
 export function drawStage(c: Ctx, st: Stage, t: number, cheer = 0): void {
@@ -53,8 +56,11 @@ export function drawStage(c: Ctx, st: Stage, t: number, cheer = 0): void {
     big.imageSmoothingEnabled = false;
     big.translate(MX, MY);
   }
-  big.clearRect(XL, YT, BW, BH);
-  st.draw(big, t, cheer);
+  if (!painted || painted.st !== st || painted.t !== t || painted.cheer !== cheer > 0) {
+    big.clearRect(XL, YT, BW, BH);
+    st.draw(big, t, cheer);
+    painted = { st, t, cheer: cheer > 0 };
+  }
   const sx = Math.max(0, MX - ox), sy = Math.max(0, MY - oy), cw = Math.min(w, BW - sx), ch = Math.min(h, BH - LIFT - sy);
   c.drawImage(big.canvas, sx, sy + LIFT, cw, ch, sx - MX, sy - MY, cw, ch);
 }
@@ -253,6 +259,15 @@ const TINT: Record<PanelTint, { face: string; hi: string; lo: string; ink: [stri
 /** A panel: black outline, two-tone team rim, an outlined bevelled face, and a darker front lip. */
 export function drawPanel(c: Ctx, col: number, row: number, state: PanelState, _t: number, owner: 0 | 1, highlight: string | undefined, stage: Stage, art: PanelArt = {}): void {
   const x = X0 + col * PW, y = Y0 + row * (FACE + LIP);
+  // a clean, untinted panel's look only depends on these, so it is painted once and stamped every frame; its
+  // first fill is an opaque box over the whole piece, so anything blended inside it blends the same either way.
+  // Tinted and cracked panels animate, so they paint fresh.
+  if (!plain(c) || state !== 'clean' || art.tint) { paintPanel(c, x, y, col, row, state, owner, highlight, stage, art); return; }
+  const key = `panel|${stage.id}|${col}|${row}|${owner}|${highlight ?? ''}`;
+  c.drawImage(piece(key, PW, FACE + LIP + 1, p => paintPanel(p, 0, 1, col, row, state, owner, highlight, stage, art)), x, y - 1);
+}
+
+function paintPanel(c: Ctx, x: number, y: number, col: number, row: number, state: PanelState, owner: 0 | 1, highlight: string | undefined, stage: Stage, art: PanelArt): void {
   const [tl, td] = TEAM_RIM[owner];
   const fx = x + 2, fy = y + 1, fw = PW - 4, fh = FACE - 2;
   const look = stage.panel;
