@@ -4,15 +4,17 @@ import { hint, zone, hot, isHot, button, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import type { ClassId } from '../art/sprites';
-import { P, UW, frame, screenRect, vy, vspan, type Ctx } from '../engine/gfx';
+import { P, UW, frame, screenRect, vy, vspan, spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
+import type { PadMode } from '../engine/touch';
 import { sfx } from '../engine/audio';
 import { PLAYABLE } from '../game/classes';
 import { ALL_CARDS, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef, type Element, type Rarity } from '../game/cards';
 import { presetsFor } from '../game/deck';
 import { drawCardDetail, drawCardFace, CARD_W, CARD_H } from './cardView';
-import { win, INK2, RED_INK, TRIM } from './skin';
+import { win, INK, INK2, RED_INK, TRIM, BURN, PAPER } from './skin';
+import { bigButton, actionBar, barTapped, tabs, panel, sheet, swipeIn, tallArea, Scroller, GAP, PAD } from './touchUi';
 import { CardPreview } from './cardPreview';
 
 const RARITIES: Rarity[] = ['common', 'uncommon', 'legendary', 'mythic'];
@@ -40,6 +42,36 @@ export class EncyclopediaScene implements Scene {
   private classes: ClassId[] = [...new Set(ALL_CARDS.map(c => c.cls))].filter(c => PLAYABLE.includes(c));
 
   constructor(private back: () => void, private test?: (card: CardDef) => void) {}
+
+  // phones in portrait: filters on top, a scrolling grid, and a tapped card's rules in a sheet
+  tall(): boolean { return true; }
+  pad(): PadMode { return spread.tall ? 'none' : 'back'; }
+  private tscroll = new Scroller();
+  private tgrid: [number, number, number, number] = [0, 0, 0, 0];
+  /** The card open in the phone layout's sheet, or -1. */
+  reading = -1;
+
+  /** The phone layout's input; true when it took this frame. */
+  private updateTall(cards: CardDef[]): boolean {
+    if (this.reading >= 0) {
+      // the sheet: TEST tries the card, any other tap (or BACK) closes it
+      if (isHot('test') && mouse.click && cards[this.reading]) { this.runTest(cards[this.reading]); return true; }
+      if (mouse.click || wasPressed('back') || mouse.rclick) { this.reading = -1; sfx('back'); }
+      return true;
+    }
+    if (barTapped('back')) { sfx('back'); this.back(); return true; }
+    const sw = swipeIn(...this.tgrid);
+    if (sw) {
+      const t = this.tabs, i = t.indexOf(this.cls);
+      this.cls = t[(i + sw + t.length) % t.length];
+      this.refilter(); this.tscroll.pos = 0; sfx('move');
+      return true;
+    }
+    this.tscroll.update(...this.tgrid);
+    const c = hot('tcard');
+    if (c >= 0 && mouse.click) { this.sel = this.reading = c; sfx('open'); return true; }
+    return false;
+  }
 
   private get tabs(): Array<ClassId | null> { return [null, ...this.classes]; }
 
@@ -74,12 +106,13 @@ export class EncyclopediaScene implements Scene {
     const cards = this.list();
     this.preview.show(cards[this.sel] ?? null);
     this.preview.update(dt);
-    if (mouse.wheel) this.scroll = Math.max(0, Math.min(this.maxScroll(cards.length), this.scroll + mouse.wheel * 28));
+    if (spread.tall && this.updateTall(cards)) return;
+    if (mouse.wheel && !spread.tall) this.scroll = Math.max(0, Math.min(this.maxScroll(cards.length), this.scroll + mouse.wheel * 28));
 
     const tab = hot('tab');
-    if (tab >= 0 && mouse.click) { this.cls = this.tabs[tab]; this.refilter(); sfx('move'); return; }
+    if (tab >= 0 && mouse.click) { this.cls = this.tabs[tab]; this.refilter(); this.tscroll.pos = 0; sfx('move'); return; }
     const r = hot('rar');
-    if (r >= 0 && mouse.click) { this.rarity = this.rarity === RARITIES[r] ? null : RARITIES[r]; this.refilter(); sfx('move'); return; }
+    if (r >= 0 && mouse.click) { this.rarity = this.rarity === RARITIES[r] ? null : RARITIES[r]; this.refilter(); this.tscroll.pos = 0; sfx('move'); return; }
     const e = hot('el');
     if (e >= 0 && mouse.click) { const el = this.elements()[e]; this.element = this.element === el ? null : el; this.refilter(); sfx('move'); return; }
     if (isHot('done') && mouse.click) { sfx('back'); this.back(); return; }
@@ -117,6 +150,7 @@ export class EncyclopediaScene implements Scene {
     c.fillRect(...screenRect());
     const cards = this.list();
     if (this.sel >= cards.length) this.sel = Math.max(0, cards.length - 1);
+    if (spread.tall) { this.drawTall(ui, cards); return; }
 
     // header: class tabs, then rarity and element filters (phone portrait moves it up)
     const hy = vy(4) - 4;
@@ -186,5 +220,67 @@ export class EncyclopediaScene implements Scene {
       if (this.test) button(ui, 'test', `${k('attack')}: TEST IN SANDBOX`, DX + 6, clipY() + clipH() - 22, DW - 12, 16, false, RED_INK);
     }
     hint(ui, `HOVER TO READ   WHEEL: SCROLL   Q/E: CLASS   ${k('attack')}: TEST   ${k('cast')}: BACK`);
+  }
+
+  private drawTall(ui: Ctx, cards: CardDef[]): void {
+    const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
+    let y = a.y + PAD;
+    drawTextCentered(ui, 'SPELLBOOK', UW / 2, y, PAPER, 3, true);
+    drawText(ui, `${cards.length}`, x0 + w - textWidth(`${cards.length}`, 2), y + 4, TRIM, 2);
+    y += 21 + GAP;
+    tabs(ui, 'tab', this.tabs.map(t => (t ? t.toUpperCase() : 'ALL')), this.tabs.indexOf(this.cls), x0, y, w, 44);
+    y += 44 + 6;
+    // filters: tap one to show only it, tap it again to clear
+    const chips = (prefix: string, labels: string[], colors: string[], on: number): void => {
+      const n = labels.length, cw = (w - 6 * (n - 1)) / n;
+      const ts = labels.every(l => textWidth(l, 2) <= cw - 20) ? 2 : 1;
+      labels.forEach((l, i) => {
+        const bx = Math.round(x0 + i * (cw + 6));
+        bigButton(ui, `${prefix}:${i}`, '', bx, y, Math.round(cw), 40, { on: i === on });
+        P(ui, colors[i], bx + 6, y + 8, 4, 20);
+        drawTextCentered(ui, l, bx + cw / 2 + 4, y + (ts === 2 ? 13 : 16), i === on ? INK : INK2, ts, false);
+      });
+    };
+    chips('rar', RARITIES.map(r => r.toUpperCase()), RARITIES.map(r => RARITY_COLOR[r]), this.rarity ? RARITIES.indexOf(this.rarity) : -1);
+    y += 40 + 6;
+    const els = this.elements();
+    chips('el', els.map(e => e.toUpperCase()), els.map(e => ELEMENT_COLOR[e]), this.element ? els.indexOf(this.element) : -1);
+    y += 40 + GAP;
+    const barTop = actionBar(ui, {});
+
+    // the grid: four cards to a row, tap one to read it
+    const gh = barTop - GAP - y, cols = 4, cw = Math.floor((w - GAP * (cols - 1)) / cols), rowH = CARD_H + 12;
+    this.tgrid = [a.x, y, a.w, gh];
+    const sc = this.tscroll;
+    sc.max = Math.max(0, Math.ceil(cards.length / cols) * rowH - gh + 8);
+    panel(ui, x0 - 6, y - 6, w + 12, gh + 12);
+    ui.save();
+    ui.beginPath(); ui.rect(x0 - 3, y - 3, w + 6, gh + 6); ui.clip();
+    cards.forEach((card, i) => {
+      const cx = x0 + (i % cols) * (cw + GAP) + Math.round((cw - CARD_W) / 2), cy = y + 6 + Math.floor(i / cols) * rowH - Math.round(sc.pos);
+      if (cy + CARD_H < y || cy > y + gh) return;
+      const top = Math.max(cy, y), bot = Math.min(cy + CARD_H, y + gh);
+      zone(`tcard:${i}`, cx, top, CARD_W, bot - top);
+      drawCardFace(ui, card, cx, cy, { lit: i === this.reading });
+    });
+    ui.restore();
+    if (!cards.length) drawTextCentered(ui, 'NO SPELLS MATCH THESE FILTERS', UW / 2, y + 40, INK2, 1, false);
+    if (sc.max > 0) {
+      const sh = Math.max(24, Math.round(gh * gh / (gh + sc.max)));
+      P(ui, BURN, a.x + a.w - 6, y, 4, gh);
+      P(ui, INK2, a.x + a.w - 6, y + Math.round((sc.pos / sc.max) * (gh - sh)), 4, sh);
+    }
+
+    const card = this.reading >= 0 ? cards[this.reading] : undefined;
+    if (card) {
+      sheet(ui, this.test ? 460 : 400, (sx, sy, sw, shh) => {
+        this.preview.draw(ui, sx, sy, sw, 140);
+        let yy = drawCardDetail(ui, card, sx, sy + 152, sw, 2) + 4;
+        const presets = presetsFor(card.cls), inDecks = presets.filter(p => p.cards[card.id]).length;
+        drawText(ui, `${card.cls.toUpperCase()}   MAX ${MAX_COPIES[card.rarity]} PER DECK`, sx, yy, INK2, 1); yy += 12;
+        drawText(ui, inDecks ? `IN ${inDecks} OF ${presets.length} READY DECKS` : 'IN NO READY DECK', sx, yy, inDecks ? '#007800' : TRIM, 1);
+        if (this.test) bigButton(ui, 'test', 'TEST IN SANDBOX', sx, sy + shh - 62, sw, 58, { primary: true });
+      });
+    }
   }
 }

@@ -62,7 +62,25 @@ const root = el('div', 'svs-pad');
 root.hidden = true;
 document.body.appendChild(root);
 
-const buzz = (): void => { try { navigator.vibrate?.(8); } catch { /* not allowed */ } };
+// ---------- touch settings (Options > Touch controls), saved in the browser ----------
+export type PadSize = 'S' | 'M' | 'L';
+export interface TouchSettings { size: PadSize; left: boolean; buzz: boolean }
+const SIZE_K: Record<PadSize, number> = { S: 0.82, M: 1, L: 1.16 };
+const touchSettings: TouchSettings = { size: 'M', left: false, buzz: true };
+try {
+  const saved = JSON.parse(localStorage.getItem('svs:touch') || '{}') as Partial<TouchSettings>;
+  if (saved.size === 'S' || saved.size === 'M' || saved.size === 'L') touchSettings.size = saved.size;
+  if (typeof saved.left === 'boolean') touchSettings.left = saved.left;
+  if (typeof saved.buzz === 'boolean') touchSettings.buzz = saved.buzz;
+} catch { /* storage blocked */ }
+export const getTouchSettings = (): Readonly<TouchSettings> => touchSettings;
+export function setTouchSettings(to: Partial<TouchSettings>): void {
+  Object.assign(touchSettings, to);
+  try { localStorage.setItem('svs:touch', JSON.stringify(touchSettings)); } catch { /* storage blocked */ }
+  layout();
+}
+
+const buzz = (): void => { if (!touchSettings.buzz) return; try { navigator.vibrate?.(8); } catch { /* not allowed */ } };
 
 /** A button that holds a Pad code down while a finger is on it. */
 function holdButton(e: HTMLElement, code: string): void {
@@ -223,7 +241,7 @@ export function layout(canvas = canvasEl): void {
   if (vh > vw) {
     // portrait: the screen sits on top, the pad underneath like a handheld
     const below = vh - screen.bottom;
-    size = Math.min(180, vw * 0.42, below * 0.62);
+    size = Math.min(180 * SIZE_K[touchSettings.size], vw * 0.46, below * 0.68);
     cy = screen.bottom + below * 0.5;
     dx = 14 + size / 2;
     ax = vw - 14 - size / 2;
@@ -232,7 +250,7 @@ export function layout(canvas = canvasEl): void {
     place(draw, ax - size * 0.5, cy - size / 2 - 60, size, 46, r);
   } else {
     // landscape: thumbs on either side of the screen
-    size = Math.min(160, vh * 0.38);
+    size = Math.min(160 * SIZE_K[touchSettings.size], vh * 0.44);
     cy = Math.min(vh - size / 2 - 14, r.top + r.height * 0.64);
     const side = (vw - r.width) / 2;
     dx = Math.max(10 + size / 2, side / 2);
@@ -242,6 +260,12 @@ export function layout(canvas = canvasEl): void {
     // DRAW over the buttons, kept off the screen when the side has room
     const w = Math.max(size * 0.8, Math.min(size, side - 12));
     place(draw, ax - w / 2, cy - size / 2 - 54, w, 42, r);
+  }
+  // left-handed: the buttons go under the left thumb and the d-pad under the right
+  if (touchSettings.left) {
+    [dx, ax] = [ax, dx];
+    const st = draw.style, w = parseFloat(st.width);
+    place(draw, vw - parseFloat(st.left) - w, parseFloat(st.top), w, parseFloat(st.height), r);
   }
   place(dpad, dx - size / 2, cy - size / 2, size, size, r);
   const arm = size / 3;

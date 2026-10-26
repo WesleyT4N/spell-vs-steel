@@ -19,6 +19,8 @@ import { TutorialScene } from '../../src/scenes/tutorial';
 import { DevMenuScene } from '../../src/scenes/devMenu';
 import { EncyclopediaScene } from '../../src/scenes/encyclopedia';
 import { LabScene } from '../../src/scenes/lab';
+import { ArcadeLadderScene, ArcadeClearScene } from '../../src/scenes/arcade';
+import { buildLadder, type ArcadeRun } from '../../src/game/arcade';
 import { loadMatch, type MatchConfig } from '../../src/game/match';
 import { PLAYABLE } from '../../src/game/classes';
 
@@ -31,6 +33,18 @@ const title = (): void => setScene(new TitleScene());
 const match = (over: Partial<MatchConfig> = {}): MatchConfig => ({ ...loadMatch(), ...over });
 const battle = (): BattleScene => getScene() as BattleScene;
 
+/** An arcade run as a warrior, `at` fights won, with the same ladder every time. */
+function arcadeRun(at: number): ArcadeRun {
+  let seed = 7;
+  const m = match({ p1: 'warrior', sides: ['player', 'cpu'], bestOf: 3 });
+  const ladder = buildLadder(m, () => (seed = (seed * 16807) % 2147483647) / 2147483647);
+  const fights = ladder.slice(0, at).map((r, i) => ({
+    cls: r.cls, skin: r.skin, difficulty: r.difficulty, boss: r.boss, rounds: [2, i % 2] as [number, number],
+    secs: 70 + i * 23, dealt: 900 + i * 110, taken: 300 + i * 90, tries: i === 3 ? 2 : 1, best: null,
+  }));
+  return { m, ladder, at: Math.min(at, ladder.length - 1), continues: 1, time: 512, tries: 1, fights };
+}
+
 /** A CPU vs CPU set to watch, so the fight plays itself. */
 function watch(over: Partial<MatchConfig> = {}): BattleScene {
   const s = new BattleScene(match({ p1: 'warrior', cpu: 'mage', bestOf: 3, ...over }), [0, 0], undefined, [], ['cpu', 'cpu']);
@@ -41,6 +55,8 @@ function watch(over: Partial<MatchConfig> = {}): BattleScene {
 const screens: Record<string, () => void> = {
   'title': title,
   'options': () => setScene(new OptionsScene(title)),
+  // the phone layout's second tab: pad size, left-handed and vibration
+  'options-touch': () => { const o = new OptionsScene(title); o.tab = 1; setScene(o); },
   'key-mapping': () => setScene(new ControlsScene(title)),
   'select-fighter': () => setScene(new CharSelectScene()),
   'select-skin': () => setScene(new CharSelectScene(undefined, 1)),
@@ -51,6 +67,8 @@ const screens: Record<string, () => void> = {
   'select-tutorial': () => setScene(new CharSelectScene(undefined, 0, 'tutorial')),
   'stage-select': () => setScene(new StageSelectScene()),
   'online-lobby': () => setScene(new OnlineScene()),
+  // typing a room code to join, three letters in
+  'online-code': () => { const o = new OnlineScene(); o.mode = 'code'; o.code = 'KQZ'; setScene(o); },
   ...Object.fromEntries(PLAYABLE.map(c => [`deck-builder-${c}`, () => setScene(new DeckBuilderScene(c, title))])),
   // the opening Draw screen, with you on the left against the CPU
   'battle-draw': () => { setScene(new BattleScene(match({ p1: 'warrior', cpu: 'mage' }))); run(0.5); },
@@ -60,10 +78,20 @@ const screens: Record<string, () => void> = {
   'battle-pause': () => { setScene(new BattleScene(match({ p1: 'mage', cpu: 'rogue' }))); run(0.5); battle().b.endCustom([[], []]); run(2); battle().paused = true; },
   // a whole round played out by two CPUs, ending on the results screen
   'battle-results': () => { watch({ p1: 'ranger', cpu: 'priest' }); run(400, () => battle().b.phase === 'over'); run(3); },
+  // the arcade ladder two fights in, and a cleared run
+  'arcade-ladder': () => setScene(new ArcadeLadderScene(arcadeRun(2))),
+  'arcade-clear': () => setScene(new ArcadeClearScene(arcadeRun(5))),
   'training': () => { setScene(new TrainingScene(match({ p1: 'rogue', cpu: 'warrior' }))); run(1); },
+  // the training settings menu, paused mid-fight
+  'training-menu': () => { setScene(new TrainingScene(match({ p1: 'rogue', cpu: 'warrior' }))); run(0.5); battle().b.endCustom([[], []]); run(1); battle().paused = true; run(0.1); },
   ...Object.fromEntries(PLAYABLE.map(c => [`tutorial-${c}`, () => { setScene(new TutorialScene(c)); run(1); }])),
+  // the tutorial's lesson goal mid-fight, and its end screen
+  'tutorial-goal': () => { const t = new TutorialScene('mage'); setScene(t); t.page = t.pages.length; run(1); },
+  'tutorial-done': () => { const t = new TutorialScene('rogue'); setScene(t); t.done = true; run(0.2); },
   'dev-menu': () => setScene(new DevMenuScene(title)),
   'encyclopedia': () => setScene(new EncyclopediaScene(title)),
+  // a card open for reading (on phones, the sheet with its clip and rules)
+  'encyclopedia-card': () => { const e = new EncyclopediaScene(title, () => {}); e.cls = 'mage'; e.sel = e.reading = 4; setScene(e); run(0.5); },
   'balance-lab': () => setScene(new LabScene(title)),
 };
 
