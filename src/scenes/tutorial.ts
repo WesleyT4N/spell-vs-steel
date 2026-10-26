@@ -716,7 +716,7 @@ export class TutorialScene implements Scene {
     }
   }
 
-  private static DONE = ['VERSUS MODE', 'SPELL DECKS', 'TRY ANOTHER CLASS', 'TITLE'];
+  private static DONE = ['VERSUS MODE', 'SPELL FORGE', 'TRY ANOTHER CLASS', 'TITLE'];
   private updateDone(dt: number): void {
     const items = TutorialScene.DONE.length;
     const clicked = listMouse('menu', this.doneSel, i => { this.doneSel = i; sfx('move'); });
@@ -729,7 +729,7 @@ export class TutorialScene implements Scene {
       const choice = TutorialScene.DONE[this.doneSel];
       // these start a new path from the title, so BACK from them lands there
       if (choice === 'VERSUS MODE') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); goHome(); pushScene(new CharSelectScene()); }
-      if (choice === 'SPELL DECKS') { goHome(); pushScene(new DeckBuilderScene(this.cls)); }
+      if (choice === 'SPELL FORGE') { goHome(); pushScene(new DeckBuilderScene(this.cls)); }
       if (choice === 'TRY ANOTHER CLASS') popTo(s => s instanceof CharSelectScene, () => new CharSelectScene(undefined, 0, 'tutorial'));
       if (choice === 'TITLE') goHome();
     }
