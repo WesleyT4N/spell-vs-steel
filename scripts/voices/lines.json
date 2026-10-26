@@ -1,5 +1,5 @@
 {
-  "_comment": "Voice script for scripts/voices/gen.py. Keys are clip banks: <class>:<kind>[_<element>] and ann:<call>. Each bank picks a random line at play time.",
+  "_comment": "Voice script for scripts/voices/gen.py. Keys are clip banks: <class>:<kind>[_<element>] and ann:<call>. Each bank picks a random line at play time. A line written /like this/ is IPA phonemes, read as-is (for grunts the text reader gets wrong).",
   "voices": {
     "ann": {
       "voice": "am_onyx",
@@ -105,25 +105,25 @@
     ],
     "warrior:grunt": [
       "Hah!",
-      "Hyah!",
+      "/hjˈɑː!/",
       "Hup!"
     ],
     "warrior:cast": [
-      "Hyah!",
+      "/hjˈɑː!/",
       "Take this!",
-      "Haaah!"
+      "/hˈɑːɑː!/"
     ],
     "warrior:castBig": [
       "For glory!",
       "Feel my rage!"
     ],
     "warrior:hurt": [
-      "Ugh!",
-      "Agh!",
+      "/ˈʌh!/",
+      "/ˈɑːh!/",
       "Oof!"
     ],
     "warrior:hurtBig": [
-      "Aaagh!",
+      "/ˈɑːɑːɑːh!/",
       "Gah!"
     ],
     "warrior:death": [
@@ -135,7 +135,7 @@
     ],
     "mage:grunt": [
       "Hah!",
-      "Hmph!"
+      "/hˈʌmf!/"
     ],
     "mage:cast_fire": [
       "Ignis!",
@@ -157,12 +157,12 @@
       "Feel the flames!"
     ],
     "mage:hurt": [
-      "Ugh!",
-      "Ngh!",
+      "/ˈʌh!/",
+      "/ˈʌŋh!/",
       "Oof!"
     ],
     "mage:hurtBig": [
-      "Aaargh!",
+      "/ˈɑːɑːɹh!/",
       "Gah!"
     ],
     "mage:death": [
@@ -174,7 +174,7 @@
     ],
     "rogue:grunt": [
       "Hah!",
-      "Tch!"
+      "/hˈʌmf!/"
     ],
     "rogue:cast": [
       "Too slow.",
@@ -186,13 +186,13 @@
       "Into the shadows!"
     ],
     "rogue:hurt": [
-      "Ugh!",
+      "/ˈʌh!/",
       "Ah!",
-      "Tch!"
+      "/hˈʌmf!/"
     ],
     "rogue:hurtBig": [
-      "Aaah!",
-      "Argh!"
+      "/ˈɑːɑː!/",
+      "/ˈɑːɹh!/"
     ],
     "rogue:death": [
       "Caught... at last..."
@@ -204,7 +204,7 @@
     "ranger:grunt": [
       "Hup!",
       "Hah!",
-      "Hyah!"
+      "/hjˈɑː!/"
     ],
     "ranger:cast": [
       "Loose!",
@@ -216,13 +216,13 @@
       "Right between the eyes!"
     ],
     "ranger:hurt": [
-      "Ugh!",
-      "Agh!",
+      "/ˈʌh!/",
+      "/ˈɑːh!/",
       "Oof!"
     ],
     "ranger:hurtBig": [
-      "Aaagh!",
-      "Argh!"
+      "/ˈɑːɑːɑːh!/",
+      "/ˈɑːɹh!/"
     ],
     "ranger:death": [
       "Missed... my mark..."
@@ -233,7 +233,7 @@
     ],
     "cleric:grunt": [
       "Hah!",
-      "Hyah!"
+      "/hjˈɑː!/"
     ],
     "cleric:cast": [
       "Be blessed.",
@@ -246,12 +246,12 @@
     ],
     "cleric:hurt": [
       "Ah!",
-      "Ugh!",
+      "/ˈʌh!/",
       "Oh!"
     ],
     "cleric:hurtBig": [
-      "Aaah!",
-      "Agh!"
+      "/ˈɑːɑː!/",
+      "/ˈɑːh!/"
     ],
     "cleric:death": [
       "The light... fades..."
