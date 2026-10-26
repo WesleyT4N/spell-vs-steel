@@ -570,7 +570,7 @@ export class TutorialScene implements Scene {
 
   private begin(cls: TutorialClass): void {
     const saved = loadMatch();
-    const m: MatchConfig = { ...saved, p1: cls, p1Deck: 'starter', cpu: 'mage', difficulty: 'easy', bestOf: 1 };
+    const m: MatchConfig = { ...saved, p1: cls, p1Deck: 'starter', cpu: 'mage', cpuDeck: 'starter', difficulty: 'easy', bestOf: 1 };
     this.inner = new BattleScene(m);
     this.inner.b = new Battle(
       { cls, deck: toList(starterDeck(cls)), name: 'YOU', skin: saved.p1Skin[cls] ?? defaultSkin(cls) },
