@@ -12,8 +12,7 @@ const HAND_Y = 194, HAND_GAP = 84;
 const handX = (i: number, n: number): number => Math.round(UW / 2 - (HAND_GAP * (n - 1) + CARD_W) / 2 + i * HAND_GAP);
 /** Pixels per raise level: hovered cards rise one level, picked cards two. */
 const LIFT = 12;
-import { STARTER_NAME } from '../game/deck';
-import { sideDeck, sideName, type Ctl, type MatchConfig } from '../game/match';
+import { deckLabel, rollDeck, sideDeck, sideName, type Ctl, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
 import { P, UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
@@ -67,15 +66,18 @@ export class BattleScene implements Scene {
   /** Post-match stats for this round; they only watch the battle, never change it. */
   stats: BattleStats;
   statsPanel = new StatsPanel();
+  /** Each side's deck this round (a RANDOM pick is rolled here). */
+  protected decks: [string, string];
 
   /**
    * Rounds won in the current set, by side, and the stats of the rounds already played.
    * `battle` lets online play hand in a seeded battle. `ctl`: who plays each side.
    */
   constructor(public m: MatchConfig, public score: [number, number] = [0, 0], battle?: Battle, public rounds: RoundRecord[] = [], public ctl: [Ctl, Ctl] = ['player', 'cpu']) {
+    this.decks = [rollDeck(m, 0), rollDeck(m, 1)];
     this.b = battle ?? new Battle(
-      { cls: m.p1, deck: sideDeck(m, 0), name: sideName(ctl, 0), skin: m.p1Skin[m.p1] },
-      { cls: m.cpu, deck: sideDeck(m, 1), name: sideName(ctl, 1), skin: m.cpuSkin[m.cpu] },
+      { cls: m.p1, deck: sideDeck(m, 0, this.decks[0]), name: sideName(ctl, 0), skin: m.p1Skin[m.p1] },
+      { cls: m.cpu, deck: sideDeck(m, 1, this.decks[1]), name: sideName(ctl, 1), skin: m.cpuSkin[m.cpu] },
     );
     this.cpu = new Cpu(m.difficulty);
     this.stats = trackStats(this.b);
@@ -305,8 +307,7 @@ export class BattleScene implements Scene {
   protected pauseItems = ['RESUME', 'OPTIONS', 'RESTART', 'QUIT TO TITLE'];
   protected rivalDeckText(): string {
     const foe: Side = this.me === 0 ? 1 : 0, f = this.b.f[foe];
-    const custom = (foe === 0 ? this.m.p1Deck : this.m.cpuDeck) === 'custom';
-    return `${f.name} DECK: ${custom ? 'CUSTOM' : STARTER_NAME[f.cls].toUpperCase()}`;
+    return `${f.name} DECK: ${deckLabel(f.cls, this.decks[foe])}`;
   }
 
   protected get need(): number { return Math.ceil(this.m.bestOf / 2); }
