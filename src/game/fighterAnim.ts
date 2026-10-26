@@ -158,18 +158,28 @@ export function lookOf(b: Battle, f: Fighter, s: State, held: boolean): Look {
 function deathLook(b: Battle, f: Fighter, s: State, L: Look): Look {
   const t = b.time - s.deadT, d = b.dir(f);
   switch (f.cls) {
-    case 'warrior':
-      // staggers back, drops to a knee, topples forward
-      if (t < 0.2) { L.ox = -Math.round(ease(t / 0.2) * 2) * d; L.frame = 'hit'; }
-      else if (t < 0.6) { L.ox = -2 * d; L.frame = 'kneel'; }
-      else { L.ox = -2 * d; L.frame = 'down'; }
+    case 'warrior': {
+      // reels back two steps, crashes to a knee, sags, then topples forward and bounces once on the floor
+      const bounce = t >= 0.84 ? (t < 0.9 ? -2 : t < 0.95 ? -1 : 0) : 0;
+      if (t < 0.15) { L.ox = -Math.round(ease(t / 0.15) * 2) * d; L.frame = 'hit'; }
+      else if (t < 0.32) { L.ox = -3 * d; L.frame = 'stagger'; }
+      else if (t < 0.62) { L.ox = -3 * d; L.frame = 'kneel'; L.oy = t < 0.36 ? 1 : 0; }
+      else if (t < 0.72) { L.ox = -3 * d; L.frame = 'slump'; }
+      else if (t < 0.78) { L.ox = -2 * d; L.frame = 'fall1'; }
+      else if (t < 0.84) { L.ox = -1 * d; L.frame = 'fall2'; }
+      else { L.ox = -2 * d; L.oy = bounce; L.frame = 'down'; }
       break;
-    case 'ranger':
-      // knocked off balance, falls backward
-      if (t < 0.25) { const p = t / 0.25; L.ox = -Math.round(ease(p) * 4) * d; L.oy = -Math.round(Math.sin(p * Math.PI) * 4); L.frame = 'hit'; }
-      else if (t < 0.4) { L.ox = -4 * d; L.frame = 'kneel'; }
-      else { L.ox = -4 * d; L.frame = 'down'; }
+    }
+    case 'ranger': {
+      // blown off his feet: hops back, tips over backward and bounces once
+      const bounce = t >= 0.48 ? (t < 0.56 ? -2 : t < 0.6 ? -1 : 0) : 0;
+      if (t < 0.2) { const p = t / 0.2; L.ox = -Math.round(ease(p) * 3) * d; L.oy = -Math.round(Math.sin(p * Math.PI) * 4); L.frame = 'hit'; }
+      else if (t < 0.32) { L.ox = -4 * d; L.frame = 'stagger'; }
+      else if (t < 0.4) { L.ox = -4 * d; L.frame = 'fall1'; }
+      else if (t < 0.48) { L.ox = -5 * d; L.frame = 'fall2'; }
+      else { L.ox = -5 * d; L.oy = bounce; L.frame = 'down'; }
       break;
+    }
     case 'mage':
       // reels, sinks to his knees, then unravels into arcane motes from the hat down
       if (t < 0.3) { L.frame = 'hit'; L.oy = -Math.round(Math.sin((t / 0.3) * Math.PI) * 3); }
@@ -204,6 +214,16 @@ export function drawUnder(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, x
       const a = k < 0.5 ? (k - 0.3) / 0.2 : k > 1.6 ? (2.1 - k) / 0.5 : 1;
       c.globalAlpha = 0.45 * a; P(c, HOLY[2], x - 7, 0, 14, y + 1); c.globalAlpha = 0.7 * a; P(c, HOLY[3], x - 3, 0, 6, y + 1); c.globalAlpha = 1;
       glow(c, x, y - 4, 16, '248,216,120', 0.4 * a);
+    }
+    if (f.cls === 'mage' && k > 0.45 && k < 2.2) {
+      // the rune circle he leaves behind, turning and fading out
+      const a = k < 0.7 ? (k - 0.45) / 0.25 : k > 1.7 ? (2.2 - k) / 0.5 : 1, rx = 4 + 8 * Math.min(1, (k - 0.45) / 0.25);
+      for (let i = 0; i < 36; i++) {
+        if ((i + Math.floor(t * 30)) % 4 >= Math.ceil(4 * a)) continue;
+        const ang = (i / 36) * Math.PI * 2 + t * 2;
+        P(c, i % 6 === 0 ? ARC[3] : ARC[2], x + Math.cos(ang) * rx, y + Math.sin(ang) * rx * 0.3, 1, 1);
+      }
+      glow(c, x, y - 2, 14, '248,120,248', 0.3 * a);
     }
     if (f.cls === 'rogue' && k > 0.45) {
       // the dropped dagger, glinting now and then
@@ -298,8 +318,9 @@ export function drawOver(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, L:
   if (!s.landed && mp >= 0) {
     if (cls === 'mage' && !s.knock) {
       // sparkles where he left and where he lands
-      for (let i = 0; i < 5; i++) spawnPart(s.fromX + rnd(-6, 6), s.fromY - rnd(4, 20), { vy: rnd(-12, -4), life: rnd(0.2, 0.35), ramp: [ARC[3], ARC[2], ARC[1]] });
-      for (let i = 0; i < 5; i++) spawnPart(fx + rnd(-6, 6), y - rnd(4, 20), { vy: rnd(-12, -4), life: rnd(0.2, 0.35), ramp: [ARC[3], ARC[2], ARC[1]] });
+      // he folds up into sparks where he stood and unfolds out of them where he lands
+      for (let i = 0; i < 10; i++) spawnPart(s.fromX + rnd(-6, 6), s.fromY - rnd(2, 22), { vx: rnd(-6, 6), vy: rnd(-40, -10), drag: 0.95, life: rnd(0.2, 0.4), ramp: [ARC[3], ARC[2], ARC[1]] });
+      for (let i = 0; i < 10; i++) { const a = rnd(0, Math.PI * 2); spawnPart(fx + Math.cos(a) * 12, y - 10 + Math.sin(a) * 10, { vx: -Math.cos(a) * 60, vy: -Math.sin(a) * 50, drag: 0.85, life: 0.18, ramp: [ARC[3], ARC[2]] }); }
       s.landed = true;
     } else if (cls === 'rogue' && !s.knock) {
       for (let i = 0; i < 3; i++) spawnPart(s.fromX + rnd(-5, 5), s.fromY - rnd(0, 4), { vx: rnd(-8, 8), vy: rnd(-8, -2), life: rnd(0.25, 0.4), ramp: SMOKE, size: 2, shrink: 0.5 });
@@ -339,10 +360,15 @@ export function drawOver(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, L:
       const col = cp < 0.1 || Math.floor(t * 20) % 4 ? ramp[2] : ramp[3];
       P(c, col, fx - 4, top - 3, 9, 1); P(c, col, fx - 5, top - 2, 1, 1); P(c, col, fx + 5, top - 2, 1, 1); P(c, col, fx - 4, top - 1, 9, 1);
     }
+    if (cls === 'mage' && cp < 0.65) {
+      const ox = fx + d * 8, oy = top - 1;
+      if (Math.random() < 0.8) { const a = t * 14 + rnd(0, 1); spawnPart(ox + Math.cos(a) * 4, oy + Math.sin(a) * 3, { vx: -Math.sin(a) * 12, vy: Math.cos(a) * 9 - 6, life: rnd(0.15, 0.3), ramp: [ramp[3], ramp[2]] }); }
+      if (Math.random() < 0.5) { const a = rnd(0, Math.PI * 2); spawnPart(fx + Math.cos(a) * 11, y + Math.sin(a) * 3, { vy: rnd(-26, -12), life: rnd(0.3, 0.5), ramp: [ramp[2], ramp[1]] }); }
+    }
     if (!s.castDone) {
       s.castDone = true;
       if (cls === 'warrior') for (let i = 0; i < 6; i++) spawnPart(fx + rnd(-8, 8), y - rnd(0, 4), { vy: rnd(-40, -20), g: 30, life: rnd(0.25, 0.4), ramp: RAGE });
-      else if (cls === 'mage') for (let i = 0; i < 6; i++) spawnPart(fx + rnd(-10, 10), y - 1, { vy: rnd(-30, -14), drag: 0.97, life: rnd(0.35, 0.55), ramp: [ramp[3], ramp[2], ramp[1]] });
+      else if (cls === 'mage') for (let i = 0; i < 10; i++) spawnPart(fx + rnd(-11, 11), y - 1, { vy: rnd(-34, -14), drag: 0.97, life: rnd(0.35, 0.6), ramp: [ramp[3], ramp[2], ramp[1]] });
       else if (cls === 'rogue') for (let i = 0; i < 4; i++) spawnPart(fx + rnd(-6, 6), y - rnd(0, 6), { vx: rnd(-14, 14), vy: rnd(-10, -2), drag: 0.9, life: rnd(0.3, 0.45), ramp: SMOKE, size: 2, shrink: 0.5, dither: true });
       else if (cls === 'ranger') for (let i = 0; i < 4; i++) spawnPart(fx + rnd(-8, 8), y - rnd(0, 2), { vx: rnd(-10, 10), vy: rnd(-22, -12), g: 35, life: rnd(0.4, 0.6), ramp: LEAF });
       else for (let i = 0; i < 6; i++) spawnPart(fx + rnd(-6, 6), top - 14 - rnd(0, 10), { vy: rnd(20, 40), life: rnd(0.25, 0.4), ramp: [ramp[3], ramp[2]] });   // light falls on him
@@ -355,29 +381,37 @@ function deathFx(c: Ctx, b: Battle, f: Fighter, s: State, sp: Sprite, L: Look, f
   const at = (stage: number, when: number): boolean => { if (s.deadStage < stage && t >= when) { s.deadStage = stage; return true; } return false; };
   switch (f.cls) {
     case 'warrior':
-      if (at(1, 0.65)) {
-        // the thud: dust both sides and the sword clattering
-        for (let i = 0; i < 8; i++) spawnPart(fx + d * rnd(0, 16), y - rnd(0, 2), { vx: rnd(-25, 25), vy: rnd(-14, -4), drag: 0.9, life: rnd(0.3, 0.5), ramp: DUST, size: 2, shrink: 0.5, dither: true });
-        for (let i = 0; i < 4; i++) spawnPart(fx + d * 14, y - 3, { vx: rnd(-30, 30), vy: rnd(-50, -20), g: 160, life: rnd(0.2, 0.35), ramp: [STEEL[3], '#f8d878'] });
+      if (at(1, 0.32)) for (let i = 0; i < 4; i++) spawnPart(fx + rnd(-6, 6), y, { vx: rnd(-18, 18), vy: rnd(-8, -2), drag: 0.9, life: rnd(0.2, 0.35), ramp: DUST, size: 2, shrink: 0.5, dither: true });   // the knee hits the floor
+      if (at(2, 0.84)) {
+        // the thud: dust along his length and the sword clattering
+        for (let i = 0; i < 12; i++) spawnPart(fx + d * rnd(-4, 16), y - rnd(0, 2), { vx: rnd(-30, 30), vy: rnd(-16, -4), drag: 0.9, life: rnd(0.3, 0.55), ramp: DUST, size: 2, shrink: 0.5, dither: true });
+        for (let i = 0; i < 6; i++) spawnPart(fx - d * 8, y - 2, { vx: rnd(-30, 30), vy: rnd(-60, -25), g: 170, life: rnd(0.2, 0.4), ramp: [STEEL[3], '#f8d878', STEEL[2]] });
       }
+      if (at(3, 0.92)) for (let i = 0; i < 3; i++) spawnPart(fx + d * rnd(0, 12), y, { vx: rnd(-12, 12), vy: rnd(-6, -2), drag: 0.9, life: 0.3, ramp: DUST, size: 1, dither: true });   // settling after the bounce
       break;
     case 'ranger':
-      if (at(1, 0.4)) {
-        for (let i = 0; i < 6; i++) spawnPart(fx - d * rnd(0, 14), y - rnd(0, 2), { vx: rnd(-20, 20), vy: rnd(-12, -4), drag: 0.9, life: rnd(0.3, 0.5), ramp: DUST, size: 2, shrink: 0.5, dither: true });
-        for (let i = 0; i < 5; i++) spawnPart(fx - d * rnd(0, 12), y - rnd(6, 16), { vx: rnd(-12, 12), vy: rnd(-20, -6), g: 25, drag: 0.96, life: rnd(0.8, 1.2), ramp: LEAF });
+      if (at(1, 0.48)) {
+        for (let i = 0; i < 10; i++) spawnPart(fx - d * rnd(-4, 14), y - rnd(0, 2), { vx: rnd(-25, 25), vy: rnd(-14, -4), drag: 0.9, life: rnd(0.3, 0.5), ramp: DUST, size: 2, shrink: 0.5, dither: true });
+        for (let i = 0; i < 7; i++) spawnPart(fx - d * rnd(0, 12), y - rnd(6, 16), { vx: rnd(-14, 14), vy: rnd(-24, -8), g: 25, drag: 0.96, life: rnd(0.9, 1.3), ramp: LEAF });
       }
+      if (at(2, 0.58)) for (let i = 0; i < 3; i++) spawnPart(fx - d * rnd(0, 10), y, { vx: rnd(-12, 12), vy: rnd(-6, -2), drag: 0.9, life: 0.3, ramp: DUST, size: 1, dither: true });
       break;
     case 'mage': {
-      // every row the dissolve passes breaks into motes in its own colors
+      // the killing blow scatters his ward in a ring of sparks
+      if (at(1, 0)) for (let i = 0; i < 14; i++) { const a = (i / 14) * Math.PI * 2; spawnPart(fx, y - 12, { vx: Math.cos(a) * rnd(35, 55), vy: Math.sin(a) * rnd(25, 40), drag: 0.9, life: rnd(0.3, 0.5), ramp: [ARC[3], ARC[2], ARC[1]] }); }
+      // magic crackles off him while he sinks
+      if (t < 0.5 && Math.random() < 0.7) spawnPart(fx + rnd(-8, 8), y - rnd(4, 20), { vx: rnd(-20, 20), vy: rnd(-20, 5), g: 40, life: rnd(0.12, 0.25), ramp: [ARC[3], ARC[2]] });
+      // every row the dissolve passes breaks into motes in its own colors, swirling up
       const cut = L.pose.cut ?? (L.hide ? 99 : -1), rows = spriteRows(sp), ax = sp.ax * sp.res, top = Math.round(y) - rows.length;
       for (let r = Math.max(0, s.cutDone + 1); r < Math.min(rows.length, cut); r++) {
         for (const [px, col] of rows[r]) {
-          if (Math.random() < 0.5) continue;
-          const xx = Math.round(fx) + (flip ? ax - px : px - ax);
-          spawnPart(xx, top + r + L.oy, { vx: rnd(-6, 6), vy: rnd(-26, -10), drag: 0.97, life: rnd(0.5, 0.9), ramp: [col, ARC[2], ARC[1], ARC[0]] });
+          const xx = Math.round(fx) + (flip ? ax - px : px - ax), side = xx < fx ? -1 : 1;
+          spawnPart(xx, top + r, { vx: side * rnd(2, 14), vy: rnd(-34, -12), drag: 0.96, life: rnd(0.6, 1.1), ramp: [col, col, ARC[2], ARC[1], ARC[0]], size: Math.random() < 0.2 ? 2 : 1, shrink: 1 });
         }
       }
       s.cutDone = Math.max(s.cutDone, Math.min(rows.length - 1, cut - 1));
+      // twinkling stars climb out of the rune circle he leaves behind
+      if (t > 0.5 && t < 2 && Math.random() < 0.5) spawnPart(fx + rnd(-11, 11), y - rnd(0, 2), { vy: rnd(-30, -16), drag: 0.98, life: rnd(0.5, 0.9), ramp: [ARC[3], ARC[2], ARC[1]] });
       break;
     }
     case 'rogue':
