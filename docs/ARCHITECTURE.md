@@ -180,15 +180,15 @@ flowchart LR
   cast --> helpers["Battle helpers<br/>strike, shoot, warn, freeze, stun, walls, bless, curse, later"]
 ```
 
-`CardDef` (`game/cards.ts`): `id, name, cls, cost (0..5 | 'all'), rarity, element, damaging, lock, dmg, short, gain, needsStealth, cast(ctx), ai(b, f)`.
+`CardDef` (`game/cards.ts`, which also gathers every class's spells into `ALL_CARDS` / `CARDS` in class order). Spells live in `content/classes/<id>/cards.ts` and import engine helpers only through `content/api.ts`. Fields: `id, name, cls, cost (0..5 | 'all'), rarity, element, damaging, lock, dmg, short, gain, needsStealth, cast(ctx), ai(b, f)`.
 
 | Class | HP | Light / heavy | Resource | Comes back | Cards |
 | --- | --- | --- | --- | --- | --- |
-| Warrior | 890 | 7 / 32 | Rage, max 5 | Heavy hits +1.5, taking damage 1 per 40 (max 1 per hit) | `cards.ts` |
-| Mage | 665 | 6 / 28 | Mana | Max 1, +1 per Draw (cap 5), refills each Draw | `cards.ts` |
-| Rogue | 650 | 12 / 22 | Energy | Topped up to 5 each Draw | `cardsRogue.ts` |
-| Ranger | 695 | 8 / 20 | Energy | Starts 2, +1 per Draw, grows standing still | `cardsRanger.ts` |
-| Priest | 630 | 6 / 28 | Mana | Starts 3, +3 per Draw (cap 5) | `cardsPriest.ts` |
+| Warrior | 890 | 7 / 32 | Rage, max 5 | Heavy hits +1.5, taking damage 1 per 40 (max 1 per hit) | `content/classes/warrior/cards.ts` |
+| Mage | 665 | 6 / 28 | Mana | Max 1, +1 per Draw (cap 5), refills each Draw | `content/classes/mage/cards.ts` |
+| Rogue | 650 | 12 / 22 | Energy | Topped up to 5 each Draw | `content/classes/rogue/cards.ts` |
+| Ranger | 695 | 8 / 20 | Energy | Starts 2, +1 per Draw, grows standing still | `content/classes/ranger/cards.ts` |
+| Priest | 630 | 6 / 28 | Mana | Starts 3, +3 per Draw (cap 5) | `content/classes/priest/cards.ts` |
 
 `tuning.ts` is the source of truth for numbers. Each class has 26 cards, a starter deck and 3 Mythic decks (`game/deck.ts`). Deck rules: exactly 30, 4 / 2 / 1 copies by rarity, max 5 Legendaries, exactly 1 Mythic. Custom decks save per class in `save.json`; `game/deckYaml.ts` imports and exports YAML.
 

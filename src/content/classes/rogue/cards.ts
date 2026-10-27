@@ -1,8 +1,5 @@
 // Rogue kit from the design doc's Rogue tab (2026-10-25). Stealth, Poison and backstabs; spells cost Energy, which refills every Draw.
-import type { CastCtx, HitResult } from './battle';
-import type { CardDef } from './cards';
-import { TUNING } from './tuning';
-import { ahead, allEnemyPanels, cellsAhead } from './cardUtil';
+import { type CastCtx, type HitResult, type CardDef, TUNING, ahead, allEnemyPanels, cellsAhead } from '../../api';
 
 /** Blink to the panel in front of the enemy and attack the panel they stand on (a wall in the way takes it instead).
  *  Opens the backstab window: the Rogue may keep acting from there until a move or the window blinks them home. */

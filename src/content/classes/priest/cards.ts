@@ -1,9 +1,6 @@
 // Priest kit (design doc Priest tab, 2026-10-25). Out-sustain and chip: blessed fields on your own panels, cursed
 // fields on the enemy's, DoTs and auto-targeted holy damage. Fields, curses and the shield pool last until the next Draw.
-import type { Battle, BlessKind, CastCtx, Fighter } from './battle';
-import type { CardDef } from './cards';
-import { allEnemyPanels, lowHp } from './cardUtil';
-import { TUNING } from './tuning';
+import { type Battle, type BlessKind, type CastCtx, type Fighter, type CardDef, allEnemyPanels, lowHp, TUNING } from '../../api';
 
 /** Run `fn` every `step` seconds for `secs` seconds. */
 function overTime(b: Battle, secs: number, step: number, fn: (i: number) => void): void {
