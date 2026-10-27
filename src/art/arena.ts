@@ -58,6 +58,12 @@ export function drawStage(c: Ctx, st: Stage, t: number, cheer = 0): void {
   }
   const sx = Math.max(0, MX - ox), sy = Math.max(0, MY - oy), cw = Math.min(w, BW - sx), ch = Math.min(h, BH - LIFT - sy);
   c.drawImage(big.canvas, sx, sy + LIFT, cw, ch, sx - MX, sy - MY, cw, ch);
+  // full-height phone screens are taller than the painted stage: its top row of sky and bottom row of floor
+  // carry on to the screen edges
+  const top = sy - MY, gapT = top + oy;
+  if (gapT > 0) c.drawImage(big.canvas, sx, sy + LIFT, cw, 1, sx - MX, -oy, cw, gapT);
+  const bot = top + ch, gapB = h - oy - bot;
+  if (gapB > 0) c.drawImage(big.canvas, sx, sy + LIFT + ch - 1, cw, 1, sx - MX, bot, cw, gapB);
 }
 
 /** Pale stone face: one seam with a lit edge and two chips. */

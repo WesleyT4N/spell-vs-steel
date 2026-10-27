@@ -191,7 +191,9 @@ export interface Projectile {
 /** A tutorial highlight on a panel (lesson guidance, not danger). */
 export interface Mark { col: number; row: number; t: number; color: string }
 /** A danger telegraph: a panel an area spell is about to hit. Every class's area spells use the same flash (BN style). */
-export interface Warn { col: number; row: number; t: number; dur: number; side: Side }
+/** How a telegraph looks, after Battle Network: a panel flash (area attacks), a crosshair (lock-on shots) or a landing shadow (lobs). */
+export type WarnKind = 'flash' | 'reticle' | 'shadow';
+export interface Warn { col: number; row: number; t: number; dur: number; side: Side; kind: WarnKind }
 /** A hidden Ranger trap. Only its owner sees it. */
 /** Traps last until the next Draw screen. A Tripwire is one trap per panel of a column, sharing a `group`. */
 export interface Trap { side: Side; col: number; row: number; arm: number; kind: 'freeze' | 'explode' | 'mine' | 'blast' | 'wire'; group?: number; fired?: boolean }
@@ -364,13 +366,15 @@ export class Battle {
    * The standard area-spell telegraph: `cells` flash for `delay` seconds, then `hit` runs. Pass TUNING.warnTime unless the
    * spell has a longer telegraph of its own. Everything here runs on the battle clock, so it stays in lockstep online.
    */
-  warn(att: Fighter | Side, cells: Array<[number, number]>, delay: number, hit?: () => void): void {
+  warn(att: Fighter | Side, cells: Array<[number, number]>, delay: number, hit?: () => void, kind: WarnKind = 'flash'): void {
     const side = typeof att === 'number' ? att : att.side;
-    for (const [col, row] of cells) if (this.inGrid(col, row)) this.warns.push({ col, row, t: delay, dur: delay, side });
+    for (const [col, row] of cells) if (this.inGrid(col, row)) this.warns.push({ col, row, t: delay, dur: delay, side, kind });
     if (hit) this.later(delay, hit);
   }
-  /** Is this panel about to be hit by `side`'s enemy? */
-  warned(col: number, row: number, side?: Side): boolean { return this.warns.some(w => w.col === col && w.row === row && w.side !== side); }
+  /** Is this panel about to be hit by `side`'s enemy? Lob shadows don't count: a lob is a shot you read from the air, like BN's bombs. */
+  warned(col: number, row: number, side?: Side): boolean {
+    return this.warns.some(w => w.col === col && w.row === row && w.side !== side && w.kind !== 'shadow');
+  }
   text(f: Fighter, s: string, color: string): void {
     this.texts.push({ x: f.col, y: f.row, text: s, color, t: 0 });
   }

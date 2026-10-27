@@ -26,7 +26,10 @@ export function noteTouch(): void { if (mouse.touched && hotZone()) fresh = fals
 interface Zone { id: string; x: number; y: number; w: number; h: number }
 let zones: Zone[] = [];
 let nextZones: Zone[] = [];
-export function zone(id: string, x: number, y: number, w: number, h: number): void { nextZones.push({ id, x, y, w, h }); }
+let zoneDY = 0;
+export function zone(id: string, x: number, y: number, w: number, h: number): void { nextZones.push({ id, x, y: y + zoneDY, w, h }); }
+/** Move zones registered from now on by `dy` (a split screen's top part draws in its own coordinates). */
+export function shiftZones(dy: number): void { zoneDY = dy; }
 /** Swap in the zones drawn this frame. Called by the main loop after drawing. */
 export function commitZones(): void { zones = nextZones; nextZones = []; }
 /** The clickable zones live this frame (for automated playtests). */
@@ -36,6 +39,14 @@ export function hotZone(): string | null {
   for (let i = zones.length - 1; i >= 0; i--) {
     const z = zones[i];
     if (mouse.x >= z.x && mouse.x < z.x + z.w && mouse.y >= z.y && mouse.y < z.y + z.h) return z.id;
+  }
+  return null;
+}
+/** Id of the topmost zone at a point (UI coordinates), or null. */
+export function zoneAt(x: number, y: number): string | null {
+  for (let i = zones.length - 1; i >= 0; i--) {
+    const z = zones[i];
+    if (x >= z.x && x < z.x + z.w && y >= z.y && y < z.y + z.h) return z.id;
   }
   return null;
 }

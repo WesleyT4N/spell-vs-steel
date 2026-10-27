@@ -2,7 +2,7 @@
 // It drives a regular BattleScene (so the fight and the Draw screen look and play exactly like a match)
 // and layers lessons, goals and pointers on top. Every step can be skipped from the pause menu.
 import { getSave, setSave } from '../engine/save';
-import { pushScene, replaceScene, popTo, goHome, dim, drawMenu, hint, listMouse, isHot, resetSel, type Scene } from './scene';
+import { pushScene, replaceScene, popTo, goHome, dim, drawMenu, hint, listMouse, isHot, resetSel, showSel, type Scene } from './scene';
 import { BattleScene } from './battle';
 import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
@@ -15,12 +15,13 @@ import { starterDeck, toList } from '../game/deck';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
 import { defaultSkin, type ClassId } from '../art/sprites';
-import { UW, UH, type Ctx } from '../engine/gfx';
+import { UW, UH, view, spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, drawTextOutlined, wrap } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
-import { touchText, type PadMode } from '../engine/touch';
+import { touchActive, touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, stageTrack, sfx, chargeHum } from '../engine/audio';
-import { win, footer, INK, INK2, RED_INK, TRIM } from './skin';
+import { win, footer, INK, INK2, RED_INK, TRIM, PAPER } from './skin';
+import { bigButton, actionBar, barTapped, panel, tallArea, TAP, GAP, PAD } from './touchUi';
 
 export const tutorialDone = (): boolean => getSave('tutorialDone');
 const markDone = (): void => setSave('tutorialDone', true);
@@ -244,7 +245,7 @@ const STEPS: Step[] = [
       },
     ],
     goal: () => 'STEP ONTO THE FLASHING PANEL',
-    tip: () => `MOVE WITH ${k('up')} ${k('left')} ${k('down')} ${k('right')} (OR THE ARROWS)`,
+    tip: () => touchActive() ? 'MOVE WITH THE D-PAD' : `MOVE WITH ${k('up')} ${k('left')} ${k('down')} ${k('right')} (OR THE ARROWS)`,
     need: 4,
     start: t => { t.targets = [[0, 0], [2, 0], [2, 2], [0, 2]]; },
     tick: t => {
@@ -556,13 +557,17 @@ export class TutorialScene implements Scene {
 
   enter(): void { playMusic(stageTrack(getArena().id)); }
 
+  // phones in portrait: the lesson fight on top, its pages, the Draw screen and the pad below
+  tall(): boolean { return true; }
+  split(): boolean { return true; }
   suspend(): void {
     if (!this.paused && !this.done && this.b.phase === 'fight') { this.paused = true; this.pauseSel = 0; resetSel(); this.quiet(); }
   }
 
   pad(): PadMode {
-    if (this.paused) return 'back';
+    if (this.paused) return spread.tall ? 'none' : 'back';
     if (this.done) return 'none';
+    if (spread.tall && this.page < this.pages.length) return 'none';
     return this.b.phase === 'custom' ? 'none' : this.inner.pad();
   }
 
@@ -641,6 +646,7 @@ export class TutorialScene implements Scene {
     // lesson pages hold the fight still
     if (this.page < this.pages.length) {
       this.quiet();
+      if (spread.tall && mouse.click && barTapped('back')) { if (this.page > 0) { this.page--; sfx('back'); } return; }
       if (wasPressed('confirm') || wasPressed('custom') || mouse.click) {
         this.page++;
         sfx(this.page < this.pages.length ? 'move' : 'select');
@@ -699,7 +705,7 @@ export class TutorialScene implements Scene {
   private triesToFight(): boolean {
     const offer = this.b.offer[0];
     return wasPressed('custom') || (wasPressed('pause') && !wasPressed('confirm')) ||
-      (mouse.click && isHot('fight')) || (wasPressed('confirm') && this.inner.cursor === offer.length);
+      (mouse.click && (isHot('fight') || (spread.tall && isHot('bar:primary')))) || (wasPressed('confirm') && this.inner.cursor === offer.length);
   }
 
   private static PAUSE = ['RESUME', 'SKIP THIS STEP', 'RESTART TUTORIAL', 'QUIT TO TITLE'];
@@ -742,11 +748,12 @@ export class TutorialScene implements Scene {
   draw(c: Ctx, tick: number, ui: Ctx): void {
     const b = this.b;
     // past the knockout the match's own results screen stays hidden behind ours
-    if (this.done) { drawBattle(c, b, tick); this.drawDone(ui, tick); return; }
+    const tall = spread.tall;
+    if (this.done) { drawBattle(c, b, tick); if (!tall) this.drawDone(ui, tick); return; }
     this.inner.draw(c, tick, ui);
     const s = this.cur;
     if (this.page < this.pages.length) {
-      this.drawPage(ui, tick);
+      if (tall) dim(ui, 0.4); else this.drawPage(ui, tick);
     } else if (b.phase === 'custom') {
       // the goal replaces the Draw screen's footer, so the hand stays clear
       const msg = this.denyT > 0 ? 'PICK AT LEAST ONE SPELL FIRST' : s.goal(this);
@@ -756,7 +763,7 @@ export class TutorialScene implements Scene {
       this.drawGoal(ui, s, tick);
     }
     if (this.clearT > 0) drawTextCentered(ui, 'NICE!', UW / 2, 120, '#58d854', 5);
-    if (this.paused) {
+    if (this.paused && !tall) {
       dim(ui, 0.55);
       drawTextCentered(ui, 'PAUSED', UW / 2, 76, '#fcfcfc', 4);
       drawMenu(ui, TutorialScene.PAUSE, this.pauseSel, UW / 2, 130, tick, { width: 220, gap: 24 });
@@ -767,18 +774,20 @@ export class TutorialScene implements Scene {
   private lessonLabel(): string { return `LESSON ${this.step + 1}/${STEPS.length}`; }
 
   private drawGoal(ui: Ctx, s: Step, tick: number): void {
-    const x = UW / 2 - 104, w = 208, y = 36;
-    const lines = wrap(touchText(s.goal(this)), 32).slice(0, 2);
-    const tip = s.tip ? wrap(touchText(s.tip(this)), 32).slice(0, 4 - lines.length) : [];
-    const h = 16 + (lines.length + tip.length) * 9;
+    // phones in portrait: wider, with the goal in 2x text, over the stands between the HUD and the grid
+    const big = spread.tall, gs = big ? 2 : 1, lh = big ? 17 : 9;
+    const x = big ? 20 : UW / 2 - 104, w = big ? UW - 40 : 208, y = big ? 46 : 36;
+    const lines = wrap(touchText(s.goal(this)), Math.floor((w - 12) / (6 * gs))).slice(0, 2);
+    const tip = s.tip ? wrap(touchText(s.tip(this)), Math.floor((w - 12) / 6)).slice(0, big ? 2 : 4 - lines.length) : [];
+    const h = 16 + lines.length * lh + tip.length * 9 + (big ? 6 : 0);
     win(ui, x, y, w, h);
     drawText(ui, this.lessonLabel(), x + 6, y + 4, TRIM);
     if (s.need) {
       const pr = `${Math.min(this.progress, s.need)}/${s.need}`;
-      drawText(ui, pr, x + w - 6 - pr.length * 6, y + 4, '#007800');
+      drawText(ui, pr, x + w - 6 - pr.length * 6 * gs, y + 4, '#007800', gs);
     }
-    lines.forEach((l, i) => drawText(ui, l, x + 6, y + 14 + i * 9, INK));
-    tip.forEach((l, i) => drawText(ui, l, x + 6, y + 14 + (lines.length + i) * 9, INK2));
+    lines.forEach((l, i) => drawText(ui, l, x + 6, y + 14 + i * lh, INK, gs));
+    tip.forEach((l, i) => drawText(ui, l, x + 6, y + 16 + lines.length * lh + i * 9, INK2));
     const pt = s.point?.(this);
     if (pt && this.clearT <= 0) {
       const bob = tick % 4 < 2 ? 0 : 2;
@@ -824,5 +833,62 @@ export class TutorialScene implements Scene {
     drawMenu(ui, TutorialScene.DONE, this.doneSel, UW / 2, 130, tick, { width: 220, gap: 24 });
     hint(ui, `CLICK OR ${k('attack')}: SELECT`);
   }
-}
 
+  // ---------- phones in portrait ----------
+
+  /** Under the fight: the battle's own bottom part (wood, Draw screen), then the lesson page, pause or the end. */
+  drawBelow(ui: Ctx, tick: number): void {
+    if (this.done) { this.drawDoneTall(ui); return; }
+    this.inner.drawBelow(ui, tick);
+    if (this.paused) this.drawMenuTall(ui, 'PAUSED', TutorialScene.PAUSE, this.pauseSel, []);
+    else if (this.page < this.pages.length) this.drawPageTall(ui);
+  }
+
+  /** The lesson page, big, in the bottom part, with BACK and NEXT in the bar (a tap anywhere is NEXT too). */
+  private drawPageTall(ui: Ctx): void {
+    const pg = this.pages[this.page], a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
+    const last = this.page === this.pages.length - 1;
+    const barTop = actionBar(ui, { back: this.page > 0 ? undefined : false, primary: { id: 'next', label: last ? (this.cur.draw ? 'PICK SPELLS →' : 'GO! →') : 'NEXT →' } });
+    const top = -view.oy * 2 + spread.halfH * 2 + GAP, h = barTop - GAP - top;
+    panel(ui, x0 - 6, top, w + 12, h);
+    const x = x0 + 8, iw = w - 16;
+    drawText(ui, this.lessonLabel(), x, top + 14, TRIM, 1);
+    if (this.pages.length > 1) {
+      const n = `${this.page + 1}/${this.pages.length}`;
+      drawText(ui, n, x + iw - n.length * 6, top + 14, TRIM, 1);
+    }
+    const ts = pg.title.length * 18 <= iw ? 3 : 2;
+    drawText(ui, pg.title, x, top + 30, RED_INK, ts);
+    // body text at 2x when it fits the panel, else 1x
+    const room = h - 30 - ts * 7 - 26;
+    const lay = (sc: number): { paras: string[][]; lh: number; need: number } => {
+      const paras = pg.body.map(p => wrap(touchText(p), Math.floor(iw / (6 * sc))));
+      const lh = sc === 2 ? 20 : 11;
+      return { paras, lh, need: paras.reduce((t, l) => t + l.length * lh + 8, 0) };
+    };
+    let sc = 2, L = lay(2);
+    if (L.need > room) { sc = 1; L = lay(1); }
+    let yy = top + 30 + ts * 7 + 18;
+    for (const lines of L.paras) {
+      lines.forEach((l, i) => drawText(ui, l, x, yy + i * L.lh, INK, sc));
+      yy += lines.length * L.lh + 8;
+    }
+  }
+
+  /** Pause and the end screen: big buttons over the whole screen (`menu:i` zones, as on desktop). */
+  private drawMenuTall(ui: Ctx, title: string, items: string[], sel: number, lines: string[]): void {
+    dim(ui, 0.65);
+    const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2, bh = TAP + 14;
+    const y0 = Math.round(a.y + a.h - PAD - items.length * (bh + GAP) + GAP);
+    items.forEach((it, i) => bigButton(ui, `menu:${i}`, it, x0, y0 + i * (bh + GAP), w, bh, { primary: i === 0, on: i === sel && i > 0 && showSel() }));
+    const ty = Math.round(a.y + (y0 - a.y) / 2 - 30 - lines.length * 10);
+    drawTextCentered(ui, title, UW / 2, ty, '#f8b800', title.length > 12 ? 3 : 4);
+    lines.forEach((l, i) => drawTextCentered(ui, l, UW / 2, ty + 52 + i * 18, PAPER, 1, true));
+  }
+
+  private drawDoneTall(ui: Ctx): void {
+    this.drawMenuTall(ui, 'TUTORIAL COMPLETE!', TutorialScene.DONE, this.doneSel, [
+      'YOU KNOW THE BASICS: MOVE, ATTACK,', 'DODGE, DRAW AND CAST. NEXT, FIGHT THE CPU', 'OR BUILD YOUR OWN 30-SPELL GRIMOIRE.',
+    ]);
+  }
+}
