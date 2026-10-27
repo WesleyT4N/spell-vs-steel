@@ -27,3 +27,9 @@ export function lunge(x: CastCtx, toCol: number, toRow: number, out: number, hol
   b.anim(out, p => { f.dx = px * p; f.dy = py * p - Math.sin(p * Math.PI) * arc; });
   b.later(out + hold, () => b.anim(back, p => { f.dx = px * (1 - p); f.dy = py * (1 - p) - Math.sin(p * Math.PI) * arc * 0.5; }));
 }
+
+/** Locks onto the enemy's panel at cast time and runs `fn` there after `delay` (dodgeable when there is a telegraph). */
+export function targeted(x: CastCtx, delay: number, fn: (c: number, r: number) => void): void {
+  const c = x.foe.col, r = x.foe.row;
+  x.b.later(delay, () => fn(c, r));
+}
