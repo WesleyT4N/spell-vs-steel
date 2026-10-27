@@ -2,6 +2,7 @@ node_modules
 dist
 dist-prod
 .DS_Store
+scripts/music/out
 dist-fuzz
 fuzz-out
 dist-test
