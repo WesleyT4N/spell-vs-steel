@@ -6,8 +6,8 @@ import { drawStage } from '../art/arena';
 import { teamColor, type ClassId } from '../art/sprites';
 import { P, UW, screenRect, spread, vy, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
-import { wasPressed, navPressed, mouse } from '../engine/input';
-import { touchActive } from '../engine/touch';
+import { wasPressed, navPressed, mouse, gesture } from '../engine/input';
+import { touchActive, type PadMode } from '../engine/touch';
 import { sfx } from '../engine/audio';
 import { cardsFor, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef } from '../game/cards';
 import { canAdd, countRarity, deckSize, loadCustom, saveCustom, presetDeck, presetsFor, validate, DECK_SIZE, MAX_LEGENDARIES, type DeckCounts, type DeckPreset } from '../game/deck';
@@ -18,6 +18,7 @@ import { CardPreview } from './cardPreview';
 import { openDeckPanel } from './deckPanel';
 import type { SpellDeck } from '../game/deckYaml';
 import { win, selRow, plaque, ink, PAPER, BURN, INK, INK2, RED_INK, GOLD, TRIM } from './skin';
+import { bigButton, actionBar, barTapped, swipeIn, tallArea, tabs, sheet, panel, Scroller, TAP, GAP, PAD } from './touchUi';
 
 const RARITY_ORDER = { common: 0, uncommon: 1, legendary: 2, mythic: 3 };
 const CLASSES: ClassId[] = PLAYABLE;
@@ -53,6 +54,15 @@ export class DeckBuilderScene implements Scene {
   constructor(public cls: ClassId, private back: () => void = popScene) {
     this.load();
   }
+
+  tall(): boolean { return true; }
+  pad(): PadMode { return spread.tall ? 'none' : 'back'; }
+  /** Full-height phone layout: the card grid's scroll, its window, and how long a finger has rested on one card. */
+  private tscroller = new Scroller();
+  private tgrid: [number, number, number, number] = [0, 0, 0, 0];
+  private holdT = 0;
+  /** The card a resting finger is reading (shown in a sheet from the bottom), or -1. */
+  private reading = -1;
 
   private load(): void {
     this.loadCards();
@@ -184,6 +194,7 @@ export class DeckBuilderScene implements Scene {
     this.preview.show(!this.picks && showSel() ? this.cardAt(this.sel) ?? null : null);
     this.preview.update(dt);
     if (this.closeYaml) return;
+    if (spread.tall) { this.updateTall(dt); return; }
     if (isHot('yaml') && mouse.click) { this.openYaml(); return; }
     if (this.picks) {
       // class tabs still switch class (and reopen the picker for it)
@@ -247,10 +258,41 @@ export class DeckBuilderScene implements Scene {
     this.back();
   }
 
+  /** The full-height phone layout's input: tabs, the bar, swipes between classes, the card grid and the picker. */
+  private updateTall(dt: number): void {
+    const tab = hot('tab');
+    if (tab >= 0 && mouse.click) { this.switchClass(CLASSES[tab]); return; }
+    if (barTapped('mid')) { this.openYaml(); return; }
+    if (barTapped('back') || barTapped('primary') || wasPressed('back') || mouse.rclick) {
+      if (this.picks) { sfx('back'); this.back(); } else this.exit();
+      return;
+    }
+    // swiping the grid sideways steps through the classes
+    const sw = swipeIn(...this.tgrid);
+    if (sw) { this.switchClass(CLASSES[(CLASSES.indexOf(this.cls) + sw + CLASSES.length) % CLASSES.length]); return; }
+    if (this.picks) {
+      const h = hot('pick');
+      if (h >= 0 && mouse.click) this.choosePick(this.picks[h]);
+      return;
+    }
+    if (isHot('change') && mouse.click) { this.special(); return; }
+    this.tscroller.update(...this.tgrid);
+    // a finger resting on a card reads it; lifting closes the sheet, dragging cancels
+    const t = hot('tile');
+    if (mouse.touched || Math.abs(gesture.dy) > 1 || !mouse.down) this.holdT = 0;
+    else if (t >= 0) this.holdT += dt;
+    this.reading = mouse.down && t >= 0 && this.holdT >= 0.35 ? t : -1;
+    if (this.reading >= 0) this.sel = this.top + this.reading;
+    const minus = hot('tminus');
+    if (minus >= 0 && mouse.click) { this.sel = this.top + minus; this.change(this.cards[minus], -1); return; }
+    if (t >= 0 && mouse.click) { this.sel = this.top + t; this.change(this.cards[t], 1); }
+  }
+
   draw(c: Ctx, tick: number, ui: Ctx): void {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.5)';
     c.fillRect(...screenRect());
+    if (spread.tall) { this.drawTall(ui); return; }
 
     // header: class tabs, counts, done (phone portrait moves it up, and the list rows grow, into the spare height)
     const hy = vy(4) - 4;
@@ -403,6 +445,91 @@ export class DeckBuilderScene implements Scene {
     cards.forEach((c, i) => drawText(ui, `${list[c.id]}X ${c.name.toUpperCase()}`, lx, y + 24 + i * 11, c.rarity === 'common' ? INK2 : ink(RARITY_COLOR[c.rarity])));
     if (id && id !== 'custom' && picks[0] === 'custom') drawText(ui, 'REPLACES YOUR SAVED SPELL DECK', lx, y + hgt - 14, RED_INK);
     hint(ui, `HOVER TO SEE A SPELL DECK   CLICK: START FROM IT   RIGHT-CLICK: BACK`);
+  }
+
+  // ---------- full-height phone layout ----------
+
+  /** The phone layout: class tabs, the counts, a scrolling grid of cards and the action bar. */
+  private drawTall(ui: Ctx): void {
+    const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
+    let y = a.y + 10;
+    tabs(ui, 'tab', CLASSES.map(c => c.toUpperCase()), CLASSES.indexOf(this.cls), x0, y, w, 48);
+    y += 58;
+    // the counts
+    const n = deckSize(this.deck), leg = countRarity(this.deck, 'legendary'), myth = countRarity(this.deck, 'mythic');
+    const ok = validate(this.deck).length === 0;
+    win(ui, x0, y, w, 46, { accent: teamColor(this.cls, loadMatch().p1Skin[this.cls], false), burn: 3 });
+    drawText(ui, `SPELLS ${n}/${DECK_SIZE}`, x0 + 12, y + 10, n === DECK_SIZE ? '#007800' : RED_INK, 2);
+    drawText(ui, ok ? 'READY' : 'NOT READY', x0 + w - 12 - (ok ? 60 : 108), y + 10, ok ? '#007800' : RED_INK, 2);
+    drawText(ui, `LEGENDARY ${leg}/${MAX_LEGENDARIES}`, x0 + 12, y + 30, leg <= MAX_LEGENDARIES ? ink(RARITY_COLOR.legendary) : RED_INK);
+    drawText(ui, `MYTHIC ${myth}/1`, x0 + 150, y + 30, myth === 1 ? ink(RARITY_COLOR.mythic) : RED_INK);
+    y += 56;
+
+    const barTop = a.y + a.h - 84, msgY = barTop - 22;
+    actionBar(ui, { mid: { id: 'yaml', label: 'YAML' }, primary: { id: 'done', label: 'DONE' } });
+    const errs = validate(this.deck);
+    const note = this.msgT > 0 ? [this.msg, '#f8b800'] : errs.length ? [errs[0], '#f83800'] : ['GRIMOIRE READY. SAVED HERE.', '#58d854'];
+    drawTextCentered(ui, note[0], UW / 2, msgY, note[1], note[0].length * 12 < w ? 2 : 1);
+
+    if (this.picks) { this.drawTallPicker(ui, x0, y, w, msgY - 10 - y); return; }
+    bigButton(ui, 'change', 'CHANGE STARTING DECK', x0, y, w, 48);
+    y += 58;
+    // the card grid: four to a row, tap a card to add a copy, - takes one out, rest a finger on a card to read it
+    const gh = msgY - 10 - y, cols = 4, cw = Math.floor((w - GAP * (cols - 1)) / cols), rowH = CARD_H + 56;
+    this.tgrid = [a.x, y, a.w, gh];
+    const sc = this.tscroller;
+    sc.max = Math.max(0, Math.ceil(this.cards.length / cols) * rowH - gh + 8);
+    panel(ui, x0 - 6, y - 6, w + 12, gh + 12);
+    ui.save();
+    ui.beginPath(); ui.rect(x0 - 3, y - 3, w + 6, gh + 6); ui.clip();
+    this.cards.forEach((card, i) => {
+      const cx = x0 + (i % cols) * (cw + GAP), cy = y + 6 + Math.floor(i / cols) * rowH - Math.round(sc.pos);
+      if (cy + rowH < y || cy > y + gh) return;
+      const have = this.deck[card.id] ?? 0, max = MAX_COPIES[card.rarity];
+      const clip = (zy: number, zh: number): [number, number] => { const lo = Math.max(zy, y), hi = Math.min(zy + zh, y + gh); return [lo, hi - lo]; };
+      const fx = cx + Math.round((cw - CARD_W) / 2);
+      const [fy, fh] = clip(cy, CARD_H);
+      if (fh > 0) zone(`tile:${i}`, fx, fy, CARD_W, fh);
+      drawCardFace(ui, card, fx, cy, { lit: this.reading === i, faded: !have });
+      // under the card: a big minus and the count
+      const by = cy + CARD_H + 6, [zy, zh] = clip(by, 44);
+      if (zh > 0) zone(`tminus:${i}`, cx, zy, 48, zh);
+      const mt = plaque(ui, cx, by, 48, 42, mouse.down && isHot(`tminus:${i}`));
+      drawTextCentered(ui, '-', cx + 24, by + 14, mouse.down && isHot(`tminus:${i}`) ? mt : have ? INK : BURN, 2, false);
+      drawText(ui, `${have}/${max}`, cx + 56, by + 14, have ? INK : TRIM, 2);
+    });
+    ui.restore();
+    if (sc.max > 0) {
+      const sh = Math.max(24, Math.round(gh * gh / (gh + sc.max)));
+      P(ui, BURN, a.x + a.w - 6, y, 4, gh);
+      P(ui, INK2, a.x + a.w - 6, y + Math.round((sc.pos / sc.max) * (gh - sh)), 4, sh);
+    }
+    // reading a card: its clip and rules slide up from the bottom
+    const card = this.reading >= 0 ? this.cards[this.reading] : undefined;
+    if (card) {
+      sheet(ui, 360, (sx, sy, sw) => {
+        this.preview.draw(ui, sx, sy, sw, 140);
+        const yy = drawCardDetail(ui, card, sx, sy + 152, sw, 2);
+        drawText(ui, `IN DECK ${this.deck[card.id] ?? 0} / ${MAX_COPIES[card.rarity]}`, sx, yy + 4, INK2, 2);
+      });
+    }
+  }
+
+  /** The start-from picker in the phone layout: a column of big choices. */
+  private drawTallPicker(ui: Ctx, x: number, y: number, w: number, h: number): void {
+    const picks = this.picks!;
+    panel(ui, x - 6, y, w + 12, h);
+    drawTextCentered(ui, 'START YOUR GRIMOIRE FROM', UW / 2, y + 14, INK, 2, false);
+    const saved = loadCustom(this.cls);
+    const rh = Math.min(TAP + 16, Math.floor((h - 44) / picks.length) - 6);
+    picks.forEach((id, i) => {
+      const p = this.presets.find(q => q.id === id);
+      const name = id === 'custom' ? 'YOUR DECK' : id === 'empty' ? 'EMPTY DECK' : id === 'import' ? 'IMPORT YAML' : p!.name.toUpperCase() + (id === 'starter' ? ' (STARTER)' : '');
+      const sub = id === 'custom' ? (saved && !validate(saved).length ? 'SAVED, READY' : `SAVED, ${deckSize(saved ?? {})}/${DECK_SIZE} SPELLS`)
+        : id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE OR PICK A FILE'
+          : `MYTHIC: ${(this.cards.find(c => c.id === p!.mythic)?.name ?? '').toUpperCase()}`;
+      bigButton(ui, `pick:${i}`, name, x + 6, y + 40 + i * (rh + 6), w - 12, rh, { sub, scale: name.length * 12 < w - 30 ? 2 : 1 });
+    });
   }
 }
 

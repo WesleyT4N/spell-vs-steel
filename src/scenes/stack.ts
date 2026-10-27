@@ -15,6 +15,18 @@ export interface Scene {
   resume?(): void;
   /** Which touch controls this screen shows on phones (a BACK button when left out). */
   pad?(): PadMode;
+  /**
+   * True when this screen has a full-height phone layout: in phone portrait it then takes the whole screen
+   * (`spread.tall`) instead of the top half, and draws its own touch controls (see touchUi.ts).
+   */
+  tall?(): boolean;
+  /**
+   * True when, in the full-height layout, the game still draws in the top part at its half-screen size and the
+   * screen's phone controls go underneath: `draw` paints the top part, then `drawBelow` paints the rest of the
+   * screen (and anything that covers the whole of it) in full-screen UI coordinates.
+   */
+  split?(): boolean;
+  drawBelow?(ui: Ctx, tick: number): void;
   /** The game went to the background (tab hidden, app switched away): pause if it makes sense. */
   suspend?(): void;
 }

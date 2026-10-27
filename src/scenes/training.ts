@@ -10,7 +10,7 @@ import { CARDS } from '../game/cards';
 import { CLASS_INFO } from '../game/classes';
 import { TUNING } from '../game/tuning';
 import type { MatchConfig } from '../game/match';
-import { UW, spread, type Ctx } from '../engine/gfx';
+import { UW, spread, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { touchActive } from '../engine/touch';
@@ -18,6 +18,7 @@ import { sfx, stopMusic } from '../engine/audio';
 import { BattleScene } from './battle';
 import { CharSelectScene } from './select';
 import { win, selRow, banner, PAPER, INK, INK2, RED_INK, TRIM } from './skin';
+import { bigButton, actionBar, barTapped, panel, tallArea, Scroller, TAP, GAP, PAD } from './touchUi';
 
 type DummyAct = 'stand' | 'move' | 'dodge' | 'attack' | 'easy' | 'normal';
 type HpMode = 'refill' | 'normal';
@@ -133,6 +134,9 @@ export class TrainingScene extends BattleScene {
   /** The stats panel, opened from the pause menu over the paused fight. */
   private statsOpen = false;
   private statsSel = 0;
+  /** The phone menu's list, which scrolls under a finger. */
+  private menuScroll = new Scroller();
+  private menuRect: [number, number, number, number] = [0, 0, 0, 0];
 
   constructor(m: MatchConfig) {
     // one endless round, so no round counter
@@ -248,14 +252,23 @@ export class TrainingScene extends BattleScene {
     });
   }
 
+  /** Training draws its own pause menu (its settings), over the fight. */
+  protected tallPause(): boolean { return false; }
+
   protected updatePause(dt: number): void {
     if (this.statsOpen) { this.updateStats(dt); return; }
+    if (spread.tall) {
+      if (mouse.click && barTapped('back')) { sfx('select'); this.paused = false; this.close(); return; }
+      this.menuScroll.update(...this.menuRect);
+    }
     const rows = this.rows, n = rows.length;
     const h = hot('trow'), arrow = hot('tarrow');
     if (mouse.moved && h >= 0 && h !== this.menuSel) { this.menuSel = h; sfx('move'); }
     if (mouse.rclick || (wasPressed('back') && !wasPressed('pause'))) { this.paused = false; this.close(); return; }
+    const keySel = this.menuSel;
     if (navPressed('up', dt)) { this.menuSel = (this.menuSel + n - 1) % n; sfx('move'); }
     if (navPressed('down', dt)) { this.menuSel = (this.menuSel + 1) % n; sfx('move'); }
+    if (spread.tall && this.menuSel !== keySel) this.revealSel();
     const row = rows[this.menuSel];
     const l = navPressed('left', dt), r = navPressed('right', dt);
     if (row.change && (l || r)) { row.change(r ? 1 : -1); sfx('move'); this.close(false); return; }
@@ -280,6 +293,12 @@ export class TrainingScene extends BattleScene {
   /** The session stats: tabs on left/right, BACK or CLEAR STATS, right-click or the back key returns to the menu. */
   private updateStats(dt: number): void {
     this.statsPanel.update(this.statsData());
+    this.swipeStats();
+    if (spread.tall && mouse.click && (barTapped('back') || barTapped('mid'))) {
+      sfx('select');
+      if (barTapped('back')) this.statsOpen = false; else clearStats(this.stats);
+      return;
+    }
     const n = TrainingScene.STATS_ITEMS.length;
     const clicked = listMouse('menu', this.statsSel, i => { this.statsSel = i; sfx('move'); });
     if (mouse.rclick || (wasPressed('back') && !wasPressed('pause'))) { this.statsOpen = false; sfx('back'); return; }
@@ -310,8 +329,78 @@ export class TrainingScene extends BattleScene {
     const b = this.b;
     if (b.phase === 'fight' || b.phase === 'ko') this.drawReadout(ui, tick);
     if (this.resetT > 0 && b.phase === 'fight') drawTextCentered(ui, 'RESET', UW / 2, 124, '#58d854', 4);
+    if (spread.tall) return;
     if (paused && this.statsOpen) this.drawStats(ui, tick);
     else if (paused) this.drawMenu(ui, tick);
+  }
+
+  // ---------- phones in portrait: the menu and stats cover the whole screen ----------
+
+  drawBelow(ui: Ctx, tick: number): void {
+    super.drawBelow(ui, tick);
+    if (!this.paused) return;
+    if (this.statsOpen) this.drawStatsTall(ui);
+    else this.drawMenuTall(ui, tick);
+  }
+
+  /** Top of menu row `i` in the phone list (RESUME, row 0, is the bar's button): settings, a gap, then the actions. */
+  private rowTop(i: number): number { return (i - 1) * (TAP + GAP) + (i >= 8 ? 20 : 0); }
+
+  private revealSel(): void {
+    if (this.menuSel > 0) this.menuScroll.reveal(this.rowTop(this.menuSel), TAP, this.menuRect[3]);
+  }
+
+  private drawMenuTall(ui: Ctx, tick: number): void {
+    const [sx, sy, sw, sh] = screenRect(2);
+    ui.fillStyle = 'rgba(40,20,0,0.75)';
+    ui.fillRect(sx, sy, sw, sh);
+    const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2, rows = this.rows;
+    let y = a.y + PAD;
+    drawTextCentered(ui, 'TRAINING', UW / 2, y, PAPER, 3, true);
+    y += 21 + GAP;
+    const barTop = actionBar(ui, { back: 'RESUME' });
+    const lh = barTop - GAP - y - 12;
+    this.menuRect = [a.x, y + 6, a.w, lh];
+    const sc = this.menuScroll;
+    sc.max = Math.max(0, this.rowTop(rows.length - 1) + TAP - lh + 8);
+    panel(ui, x0 - 6, y, w + 12, lh + 12);
+    ui.save();
+    ui.beginPath(); ui.rect(x0 - 3, y + 3, w + 6, lh + 6); ui.clip();
+    const ix = x0 + 6, iw = w - 12, top = y + 6;
+    rows.forEach((r, i) => {
+      if (i === 0) return;
+      const ry = top + this.rowTop(i) - Math.round(sc.pos);
+      if (ry + TAP < top || ry > top + lh) return;
+      const on = i === this.menuSel && showSel();
+      if (!r.value) { bigButton(ui, `trow:${i}`, r.label, ix, ry, iw, TAP, { on }); return; }
+      // a setting: tap the row (or >) for the next value, < for the one before
+      const v = r.value(), stw = 252, stx = ix + iw - stw;
+      zone(`trow:${i}`, ix, ry, iw - stw, TAP);
+      if (on) selRow(ui, ix, ry, iw, TAP);
+      drawText(ui, r.label, ix + 6, ry + Math.round((TAP - 14) / 2), on ? INK : INK2, textWidth(r.label, 2) < iw - stw - 12 ? 2 : 1);
+      bigButton(ui, `tarrow:${i * 2}`, '<', stx, ry, TAP, TAP);
+      bigButton(ui, `tarrow:${i * 2 + 1}`, '>', stx + stw - TAP, ry, TAP, TAP);
+      drawTextCentered(ui, v, stx + stw / 2, ry + Math.round((TAP - 14) / 2), RED_INK, textWidth(v, 2) < stw - TAP * 2 - 8 ? 2 : 1, false);
+    });
+    ui.restore();
+    if (sc.max > 0) {
+      const th = Math.max(30, lh * lh / (lh + sc.max)), ty = top + (lh - th) * (sc.pos / sc.max);
+      ui.fillStyle = 'rgba(80,48,0,0.5)'; ui.fillRect(x0 + w + 1, ty, 3, th);
+    }
+    void tick;
+  }
+
+  private drawStatsTall(ui: Ctx): void {
+    const [sx, sy, sw, sh] = screenRect(2);
+    ui.fillStyle = 'rgba(40,20,0,0.75)';
+    ui.fillRect(sx, sy, sw, sh);
+    const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
+    let y = a.y + PAD;
+    drawTextCentered(ui, 'TRAINING STATS', UW / 2, y, PAPER, 3, true);
+    y += 21 + GAP;
+    const barTop = actionBar(ui, { mid: { id: 'clear', label: 'CLEAR STATS' } });
+    this.statsRect = [x0, y, w, barTop - GAP - y];
+    this.statsPanel.draw(ui, this.statsData(), x0, y, w, barTop - GAP - y);
   }
 
   private drawStats(ui: Ctx, tick: number): void {

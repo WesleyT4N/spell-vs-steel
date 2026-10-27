@@ -15,22 +15,36 @@ export const view = { w: W, h: H, ox: 0, oy: 0 };
 export const MIN_ASPECT = 4 / 3, MAX_ASPECT = 7 / 3;
 /** Phones in portrait may go taller, filling the top half of the screen. */
 export const PORTRAIT_MIN_ASPECT = 3 / 4;
-/** Size the view for a window shape. Returns true when it changed. */
-export function setView(aspect: number, min = MIN_ASPECT): boolean {
+/** Phones in portrait on screens with a tall layout use the whole screen, down to this shape (taller letterboxes). */
+export const TALL_MIN_ASPECT = 9 / 22;
+/** The view size (world pixels) for a window shape. */
+export function viewSize(aspect: number, min = MIN_ASPECT): { w: number; h: number } {
   const a = Math.min(MAX_ASPECT, Math.max(min, aspect));
   // margins stay whole world pixels on both sides, so the content never lands between pixels
   const w = a >= W / H ? W + 2 * Math.round((H * a - W) / 2) : W;
   const h = a >= W / H ? H : H + 2 * Math.round((W / a - H) / 2);
+  return { w, h };
+}
+/** Size the view for a window shape. Returns true when it changed. */
+export function setView(aspect: number, min = MIN_ASPECT): boolean {
+  const { w, h } = viewSize(aspect, min);
   if (w === view.w && h === view.h) return false;
   Object.assign(view, { w, h, ox: (w - W) / 2, oy: (h - H) / 2 });
   return true;
 }
 /**
+ * `spread.tall` is set while a screen with its own full-height phone layout (Scene.tall) fills the whole screen.
  * Phone portrait leaves spare height above and below the 480×320 UI area, and menus spread their layout into it:
  * `vy` moves a UI-layer y away from the middle by `k` (up to 1.5×), and `vspan` is a box's height once both its
  * edges move. Only positions and box heights change; sprites and text keep their size. `k` is 1 everywhere else.
  */
-export const spread = { portrait: false, k: 1 };
+export const spread = { portrait: false, k: 1, tall: false, halfH: H };
+/**
+ * Split screens (Scene.split) in the full-height layout draw the game in the top part, exactly as the half-screen
+ * layout would (`halfH` world pixels tall), and their phone controls below it. This is how far up that top part
+ * sits from where the full-height view would center the game, in world pixels.
+ */
+export const splitLift = (): number => view.oy - (spread.halfH - H) / 2;
 export const vy = (y: number): number => Math.round(UH / 2 + (y - UH / 2) * spread.k);
 export const vspan = (y: number, h: number): number => vy(y + h) - vy(y);
 /** The whole visible screen as [x, y, w, h] in layer coordinates (`s` = 2 for the UI layer). */
