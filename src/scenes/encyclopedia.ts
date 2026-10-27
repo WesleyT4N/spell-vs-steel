@@ -279,6 +279,8 @@ export class EncyclopediaScene implements Scene {
         const presets = presetsFor(card.cls), inDecks = presets.filter(p => p.cards[card.id]).length;
         drawText(ui, `${card.cls.toUpperCase()}   MAX ${MAX_COPIES[card.rarity]} PER DECK`, sx, yy, INK2, 1); yy += 12;
         drawText(ui, inDecks ? `IN ${inDecks} OF ${presets.length} READY DECKS` : 'IN NO READY DECK', sx, yy, inDecks ? '#007800' : TRIM, 1);
+        yy += 12;
+        drawText(ui, `CAST LOCK ${(card.lock ?? 0.3).toFixed(2)}S`, sx, yy, TRIM, 1);
         if (this.test) bigButton(ui, 'test', 'TEST IN SANDBOX', sx, sy + shh - 62, sw, 58, { primary: true });
       });
     }

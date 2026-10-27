@@ -12,7 +12,7 @@ import { roundRecord, type RoundRecord } from '../game/stats';
 import { replayScore, type Replay, type ReplayMode } from '../game/replay';
 import { rankedOf, rankedRound, rankedNote } from '../net/rating';
 import { tournamentRound, tournamentNote } from './tournament';
-import { UW, type Ctx } from '../engine/gfx';
+import { UW, spread, type Ctx } from '../engine/gfx';
 import { drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
@@ -51,6 +51,10 @@ export class OnlineBattleScene extends BattleScene {
   }
 
   get locked(): boolean { return this.ls.locked; }
+  protected get waitingOn(): string {
+    const b = this.b;
+    return (b.phase === 'custom' && this.locked) || (b.phase === 'over' && this.waitingNext) ? 'WAITING FOR RIVAL...' : '';
+  }
 
   protected get replayMode(): ReplayMode { return rankedOf(this.net) ? 'ranked' : 'online'; }
   /** Recorded from the agreed frames instead (see the constructor). */
@@ -165,7 +169,8 @@ export class OnlineBattleScene extends BattleScene {
     const ping = net.rtt ? `PING ${Math.round(net.rtt)}MS  DELAY ${net.delay}F  ROLLBACK ${this.shownRollback}F` : '';
     if (b.phase === 'fight') drawTextOutlined(ui, ping, Math.round(UW / 2 - textWidth(ping) / 2), 48, '#bcbcbc');
     if (net.desync) drawTextCentered(ui, 'DESYNC: THE TWO GAMES DISAGREE', UW / 2, 270, '#f83800', 1);
-    if (b.phase === 'custom' && this.locked) {
+    // phones in portrait say it in the action bar under the fight instead (see waitingOn)
+    if (b.phase === 'custom' && this.locked && !spread.tall) {
       win(ui, 300, 150, 116, 30, { burn: 3 });
       drawTextCentered(ui, tick % 8 < 6 ? 'WAITING FOR' : '', 358, 157, RED_INK, 1, false);
       drawTextCentered(ui, 'RIVAL...', 358, 168, RED_INK, 1, false);
@@ -180,7 +185,7 @@ export class OnlineBattleScene extends BattleScene {
       drawTextCentered(ui, msg, UW / 2, 146, RED_INK, 1, false);
       if (sub) drawTextCentered(ui, sub, UW / 2, 158, INK2, 1, false);
     }
-    if (b.phase === 'over' && this.waitingNext) {
+    if (b.phase === 'over' && this.waitingNext && !spread.tall) {
       win(ui, 360, 38, 112, 20, { burn: 3 });
       drawTextCentered(ui, 'WAITING FOR RIVAL', 416, 45, RED_INK, 1, false);
     }

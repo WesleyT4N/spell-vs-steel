@@ -5,7 +5,7 @@ import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, skinOf } from '../art/sprites';
 import { P, UW, frame, screenRect, spread, vy, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered, textWidth } from '../engine/font';
+import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, navPressed, captureNextKey, k, mouse } from '../engine/input';
 import { touchActive, touchCodeBox, touchText, type PadMode } from '../engine/touch';
 import { bigButton, actionBar, barTapped, panel, tallArea, TAP, GAP, PAD } from './touchUi';
@@ -62,6 +62,9 @@ export class OnlineScene implements Scene {
       const bo = hot('bo');
       if (bo >= 0) { this.m.bestOf = ([1, 3, 5] as const)[bo]; saveMatch(this.m); sfx('move'); return true; }
       if (isHot('t:create')) { this.activate('CREATE ROOM'); return true; }
+      if (isHot('t:lobby')) { this.activate('LOBBY'); return true; }
+      if (isHot('t:ranked')) { this.activate('RANKED MATCH'); return true; }
+      if (isHot('t:tournament')) { this.activate('TOURNAMENT'); return true; }
       if (isHot('t:join')) { this.activate('JOIN ROOM'); return true; }
     }
     if (this.mode === 'room' && isHot('t:copy')) { this.copy(); return true; }
@@ -312,7 +315,8 @@ export class OnlineScene implements Scene {
 
     const cx = UW / 2;
     if (this.mode === 'menu') {
-      // the buttons sit low, under the thumb; the how-to fills what's left between them and your fighter
+      // the buttons sit low, under the thumb: the lobby, ranked and tournaments, then a friendly by room code;
+      // the how-to fills what's left between them and your fighter
       let by = barTop - GAP * 2 - 76;
       bigButton(ui, 't:join', 'JOIN ROOM', x0, by, w, 76, { sub: 'TYPE A FRIEND\'S CODE' });
       by -= 76 + GAP;
@@ -321,12 +325,17 @@ export class OnlineScene implements Scene {
       const bw = (w - GAP * 2) / 3;
       ['1 ROUND', 'BEST OF 3', 'BEST OF 5'].forEach((l, i) =>
         bigButton(ui, `bo:${i}`, l, x0 + i * (bw + GAP), by, bw, TAP, { primary: this.m.bestOf === [1, 3, 5][i] }));
-      drawTextCentered(ui, 'MATCH LENGTH', x0 + textWidth('MATCH LENGTH', 2) / 2, by - 22, PAPER, 2, true);
+      drawTextOutlined(ui, 'MATCH LENGTH (NOT RANKED)', x0, by - 22, PAPER, 2);
+      by -= 22 + GAP + 76;
+      ([['t:lobby', 'LOBBY', 'CHAT, CHALLENGE'], ['t:ranked', 'RANKED', 'RATED, BEST OF 3'], ['t:tournament', 'TOURNEY', 'A BRACKET']] as const)
+        .forEach(([id, l, sub], i) => bigButton(ui, id, l, x0 + i * (bw + GAP), by, bw, 76, { sub }));
+      drawTextOutlined(ui, 'PLAY ANYONE ON THIS PAGE', x0, by - 22, PAPER, 2);
       const lines = [
-        'ONE PLAYER CREATES A ROOM AND SHARES',
-        'THE 5-LETTER CODE. THE OTHER JOINS',
-        'WITH IT. THEN BOTH PICK FIGHTERS AND',
-        'VOTE ON THE STAGE. NO PAUSE ONLINE.',
+        'LOBBY: SEE WHO IS HERE AND CHALLENGE',
+        'THEM. RANKED FINDS A RIVAL NEAR YOUR',
+        'RATING. FOR A FRIENDLY, ONE PLAYER',
+        'CREATES A ROOM, THE OTHER JOINS WITH',
+        'ITS 5-LETTER CODE. NO PAUSE ONLINE.',
       ];
       const hh = 44 + lines.length * 16, room = by - 22 - GAP * 2 - y;
       if (room >= hh) {
@@ -372,6 +381,6 @@ export class OnlineScene implements Scene {
     if (!net.matched) status = host ? 'WAITING FOR A RIVAL' : this.waitT > 12 ? 'NO HOST YET: CHECK THE CODE' : 'WAITING FOR THE HOST';
     else status = `RIVAL: ${rival!.cls.toUpperCase()}   STARTING...`;
     drawTextCentered(ui, tick % 8 < 6 || net.matched ? status : '', cx, y + 124, net.matched ? '#007800' : INK, 2, false);
-    if (host) bigButton(ui, 't:copy', this.copied > 0 ? 'COPIED!' : this.kind === 'room' ? 'COPY CODE' : 'COPY LINK', x0 + 20, y + 156, w - 40, TAP);
+    if (host) bigButton(ui, 't:copy', this.copied > 0 ? 'COPIED!' : this.codeOnly ? 'COPY CODE' : 'COPY LINK', x0 + 20, y + 156, w - 40, TAP);
   }
 }
