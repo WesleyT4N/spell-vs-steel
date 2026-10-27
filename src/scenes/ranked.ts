@@ -4,10 +4,10 @@ import { popScene, replaceScene, hint, button, hot, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, skinOf } from '../art/sprites';
-import { UW, screenRect, vy, type Ctx } from '../engine/gfx';
+import { UW, screenRect, spread, vy, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, k, mouse } from '../engine/input';
-import { touchText } from '../engine/touch';
+import { touchText, type PadMode } from '../engine/touch';
 import { sfx } from '../engine/audio';
 import { loadMatch, playerDeck, type MatchConfig } from '../game/match';
 import { NetSession } from '../net/session';
@@ -15,7 +15,8 @@ import { openTransport, pickTransport } from '../net/transport';
 import { Search, searchGap } from '../net/matchmaking';
 import { ratingStore, settlePending, startRanked, rankedForfeit, rankedOf, type LadderRow, type Rating, type RatingStore } from '../net/rating';
 import { CharSelectScene } from './select';
-import { win, banner, INK, INK2, RED_INK, TRIM } from './skin';
+import { win, banner, PAPER, INK, INK2, RED_INK, TRIM } from './skin';
+import { actionBar, barTapped, panel, tallArea, GAP, PAD } from './touchUi';
 
 type Mode = 'loading' | 'search' | 'found' | 'error';
 /** A matched rival who never shows up on the room code: search again. */
@@ -34,6 +35,9 @@ export class RankedScene implements Scene {
   private gone = false;
 
   enter(): void { void this.begin(); }
+
+  tall(): boolean { return true; }
+  pad(): PadMode { return spread.tall ? 'none' : 'back'; }
 
   private async begin(): Promise<void> {
     this.mode = 'loading';
@@ -86,8 +90,8 @@ export class RankedScene implements Scene {
 
   update(dt: number): void {
     this.t += dt;
-    const back = wasPressed('back') || mouse.rclick || (mouse.click && hot('btn') === 0);
-    if (this.mode === 'error') { if (back || mouse.click || wasPressed('confirm')) this.leave(); return; }
+    const back = wasPressed('back') || mouse.rclick || (mouse.click && (hot('btn') === 0 || barTapped('back')));
+    if (this.mode === 'error') { if (back || (mouse.click && !spread.tall) || wasPressed('confirm')) this.leave(); return; }
     if (back) { this.leave(); return; }
     if (this.mode === 'search' && this.search) {
       this.search.tick();
@@ -111,6 +115,7 @@ export class RankedScene implements Scene {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.35)';
     c.fillRect(...screenRect());
+    if (spread.tall) { this.drawTall(ui, tick); return; }
     banner(ui, 'RANKED MATCH', UW / 2, vy(3));
     const dy = vy(36) - 36, db = vy(176) - 176;
 
@@ -162,6 +167,67 @@ export class RankedScene implements Scene {
       drawText(ui, rec, lx + (UW - 52) / 2 - 12 - textWidth(rec), y, row.you ? RED_INK : INK2);
     });
     hint(ui, `${k('cast')} / RIGHT-CLICK: BACK`);
+  }
+
+  /** The phone layout: you and your rating, the search, then the ladder, with CANCEL in the bar. */
+  private drawTall(ui: Ctx, tick: number): void {
+    const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2, cx = UW / 2;
+    let y = a.y + PAD;
+    drawTextCentered(ui, 'RANKED MATCH', cx, y, PAPER, 3, true);
+    y += 21 + GAP * 2;
+    const barTop = actionBar(ui, { back: this.mode === 'error' ? undefined : 'CANCEL' });
+
+    // you: fighter, rating, record
+    const skin = skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id;
+    const bob = Math.floor(tick / 4) % 2, r = this.rating;
+    panel(ui, x0 - 6, y, w + 12, 120);
+    drawFighterSprite(ui, getSprite(this.m.p1, skin, false), x0 + 56, y + 108 - bob * 2, false, 'none', 4);
+    drawText(ui, 'YOUR RATING', x0 + 120, y + 18, RED_INK, 2);
+    drawText(ui, r ? String(r.rating) : '...', x0 + 120, y + 42, INK, 4);
+    drawText(ui, r ? `${r.wins} WON  ${r.losses} LOST` : '', x0 + 120, y + 82, INK2, 2);
+    y += 120 + GAP * 2;
+
+    // the search
+    const sh = 150;
+    panel(ui, x0 - 6, y, w + 12, sh);
+    if (this.mode === 'loading') drawTextCentered(ui, 'LOADING YOUR RATING...', cx, y + sh / 2 - 7, INK, 2, false);
+    if (this.mode === 'error') {
+      drawTextCentered(ui, this.msg, cx, y + 50, RED_INK, textWidth(this.msg, 2) < w - 24 ? 2 : 1, false);
+      drawTextCentered(ui, 'TAP BACK TO LEAVE', cx, y + 86, TRIM, 2, false);
+    }
+    if (this.mode === 'search' && this.search) {
+      const s = Math.floor(this.search.waited / 1000);
+      drawTextCentered(ui, tick % 8 < 6 ? 'SEARCHING FOR A RIVAL' : '', cx, y + 16, RED_INK, 2, false);
+      drawTextCentered(ui, `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`, cx, y + 42, INK, 4, false);
+      const gap = Math.round(searchGap(this.search.waited));
+      drawTextCentered(ui, `RATINGS ${Math.max(0, (r?.rating ?? 0) - gap)} TO ${(r?.rating ?? 0) + gap}`, cx, y + 88, INK2, 2, false);
+      const n = this.search.searching;
+      drawTextCentered(ui, n ? `${n} OTHER${n > 1 ? 'S' : ''} SEARCHING` : 'NOBODY ELSE IS SEARCHING YET', cx, y + 112, INK2, 2, false);
+    }
+    if (this.mode === 'found') {
+      const rival = this.search?.match?.rival;
+      drawTextCentered(ui, 'RIVAL FOUND!', cx, y + 24, '#007800', 3, false);
+      drawTextCentered(ui, rival ? `RATING ${rival.rating}` : '', cx, y + 66, INK, 2, false);
+      drawTextCentered(ui, tick % 8 < 6 ? 'CONNECTING...' : '', cx, y + 98, INK2, 2, false);
+    }
+    y += sh + GAP * 2;
+
+    // the ladder, in big type when there's room for all ten
+    const lh = barTop - GAP * 2 - y;
+    if (lh < 80) return;
+    panel(ui, x0 - 6, y, w + 12, lh);
+    drawText(ui, this.store?.kind === 'local' ? 'LADDER (THIS PHONE)' : 'LADDER', x0 + 8, y + 14, RED_INK, 2);
+    drawTextCentered(ui, 'EVERY SET IS BEST OF 3.', cx, y + lh - 46, TRIM, 2, false);
+    drawTextCentered(ui, 'LEAVING EARLY COUNTS AS A LOSS.', cx, y + lh - 26, TRIM, 2, false);
+    const rows = this.ladder.slice(0, 10), room = lh - 100;
+    const big = rows.length * 24 <= room, rh = big ? 24 : 14, s = big ? 2 : 1;
+    if (!rows.length) drawText(ui, 'NO RANKED SETS PLAYED YET.', x0 + 8, y + 44, INK2, 2);
+    rows.slice(0, Math.floor(room / rh)).forEach((row, i) => {
+      const ry = y + 42 + i * rh;
+      drawText(ui, `${i + 1}. ${row.name.toUpperCase().slice(0, 14)}`, x0 + 8, ry, row.you ? RED_INK : INK, s);
+      const rec = `${row.rating}  ${row.wins}-${row.losses}`;
+      drawText(ui, rec, x0 + w - 8 - textWidth(rec, s), ry, row.you ? RED_INK : INK2, s);
+    });
   }
 }
 
