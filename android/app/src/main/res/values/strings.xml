@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Spell VS Steel</string>
+    <string name="title_activity_main">Spell VS Steel</string>
+    <string name="package_name">com.wesleyt4n.spellvssteel</string>
+    <string name="custom_url_scheme">com.wesleyt4n.spellvssteel</string>
+</resources>
