@@ -1,8 +1,8 @@
 // Every number worth tweaking after a playtest lives here.
 
 export const TUNING = {
-  // from the 2026-10-26 sweep + number search (scripts/sweep.ts, scripts/tune.ts): the HP-only patch closest to the 55-65 wheel at Normal, at Hard and with the starters
-  hp: { warrior: 845, mage: 660, rogue: 540, ranger: 740, priest: 685 },
+  // re-searched after the CPU stopped freezing up when stunned mid-charge (#45): the HP-only patch closest to the 55-65 wheel at Normal, at Hard and with the starters (scripts/tune.ts)
+  hp: { warrior: 890, mage: 665, rogue: 650, ranger: 695, priest: 630 },
 
   /** Seconds for the shared custom gauge to fill. */
   gaugeSeconds: 10,
