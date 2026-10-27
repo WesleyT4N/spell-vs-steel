@@ -1,7 +1,7 @@
 // Draws a Battle: arena, panels, fighters, spell effects and the HUD.
 import { k } from '../engine/input';
 import { drawPanel, drawHole, drawStage, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState, type PanelTint } from '../art/arena';
-import { getStage } from '../art/stages';
+import { getStage } from '../content/stages';
 import type { Stage } from '../art/arena';
 import { getSprite, getFrame, drawFighterSprite, drawFighterPosed, teamColor, type Tint } from '../art/sprites';
 import type { FrameId } from '../art/fighterFrames';
