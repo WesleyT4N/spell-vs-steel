@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at 21c9b2b (2026-10-27).
+How the game is put together, one section per system. Describes `main` at c1e6e00 (2026-10-27).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -33,7 +33,7 @@ flowchart LR
   end
   subgraph sim ["Simulation (game/)"]
     battle["Battle<br/>battle.ts"]
-    cards["Cards<br/>cards*.ts"]
+    cards["Spells<br/>content/classes/*/cards.ts"]
     tune["tuning.ts, rng.ts"]
   end
   subgraph pres [Presentation]
@@ -53,7 +53,8 @@ flowchart LR
 
 | Folder | What lives there |
 | --- | --- |
-| `src/game/` | Rules (`battle.ts`, cards per class, `ai.ts`, `tuning.ts`, `rng.ts`, decks, stats, combo) and the battle views |
+| `src/content/` | Built-in content: each class's spells in `classes/<id>/cards.ts`, stages in `stages/`, `api.ts` (the only engine surface content imports) |
+| `src/game/` | Rules (`battle.ts`, `cards.ts` gathers every class's spells, `ai.ts`, `tuning.ts`, `rng.ts`, decks, stats, combo) and the battle views |
 | `src/scenes/` | Every screen: title, select, stage select, battle, online, training, tutorial, deck builder, options, dev tools |
 | `src/art/` | Generated sprites and frames, Inked stages, logo |
 | `src/engine/` | Pixel gfx, bitmap font, input, gamepad, touch pad, audio, sampled music, battle audio, voice, save |
@@ -192,7 +193,7 @@ flowchart LR
 
 `tuning.ts` is the source of truth for numbers. Each class has 26 cards, a starter deck and 3 Mythic decks (`game/deck.ts`). Deck rules: exactly 30, 4 / 2 / 1 copies by rarity, max 5 Legendaries, exactly 1 Mythic. Custom decks save per class in `save.json`; `game/deckYaml.ts` imports and exports YAML.
 
-Adding a class today touches: `art/sprites.ts` (+ generated sprites and frames), `game/classes.ts`, a `tuning.ts` block, a `cardsX.ts` merged into `CARDS`, resource rules in `battle.ts`, decks in `deck.ts`, `game/fighterAnim.ts`, voice lines, and tutorial lessons (every new character gets tutorial support). The modularize pass will gather these into `src/content/classes/<id>/`.
+Adding a class today touches: `art/sprites.ts` (+ generated sprites and frames), `game/classes.ts`, a `tuning.ts` block, `content/classes/<id>/cards.ts` (listed in `game/cards.ts`), resource rules in `battle.ts`, decks in `deck.ts`, `game/fighterAnim.ts`, voice lines, and tutorial lessons (every new character gets tutorial support). Only the spells live in the class folder so far (#62); the rest moves there next.
 
 ## Stages
 
@@ -465,6 +466,6 @@ New screens go in `tests/screens/harness.ts`.
 
 ## In flight
 
-- Modularize: stages are modules (#35); class folders under `src/content/classes/<id>/` come next.
+- Modularize: stages are modules (#35) and spells sit in `src/content/classes/<id>/` (#62); next the rest of each class (sprites, tuning, decks, voices, lessons) and the `content/effects.ts` registry.
 - Battle state as plain data (no closures for delayed effects), after the class move.
 - BN indicators (#32).
