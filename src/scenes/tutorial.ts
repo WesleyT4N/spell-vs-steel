@@ -556,6 +556,10 @@ export class TutorialScene implements Scene {
 
   enter(): void { playMusic(stageTrack(getArena().id)); }
 
+  suspend(): void {
+    if (!this.paused && !this.done && this.b.phase === 'fight') { this.paused = true; this.pauseSel = 0; resetSel(); this.quiet(); }
+  }
+
   pad(): PadMode {
     if (this.paused) return 'back';
     if (this.done) return 'none';
