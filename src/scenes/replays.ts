@@ -15,7 +15,6 @@ import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engi
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { touchText } from '../engine/touch';
 import { sfx, playMusic, stopMusic, chargeHum } from '../engine/audio';
-import { RESULT_SONG } from '../engine/music';
 import { win, selRow, banner, PAPER, BURN, INK, INK2, RED_INK, TRIM } from './skin';
 
 const MODE_NAME: Record<ReplayMode, string> = { cpu: 'VS CPU', arcade: 'ARCADE', versus: '2 PLAYERS', watch: 'CPU VS CPU', online: 'ONLINE', ranked: 'RANKED' };
@@ -192,7 +191,7 @@ export class ReplayScene extends BattleScene {
       this.rounds.push(roundRecord(b, this.stats));
       stopMusic();
       sfx('win');
-      playMusic('result', RESULT_SONG);
+      playMusic('victory');
     }
   }
 

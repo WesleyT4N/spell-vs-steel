@@ -7,7 +7,7 @@ import { BattleScene } from './battle';
 import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { Battle, NO_INTENT, COLS, type Fighter, type Intent, type Mark, type Projectile } from '../game/battle';
-import { drawBattle } from '../game/battleView';
+import { drawBattle, getArena } from '../game/battleView';
 import { CLASS_INFO } from '../game/classes';
 import type { Cpu } from '../game/ai';
 import { CARDS } from '../game/cards';
@@ -19,8 +19,7 @@ import { UW, UH, view, spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, drawTextOutlined, wrap } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { touchActive, touchText, type PadMode } from '../engine/touch';
-import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
-import { BATTLE_SONG } from '../engine/music';
+import { playMusic, stopMusic, stageTrack, sfx, chargeHum } from '../engine/audio';
 import { win, footer, INK, INK2, RED_INK, TRIM, PAPER } from './skin';
 import { bigButton, actionBar, barTapped, panel, tallArea, TAP, GAP, PAD } from './touchUi';
 
@@ -556,7 +555,7 @@ export class TutorialScene implements Scene {
   get dummyF(): Fighter { return this.b.f[1]; }
   private get cur(): Step { return STEPS[this.step]; }
 
-  enter(): void { playMusic('battle', BATTLE_SONG); }
+  enter(): void { playMusic(stageTrack(getArena().id)); }
 
   // phones in portrait: the lesson fight on top, its pages, the Draw screen and the pad below
   tall(): boolean { return true; }

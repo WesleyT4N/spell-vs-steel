@@ -11,7 +11,6 @@ import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engi
 import { wasPressed, navPressed, anyPressed, k, mouse, page } from '../engine/input';
 import type { PadMode } from '../engine/touch';
 import { playMusic, sfx, isMuted } from '../engine/audio';
-import { MENU_SONG } from '../engine/music';
 import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { OptionsScene } from './options';
@@ -130,9 +129,9 @@ export class TitleScene implements Scene {
   /** Drifting motes in the air, x/y in world pixels. */
   motes = Array.from({ length: 14 }, (_, i) => ({ x: (i * 53) % W, y: 40 + ((i * 37) % 100), s: 6 + (i % 4) * 3 }));
 
-  enter(): void { playMusic('menu', MENU_SONG); }
+  enter(): void { playMusic('menu'); }
   // a screen opened from here (the sandbox, a fight) may have changed the music
-  resume(): void { playMusic('menu', MENU_SONG); }
+  resume(): void { playMusic('menu'); }
   pad(): PadMode { return 'none'; }
   tall(): boolean { return true; }
 

@@ -20,8 +20,7 @@ import { P, UW, screenRect, spread, view, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse, gesture, localDir, localDown, localPressed, localNav, localKey } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
-import { playMusic, stopMusic, sfx, chargeHum, announce, voiceLine } from '../engine/audio';
-import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
+import { playMusic, stopMusic, stageTrack, sfx, chargeHum, announce, voiceLine } from '../engine/audio';
 import { drawCardDetail, drawCardFace, resName, resInk, RES_INK, CARD_W, CARD_H, PICKED } from './cardView';
 import { CardPreview } from './cardPreview';
 import { win, plaque, pip, disc, banner, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, BLUE_INK, WAX_HI, GOLD, FRAME } from './skin';
@@ -112,7 +111,8 @@ export class BattleScene implements Scene {
   /** On-screen key name for side `s`. */
   protected keyOf(s: Side, a: 'left' | 'right' | 'attack' | 'cast' | 'custom'): string { return this.twoPlayer ? localKey(s, a) : k(a); }
 
-  enter(): void { playMusic('battle', BATTLE_SONG); }
+  enter(): void { playMusic(stageTrack(getArena().id)); }
+  resume(): void { playMusic(stageTrack(getArena().id)); }
   // phones in portrait: the fight on top at its usual size, the pad, Draw screen, pause and results below it
   tall(): boolean { return true; }
   split(): boolean { return true; }
@@ -120,7 +120,6 @@ export class BattleScene implements Scene {
   protected tallPause(): boolean { return true; }
   /** Where the bottom part of a split phone screen starts (full-screen UI coordinates). */
   protected get splitTop(): number { return -view.oy * 2 + spread.halfH * 2; }
-  resume(): void { playMusic('battle', BATTLE_SONG); }
 
   pad(): PadMode {
     const b = this.b;
@@ -178,7 +177,7 @@ export class BattleScene implements Scene {
       this.rounds.push(roundRecord(b, this.stats));
       stopMusic();
       if (b.winner !== null && (b.winner === this.me || this.ctl[b.winner] === 'player' || this.watching)) sfx('win');
-      playMusic('result', RESULT_SONG);
+      playMusic('victory');
     }
   }
 
@@ -414,7 +413,7 @@ export class BattleScene implements Scene {
     const b = this.b;
     // one player sees their side's hidden things (traps, stealth); sharing a screen or watching, everything shows
     const shared = this.humans.length !== 1;
-    drawBattle(c, b, tick, shared ? 'all' : this.me);
+    drawBattle(c, b, tick, shared ? 'all' : this.me, true);
     if (b.phase !== 'custom') {
       if (!shared) drawBattleUi(ui, b, tick, this.me);
       else drawBattleUi(ui, b, tick, 0, this.twoPlayer

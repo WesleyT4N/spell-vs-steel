@@ -16,7 +16,6 @@ import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import type { PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx } from '../engine/audio';
-import { MENU_SONG, RESULT_SONG } from '../engine/music';
 import { win, plaque, banner, FRAME, GOLD, INK, INK2, TRIM, RED_INK, BLUE_INK, PAPER } from './skin';
 import { actionBar, barTapped, panel, tallArea, GAP, PAD } from './touchUi';
 import { BattleScene } from './battle';
@@ -34,7 +33,7 @@ export class ArcadeLadderScene implements Scene {
   t = 0;
   constructor(private run: ArcadeRun) {}
 
-  enter(): void { playMusic('menu', MENU_SONG); }
+  enter(): void { playMusic('menu'); }
   pad(): PadMode { return 'none'; }
   tall(): boolean { return true; }
 
@@ -218,7 +217,7 @@ export class ArcadeClearScene implements Scene {
   constructor(private run: ArcadeRun) {
     this.record = saveClear(run.m.p1, { time: run.time, continues: run.continues });
   }
-  enter(): void { playMusic('result', RESULT_SONG); sfx('win'); }
+  enter(): void { playMusic('victory'); sfx('win'); }
   pad(): PadMode { return 'none'; }
   tall(): boolean { return true; }
 
