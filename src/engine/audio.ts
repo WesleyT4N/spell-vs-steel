@@ -1,27 +1,32 @@
 // WebAudio sound: realistic combat/spell effects (sfxReal), NES-style blips for menus, and a tiny SNES-style sequencer for the BGM.
+import { getSave, setSave } from './save';
 import { playReal, type RealOpts } from './sfxReal';
+import { playVoice, loadClips, type VoiceKind } from './voice';
+import { playCall, type Call } from './announcer';
+import type { ClassId } from '../art/sprites';
 
 let ctx: AudioContext | null = null;
-let master: GainNode, sfxBus: GainNode, realBus: GainNode, musicBus: GainNode, reverb: ConvolverNode, reverbSend: GainNode;
+let master: GainNode, sfxBus: GainNode, stingBus: GainNode, voiceBus: GainNode, annBus: GainNode, realBus: GainNode, musicBus: GainNode, reverb: ConvolverNode, reverbSend: GainNode;
 let noiseBuf: AudioBuffer;
 let muted = false;
 
 /** Player audio settings. Volumes run 0-10. */
-export interface AudioSettings { master: number; sfx: number; music: number; sfxOn: boolean; musicOn: boolean }
-const AUDIO_KEY = 'svs:audio';
-let settings: AudioSettings = { master: 8, sfx: 10, music: 10, sfxOn: true, musicOn: true };
-
-try {
-  muted = localStorage.getItem('svs:muted') === '1';
-  const raw = localStorage.getItem(AUDIO_KEY);
-  if (raw) settings = { ...settings, ...(JSON.parse(raw) as Partial<AudioSettings>) };
-} catch { /* storage blocked */ }
+export interface AudioSettings { master: number; sfx: number; music: number; sfxOn: boolean; musicOn: boolean; voice: number; announcer: number }
+const DEFAULT_AUDIO: AudioSettings = { master: 8, sfx: 10, music: 10, sfxOn: true, musicOn: true, voice: 8, announcer: 8 };
+let settings: AudioSettings = { ...DEFAULT_AUDIO };
+muted = getSave('muted');
+// keep only known settings of the right type, so a hand-edited save can't break the mix
+for (const [k, v] of Object.entries(getSave('audio'))) {
+  if (k in DEFAULT_AUDIO && typeof v === typeof DEFAULT_AUDIO[k as keyof AudioSettings]) (settings as unknown as Record<string, unknown>)[k] = v;
+}
 
 // Base mix levels at full volume.
-const MASTER = 1, SFX_LEVEL = 0.45, MUSIC_LEVEL = 0.32;
+const MASTER = 1, SFX_LEVEL = 0.45, MUSIC_LEVEL = 0.32, VOICE_LEVEL = 0.5, ANN_LEVEL = 0.55;
 const masterGain = (): number => (muted ? 0 : MASTER * settings.master / 10);
 const sfxGain = (): number => (settings.sfxOn ? SFX_LEVEL * settings.sfx / 10 : 0);
 const musicGain = (): number => (settings.musicOn ? MUSIC_LEVEL * settings.music / 10 : 0);
+const voiceGain = (): number => VOICE_LEVEL * settings.voice / 10;
+const annGain = (): number => ANN_LEVEL * settings.announcer / 10;
 
 function applyGains(): void {
   if (!ctx) return;
@@ -29,12 +34,14 @@ function applyGains(): void {
   master.gain.setTargetAtTime(masterGain(), t, 0.02);
   sfxBus.gain.setTargetAtTime(sfxGain(), t, 0.02);
   musicBus.gain.setTargetAtTime(musicGain(), t, 0.02);
+  voiceBus.gain.setTargetAtTime(voiceGain(), t, 0.02);
+  annBus.gain.setTargetAtTime(annGain(), t, 0.02);
 }
 
 export const getAudioSettings = (): AudioSettings => ({ ...settings });
 export function setAudioSettings(patch: Partial<AudioSettings>): void {
   settings = { ...settings, ...patch };
-  try { localStorage.setItem(AUDIO_KEY, JSON.stringify(settings)); } catch { /* storage blocked */ }
+  setSave('audio', { ...settings });
   applyGains();
 }
 
@@ -49,6 +56,10 @@ function init(): AudioContext | null {
   sfxBus = ctx.createGain(); sfxBus.gain.value = sfxGain(); sfxBus.connect(master);
   realBus = ctx.createGain(); realBus.gain.value = 0.75; realBus.connect(sfxBus);
   musicBus = ctx.createGain(); musicBus.gain.value = musicGain(); musicBus.connect(master);
+  voiceBus = ctx.createGain(); voiceBus.gain.value = voiceGain(); voiceBus.connect(master);
+  annBus = ctx.createGain(); annBus.gain.value = annGain(); annBus.connect(master);
+  // announcer stingers sit on the SFX channel, well under the announcer's voice
+  stingBus = ctx.createGain(); stingBus.gain.value = 0.45; stingBus.connect(sfxBus);
   // SNES-ish echo: a short generated reverb tail
   reverb = ctx.createConvolver();
   const len = Math.floor(ctx.sampleRate * 1.6);
@@ -68,13 +79,15 @@ function init(): AudioContext | null {
 
 /** Browsers only allow audio after a user gesture; call this from input handlers. */
 export function unlockAudio(): void {
+  const was = ctx;
   const c = init();
+  if (!was && c) void loadClips(c);
   if (c && c.state === 'suspended') void c.resume();
 }
 
 export function toggleMute(): boolean {
   muted = !muted;
-  try { localStorage.setItem('svs:muted', muted ? '1' : '0'); } catch { /* storage blocked */ }
+  setSave('muted', muted);
   applyGains();
   return muted;
 }
@@ -163,6 +176,20 @@ export function sfx(name: string, o?: RealOpts): void {
     src.start(t);
     src.stop(t + b.d + 0.02);
   }
+}
+
+/** A fighter's voice: grunts, casting, hurt and death. `side` keeps each fighter to one line at a time. */
+export function voiceLine(cls: ClassId, kind: VoiceKind, pan = 0, side = 0, element?: string): void {
+  const c = ctx;
+  if (!c || c.state !== 'running' || quiet || muted || settings.voice === 0) return;
+  playVoice(c, voiceBus, cls, kind, pan, side, element);
+}
+
+/** The announcer: a stinger plus the spoken words. */
+export function announce(call: Call, args?: { n?: number; who?: string }): void {
+  const c = ctx;
+  if (!c || c.state !== 'running' || quiet || muted || settings.announcer === 0) return;
+  playCall(c, annBus, settings.sfxOn && settings.sfx > 0 ? stingBus : null, call, args);
 }
 
 /** The sound that goes with a spell effect's visual (see battle.addFx). */
