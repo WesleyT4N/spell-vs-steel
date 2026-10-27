@@ -2,10 +2,12 @@
 // mobile builds (Capacitor) sits behind this one interface: save storage, fullscreen and the app lifecycle.
 // Game code only talks to `platform`; a native build swaps the implementation and nothing else.
 //
-// A native shell hands in its implementation before the game boots, as `window.svsNative` (an Electron
-// preload via contextBridge, or a Capacitor plugin bootstrap). Anything it leaves out falls back to the web version.
+// A native shell hands in its implementation before the game boots, as `window.svsNative` (the Electron
+// preload, via contextBridge); the Android app is recognised by its Capacitor bridge (capacitor.ts).
+// Anything a shell leaves out falls back to the web version.
 import { webStorage, type PlatformStorage } from './storage';
 import { webFullscreen, webLifecycle } from './web';
+import { capacitorPlatform } from './capacitor';
 
 export type { PlatformStorage } from './storage';
 
@@ -45,7 +47,7 @@ export interface NativePlatform {
 
 function detect(): Platform {
   const web: Platform = { id: 'web', storage: webStorage, fullscreen: webFullscreen, lifecycle: webLifecycle };
-  const native = typeof window === 'undefined' ? undefined : (window as unknown as { svsNative?: NativePlatform }).svsNative;
+  const native = (typeof window === 'undefined' ? undefined : (window as unknown as { svsNative?: NativePlatform }).svsNative) ?? capacitorPlatform();
   if (!native) return web;
   // a shell may give only some functions of a part (say QUIT, but not the background events)
   return {
