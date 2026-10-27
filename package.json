@@ -12,6 +12,8 @@
     "typecheck": "tsc --noEmit && tsc -p tests --noEmit",
     "preview": "vite preview",
     "netcheck": "tsx scripts/netcheck.ts",
+    "golden": "tsx scripts/golden.ts --check",
+    "golden:write": "tsx scripts/golden.ts --write",
     "netsoak": "tsx scripts/netsoak.ts",
     "combocheck": "tsx scripts/combo-check.ts",
     "replaycheck": "tsx scripts/replay-check.ts",
