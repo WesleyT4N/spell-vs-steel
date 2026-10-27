@@ -1,0 +1,10 @@
+{
+  "name": "svs-music-render",
+  "private": true,
+  "type": "module",
+  "description": "Offline renderer for the Spell VS Steel soundtrack (not part of the game build).",
+  "dependencies": {
+    "@librescore/sf3": "0.8.0",
+    "spessasynth_core": "4.3.22"
+  }
+}

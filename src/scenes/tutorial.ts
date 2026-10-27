@@ -7,7 +7,7 @@ import { BattleScene } from './battle';
 import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { Battle, NO_INTENT, COLS, type Fighter, type Intent, type Mark, type Projectile } from '../game/battle';
-import { drawBattle } from '../game/battleView';
+import { drawBattle, getArena } from '../game/battleView';
 import { CLASS_INFO } from '../game/classes';
 import type { Cpu } from '../game/ai';
 import { CARDS } from '../game/cards';
@@ -19,8 +19,7 @@ import { UW, UH, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, drawTextOutlined, wrap } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
-import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
-import { BATTLE_SONG } from '../engine/music';
+import { playMusic, stopMusic, stageTrack, sfx, chargeHum } from '../engine/audio';
 import { win, footer, INK, INK2, RED_INK, TRIM } from './skin';
 
 export const tutorialDone = (): boolean => getSave('tutorialDone');
@@ -555,7 +554,7 @@ export class TutorialScene implements Scene {
   get dummyF(): Fighter { return this.b.f[1]; }
   private get cur(): Step { return STEPS[this.step]; }
 
-  enter(): void { playMusic('battle', BATTLE_SONG); }
+  enter(): void { playMusic(stageTrack(getArena().id)); }
 
   suspend(): void {
     if (!this.paused && !this.done && this.b.phase === 'fight') { this.paused = true; this.pauseSel = 0; resetSel(); this.quiet(); }

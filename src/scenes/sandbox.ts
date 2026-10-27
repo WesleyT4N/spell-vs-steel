@@ -4,7 +4,7 @@
 import { popScene, zone, hot, type Scene } from './scene';
 import { CLASS_INFO } from '../game/classes';
 import { Battle, NO_INTENT, heavyChargeOf, COLS, ROWS, type Dir, type Fighter, type Intent, type Side, type StatusKey } from '../game/battle';
-import { drawBattle, drawBattleUi } from '../game/battleView';
+import { drawBattle, drawBattleUi, getArena } from '../game/battleView';
 import { Cpu } from '../game/ai';
 import { CARDS, RARITY_COLOR, cardsFor, type CardDef } from '../game/cards';
 import { starterDeck, toList } from '../game/deck';
@@ -15,8 +15,7 @@ import { UW, UH, P, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, isDown, heldDir, mouse, getKey, BINDABLE } from '../engine/input';
 import type { PadMode } from '../engine/touch';
-import { playMusic, stopMusic, chargeHum } from '../engine/audio';
-import { BATTLE_SONG } from '../engine/music';
+import { playMusic, stopMusic, stageTrack, chargeHum } from '../engine/audio';
 import { instrument, sourceName, type Hit, type Probe } from '../dev/instrument';
 import { classIds } from '../dev/simulate';
 import { h, btn, choice, check, reserveRight } from '../dev/dom';
@@ -67,7 +66,7 @@ export class SandboxScene implements Scene {
   }
 
   enter(): void {
-    playMusic('battle', BATTLE_SONG);
+    playMusic(stageTrack(getArena().id));
     this.mount();
     window.addEventListener('keydown', this.onKey);
   }
