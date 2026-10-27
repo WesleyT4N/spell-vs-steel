@@ -16,7 +16,6 @@ import { UW, type Ctx } from '../engine/gfx';
 import { drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
-import { RESULT_SONG } from '../engine/music';
 import { listMouse } from './scene';
 import { win, RED_INK, INK2 } from './skin';
 
@@ -102,7 +101,7 @@ export class OnlineBattleScene extends BattleScene {
       this.paused = false;
       stopMusic();
       if (b.winner === this.me) sfx('win');
-      playMusic('result', RESULT_SONG);
+      playMusic('victory');
     }
   }
 

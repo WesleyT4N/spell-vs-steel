@@ -1,12 +1,13 @@
-// WebAudio sound: realistic combat/spell effects (sfxReal), NES-style blips for menus, and a tiny SNES-style sequencer for the BGM.
+// WebAudio sound: realistic combat/spell effects (sfxReal), NES-style blips for menus, and pre-rendered looping BGM.
 import { getSave, setSave } from './save';
 import { playReal, type RealOpts } from './sfxReal';
 import { playVoice, loadClips, type VoiceKind } from './voice';
 import { playCall, type Call } from './announcer';
 import type { ClassId } from '../art/sprites';
+import { TRACKS, type TrackId } from './musicTracks';
 
 let ctx: AudioContext | null = null;
-let master: GainNode, sfxBus: GainNode, stingBus: GainNode, voiceBus: GainNode, annBus: GainNode, realBus: GainNode, musicBus: GainNode, reverb: ConvolverNode, reverbSend: GainNode;
+let master: GainNode, sfxBus: GainNode, stingBus: GainNode, voiceBus: GainNode, annBus: GainNode, realBus: GainNode, musicBus: GainNode;
 let noiseBuf: AudioBuffer;
 let muted = false;
 
@@ -60,17 +61,6 @@ function init(): AudioContext | null {
   annBus = ctx.createGain(); annBus.gain.value = annGain(); annBus.connect(master);
   // announcer stingers sit on the SFX channel, well under the announcer's voice
   stingBus = ctx.createGain(); stingBus.gain.value = 0.45; stingBus.connect(sfxBus);
-  // SNES-ish echo: a short generated reverb tail
-  reverb = ctx.createConvolver();
-  const len = Math.floor(ctx.sampleRate * 1.6);
-  const ir = ctx.createBuffer(2, len, ctx.sampleRate);
-  for (let ch = 0; ch < 2; ch++) {
-    const d = ir.getChannelData(ch);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
-  }
-  reverb.buffer = ir;
-  reverbSend = ctx.createGain(); reverbSend.gain.value = 0.35;
-  reverbSend.connect(reverb); reverb.connect(musicBus);
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const nd = noiseBuf.getChannelData(0);
   for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
@@ -196,167 +186,60 @@ export function announce(call: Call, args?: { n?: number; who?: string }): void 
 export function sfxFx(kind: string, o?: RealOpts): void { sfx('fx:' + kind, o); }
 
 // ---------- music ----------
-// Tracks are written as one token per step: a note ("D5", "C#4", "Bb3"), "-" to hold, "." for a rest.
-export interface Song {
-  bpm: number;
-  /** Steps per beat (2 = eighth notes, 4 = sixteenths). */
-  steps: number;
-  /** Bars played once before the loop starts. */
-  intro?: number;
-  tracks: Array<{ inst: Instrument; notes: string[]; vol?: number }>;
-}
-export type Instrument = 'lead' | 'flute' | 'harp' | 'strings' | 'bass' | 'kick' | 'snare' | 'hat' | 'brass';
-
-const NOTE: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-export function midi(n: string): number {
-  const m = /^([A-G])(#|b)?(-?\d)$/.exec(n);
-  if (!m) return -1;
-  return 12 * (parseInt(m[3]) + 1) + NOTE[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
-}
-const hz = (m: number): number => 440 * Math.pow(2, (m - 69) / 12);
-
-function voice(c: AudioContext, inst: Instrument, freq: number, t: number, dur: number, vol: number): void {
-  const out = c.createGain();
-  out.connect(musicBus);
-  out.connect(reverbSend);
-  const env = out.gain;
-  const end = t + dur;
-  const osc = (type: OscillatorType, f: number, detune = 0): OscillatorNode => {
-    const o = c.createOscillator();
-    o.type = type; o.frequency.value = f; o.detune.value = detune;
-    return o;
-  };
-  const vib = (o: OscillatorNode, depth: number, delay: number): void => {
-    const l = c.createOscillator(); l.frequency.value = 5.5;
-    const lg = c.createGain(); lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(depth, t + delay);
-    l.connect(lg); lg.connect(o.detune); l.start(t); l.stop(end + 0.3);
-  };
-  const lp = (f: number, q = 0.7): BiquadFilterNode => { const b = c.createBiquadFilter(); b.type = 'lowpass'; b.frequency.value = f; b.Q.value = q; b.connect(out); return b; };
-  const play = (nodes: AudioScheduledSourceNode[], stop: number): void => { for (const n of nodes) { n.start(t); n.stop(stop); } };
-
-  switch (inst) {
-    case 'lead': case 'brass': {
-      const f = lp(inst === 'brass' ? 1800 : 2600, 2);
-      f.frequency.setValueAtTime(600, t);
-      f.frequency.linearRampToValueAtTime(inst === 'brass' ? 2200 : 3000, t + 0.06);
-      f.frequency.linearRampToValueAtTime(inst === 'brass' ? 1400 : 2000, t + 0.3);
-      const a = osc('sawtooth', freq, -6), b = osc('square', freq, 6);
-      const ga = c.createGain(); ga.gain.value = 0.5; a.connect(ga); b.connect(ga); ga.connect(f);
-      vib(a, 14, 0.25); vib(b, 14, 0.25);
-      env.setValueAtTime(0, t); env.linearRampToValueAtTime(vol, t + 0.02); env.setValueAtTime(vol * 0.8, end - 0.02); env.linearRampToValueAtTime(0, end + 0.08);
-      play([a, b], end + 0.1);
-      break;
-    }
-    case 'flute': {
-      const f = lp(3000);
-      const a = osc('triangle', freq), b = osc('sine', freq * 2);
-      const gb = c.createGain(); gb.gain.value = 0.15; b.connect(gb); gb.connect(f); a.connect(f);
-      vib(a, 18, 0.2); vib(b, 18, 0.2);
-      env.setValueAtTime(0, t); env.linearRampToValueAtTime(vol, t + 0.06); env.setValueAtTime(vol * 0.85, end - 0.03); env.linearRampToValueAtTime(0, end + 0.15);
-      play([a, b], end + 0.2);
-      break;
-    }
-    case 'harp': {
-      const f = lp(2600);
-      const a = osc('triangle', freq), b = osc('square', freq);
-      const gb = c.createGain(); gb.gain.value = 0.12; b.connect(gb); gb.connect(f); a.connect(f);
-      env.setValueAtTime(vol, t); env.exponentialRampToValueAtTime(0.001, t + 1.2);
-      play([a, b], t + 1.25);
-      break;
-    }
-    case 'strings': {
-      const f = lp(1300);
-      const a = osc('sawtooth', freq, -9), b = osc('sawtooth', freq, 9);
-      const ga = c.createGain(); ga.gain.value = 0.5; a.connect(ga); b.connect(ga); ga.connect(f);
-      env.setValueAtTime(0, t); env.linearRampToValueAtTime(vol, t + 0.18); env.setValueAtTime(vol, end - 0.05); env.linearRampToValueAtTime(0, end + 0.3);
-      play([a, b], end + 0.35);
-      break;
-    }
-    case 'bass': {
-      const f = lp(900, 3);
-      const a = osc('sawtooth', freq), b = osc('triangle', freq);
-      a.connect(f); b.connect(f);
-      env.setValueAtTime(vol, t); env.exponentialRampToValueAtTime(vol * 0.5, t + dur * 0.8); env.linearRampToValueAtTime(0, end + 0.03);
-      play([a, b], end + 0.05);
-      break;
-    }
-    case 'kick': {
-      const a = osc('sine', 150);
-      a.frequency.setValueAtTime(150, t); a.frequency.exponentialRampToValueAtTime(40, t + 0.12);
-      a.connect(out);
-      env.setValueAtTime(vol, t); env.exponentialRampToValueAtTime(0.001, t + 0.18);
-      play([a], t + 0.2);
-      break;
-    }
-    case 'snare': case 'hat': {
-      const n = c.createBufferSource(); n.buffer = noiseBuf;
-      const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = inst === 'hat' ? 7000 : 1500;
-      n.connect(hp); hp.connect(out);
-      const d = inst === 'hat' ? 0.04 : 0.14;
-      env.setValueAtTime(vol, t); env.exponentialRampToValueAtTime(0.001, t + d);
-      const nodes: AudioScheduledSourceNode[] = [n];
-      if (inst === 'snare') { const o = osc('triangle', 190); const g2 = c.createGain(); g2.gain.value = 0.6; o.connect(g2); g2.connect(out); nodes.push(o); }
-      play(nodes, t + d + 0.02);
-      break;
-    }
+// Pre-rendered, sample-based tracks (scripts/music) shipped as looping MP3s. Each one decodes on first use.
+const decoded = new Map<TrackId, Promise<AudioBuffer | null>>();
+function loadTrack(c: AudioContext, id: TrackId): Promise<AudioBuffer | null> {
+  let p = decoded.get(id);
+  if (!p) {
+    const bytes = Uint8Array.from(atob(TRACKS[id].mp3), ch => ch.charCodeAt(0));
+    p = c.decodeAudioData(bytes.buffer).catch(() => null);
+    decoded.set(id, p);
   }
+  return p;
 }
 
-interface Playing { song: Song; step: number; next: number; timer: number; total: number; introSteps: number; parsed: Array<Array<{ m: number; len: number } | null>> }
+/** Decode a track ahead of time so it starts on cue (e.g. the stage theme while the battle loads). */
+export function preloadMusic(id: TrackId): void {
+  const c = init();
+  if (c) void loadTrack(c, id);
+}
+
+interface Playing { id: TrackId; gain: GainNode; src: AudioBufferSourceNode | null }
 let current: Playing | null = null;
-let currentName = '';
 
-function parse(song: Song): Playing['parsed'] {
-  return song.tracks.map(tr => {
-    const out: Array<{ m: number; len: number } | null> = [];
-    tr.notes.forEach((tok, i) => {
-      if (tok === '-' || tok === '.') { out.push(null); return; }
-      let len = 1;
-      while (tr.notes[i + len] === '-') len++;
-      out.push({ m: tok === 'x' ? 0 : midi(tok), len });
-    });
-    return out;
-  });
-}
-
-export function playMusic(name: string, song: Song): void {
-  if (currentName === name && current) return;
+export function playMusic(id: TrackId): void {
+  if (current?.id === id) return;
   stopMusic();
   const c = init();
   if (!c) return;
-  currentName = name;
-  const parsed = parse(song);
-  const total = Math.max(...song.tracks.map(t => t.notes.length));
-  const introSteps = (song.intro ?? 0) * song.steps * 4;
-  const p: Playing = { song, step: 0, next: c.currentTime + 0.1, timer: 0, total, introSteps, parsed };
-  const stepDur = 60 / song.bpm / song.steps;
-  const tick = (): void => {
-    if (!ctx || current !== p) return;
-    while (p.next < ctx.currentTime + 0.2) {
-      if (ctx.state === 'running') {
-        song.tracks.forEach((tr, k) => {
-          const ev = p.parsed[k][p.step];
-          if (!ev) return;
-          const vol = tr.vol ?? 0.2;
-          if (tr.inst === 'kick' || tr.inst === 'snare' || tr.inst === 'hat') voice(ctx!, tr.inst, 0, p.next, stepDur, vol);
-          else if (ev.m > 0) voice(ctx!, tr.inst, hz(ev.m), p.next, ev.len * stepDur * 0.95, vol);
-        });
-      }
-      p.next += stepDur;
-      p.step++;
-      if (p.step >= p.total) p.step = p.introSteps;
-    }
-  };
-  p.timer = window.setInterval(tick, 40);
-  current = p;
-  tick();
+  const me: Playing = { id, gain: c.createGain(), src: null };
+  me.gain.connect(musicBus);
+  current = me;
+  void loadTrack(c, id).then(buf => {
+    if (current !== me || !buf) return;
+    const t = TRACKS[id];
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    // loop points sit on bar lines; the file's loop head already holds the ringing tail of the loop's end
+    if (t.loopEnd > t.loopStart) { src.loop = true; src.loopStart = t.loopStart; src.loopEnd = t.loopEnd; }
+    src.connect(me.gain);
+    src.start();
+    me.src = src;
+  });
 }
 
+/** Fade the current track out quickly. */
 export function stopMusic(): void {
-  if (current) window.clearInterval(current.timer);
+  const p = current;
   current = null;
-  currentName = '';
+  if (!p || !ctx) return;
+  const t = ctx.currentTime;
+  p.gain.gain.setTargetAtTime(0, t, 0.06);
+  p.src?.stop(t + 0.3);
 }
+
+/** The battle theme for a stage (falls back to the Colosseum theme). */
+export const stageTrack = (stageId: string): TrackId => (`stage_${stageId}` in TRACKS ? `stage_${stageId}` : 'stage_colosseum') as TrackId;
 
 // ---------- charge hum ----------
 // A held tone that rises while a heavy attack charges and warbles once it's ready. Call every frame
