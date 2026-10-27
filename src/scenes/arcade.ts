@@ -3,7 +3,7 @@
 import { replaceScene, goHome, drawMenu, hint, listMouse, type Scene } from './scene';
 import { getArena, useStage } from '../game/battleView';
 import { drawStage } from '../art/arena';
-import { getStage } from '../art/stages';
+import { getStage } from '../content/stages';
 import { getSprite, drawFighterSprite, skinOf, type ClassId } from '../art/sprites';
 import { CLASS_INFO } from '../game/classes';
 import { TUNING } from '../game/tuning';
