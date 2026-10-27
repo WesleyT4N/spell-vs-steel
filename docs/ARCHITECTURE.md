@@ -211,14 +211,14 @@ flowchart BT
 
 | Id | Name | File |
 | --- | --- | --- |
-| `colosseum` | Grand Colosseum | `art/arena.ts` |
-| `courtyard` | Castle Courtyard | `art/stages.ts` |
-| `archive` | Arcane Archive | `art/stages.ts` |
-| `frostpeak` | Frostpeak Pass | `art/stages.ts` |
-| `emberforge` | Emberforge | `art/stages.ts` |
-| `elderwood` | Elderwood Ruins | `art/stages.ts` |
+| `colosseum` | Grand Colosseum | `content/stages/colosseum.ts` |
+| `courtyard` | Castle Courtyard | `content/stages/courtyard.ts` |
+| `archive` | Arcane Archive | `content/stages/archive.ts` |
+| `frostpeak` | Frostpeak Pass | `content/stages/frostpeak.ts` |
+| `emberforge` | Emberforge | `content/stages/emberforge.ts` |
+| `elderwood` | Elderwood Ruins | `content/stages/elderwood.ts` |
 
-`StageDef` = id, name, tag, `PanelLook`, panel `tex()`, up to four layer painters. `getStage(id)` builds and caches; `STAGE_IDS` feeds stage select. `art/ink.ts` is the Inked toolkit. Online, both players vote; a tie wins, otherwise a seeded coin flip.
+Each stage is a module in `content/stages/`, registered in `content/stages/index.ts` (order = stage select and online vote order; new stages go at the end). `StageDef` (`content/stages/inked.ts`) = id, name, tag, `PanelLook`, panel `tex()`, up to four layer painters; `inkedStage(def)` wraps one as a `StageModule`. `getStage(id)` builds and caches; `STAGE_IDS` feeds stage select. `art/ink.ts` is the Inked toolkit. Online, both players vote; a tie wins, otherwise a seeded coin flip.
 
 ## Rendering and art pipeline
 
