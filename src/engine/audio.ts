@@ -75,6 +75,12 @@ export function unlockAudio(): void {
   if (c && c.state === 'suspended') void c.resume();
 }
 
+/** Pause all sound while the game is in the background, and pick it back up when it returns. */
+export function setAudioSuspended(on: boolean): void {
+  if (!ctx) return;
+  void (on ? ctx.suspend() : ctx.resume()).catch(() => { /* resume waits for a gesture on some browsers */ });
+}
+
 export function toggleMute(): boolean {
   muted = !muted;
   setSave('muted', muted);

@@ -2,7 +2,7 @@
 // Online, each player votes; the same pick comes out on both machines (a tie wins, otherwise a seeded coin
 // flip between the two votes, shown as a roulette).
 import { replaceScene, popScene, goHome, hint, zone, hot, showSel, type Scene } from './scene';
-import { getStage, STAGE_IDS } from '../art/stages';
+import { getStage, STAGE_IDS } from '../content/stages';
 import { drawPanel, drawStage, panelFoot } from '../art/arena';
 import { useStage } from '../game/battleView';
 import { getSprite, drawFighterSprite, skinOf, mirrorSkin } from '../art/sprites';

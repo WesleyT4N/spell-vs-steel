@@ -9,9 +9,10 @@ import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx, getAudioSettings, setAudioSettings, isMuted, toggleMute, voiceLine, announce } from '../engine/audio';
 import { PLAYABLE } from '../game/classes';
 import { ControlsScene } from './controls';
+import { platform } from '../platform';
 import { win, selRow, PAPER, PAPER2, BURN, INK, INK2, RED_INK, TRIM, FRAME } from './skin';
 
-type Row = 'master' | 'musicOn' | 'music' | 'sfxOn' | 'sfx' | 'voice' | 'announcer' | 'mute' | 'keys' | 'back';
+type Row = 'master' | 'musicOn' | 'music' | 'sfxOn' | 'sfx' | 'voice' | 'announcer' | 'mute' | 'fullscreen' | 'keys' | 'back';
 const ROWS: Array<[Row, string]> = [
   ['master', 'MASTER VOLUME'],
   ['musicOn', 'MUSIC'],
@@ -21,6 +22,8 @@ const ROWS: Array<[Row, string]> = [
   ['voice', 'CHARACTER VOICES'],
   ['announcer', 'ANNOUNCER VOICE'],
   ['mute', 'MUTE ALL (M)'],
+  // only where the platform can switch it (not iPhone Safari)
+  ...(platform.fullscreen.supported() ? [['fullscreen', 'FULLSCREEN'] as [Row, string]] : []),
   ['keys', 'KEY MAPPING'],
   ['back', 'BACK'],
 ];
@@ -41,8 +44,10 @@ function preview(row: Row): void {
 }
 
 // layout (UI pixels)
-const PX = 64, PW = UW - 128, Y0 = 56, RH = 20, BAR_X = 236, BLOCK = 14;
-const rowY = (i: number): number => Y0 + i * RH + (i >= 8 ? 10 : 0);
+// the key mapping and back rows sit a little apart; with the fullscreen row the rows pack tighter to fit
+const PX = 64, PW = UW - 128, Y0 = 56, RH = ROWS.length > 10 ? 18 : 20, BAR_X = 236, BLOCK = 14;
+const GROUP = ROWS.findIndex(([r]) => r === 'keys');
+const rowY = (i: number): number => Y0 + i * RH + (i >= GROUP ? 10 : 0);
 // phone portrait spreads the rows into the spare height (vy); `off` centers a row's contents in its taller box
 
 /** Audio settings and a door to the key mapping screen. Settings save in the browser. */
@@ -122,6 +127,7 @@ export class OptionsScene implements Scene {
     const toggle = ok || l || r;
     if (toggle && (row === 'musicOn' || row === 'sfxOn')) { setAudioSettings({ [row]: !s[row] }); sfx('select'); }
     if (toggle && row === 'mute') { toggleMute(); sfx('select'); }
+    if (toggle && row === 'fullscreen') { void platform.fullscreen.set(!platform.fullscreen.isOn()); sfx('select'); }
     if (ok && row === 'keys') { sfx('select'); pushScene(new ControlsScene()); }
     if (ok && row === 'back') { sfx('back'); this.back(); }
   }
@@ -157,6 +163,7 @@ export class OptionsScene implements Scene {
       }
       if (row === 'musicOn' || row === 'sfxOn') drawText(ui, s[row] ? 'ON' : 'OFF', BAR_X, ty, s[row] ? '#007800' : RED_INK);
       if (row === 'mute') drawText(ui, isMuted() ? 'ON' : 'OFF', BAR_X, ty, isMuted() ? RED_INK : INK);
+      if (row === 'fullscreen') drawText(ui, platform.fullscreen.isOn() ? 'ON' : 'OFF', BAR_X, ty, INK);
       if (row === 'keys') drawText(ui, '→', BAR_X, ty, TRIM);
     });
     hint(ui, `CLICK OR DRAG THE BARS   ${k('left')}/${k('right')}: ADJUST   ${k('cast')} / RIGHT-CLICK: BACK`);

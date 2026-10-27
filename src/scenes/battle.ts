@@ -121,6 +121,11 @@ export class BattleScene implements Scene {
   /** Where the bottom part of a split phone screen starts (full-screen UI coordinates). */
   protected get splitTop(): number { return -view.oy * 2 + spread.halfH * 2; }
 
+  /** Tabbing away mid-fight pauses it (online play keeps running: the other side decides). */
+  suspend(): void {
+    if (this.b.phase === 'fight' && !this.paused && !this.watching) { this.paused = true; this.pauseSel = 0; resetSel(); }
+  }
+
   pad(): PadMode {
     const b = this.b;
     if (this.paused) return spread.tall ? 'none' : 'back';
