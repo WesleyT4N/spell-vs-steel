@@ -20,8 +20,7 @@ import { P, UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse, localDir, localDown, localPressed, localNav, localKey } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
-import { playMusic, stopMusic, sfx, chargeHum, announce, voiceLine } from '../engine/audio';
-import { BATTLE_SONG, RESULT_SONG } from '../engine/music';
+import { playMusic, stopMusic, stageTrack, sfx, chargeHum, announce, voiceLine } from '../engine/audio';
 import { drawCardDetail, drawCardFace, resName, resInk, RES_INK, CARD_W, CARD_H, PICKED } from './cardView';
 import { CardPreview } from './cardPreview';
 import { win, plaque, pip, disc, banner, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, BLUE_INK, WAX_HI, GOLD } from './skin';
@@ -111,8 +110,13 @@ export class BattleScene implements Scene {
   /** On-screen key name for side `s`. */
   protected keyOf(s: Side, a: 'left' | 'right' | 'attack' | 'cast' | 'custom'): string { return this.twoPlayer ? localKey(s, a) : k(a); }
 
-  enter(): void { playMusic('battle', BATTLE_SONG); }
-  resume(): void { playMusic('battle', BATTLE_SONG); }
+  enter(): void { playMusic(stageTrack(getArena().id)); }
+  resume(): void { playMusic(stageTrack(getArena().id)); }
+
+  /** Tabbing away mid-fight pauses it (online play keeps running: the other side decides). */
+  suspend(): void {
+    if (this.b.phase === 'fight' && !this.paused && !this.watching) { this.paused = true; this.pauseSel = 0; resetSel(); }
+  }
 
   pad(): PadMode {
     const b = this.b;
@@ -170,7 +174,7 @@ export class BattleScene implements Scene {
       this.rounds.push(roundRecord(b, this.stats));
       stopMusic();
       if (b.winner !== null && (b.winner === this.me || this.ctl[b.winner] === 'player' || this.watching)) sfx('win');
-      playMusic('result', RESULT_SONG);
+      playMusic('victory');
     }
   }
 
@@ -381,7 +385,7 @@ export class BattleScene implements Scene {
     const b = this.b;
     // one player sees their side's hidden things (traps, stealth); sharing a screen or watching, everything shows
     const shared = this.humans.length !== 1;
-    drawBattle(c, b, tick, shared ? 'all' : this.me);
+    drawBattle(c, b, tick, shared ? 'all' : this.me, true);
     if (b.phase !== 'custom') {
       if (!shared) drawBattleUi(ui, b, tick, this.me);
       else drawBattleUi(ui, b, tick, 0, this.twoPlayer

@@ -555,11 +555,48 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
       if (once(e, 'fl', p > 0.5)) emit(6, () => spark(hx, hy, [ramp[3], ramp[2], ramp[1]], boxC(hx, hy), 40, { g: 20 }));
       break;
     }
+    case 'impact': impact(c, e, x, y - 11, p, d); break;
     case 'castName': break; // drawn on the UI layer by drawCastCallout
   }
 }
 
 // ---------- projectiles ----------
+/**
+ * The hit spark on every landed hit, colored by element and sized by how hard it hit (tier 0 light .. 3 KO).
+ * A white-hot star on the first frames, a ring, then element sparks, all inside the 24x24 box around the target.
+ */
+function impact(c: Ctx, e: Fx, x: number, y: number, p: number, d: number): void {
+  const el = String(e.data?.el ?? 'steel'), tier = Number(e.data?.tier ?? 0);
+  const ramp = ELEMENT_RAMP[el] ?? STEEL;
+  const box = boxC(x, y), hot = [ramp[3], ramp[2], ramp[1], ramp[0]];
+  // struck point sits a little toward the attacker
+  const sx = Math.round(x - d * 3), sy = Math.round(y);
+  // star flash: long arms on the first frames, then shrinking
+  const flash = 0.25 + tier * 0.05;
+  if (p < flash) {
+    const k = 1 - p / flash, s = Math.round((3 + tier * 2.5) * k) + 1;
+    P(c, '#000000', sx - s - 1, sy - 1, s * 2 + 3, 3); P(c, '#000000', sx - 1, sy - s - 1, 3, s * 2 + 3);
+    P(c, ramp[2], sx - s, sy, s * 2 + 1, 1); P(c, ramp[2], sx, sy - s, 1, s * 2 + 1);
+    P(c, '#fcfcfc', sx - (s >> 1), sy, s + 1, 1); P(c, '#fcfcfc', sx, sy - (s >> 1), 1, s + 1);
+    if (tier >= 1) { const q = Math.round(s * 0.6); for (let i = 1; i <= q; i++) { P(c, ramp[1], sx - i, sy - i); P(c, ramp[1], sx + i, sy - i); P(c, ramp[1], sx - i, sy + i); P(c, ramp[1], sx + i, sy + i); } }
+    P(c, '#fcfcfc', sx - 1, sy - 1, 3, 3);
+  }
+  // ring rolling out on solid hits
+  if (tier >= 1 && p < 0.6) ring(c, p < 0.25 ? ramp[3] : ramp[1], sx, sy, 3 + p * (14 + tier * 3), 2 + p * (10 + tier * 2), p > 0.3 ? 2 : 0);
+  if (tier >= 2 && p < 0.2) glow(c, sx, sy, 10, '252,252,252', 0.6 * (1 - p / 0.2));
+  if (!once(e, 'sp')) return;
+  const n = [5, 9, 13, 18][tier] ?? 5, speed = 45 + tier * 15;
+  switch (el) {
+    case 'fire': emit(n, () => ember(sx + rnd(-3, 3), sy + rnd(-2, 2), box, { vx: rnd(-25, 25) + d * 10, vy: rnd(-45, -10) })); break;
+    case 'frost': emit(n, () => spark(sx, sy, ICE.slice().reverse(), box, speed, { g: 160, size: 2, shrink: 0.5 })); break;
+    case 'poison': emit(n, () => spark(sx, sy, [TOX[2], TOX[1], TOX[0]], box, speed * 0.7, { g: 220, size: 2 })); break;
+    case 'nature': emit(n, () => spark(sx, sy, ['#b8f818', '#58d854', '#005800'], box, speed * 0.8, { g: 60, drag: 0.92, life: rnd(0.3, 0.6) })); break;
+    case 'shadow': emit(n, () => { const a = Math.random() * Math.PI * 2, r = rnd(8, 11); part(sx + Math.cos(a) * r, sy + Math.sin(a) * r, { vx: -Math.cos(a) * 30, vy: -Math.sin(a) * 30, life: 0.3, ramp: [SHADOW[2], SHADOW[1], SHADOW[0]], size: 2, box }); }); break;
+    case 'arcane': case 'holy': emit(n, () => mote(sx + rnd(-6, 6), sy + rnd(-5, 5), hot, box, { vy: rnd(-30, -8), life: rnd(0.3, 0.55), size: rnd(1, 2) })); emit(Math.ceil(n / 2), () => spark(sx, sy, hot, box, speed)); break;
+    default: emit(n, () => spark(sx, sy, ['#fcfcfc', '#f8d878', '#bcbcbc', '#7c7c7c'], box, speed + 15, { vx: d * rnd(20, 70), vy: rnd(-40, 15) }));
+  }
+}
+
 export function drawShot(c: Ctx, b: Battle, p: Projectile, x: number, y: number, dir: number): boolean {
   const ph = Math.floor(b.time * 20) % 2;
   if (p.kind === 'fireball') {
