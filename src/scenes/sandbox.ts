@@ -195,7 +195,7 @@ export class SandboxScene implements Scene {
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
     const b = this.b;
-    drawBattle(c, b, tick, 'all');
+    drawBattle(c, b, tick, 'all', true);
     drawBattleUi(ui, b, tick);
     for (let col = 0; col < COLS; col++) for (let row = 0; row < ROWS; row++) {
       zone(`cell:${col * ROWS + row}`, (X0 + col * PW) * 2, (Y0 + row * (FACE + LIP)) * 2, PW * 2, (FACE + LIP) * 2);
