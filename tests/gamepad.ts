@@ -1,7 +1,13 @@
 // Gamepad input: a fake pad (standard mapping) is polled the way the main loop does, and its presses must come
 // out as the same actions a keyboard makes: menus, single-player, both players in local Versus, and rebinding.
 // Run: npx tsx tests/gamepad.ts
-import { pollInput, endFrame, isDown, wasPressed, heldDir, localDown, localPressed, localDir, k, localKey, captureNextKey, setPadButton, resetPads } from '../src/engine/input';
+import { initSave, getSave } from '../src/engine/save';
+import { memoryStorage } from '../src/platform/storage';
+
+// saves go to memory; input reads its bindings when it loads, so it is imported after
+await initSave(memoryStorage());
+const { pollInput, endFrame, isDown, wasPressed, heldDir, localDown, localPressed, localDir, k, localKey, captureNextKey, setPadButton, resetPads } =
+  await import('../src/engine/input');
 
 interface FakePad { index: number; connected: boolean; mapping: string; buttons: Array<{ pressed: boolean; value: number }>; axes: number[] }
 const pads: Array<FakePad | null> = [null, null, null, null];
@@ -69,6 +75,8 @@ hold(p1, A, true); step(() => check('A still confirms menus after attack moves o
 setPadButton(0, 'attack', 'B');
 hold(p1, B, true); step(() => check('taking cast\'s button swaps cast onto the old one', wasPressed('attack') && !wasPressed('cast'))); hold(p1, B, false); step();
 hold(p1, 2, true); step(() => check('cast moved to X', wasPressed('cast'))); hold(p1, 2, false); step();
+const saved = getSave('pads') as { p1?: Record<string, string> } | null;
+check('pad bindings are saved', saved?.p1?.attack === 'B' && saved.p1.cast === 'X');
 resetPads(0);
 
 if (failed) { console.error(`${failed} gamepad check(s) failed`); process.exit(1); }

@@ -1,4 +1,5 @@
 // Keyboard and gamepad input with per-frame "pressed" edges and rebindable keys and buttons (saved in the browser).
+import { getSave, setSave } from './save';
 import { unlockAudio } from './audio';
 import { view } from './gfx';
 import { pollPads, clearPads, padCode, parsePad, padName, PAD_BUTTONS, PAD_SLOTS, type PadButton } from './gamepad';
@@ -29,12 +30,11 @@ const FIXED: Record<string, Action[]> = {
   PadAttack: ['attack', 'confirm'], PadCast: ['cast', 'back'], PadDraw: ['custom'], PadPause: ['pause'], PadBack: ['back'],
 };
 
-const STORE = 'svs:keys';
-let keys: Record<Bindable, string> = { ...DEFAULT_KEYS };
-try {
-  const raw = localStorage.getItem(STORE);
-  if (raw) keys = { ...DEFAULT_KEYS, ...(JSON.parse(raw) as Partial<Record<Bindable, string>>) };
-} catch { /* storage blocked */ }
+/** The saved bindings for `acts` that are real key codes. */
+function pick<A extends string>(saved: Record<string, string>, acts: readonly A[]): Partial<Record<A, string>> {
+  return Object.fromEntries(acts.filter(a => typeof saved[a] === 'string').map(a => [a, saved[a]])) as Partial<Record<A, string>>;
+}
+let keys: Record<Bindable, string> = { ...DEFAULT_KEYS, ...pick(getSave('keys'), BINDABLE) };
 
 // ---------- gamepad buttons ----------
 // Player 1's buttons work on every pad outside two-player Versus; there pad 1 plays player 1 and pad 2 player 2.
@@ -51,18 +51,14 @@ const PAD_FIXED: Partial<Record<PadButton, Action[]>> = {
 };
 /** Buttons the rebinding screen refuses: SELECT always backs out, and START is only for pausing. */
 export const padReserved = (b: PadButton, a: Bindable | LocalAct): boolean => b === 'Back' || b === 'Home' || (b === 'Start' && a !== 'pause');
-const PAD_STORE = 'svs:pads';
 let pads: { p1: Record<Bindable, PadButton>; p2: Record<LocalAct, PadButton> } = { p1: { ...DEFAULT_PAD }, p2: { ...DEFAULT_P2_PAD } };
-try {
-  const raw = localStorage.getItem(PAD_STORE);
-  if (raw) {
-    const saved = JSON.parse(raw) as { p1?: Record<string, unknown>; p2?: Record<string, unknown> };
-    // only real button names for real actions survive a hand-edited save
-    const pick = <A extends string>(m: Record<string, unknown> | undefined, acts: readonly A[]): Partial<Record<A, PadButton>> =>
-      Object.fromEntries(acts.filter(a => (PAD_BUTTONS as readonly unknown[]).includes(m?.[a])).map(a => [a, m![a]])) as Partial<Record<A, PadButton>>;
-    pads = { p1: { ...DEFAULT_PAD, ...pick(saved.p1, BINDABLE) }, p2: { ...DEFAULT_P2_PAD, ...pick(saved.p2, LOCAL_ACTS) } };
-  }
-} catch { /* storage blocked */ }
+{
+  const saved = (getSave('pads') ?? {}) as { p1?: Record<string, unknown>; p2?: Record<string, unknown> };
+  // only real button names for real actions survive a hand-edited save
+  const pickPad = <A extends string>(m: Record<string, unknown> | undefined, acts: readonly A[]): Partial<Record<A, PadButton>> =>
+    Object.fromEntries(acts.filter(a => (PAD_BUTTONS as readonly unknown[]).includes(m?.[a])).map(a => [a, m![a]])) as Partial<Record<A, PadButton>>;
+  pads = { p1: { ...DEFAULT_PAD, ...pickPad(saved.p1, BINDABLE) }, p2: { ...DEFAULT_P2_PAD, ...pickPad(saved.p2, LOCAL_ACTS) } };
+}
 
 export const getPadButton = (a: Bindable): PadButton => pads.p1[a];
 export const getP2PadButton = (a: LocalAct): PadButton => pads.p2[a];
@@ -81,7 +77,7 @@ export function resetPads(p: 0 | 1): void {
 function savePads(): void {
   rebuild();
   rebuildLocal();
-  try { localStorage.setItem(PAD_STORE, JSON.stringify(pads)); } catch { /* storage blocked */ }
+  setSave('pads', { p1: { ...pads.p1 }, p2: { ...pads.p2 } });
 }
 
 let BINDINGS: Record<string, Action[]> = {};
@@ -118,7 +114,7 @@ export function resetKeys(): void { keys = { ...DEFAULT_KEYS }; save(); }
 function save(): void {
   rebuild();
   rebuildLocal();
-  try { localStorage.setItem(STORE, JSON.stringify(keys)); } catch { /* storage blocked */ }
+  setSave('keys', { ...keys });
 }
 
 /** Short on-screen name for a key code. */
@@ -156,12 +152,7 @@ const LOCAL_EXTRA: [Record<LocalAct, string>, Record<LocalAct, string>] = [
   { up: 'PadUp', down: 'PadDown', left: 'PadLeft', right: 'PadRight', attack: 'PadAttack', cast: 'PadCast', custom: 'PadDraw' },
   { up: 'Numpad8', down: 'Numpad5', left: 'Numpad4', right: 'Numpad6', attack: 'Numpad1', cast: 'Numpad2', custom: 'Numpad3' },
 ];
-const P2_STORE = 'svs:p2keys';
-let p2Keys: Record<LocalAct, string> = { ...DEFAULT_P2_KEYS };
-try {
-  const raw = localStorage.getItem(P2_STORE);
-  if (raw) p2Keys = { ...DEFAULT_P2_KEYS, ...(JSON.parse(raw) as Partial<Record<LocalAct, string>>) };
-} catch { /* storage blocked */ }
+let p2Keys: Record<LocalAct, string> = { ...DEFAULT_P2_KEYS, ...pick(getSave('p2keys'), LOCAL_ACTS) };
 let LOCAL_KEYS: [Record<LocalAct, string[]>, Record<LocalAct, string[]>] = [{} as Record<LocalAct, string[]>, {} as Record<LocalAct, string[]>];
 let LOCAL_CODES = new Set<string>();
 function rebuildLocal(): void {
@@ -192,7 +183,7 @@ export function setP2Key(a: LocalAct, code: string): void {
 export function resetP2Keys(): void { p2Keys = { ...DEFAULT_P2_KEYS }; saveP2(); }
 function saveP2(): void {
   rebuildLocal();
-  try { localStorage.setItem(P2_STORE, JSON.stringify(p2Keys)); } catch { /* storage blocked */ }
+  setSave('p2keys', { ...p2Keys });
 }
 const rawHeld = new Set<string>();
 const rawPressed = new Set<string>();

@@ -3,7 +3,7 @@
 // Each frame checks invariants that should never break whatever the balance is (HP and resources in range,
 // fighters on the grid and apart, nothing piling up), and each match must end in a KO within the time limit.
 // Usage: npx tsx tests/matches.ts [--quick] [--rounds 3] [--only warrior,mage] [--seed 123]
-import { Battle, COLS, ROWS, type Fighter } from '../src/game/battle';
+import { Battle, COLS, ROWS, NO_INTENT, type Fighter } from '../src/game/battle';
 import { Cpu } from '../src/game/ai';
 import { presetsFor, toList, validate, type DeckCounts } from '../src/game/deck';
 import { battleHash } from '../src/net/hash';
@@ -37,7 +37,7 @@ const fail = (c: Case, msg: string): void => {
   console.log(`FAIL ${c.a.cls}/${c.a.label} vs ${c.b.cls}/${c.b.label} (${c.cpu.join('/')}, seed ${c.seed}): ${msg}`);
 };
 
-// every ready-made deck must be a legal grimoire, or the CPU and the player fight with something the builder refuses
+// every ready-made deck must be a legal spell deck, or the CPU and the player fight with something the builder refuses
 for (const cls of classes) for (const p of presetsFor(cls)) {
   const errs = validate(p.cards);
   if (errs.length) { failures++; console.log(`FAIL deck ${cls}/${p.id} is not legal: ${errs.join('; ')}`); }
@@ -55,10 +55,14 @@ function checkFighter(f: Fighter): string | null {
   return null;
 }
 
-/** Plays one match. Math.random is seeded too (the CPUs use it), so the whole match replays from `seed`. */
+/**
+ * Plays one match. The CPUs seed their rolls from the battle, so the whole match replays from `seed`.
+ * Math.random gets a different stream on every play, so a rule or CPU roll that still leans on it shows up as a failed replay.
+ */
+let plays = 0;
 function play(c: Case): { b: Battle; hashes: number[] } | null {
   const real = Math.random;
-  Math.random = seeded(c.seed * 31 + 7);
+  Math.random = seeded(++plays * 7919);
   try {
     const b = new Battle({ cls: c.a.cls, deck: toList(c.a.deck), name: 'A' }, { cls: c.b.cls, deck: toList(c.b.deck), name: 'B' }, c.seed);
     const cpus = [new Cpu(c.cpu[0]), new Cpu(c.cpu[1])];
@@ -66,7 +70,7 @@ function play(c: Case): { b: Battle; hashes: number[] } | null {
     let frame = 0;
     while (b.phase !== 'over') {
       if (b.phase === 'custom') b.endCustom([cpus[0].pick(b, b.f[0]), cpus[1].pick(b, b.f[1])]);
-      else if (b.canOpenCustom() && Math.random() < 0.02) b.beginCustom();
+      else if (cpus[0].wantsDraw(b, b.f[0], DT)) b.beginCustom();
       b.update(DT, [cpus[0].intent(b, b.f[0], DT), cpus[1].intent(b, b.f[1], DT)]);
       frame++;
       if (frame % 30 === 0) hashes.push(battleHash(b));
@@ -78,7 +82,8 @@ function play(c: Case): { b: Battle; hashes: number[] } | null {
       if (frame * DT > LIMIT) { fail(c, `no KO after ${LIMIT}s (HP ${Math.round(b.f[0].hp)}/${Math.round(b.f[1].hp)}, turn ${b.turn})`); return null; }
     }
     const w = b.winner;
-    if (w === null) { fail(c, 'match ended with no winner'); return null; }
+    // a double K.O. is a drawn round: both fighters down on the same frame
+    if (w === null) { if (!b.f.every(f => f.dead && f.hp <= 0)) { fail(c, 'match ended with no winner'); return null; } return { b, hashes }; }
     if (b.f[1 - w].hp > 0) { fail(c, `side ${w} won but the loser has ${b.f[1 - w].hp} HP`); return null; }
     if (b.f[w].hp <= 0) { fail(c, `side ${w} won with ${b.f[w].hp} HP`); return null; }
     if (b.turn < 1) { fail(c, 'the Draw screen never opened'); return null; }
@@ -104,6 +109,22 @@ for (let r = 0; r < rounds; r++) {
   for (const a of classes) for (const p of presetsFor(a).slice(1)) for (const bc of classes) {
     cases.push({ a: { cls: a, deck: p.cards, label: p.id }, b: starter(bc), cpu: ['normal', 'normal'], seed: next() });
   }
+}
+
+// a double K.O. (both fighters down on the same frame) is a drawn round, and a lone K.O. still has a winner
+{
+  const ko = (both: boolean): Battle => {
+    const b = new Battle({ cls: 'warrior', deck: toList(starter('warrior').deck), name: 'A' }, { cls: 'mage', deck: toList(starter('mage').deck), name: 'B' }, 99);
+    b.endCustom([[], []]);
+    b.f[1].hp = 0;
+    if (both) b.f[0].hp = 0;
+    b.update(DT, [NO_INTENT, NO_INTENT]);
+    for (let i = 0; i < 300 && b.phase !== 'over'; i++) b.update(DT, [NO_INTENT, NO_INTENT]);
+    return b;
+  };
+  const d = ko(true), one = ko(false);
+  if (d.phase !== 'over' || d.winner !== null || !d.f.every(f => f.dead)) { failures++; console.log(`FAIL double K.O.: phase ${d.phase}, winner ${d.winner}`); }
+  if (one.phase !== 'over' || one.winner !== 0 || one.f[0].dead) { failures++; console.log(`FAIL single K.O.: phase ${one.phase}, winner ${one.winner}`); }
 }
 
 const t0 = Date.now();

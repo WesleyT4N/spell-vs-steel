@@ -1,6 +1,7 @@
 // Balance lab: run CPU-vs-CPU matches in the browser, read per-card stats, and tweak numbers live.
 // Tuning edits apply to the whole game (Versus and the sandbox too) until the page reloads.
-import type { Scene } from './scene';
+import { popScene, type Scene } from './scene';
+import { getSave, setSave } from '../engine/save';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { screenRect, type Ctx } from '../engine/gfx';
@@ -11,7 +12,12 @@ import type { Difficulty } from '../game/tuning';
 import type { ClassId } from '../art/sprites';
 import { addMatch, classIds, emptyStats, runMatch, wilson, type SeriesStats, type SideSpec } from '../dev/simulate';
 import { cardPower } from '../dev/instrument';
-import { applyOverrides, defaultTuning, getTuning, isModified, onTuningChange, overrides, resetAll, setPower, setTuning, tuningPaths } from '../dev/tuningEdit';
+import { defaultTuning, getTuning, isModified, onTuningChange, overrideCount, overrides, replaceOverrides, resetAll, setPower, setTuning, tuningPaths } from '../dev/tuningEdit';
+import { parseScript, toScript } from '../dev/script';
+import { planGrid, foldGrid, cellRate, cellRange, classTotal, favorable, ruleChecks, FAV, THIN, LOPSIDED, type GridPlan, type GridReport } from '../dev/grid';
+import { runGrid, type GridRun } from '../dev/gridRunner';
+import { archetypesFor, mythicOf, type PoolKind } from '../dev/archetypes';
+import { styleById } from '../game/playstyles';
 import { h, btn, choice, setBadge } from '../dev/dom';
 
 // the corner badge, hooked up the first time the lab opens
@@ -19,7 +25,7 @@ let badgeHooked = false;
 const hookBadge = (): void => { if (!badgeHooked) { badgeHooked = true; onTuningChange(showBadge); } };
 const showBadge = (): void => {
   const o = overrides();
-  const n = Object.keys(o.tuning).length + Object.keys(o.cardPower).length;
+  const n = overrideCount(o);
   setBadge(n ? `DEV TUNING ON: ${n} change${n === 1 ? '' : 's'} (reload the page to undo)` : null);
 };
 
@@ -35,16 +41,29 @@ const pct = (v: number): string => `${Math.round(v * 100)}%`;
 const cfg = {
   sides: [{ cls: 'warrior', deck: 'starter', cpu: 'normal' }, { cls: 'mage', deck: 'starter', cpu: 'normal' }] as [SideCfg, SideCfg],
   n: 100,
+  grid: { kind: 'archetype' as PoolKind, n: 20, k: 3, hz: 60 },
 };
 let lastSingle: Task | null = null;
 let lastMatrix: Map<string, Task> | null = null;
+let lastGrid: { plan: GridPlan; run: GridRun; report: GridReport } | null = null;
+
+const SCRIPT_HELP = `# One edit per line. Runs from the shipped numbers every time.
+# hp.mage = 700              any number from the Tuning list below
+# warrior.heavyDamage *= 1.1 also += and -=
+# fireball.power = 110%      a card's damage
+# fireball.cost = 2          a card's cost
+# mage.power = 95%           every card of a class
+`;
+const loadScript = (): string => getSave('labScript') ?? SCRIPT_HELP;
+const saveScript = (t: string): void => setSave('labScript', t);
 
 export class LabScene implements Scene {
   private root!: HTMLElement;
   private tasks: Task[] = [];
-  private mode: 'single' | 'matrix' = 'single';
+  private mode: 'single' | 'matrix' | 'grid' = 'single';
   private matrix = new Map<string, Task>();
   private progressEl!: HTMLElement;
+  private scriptEl!: HTMLElement;
   private resultsEl!: HTMLElement;
   private tuningEl!: HTMLElement;
   private runBtns: HTMLButtonElement[] = [];
@@ -55,7 +74,7 @@ export class LabScene implements Scene {
     if (e.code === 'Escape' && !(e.target instanceof Element && e.target.closest('input, select, textarea'))) this.leaving = true;
   };
 
-  constructor(private back: () => void) {}
+  constructor(private back: () => void = popScene) {}
 
   enter(): void {
     hookBadge();
@@ -125,7 +144,31 @@ export class LabScene implements Scene {
     this.renderProgress();
   }
 
-  private stop(): void { this.tasks = []; this.finish(); }
+  private runFullGrid(): void {
+    this.mode = 'grid';
+    lastGrid?.run.stop();
+    const g = cfg.grid;
+    const plan = planGrid(classIds(), g.kind, g.k, 1, g.n, g.hz);
+    let last = 0;
+    const run = runGrid(plan, () => {
+      // refold at most a few times a second; the table fills in as pairs finish
+      if (performance.now() - last < 300 && run.done < run.total) { this.renderProgress(); return; }
+      last = performance.now();
+      if (lastGrid) lastGrid.report = foldGrid(plan, run.results);
+      this.renderProgress();
+      this.renderResults();
+    });
+    lastGrid = { plan, run, report: foldGrid(plan, []) };
+    for (const b of this.runBtns) b.disabled = true;
+    this.renderProgress();
+    void run.finished.then(() => {
+      if (lastGrid?.run !== run) return;
+      lastGrid.report = foldGrid(plan, run.results);
+      this.finish();
+    });
+  }
+
+  private stop(): void { this.tasks = []; lastGrid?.run.stop(); this.finish(); }
 
   private finish(): void {
     for (const b of this.runBtns) b.disabled = false;
@@ -152,16 +195,23 @@ export class LabScene implements Scene {
       deckSel.addEventListener('change', () => { s.deck = deckSel.value as DeckChoice; });
       fillDecks();
       const cls = choice(classIds().map(c => [c, cap(c)] as [ClassId, string]), s.cls, v => { s.cls = v; fillDecks(); });
-      const cpu = choice<Difficulty>([['easy', 'Easy'], ['normal', 'Normal']], s.cpu, v => { s.cpu = v; });
+      const cpu = choice<Difficulty>([['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']], s.cpu, v => { s.cpu = v; });
       return h('div', { style: 'margin-bottom:6px' }, h('div', { class: 'muted' }, i ? 'Side B (right)' : 'Side A (left)'), cls.el, h('div', { class: 'row' }, deckSel, h('span', { class: 'muted' }, 'CPU'), cpu.el));
     };
     const n = choice<number>([[20, '20'], [50, '50'], [100, '100'], [250, '250'], [500, '500']], cfg.n, v => { cfg.n = v; });
     const run = btn('Run matchup', () => this.runSingle(), 'primary');
     const mat = btn('Run class matrix', () => this.runMatrix());
-    this.runBtns = [run, mat];
+    const g = cfg.grid;
+    const kind = choice<PoolKind>([['starter', 'Starters'], ['archetype', 'Archetypes'], ['variant', 'Archetype variants'], ['random', 'Random decks'], ['style', 'CPU styles + their decks'], ['style-starter', 'CPU styles, starters']], g.kind, v => { g.kind = v; });
+    const gn = choice<number>([[10, '10'], [20, '20'], [40, '40'], [100, '100']], g.n, v => { g.n = v; });
+    const gk = choice<number>([[2, '2'], [3, '3'], [5, '5'], [8, '8']], g.k, v => { g.k = v; });
+    const hz = choice<number>([[60, '60 (exact)'], [30, '30 (fast)']], g.hz, v => { g.hz = v; });
+    const grid = btn('Run full grid', () => this.runFullGrid(), 'primary');
+    this.runBtns = [run, mat, grid];
     this.progressEl = h('div', { class: 'muted', style: 'min-height:16px' });
     this.resultsEl = h('div');
     this.tuningEl = h('div');
+    this.scriptEl = this.scriptBox();
 
     const left = h('div', { style: 'flex:0 0 360px;min-width:0' },
       h('h2', {}, 'Matchup'),
@@ -170,6 +220,15 @@ export class LabScene implements Scene {
       h('div', { class: 'row' }, run, mat, btn('Stop', () => this.stop())),
       this.progressEl,
       h('div', { class: 'muted' }, 'Both sides are CPUs. The class matrix plays every class against every other with starter decks, both sides of the grid.'),
+      h('h2', {}, 'Full matchup grid'),
+      h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Decks'), kind.el),
+      h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Matches per deck pair'), gn.el),
+      h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Decks per class (random) / builds per archetype (variants)'), gk.el),
+      h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Steps per second'), hz.el),
+      h('div', { class: 'row' }, grid),
+      h('div', { class: 'muted' }, `Every deck plays every other class's decks, sides alternating, on all cores. Checks Wes's rules: 2+ favorable matchups (over ${FAV * 100}%, thin under ${THIN * 100}%), nothing past ${LOPSIDED * 100}-${100 - LOPSIDED * 100}, and the counter wheel. Uses the script and tuning below.`),
+      h('h2', {}, 'Script'),
+      this.scriptEl,
       h('h2', {}, 'Tuning'),
       h('div', { class: 'muted' }, 'Live: the whole game uses these until you reload. Changed values are yellow.'),
       this.tuningEl,
@@ -183,10 +242,16 @@ export class LabScene implements Scene {
     this.renderTuning();
     if (lastMatrix) { this.matrix = lastMatrix; this.mode = 'matrix'; }
     if (lastSingle) this.mode = 'single';
+    if (lastGrid) this.mode = 'grid';
     this.renderResults();
   }
 
   private renderProgress(): void {
+    if (this.mode === 'grid' && lastGrid) {
+      const r = lastGrid.run, running = r.done < r.total && this.runBtns[0]?.disabled;
+      this.progressEl.textContent = running ? `Running grid on ${r.how}… ${r.done}/${r.total} deck pairs` : `Grid done: ${lastGrid.report.matches} matches (${r.how}).`;
+      return;
+    }
     const all = this.mode === 'single' ? (lastSingle ? [lastSingle] : []) : [...this.matrix.values()];
     const done = all.reduce((a, t) => a + t.stats.n, 0), total = all.reduce((a, t) => a + t.n, 0);
     this.progressEl.textContent = this.tasks.length ? `Running… ${done}/${total} matches` : total ? `Done: ${done} matches.` : '';
@@ -198,14 +263,8 @@ export class LabScene implements Scene {
       const g = p.includes('.') ? p.split('.').slice(0, -1).join('.') : 'general';
       (groups.get(g) ?? groups.set(g, []).get(g)!).push(p);
     }
-    const textarea = h('textarea', { rows: 3, style: 'width:100%;font:inherit;background:#000;color:#fcfcfc;border:1px solid #7c7c7c', placeholder: 'Paste overrides JSON here' });
     this.tuningEl.replaceChildren(
-      h('div', { class: 'row' },
-        btn('Reset all', () => { resetAll(); this.renderTuning(); this.renderResults(); }),
-        btn('Copy overrides', () => { void navigator.clipboard?.writeText(JSON.stringify(overrides(), null, 2)); textarea.value = JSON.stringify(overrides(), null, 2); }),
-        btn('Apply pasted', () => { try { applyOverrides(JSON.parse(textarea.value)); this.renderTuning(); this.renderResults(); } catch { textarea.value = 'Not valid JSON'; } }),
-      ),
-      textarea,
+      h('div', { class: 'row' }, btn('Reset all', () => { resetAll(); this.renderTuning(); this.renderResults(); })),
       ...[...groups].map(([g, paths]) => h('div', {},
         h('h3', {}, g),
         ...paths.map(p => {
@@ -222,8 +281,76 @@ export class LabScene implements Scene {
     );
   }
 
+  /** Text box of balance edits (src/dev/script.ts). Also takes the old overrides JSON. */
+  private scriptBox(): HTMLElement {
+    const area = h('textarea', { rows: 9, spellcheck: false, style: 'width:100%;font:inherit;background:#000;color:#fcfcfc;border:1px solid #7c7c7c' });
+    area.value = loadScript();
+    const msg = h('div', { class: 'muted' });
+    area.addEventListener('input', () => saveScript(area.value));
+    const apply = (): void => {
+      const text = area.value.trim();
+      if (text.startsWith('{')) {
+        try { replaceOverrides(JSON.parse(text)); msg.className = 'good'; msg.textContent = 'Applied the pasted JSON.'; } catch { msg.className = 'bad'; msg.textContent = 'Not valid JSON.'; return; }
+      } else {
+        const res = parseScript(area.value);
+        if (res.errors.length) { msg.className = 'bad'; msg.textContent = res.errors.join(' · '); return; }
+        replaceOverrides(res.overrides);
+        msg.className = 'good';
+        msg.textContent = `Applied ${overrideCount(res.overrides)} change${overrideCount(res.overrides) === 1 ? '' : 's'} from ${res.lines} line${res.lines === 1 ? '' : 's'}. The whole game uses them until reload.`;
+      }
+      this.renderTuning();
+      this.renderResults();
+    };
+    return h('div', {},
+      h('div', { class: 'muted' }, 'Edit class and card numbers as text, then Apply. Apply replaces earlier edits (sliders and Power % included).'),
+      area,
+      h('div', { class: 'row' },
+        btn('Apply script', apply, 'primary'),
+        btn('Current edits as script', () => { area.value = `${SCRIPT_HELP}${toScript(overrides())}\n`; saveScript(area.value); }),
+        btn('Copy', () => { void navigator.clipboard?.writeText(area.value); }),
+        btn('Clear', () => { area.value = SCRIPT_HELP; saveScript(area.value); replaceOverrides({}); msg.textContent = 'Back to the shipped numbers.'; this.renderTuning(); this.renderResults(); }),
+      ),
+      msg,
+    );
+  }
+
+  private gridView(r: GridReport): HTMLElement {
+    const ids = classIds();
+    const color = (v: number): string => (v >= 0.6 ? '#58d854' : v > THIN ? '#b8f818' : v > 1 - THIN ? '#fcfcfc' : v > 0.4 ? '#fca044' : '#f83800');
+    const cell = (a: string, b: string): HTMLElement => {
+      if (a === b) return h('td', { class: 'muted' }, '-');
+      const c = r.grid[a]?.[b], v = cellRate(c);
+      if (Number.isNaN(v)) return h('td', { class: 'muted' }, '…');
+      const [lo, hi] = cellRange(c);
+      return h('td', { style: `color:${color(v)}`, title: `${c!.wins}-${c!.losses}, 95% ${pct(lo)}-${pct(hi)}` }, `${pct(v)} `, h('span', { class: 'muted' }, `±${Math.round((hi - lo) * 50)}`));
+    };
+    const deckRows = r.kind === 'starter' ? [] : r.decks.map(d => {
+      const row = r.deckGrid[d.key] ?? {};
+      const tot = Object.values(row).reduce((s, c) => ({ wins: s.wins + c.wins, losses: s.losses + c.losses, draws: s.draws + c.draws }), { wins: 0, losses: 0, draws: 0 });
+      const arch = archetypesFor(d.cls).find(a => d.key.startsWith(`${d.cls}:${a.id}`));
+      return h('tr', {}, h('td', { title: d.style ? styleById(d.style).desc : arch?.plan ?? '' }, `${cap(d.cls)} ${d.name}`), h('td', { class: 'muted' }, CARDS[mythicOf(d.deck)]?.name ?? '-'),
+        ...ids.map(c => (c === d.cls ? h('td', { class: 'muted' }, '-') : h('td', { style: `color:${color(cellRate(row[c]))}` }, Number.isNaN(cellRate(row[c])) ? '…' : pct(cellRate(row[c]))))),
+        h('td', {}, Number.isNaN(cellRate(tot)) ? '…' : pct(cellRate(tot))));
+    });
+    return h('div', {},
+      h('h2', {}, `Full grid: ${r.kind} decks (row class win rate vs column class)`),
+      h('div', { class: 'muted' }, `${r.decks.length} decks, ${r.matches} matches, average match ${r.avgTime.toFixed(0)}s.`),
+      h('table', { style: 'width:auto' },
+        h('thead', {}, h('tr', {}, h('th', {}, ''), ...ids.map(c => h('th', {}, cap(c))), h('th', {}, 'Overall'), h('th', {}, 'Fav'), h('th', {}, 'Rules'))),
+        h('tbody', {}, ...ids.map(a => {
+          const issues = ruleChecks(r, a, ids);
+          return h('tr', {}, h('td', {}, cap(a)), ...ids.map(b => cell(a, b)), h('td', {}, pct(cellRate(classTotal(r, a)))),
+            h('td', {}, favorable(r, a, ids).length), h('td', { class: issues.length ? 'warn' : 'good', style: 'text-align:left;white-space:normal' }, issues.join('; ') || 'ok'));
+        })),
+      ),
+      deckRows.length ? h('h3', {}, 'By deck (hover a name for its plan)') : null,
+      deckRows.length ? h('table', { style: 'width:auto' }, h('thead', {}, h('tr', {}, h('th', {}, 'Deck'), h('th', {}, 'Mythic'), ...ids.map(c => h('th', {}, cap(c))), h('th', {}, 'Overall'))), h('tbody', {}, ...deckRows)) : null,
+    );
+  }
+
   private renderResults(): void {
     const out: Node[] = [];
+    if (this.mode === 'grid' && lastGrid) out.push(this.gridView(lastGrid.report));
     if (this.mode === 'matrix' && this.matrix.size) out.push(this.matrixView());
     const single = lastSingle;
     if (single && single.stats.n) out.push(this.singleView(single));

@@ -1,7 +1,7 @@
 # Input and platform layer
 
 How keys, gamepads and touch reach the game, and the one seam native builds (Steam via Electron, mobile via
-Capacitor) swap out. Part of the architecture docs; see `docs/ARCHITECTURE.md` once it lands.
+Capacitor) swap out. Summary in [ARCHITECTURE.md](ARCHITECTURE.md#input-and-platform).
 
 ## Input
 
@@ -42,7 +42,7 @@ flowchart LR
 
 Rebinding lives on Options > Key Mapping: pick a row and press either a key or a pad button, and that
 device's column changes. SELECT cancels; SELECT and HOME can't be bound, START only to pause. Player 1 and
-player 2 have separate pad bindings. Pad bindings save as `svs:pads` (moving into the save module, PR #48).
+player 2 have separate pad bindings. Pad bindings save in the save module as `pads`.
 Hints (`k()`, `localKey()`) name pad buttons once the last press was on a pad.
 
 Tested by `tests/gamepad.ts` (fake pads, runs in CI) and the `key-mapping-pad` screen shot.
@@ -59,6 +59,7 @@ flowchart TB
   N["window.svsNative\nElectron preload or Capacitor bootstrap\n(any part it provides overrides web)"] -.-> PF
 ```
 
+- The Electron build (`electron/main.cjs`) has no preload yet, so it runs the web platform: no QUIT item, F11 / Alt+Enter still toggle fullscreen. Adding a preload that sets `window.svsNative` with `canQuit` and `quit` is the next step.
 - `platform` is picked once at load: the web implementation, with any parts a native shell put on
   `window.svsNative` before the game script runs laid over it.
 - **Storage** is the file-like `PlatformStorage` shared with the save module (`src/platform/storage.ts`,

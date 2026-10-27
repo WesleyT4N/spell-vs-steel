@@ -1,4 +1,4 @@
-import { hint, zone, hot, listMouse, showSel, type Scene } from './scene';
+import { popScene, hint, zone, hot, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { UW, screenRect, vy, vspan, type Ctx } from '../engine/gfx';
@@ -30,7 +30,7 @@ export class ControlsScene implements Scene {
   waiting = false;
   msg = '';
   msgT = 0;
-  constructor(private back: () => void) {}
+  constructor(private back: () => void = popScene) {}
 
   private get rows(): Row[] { return this.tab === 0 ? [...BINDABLE, 'reset', 'back'] : [...LOCAL_ACTS, 'reset', 'back']; }
   private rowY(i: number): number { return Y0 + i * RH + (i >= this.rows.length - 2 ? 8 : 0); }

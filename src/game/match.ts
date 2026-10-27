@@ -1,4 +1,5 @@
 // The player's match setup, remembered between visits.
+import { getSave, setSave } from '../engine/save';
 import { defaultSkin, type ClassId } from '../art/sprites';
 import { CLASS_IDS } from './classes';
 import type { Difficulty } from './tuning';
@@ -27,21 +28,16 @@ export interface MatchConfig {
   stage: string;
 }
 
-const KEY = 'svs:match';
-
 export function loadMatch(): MatchConfig {
   const skins = (): Record<ClassId, string> => Object.fromEntries(CLASS_IDS.map(c => [c, defaultSkin(c)])) as Record<ClassId, string>;
   const def: MatchConfig = { p1: 'warrior', p1Deck: 'starter', cpu: 'mage', cpuDeck: 'starter', sides: ['player', 'cpu'], difficulty: 'normal', bestOf: 3, stage: 'colosseum', p1Skin: skins(), cpuSkin: skins() };
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return def;
-    const saved = JSON.parse(raw) as Partial<MatchConfig>;
-    return { ...def, ...saved, p1Skin: { ...skins(), ...saved.p1Skin }, cpuSkin: { ...skins(), ...saved.cpuSkin } };
-  } catch { return def; }
+  const saved = getSave('match') as Partial<MatchConfig> | null;
+  if (!saved) return def;
+  return { ...def, ...saved, p1Skin: { ...skins(), ...saved.p1Skin }, cpuSkin: { ...skins(), ...saved.cpuSkin } };
 }
 
 export function saveMatch(m: MatchConfig): void {
-  try { localStorage.setItem(KEY, JSON.stringify(m)); } catch { /* storage blocked */ }
+  setSave('match', JSON.parse(JSON.stringify(m)) as Record<string, unknown>);
 }
 
 /** The card list the player will fight with (falls back to the starter if the custom deck is invalid). */
