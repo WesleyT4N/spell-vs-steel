@@ -1,6 +1,6 @@
 // Arcade mode: the ladder screen between fights, the fights themselves (best of 3, CONTINUE on a loss),
 // and the clear screen. You pick your fighter and deck on the shared character select first.
-import { setScene, drawMenu, hint, listMouse, type Scene } from './scene';
+import { replaceScene, goHome, drawMenu, hint, listMouse, type Scene } from './scene';
 import { getArena, useStage } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getStage } from '../art/stages';
@@ -20,7 +20,7 @@ import { MENU_SONG, RESULT_SONG } from '../engine/music';
 import { win, plaque, banner, FRAME, GOLD, INK, INK2, TRIM, RED_INK, BLUE_INK, PAPER } from './skin';
 import { actionBar, barTapped, panel, tallArea, GAP, PAD } from './touchUi';
 import { BattleScene } from './battle';
-import { TitleScene } from './title';
+import type { ReplayMode } from '../game/replay';
 
 const LEVEL: Record<string, string> = { easy: 'EASY', normal: 'NORMAL', hard: 'HARD' };
 const BOSS_NAME = 'SHADOW';
@@ -44,7 +44,7 @@ export class ArcadeLadderScene implements Scene {
     this.t += dt;
     if (spread.tall && mouse.click && (barTapped('back') || barTapped('primary'))) {
       sfx('select');
-      if (barTapped('back')) { stopMusic(); setScene(new TitleScene()); } else setScene(arcadeFight(this.run));
+      if (barTapped('back')) { stopMusic(); goHome(); } else replaceScene(arcadeFight(this.run));
       return;
     }
     const n = this.items.length;
@@ -55,8 +55,8 @@ export class ArcadeLadderScene implements Scene {
     if (wasPressed('back') || mouse.rclick) { this.sel = 1; sfx('move'); return; }
     if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
       sfx('select');
-      if (this.sel === 1) { stopMusic(); setScene(new TitleScene()); return; }
-      setScene(arcadeFight(this.run));
+      if (this.sel === 1) { stopMusic(); goHome(); return; }
+      replaceScene(arcadeFight(this.run));
     }
   }
 
@@ -87,7 +87,7 @@ export class ArcadeLadderScene implements Scene {
       const hidden = r.boss && !now;
       drawFighterSprite(ui, getSprite(r.cls, r.skin, false), RX + 20, y + RH - 2, true, hidden ? 'ghost' : 'none', 1);
       drawText(ui, r.boss ? (hidden ? 'BOSS  ???' : `BOSS  ${BOSS_NAME}`) : `${i + 1}  ${CLASS_INFO[r.cls].name}`, RX + 38, y + 6, text, 1);
-      drawText(ui, r.boss ? 'HARD+' : LEVEL[r.difficulty], RX + 38, y + 16, now ? text : INK2, 1);
+      drawText(ui, r.boss ? 'HARD  FULL POWER' : `${LEVEL[r.difficulty]}  ${Math.round(r.power * 100)}% POWER`, RX + 38, y + 16, now ? text : INK2, 1);
       if (done) drawTextCentered(ui, 'CLEAR', RX + RW - 30, y + 10, RED_INK, 1, false);
     });
 
@@ -98,7 +98,7 @@ export class ArcadeLadderScene implements Scene {
     drawFighterSprite(ui, getSprite(next.cls, next.skin, false), rcx, py + 92 - (Math.floor(tick / 4 + 1) % 2) * 2, true, 'none', 3);
     drawTextCentered(ui, next.boss ? BOSS_NAME : CLASS_INFO[next.cls].name, rcx, py + 100, INK, 2, false);
     const lines = [deckLabel(next.cls, next.deck), `CPU ${LEVEL[next.difficulty]}`, getStage(next.stage).name.toUpperCase()];
-    if (next.boss) lines.push(`HP x${BOSS_HP}`);
+    lines.push(next.boss ? `FULL KIT  HP x${BOSS_HP}` : `${Math.round(next.power * 100)}% POWER`);
     lines.forEach((l, i) => drawTextCentered(ui, l, rcx, py + 124 + i * 12, i ? INK2 : TRIM, 1, false));
 
     drawMenu(ui, this.items, this.sel, UW / 2, vy(PY + SIDE_H + 12), tick, { width: 160, gap: 18 });
@@ -163,13 +163,14 @@ export class ArcadeBattleScene extends BattleScene {
     this.rivalName = rung.boss ? BOSS_NAME : 'CPU';
     // GIVE UP stands where QUIT TO TITLE does, and does the same
     this.pauseItems = ['RESUME', 'OPTIONS', 'RESTART', 'GIVE UP'];
-    if (rung.boss) {
-      const f = this.b.f[1];
-      f.name = BOSS_NAME;
-      f.maxHp = f.hp = Math.round(TUNING.hp[f.cls as ClassId] * BOSS_HP);
-    }
+    // rivals fight with a weakened kit (less HP, less damage); the boss at full power with extra HP
+    const f = this.b.f[1];
+    f.power = rung.power;
+    f.maxHp = f.hp = Math.round(TUNING.hp[f.cls as ClassId] * (rung.boss ? BOSS_HP : rung.power));
+    if (rung.boss) f.name = BOSS_NAME;
   }
 
+  protected get replayMode(): ReplayMode { return 'arcade'; }
   protected again(score: [number, number], rounds: RoundRecord[]): Scene { return new ArcadeBattleScene(this.run, score, rounds); }
 
   update(dt: number): void {
@@ -187,12 +188,12 @@ export class ArcadeBattleScene extends BattleScene {
 
   protected onResult(choice: string): void {
     const run = this.run;
-    if (choice === 'NEXT ROUND') setScene(this.again(this.score, this.rounds));
-    if (choice === 'CONTINUE') { run.continues++; run.tries++; setScene(this.again([0, 0], [])); }
-    if (choice === 'GIVE UP') setScene(new TitleScene());
+    if (choice === 'NEXT ROUND') replaceScene(this.again(this.score, this.rounds));
+    if (choice === 'CONTINUE') { run.continues++; run.tries++; replaceScene(this.again([0, 0], [])); }
+    if (choice === 'GIVE UP') goHome();
     if (choice === 'NEXT FIGHT' || choice === 'CLAIM VICTORY') run.fights.push(this.record());
-    if (choice === 'NEXT FIGHT') { run.at++; run.tries = 1; setScene(new ArcadeLadderScene(run)); }
-    if (choice === 'CLAIM VICTORY') setScene(new ArcadeClearScene(run));
+    if (choice === 'NEXT FIGHT') { run.at++; run.tries = 1; replaceScene(new ArcadeLadderScene(run)); }
+    if (choice === 'CLAIM VICTORY') replaceScene(new ArcadeClearScene(run));
   }
 
   /** The won set, summed up for the clear screen. */
@@ -224,7 +225,7 @@ export class ArcadeClearScene implements Scene {
   update(dt: number): void {
     this.t += dt;
     if (this.t > 1 && (wasPressed('confirm') || wasPressed('custom') || wasPressed('back') || mouse.click)) {
-      sfx('select'); stopMusic(); setScene(new TitleScene());
+      sfx('select'); stopMusic(); goHome();
     }
   }
 

@@ -1,6 +1,7 @@
 // Training mode: a fight that never ends, for testing decks. The dummy's behavior, both sides' HP and
 // resources, and the Draw gauge are set from the pause menu; R puts both fighters back to the start of the turn.
-import { setScene, dim, hint, zone, hot, showSel, drawMenu, listMouse } from './scene';
+import { getSave, setSave } from '../engine/save';
+import { replaceScene, popTo, goHome, dim, hint, zone, hot, showSel, drawMenu, listMouse } from './scene';
 import { clearStats } from '../game/stats';
 import type { StatsData } from './statsView';
 import { NO_INTENT, heavyChargeOf, type Battle, type Dir, type Fighter, type Intent } from '../game/battle';
@@ -16,7 +17,6 @@ import { touchActive } from '../engine/touch';
 import { sfx, stopMusic } from '../engine/audio';
 import { BattleScene } from './battle';
 import { CharSelectScene } from './select';
-import { TitleScene } from './title';
 import { win, selRow, banner, PAPER, INK, INK2, RED_INK, TRIM } from './skin';
 import { bigButton, actionBar, barTapped, panel, tallArea, Scroller, TAP, GAP, PAD } from './touchUi';
 
@@ -40,16 +40,12 @@ const REFILL_AFTER = 2;
 /** How long LAST HIT stays lit after a hit. */
 const HIT_GLOW = 1.5;
 
-const KEY = 'svs:training';
 function loadSettings(): Settings {
   const def: Settings = { act: 'stand', spells: false, hp: ['refill', 'refill'], res: ['normal', 'normal'], gauge: 'normal' };
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? { ...def, ...(JSON.parse(raw) as Partial<Settings>) } : def;
-  } catch { return def; }
+  return { ...def, ...(getSave('training') as Partial<Settings> | null) };
 }
 function saveSettings(s: Settings): void {
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* storage blocked */ }
+  setSave('training', { ...s });
 }
 
 /** The training dummy: simple scripted behaviors, or the real CPU at either level. */
@@ -154,6 +150,8 @@ export class TrainingScene extends BattleScene {
     this.prevHp = [this.b.f[0].hp, this.b.f[1].hp];
   }
 
+  protected get keepsReplays(): boolean { return false; }
+
   protected rivalDeckText(): string { return `DUMMY: ${ACTS.find(a => a[0] === this.s.act)![1]}${this.s.spells ? ', CASTS SPELLS' : ''}`; }
 
   private get rows(): Row[] {
@@ -173,9 +171,9 @@ export class TrainingScene extends BattleScene {
       { label: touchActive() ? 'RESET POSITIONS' : 'RESET POSITIONS (R)', act: () => { this.paused = false; this.reset(); } },
       { label: 'NEW HAND NOW', act: () => { this.paused = false; this.newHand(); } },
       { label: 'SESSION STATS', act: () => { this.statsOpen = true; this.statsSel = 0; this.paused = true; } },
-      { label: 'RESTART FROM TURN 1', act: () => setScene(new TrainingScene(this.m)) },
-      { label: 'CHARACTER SELECT', act: () => { stopMusic(); setScene(new CharSelectScene(undefined, 0, 'training')); } },
-      { label: 'QUIT TO TITLE', act: () => { stopMusic(); setScene(new TitleScene()); } },
+      { label: 'RESTART FROM TURN 1', act: () => replaceScene(new TrainingScene(this.m)) },
+      { label: 'CHARACTER SELECT', act: () => { stopMusic(); popTo(s => s instanceof CharSelectScene, () => new CharSelectScene(undefined, 0, 'training')); } },
+      { label: 'QUIT TO TITLE', act: () => { stopMusic(); goHome(); } },
     ];
   }
 

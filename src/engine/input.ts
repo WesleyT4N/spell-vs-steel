@@ -1,4 +1,5 @@
 // Keyboard input with per-frame "pressed" edges and rebindable keys (saved in the browser).
+import { getSave, setSave } from './save';
 import { unlockAudio } from './audio';
 import { view } from './gfx';
 
@@ -23,12 +24,11 @@ const FIXED: Record<string, Action[]> = {
   PadAttack: ['attack', 'confirm'], PadCast: ['cast', 'back'], PadDraw: ['custom'], PadPause: ['pause'], PadBack: ['back'],
 };
 
-const STORE = 'svs:keys';
-let keys: Record<Bindable, string> = { ...DEFAULT_KEYS };
-try {
-  const raw = localStorage.getItem(STORE);
-  if (raw) keys = { ...DEFAULT_KEYS, ...(JSON.parse(raw) as Partial<Record<Bindable, string>>) };
-} catch { /* storage blocked */ }
+/** The saved bindings for `acts` that are real key codes. */
+function pick<A extends string>(saved: Record<string, string>, acts: readonly A[]): Partial<Record<A, string>> {
+  return Object.fromEntries(acts.filter(a => typeof saved[a] === 'string').map(a => [a, saved[a]])) as Partial<Record<A, string>>;
+}
+let keys: Record<Bindable, string> = { ...DEFAULT_KEYS, ...pick(getSave('keys'), BINDABLE) };
 
 let BINDINGS: Record<string, Action[]> = {};
 function rebuild(): void {
@@ -57,7 +57,7 @@ export function resetKeys(): void { keys = { ...DEFAULT_KEYS }; save(); }
 function save(): void {
   rebuild();
   rebuildLocal();
-  try { localStorage.setItem(STORE, JSON.stringify(keys)); } catch { /* storage blocked */ }
+  setSave('keys', { ...keys });
 }
 
 /** Short on-screen name for a key code. */
@@ -95,12 +95,7 @@ const LOCAL_EXTRA: [Record<LocalAct, string>, Record<LocalAct, string>] = [
   { up: 'PadUp', down: 'PadDown', left: 'PadLeft', right: 'PadRight', attack: 'PadAttack', cast: 'PadCast', custom: 'PadDraw' },
   { up: 'Numpad8', down: 'Numpad5', left: 'Numpad4', right: 'Numpad6', attack: 'Numpad1', cast: 'Numpad2', custom: 'Numpad3' },
 ];
-const P2_STORE = 'svs:p2keys';
-let p2Keys: Record<LocalAct, string> = { ...DEFAULT_P2_KEYS };
-try {
-  const raw = localStorage.getItem(P2_STORE);
-  if (raw) p2Keys = { ...DEFAULT_P2_KEYS, ...(JSON.parse(raw) as Partial<Record<LocalAct, string>>) };
-} catch { /* storage blocked */ }
+let p2Keys: Record<LocalAct, string> = { ...DEFAULT_P2_KEYS, ...pick(getSave('p2keys'), LOCAL_ACTS) };
 let LOCAL_KEYS: [Record<LocalAct, string[]>, Record<LocalAct, string[]>] = [{} as Record<LocalAct, string[]>, {} as Record<LocalAct, string[]>];
 let LOCAL_CODES = new Set<string>();
 function rebuildLocal(): void {
@@ -123,7 +118,7 @@ export function setP2Key(a: LocalAct, code: string): void {
 export function resetP2Keys(): void { p2Keys = { ...DEFAULT_P2_KEYS }; saveP2(); }
 function saveP2(): void {
   rebuildLocal();
-  try { localStorage.setItem(P2_STORE, JSON.stringify(p2Keys)); } catch { /* storage blocked */ }
+  setSave('p2keys', { ...p2Keys });
 }
 const rawHeld = new Set<string>();
 const rawPressed = new Set<string>();

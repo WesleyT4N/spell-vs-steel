@@ -1,4 +1,4 @@
-import { setScene, hint, zone, hot, isHot, listMouse, showSel, type Scene } from './scene';
+import { pushScene, popScene, hint, zone, hot, isHot, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { P, UW, screenRect, vy, vspan, spread, type Ctx } from '../engine/gfx';
@@ -51,7 +51,7 @@ export class OptionsScene implements Scene {
   /** Phone layout tab: 0 sound, 1 touch controls. */
   tab = 0;
   private tabRect: [number, number, number, number] = [0, 0, 0, 0];
-  constructor(private back: () => void) {}
+  constructor(private back: () => void = popScene) {}
 
   tall(): boolean { return true; }
   pad(): PadMode { return spread.tall ? 'none' : 'back'; }
@@ -122,7 +122,7 @@ export class OptionsScene implements Scene {
     const toggle = ok || l || r;
     if (toggle && (row === 'musicOn' || row === 'sfxOn')) { setAudioSettings({ [row]: !s[row] }); sfx('select'); }
     if (toggle && row === 'mute') { toggleMute(); sfx('select'); }
-    if (ok && row === 'keys') { sfx('select'); setScene(new ControlsScene(() => setScene(this))); }
+    if (ok && row === 'keys') { sfx('select'); pushScene(new ControlsScene()); }
     if (ok && row === 'back') { sfx('back'); this.back(); }
   }
 

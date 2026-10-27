@@ -78,6 +78,8 @@ const screens: Record<string, () => void> = {
   'battle-pause': () => { setScene(new BattleScene(match({ p1: 'mage', cpu: 'rogue' }))); run(0.5); battle().b.endCustom([[], []]); run(2); battle().paused = true; },
   // a whole round played out by two CPUs, ending on the results screen
   'battle-results': () => { watch({ p1: 'ranger', cpu: 'priest' }); run(400, () => battle().b.phase === 'over'); run(3); },
+  'battle-double-ko': () => { watch({ p1: 'warrior', cpu: 'rogue' }); run(0.5); battle().b.endCustom([[], []]); run(1); for (const f of battle().b.f) f.hp = 0; run(1); },
+  'battle-draw-result': () => { watch({ p1: 'warrior', cpu: 'rogue' }); run(0.5); battle().b.endCustom([[], []]); run(1); for (const f of battle().b.f) f.hp = 0; run(400, () => battle().b.phase === 'over'); run(3); },
   // the arcade ladder two fights in, and a cleared run
   'arcade-ladder': () => setScene(new ArcadeLadderScene(arcadeRun(2))),
   'arcade-clear': () => setScene(new ArcadeClearScene(arcadeRun(5))),

@@ -1,4 +1,4 @@
-import { setScene, drawMenu, hint, listMouse, showSel, type Scene } from './scene';
+import { pushScene, drawMenu, hint, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { drawLogo } from '../art/logo';
@@ -7,7 +7,7 @@ import type { FrameId } from '../art/fighterFrames';
 import { FIRE as FIRE_RAMP, STEEL, SHADOW, HOLY } from '../game/fxView';
 import { P, W, UW, UH, view, screenRect, spread, clamp, dith, type Ctx } from '../engine/gfx';
 import { PLAYABLE } from '../game/classes';
-import { drawText, drawTextCentered, textWidth } from '../engine/font';
+import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, navPressed, anyPressed, k, mouse, page } from '../engine/input';
 import type { PadMode } from '../engine/touch';
 import { playMusic, sfx, isMuted } from '../engine/audio';
@@ -16,16 +16,17 @@ import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { OptionsScene } from './options';
 import { OnlineScene } from './online';
+import { ReplaysScene } from './replays';
 import { tutorialDone } from './tutorial';
 import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
 import { RED_INK } from './skin';
 import { bigButton, tallArea, panel, TAP, GAP, PAD } from './touchUi';
 
-const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'DECK BUILDER', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
+const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'SPELL DECK BUILDER', 'REPLAYS', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
 
-// seven rows (eight in dev builds) still clear the version line
-const MENU_Y = ITEMS.length > 7 ? 162 : ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 7 ? 15 : ITEMS.length > 6 ? 16 : 18;
+// eight rows (nine in dev builds) still clear the version line
+const MENU_Y = ITEMS.length > 8 ? 156 : ITEMS.length > 7 ? 162 : ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 8 ? 14 : ITEMS.length > 7 ? 15 : ITEMS.length > 6 ? 16 : 18;
 // taller screens (phone portrait) have room under the stage: rows grow into it, with double-size text once they fit
 const MAX_GAP = 36, BIG_GAP = 24;
 
@@ -130,6 +131,8 @@ export class TitleScene implements Scene {
   motes = Array.from({ length: 14 }, (_, i) => ({ x: (i * 53) % W, y: 40 + ((i * 37) % 100), s: 6 + (i % 4) * 3 }));
 
   enter(): void { playMusic('menu', MENU_SONG); }
+  // a screen opened from here (the sandbox, a fight) may have changed the music
+  resume(): void { playMusic('menu', MENU_SONG); }
   pad(): PadMode { return 'none'; }
   tall(): boolean { return true; }
 
@@ -180,15 +183,16 @@ export class TitleScene implements Scene {
     if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
       sfx('select');
       const item = ITEMS[this.sel];
-      if (item === 'ARCADE MODE') setScene(new CharSelectScene(undefined, 0, 'arcade'));
-      if (item === 'VERSUS MODE') setScene(new CharSelectScene());
-      if (item === 'ONLINE MODE') setScene(new OnlineScene());
-      if (item === 'TRAINING MODE') setScene(new CharSelectScene(undefined, 0, 'training'));
-      if (item === 'TUTORIAL') setScene(new CharSelectScene(undefined, 0, 'tutorial'));
-      if (item === 'DECK BUILDER') setScene(new DeckBuilderScene(loadMatch().p1, () => setScene(new TitleScene())));
-      if (item === 'OPTIONS') setScene(new OptionsScene(() => setScene(new TitleScene())));
+      if (item === 'ARCADE MODE') pushScene(new CharSelectScene(undefined, 0, 'arcade'));
+      if (item === 'VERSUS MODE') pushScene(new CharSelectScene());
+      if (item === 'ONLINE MODE') pushScene(new OnlineScene());
+      if (item === 'TRAINING MODE') pushScene(new CharSelectScene(undefined, 0, 'training'));
+      if (item === 'TUTORIAL') pushScene(new CharSelectScene(undefined, 0, 'tutorial'));
+      if (item === 'SPELL DECK BUILDER') pushScene(new DeckBuilderScene(loadMatch().p1));
+      if (item === 'REPLAYS') pushScene(new ReplaysScene());
+      if (item === 'OPTIONS') pushScene(new OptionsScene());
       // loaded on demand, so the prod build (DEV_TOOLS off) carries none of the dev tools code
-      if (item === 'DEV TOOLS' && DEV_TOOLS) void import('./devMenu').then(m => setScene(new m.DevMenuScene(() => setScene(new TitleScene()))));
+      if (item === 'DEV TOOLS' && DEV_TOOLS) void import('./devMenu').then(m => pushScene(new m.DevMenuScene()));
     }
   }
 
@@ -288,8 +292,9 @@ export class TitleScene implements Scene {
       const x = scale > 1 ? UW / 2 + textWidth('TUTORIAL', scale) / 2 + 8 : UW / 2 + 40;
       drawText(ui, 'NEW!', x, MENU_Y + ITEMS.indexOf('TUTORIAL') * gap + Math.round((gap - 17) / 2), RED_INK);
     }
-    drawTextCentered(ui, DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2', UW / 2, versionY, '#7c7c7c', 1, false);
-    if (isMuted()) drawText(ui, 'MUTED', 8, 8, '#7c7c7c');
+    drawTextOutlined(ui, DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2', 8, 8, '#fcfcfc');
+    drawTextCentered(ui, 'DESIGNED BY WES   -   BUILT BY CLAUDE', UW / 2, versionY, '#fcfcfc');
+    if (isMuted()) drawTextOutlined(ui, 'MUTED', 8, 22, '#fcfcfc');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   M: MUTE`);
   }
 
@@ -319,7 +324,7 @@ export class TitleScene implements Scene {
 }
 
 /** Shorter names for the two-column phone menu. */
-const TALL_LABEL: Record<string, string> = { 'ARCADE MODE': 'ARCADE', 'VERSUS MODE': 'VERSUS', 'ONLINE MODE': 'ONLINE', 'TRAINING MODE': 'TRAINING', 'DECK BUILDER': 'DECKS' };
+const TALL_LABEL: Record<string, string> = { 'ARCADE MODE': 'ARCADE', 'VERSUS MODE': 'VERSUS', 'ONLINE MODE': 'ONLINE', 'TRAINING MODE': 'TRAINING', 'SPELL DECK BUILDER': 'DECKS' };
 /** The phone menu's rows: ARCADE alone and tall, the rest in pairs. */
 function tallRows(): Array<{ items: string[]; h: number }> {
   const rest = ITEMS.filter(i => i !== 'ARCADE MODE');

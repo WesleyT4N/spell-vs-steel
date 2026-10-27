@@ -1,7 +1,6 @@
 // Ranger kit (design doc, 2026-10-25). Arrows, hidden traps and companions; Energy comes from standing still.
 import type { Battle, CastCtx, Fighter, Trap } from './battle';
 import type { CardDef } from './cards';
-import { sfx } from '../engine/audio';
 import { shuffle } from './rng';
 import { allEnemyPanels, sameRow } from './cardUtil';
 import { TUNING } from './tuning';
@@ -52,7 +51,7 @@ export const ranger: CardDef[] = [
         homing: { p: 0, dur: 0.5, sx: x.f.col, sy: x.f.row, target: x.foe.side },
         onHit: (b, t) => { if (t) b.damage(t, 40 * x.mult, b.f[1 - t.side], { spell: true, element: 'nature' }); },
       });
-      sfx('shot_hawk', { pan: (x.f.col - 2.5) / 3 });
+      x.b.sound('shot_hawk', { pan: (x.f.col - 2.5) / 3 });
     },
   },
   {
@@ -239,11 +238,11 @@ export const ranger: CardDef[] = [
   },
   {
     id: 'bestial_wrath', name: 'Bestial Wrath', cls: 'ranger', cost: 3, rarity: 'legendary', element: 'nature', damaging: true, lock: 0.3,
-    dmg: '25/30', short: 'For 6s a hawk dives every second and a wolf bites whenever the enemy is in your row.',
+    dmg: '15/20', short: 'For 6s a hawk dives every second and a wolf bites whenever the enemy is in your row.',
     cast: x => {
       const { b, f } = x;
-      b.pets.push({ side: f.side, kind: 'hawk', row: null, col: b.backCol(f.side), t: 6, cd: 0.5, period: 1, dmg: 25 * x.mult });
-      b.pets.push({ side: f.side, kind: 'wolf', row: null, col: b.backCol(f.side), t: 6, cd: 0.3, period: 1, dmg: 30 * x.mult });
+      b.pets.push({ side: f.side, kind: 'hawk', row: null, col: b.backCol(f.side), t: 6, cd: 0.5, period: 1, dmg: 15 * x.mult });
+      b.pets.push({ side: f.side, kind: 'wolf', row: null, col: b.backCol(f.side), t: 6, cd: 0.3, period: 1, dmg: 20 * x.mult });
     },
   },
   {
@@ -273,10 +272,10 @@ export const ranger: CardDef[] = [
   },
   {
     id: 'call_of_the_wild', name: 'Call of the Wild', cls: 'ranger', cost: 5, rarity: 'mythic', element: 'nature', damaging: true, lock: 0.4,
-    dmg: '30/bite', short: 'Three wolves for 10s, one per row. Each bites when the enemy is in its row.',
+    dmg: '20/bite', short: 'Three wolves for 10s, one per row. Each bites when the enemy is in its row.',
     cast: x => {
       const { b, f } = x;
-      for (let r = 0; r < 3; r++) b.pets.push({ side: f.side, kind: 'wolf', row: r, col: b.backCol(f.side), t: 10, cd: 0.3 + r * 0.2, period: 1, dmg: 30 * x.mult });
+      for (let r = 0; r < 3; r++) b.pets.push({ side: f.side, kind: 'wolf', row: r, col: b.backCol(f.side), t: 10, cd: 0.3 + r * 0.2, period: 1, dmg: 20 * x.mult });
       b.cheer = 2;
     },
   },
