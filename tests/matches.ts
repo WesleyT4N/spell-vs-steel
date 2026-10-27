@@ -37,7 +37,7 @@ const fail = (c: Case, msg: string): void => {
   console.log(`FAIL ${c.a.cls}/${c.a.label} vs ${c.b.cls}/${c.b.label} (${c.cpu.join('/')}, seed ${c.seed}): ${msg}`);
 };
 
-// every ready-made deck must be a legal grimoire, or the CPU and the player fight with something the builder refuses
+// every ready-made deck must be a legal spell deck, or the CPU and the player fight with something the builder refuses
 for (const cls of classes) for (const p of presetsFor(cls)) {
   const errs = validate(p.cards);
   if (errs.length) { failures++; console.log(`FAIL deck ${cls}/${p.id} is not legal: ${errs.join('; ')}`); }

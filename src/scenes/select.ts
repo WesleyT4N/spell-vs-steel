@@ -51,7 +51,7 @@ const FW = 84, FH = 68, PORTRAIT_IN = 0.18;
 
 /** 0/1: picking the left side's fighter/skin, 2/3: the right side's (skipped online), 4: options. */
 type Step = 0 | 1 | 2 | 3 | 4;
-type Chip = 'DECK' | 'EDIT DECK' | 'CPU LEVEL' | 'MATCH' | 'NEXT';
+type Chip = 'SPELL DECK' | 'EDIT SPELL DECK' | 'CPU LEVEL' | 'MATCH' | 'NEXT';
 /** What the screen leads to: a match against the CPU, the tutorial, training mode, or an arcade run. */
 export type SelectMode = 'versus' | 'tutorial' | 'training' | 'arcade';
 
@@ -94,7 +94,7 @@ export class CharSelectScene implements Scene {
   private get arcade(): boolean { return this.mode === 'arcade'; }
   /** Local Versus: both sides can be a player or the CPU, and each picks a deck on its panel. */
   private get local(): boolean { return this.mode === 'versus' && !this.net; }
-  private get chips(): Chip[] { return this.net ? ['DECK', 'NEXT'] : this.training || this.arcade ? ['DECK', 'EDIT DECK', 'NEXT'] : ['EDIT DECK', 'CPU LEVEL', 'MATCH', 'NEXT']; }
+  private get chips(): Chip[] { return this.net ? ['SPELL DECK', 'NEXT'] : this.training || this.arcade ? ['SPELL DECK', 'EDIT SPELL DECK', 'NEXT'] : ['EDIT SPELL DECK', 'CPU LEVEL', 'MATCH', 'NEXT']; }
   /** What a side is called on this screen. */
   private who(s: 0 | 1): string {
     if (this.local) return sideName(this.m.sides, s);
@@ -188,8 +188,8 @@ export class CharSelectScene implements Scene {
   }
 
   private activateChip(c: Chip): void {
-    if (c === 'DECK') { this.toggleDeck(0); return; }
-    else if (c === 'EDIT DECK') { this.editDeck(this.local ? this.focus : 0); return; }
+    if (c === 'SPELL DECK') { this.toggleDeck(0); return; }
+    else if (c === 'EDIT SPELL DECK') { this.editDeck(this.local ? this.focus : 0); return; }
     else if (c === 'CPU LEVEL') { this.m.difficulty = this.m.difficulty === 'easy' ? 'normal' : this.m.difficulty === 'normal' ? 'hard' : 'easy'; sfx('move'); }
     else if (c === 'MATCH') { const o = [1, 3, 5] as const; this.m.bestOf = o[(o.indexOf(this.m.bestOf) + 1) % o.length]; sfx('move'); }
     else if (c === 'NEXT') { this.next(); return; }
@@ -200,7 +200,7 @@ export class CharSelectScene implements Scene {
   private next(): void {
     for (const s of this.local ? [0, 1] as const : [0] as const) {
       if (this.deckOf(s) === 'custom' && !this.customValid(s)) {
-        this.msg = this.local ? `${this.who(s)}'S CUSTOM ${CLASS_INFO[this.slotClass(s)].name} DECK IS NOT READY` : 'YOUR CUSTOM DECK IS NOT READY';
+        this.msg = this.local ? `${this.who(s)}'S CUSTOM ${CLASS_INFO[this.slotClass(s)].name} SPELL DECK IS NOT READY` : 'YOUR CUSTOM SPELL DECK IS NOT READY';
         this.msgT = 2; sfx('deny');
         return;
       }
@@ -349,12 +349,12 @@ export class CharSelectScene implements Scene {
 
     // option chips
     if (!this.tutorial && (this.step === 4 || !net)) {
-      const chips = this.chips, cw = net ? 140 : this.local ? 104 : 86, gap = 6, x0 = Math.round(UW / 2 - (chips.length * cw + (chips.length - 1) * gap) / 2);
+      const chips = this.chips, cw = net ? 140 : 110, gap = 6, x0 = Math.round(UW / 2 - (chips.length * cw + (chips.length - 1) * gap) / 2);
       chips.forEach((ch, i) => {
         const x = x0 + i * (cw + gap), on = this.step === 4 && this.chip === i && showSel();
         let label: string = ch;
-        if (ch === 'DECK') label = this.m.p1Deck === 'custom' ? `CUSTOM DECK${this.customValid() ? '' : '!'}` : deckLabel(this.m.p1, this.m.p1Deck);
-        if (ch === 'EDIT DECK' && this.local) label = `EDIT ${this.focus === 0 ? 'LEFT' : 'RIGHT'} DECK`;
+        if (ch === 'SPELL DECK') label = this.m.p1Deck === 'custom' ? `CUSTOM SPELL DECK${this.customValid() ? '' : '!'}` : deckLabel(this.m.p1, this.m.p1Deck);
+        if (ch === 'EDIT SPELL DECK' && this.local) label = `EDIT ${this.focus === 0 ? 'P1' : 'P2'} SPELL DECK`;
         if (ch === 'CPU LEVEL') label = `CPU: ${this.m.difficulty.toUpperCase()}`;
         if (ch === 'MATCH') label = this.m.bestOf === 1 ? '1 ROUND' : `BEST OF ${this.m.bestOf}`;
         if (ch === 'NEXT') label = net ? (this.locked ? 'LOCKED IN' : 'LOCK IN') : this.training || this.arcade ? 'START →' : 'STAGE →';
@@ -370,7 +370,7 @@ export class CharSelectScene implements Scene {
       return;
     }
     const keys = `${k('left')}/${k('right')}`, ud = `${k('up')}/${k('down')}`;
-    hint(ui, this.local && (this.step === 1 || this.step === 3) ? `${keys}: SKIN   ${ud}: DECK   ${k('attack')} / CLICK A COLOR: OK   ${k('cast')}: BACK`
+    hint(ui, this.local && (this.step === 1 || this.step === 3) ? `${keys}: SKIN   ${ud}: SPELL DECK   ${k('attack')} / CLICK A COLOR: OK   ${k('cast')}: BACK`
       : this.local && (this.step === 0 || this.step === 2) ? `${keys}: CHOOSE   ${ud} / CLICK THE NAME: PLAYER OR CPU   ${k('attack')}: PICK   ${k('cast')}: BACK`
       : this.step === 1 || this.step === 3 ? `${keys}: SKIN   ${k('attack')} / CLICK A COLOR: ${this.tutorial ? 'START' : 'OK'}   ${k('cast')}: BACK`
       : this.locked ? `${k('cast')} / RIGHT-CLICK: LEAVE ROOM`
@@ -489,9 +489,9 @@ export class CharSelectScene implements Scene {
     const deck = `${deckLabel(cls, this.deckOf(s))}${this.deckOf(s) === 'custom' && !this.customValid(s) ? '!' : ''}`;
     if (this.local) {
       // the deck steps through the ready-made decks, custom and RANDOM; EDIT opens the deck builder
-      button(ui, `deck:${s}`, `DECK: ${deck}`.length * 6 <= 84 ? `DECK: ${deck}` : deck, x + 8, this.py + 130, PW - 52, 12, false, TRIM);
+      button(ui, `deck:${s}`, `SPELL DECK: ${deck}`.length * 6 <= 84 ? `SPELL DECK: ${deck}` : deck, x + 8, this.py + 130, PW - 52, 12, false, TRIM);
       button(ui, `edit:${s}`, 'EDIT', x + PW - 40, this.py + 130, 32, 12, false, TRIM);
-    } else if (!(net && s === 1)) drawTextCentered(ui, `DECK: ${deck}`, cx, this.py + 132, TRIM, 1, false);
+    } else if (!(net && s === 1)) drawTextCentered(ui, `SPELL DECK: ${deck}`.length * 6 <= PW - 8 ? `SPELL DECK: ${deck}` : deck, cx, this.py + 132, TRIM, 1, false);
     if (!editable) return;
     const skinStep = (s === 0 && this.step === 1) || (s === 1 && this.step === 3);
     list.forEach((sk, n) => {
