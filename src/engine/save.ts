@@ -36,6 +36,8 @@ export interface SaveData {
   rankedPending: Obj | null;
   /** The balance lab's script box. */
   labScript: string | null;
+  /** Touch controls: pad size, left-handed, vibration (see TouchSettings in touch.ts). */
+  touch: Obj | null;
 }
 
 /** A saved replay, as far as the save module cares: newest-first order and the kept flag. */
@@ -55,7 +57,7 @@ interface Envelope { game: string; v: number; data: unknown }
 
 const defaults = (): SaveData => ({
   keys: {}, p2keys: {}, pads: null, audio: {}, muted: false, decks: {}, match: null, training: null,
-  tutorialDone: false, arcade: {}, rating: null, rankedPending: null, labScript: null,
+  tutorialDone: false, arcade: {}, rating: null, rankedPending: null, labScript: null, touch: null,
 });
 
 /** MIGRATIONS[n] turns a version n-1 save into version n. Never edit a shipped entry; add the next one. */
@@ -93,6 +95,7 @@ function normalize(raw: Obj): SaveData {
     rating: objOr(r.rating, d.rating),
     rankedPending: objOr(r.rankedPending, d.rankedPending),
     labScript: typeof r.labScript === 'string' ? r.labScript : null,
+    touch: objOr(r.touch, d.touch),
   };
 }
 
@@ -114,7 +117,7 @@ export function capReplays<T extends StoredReplay>(list: T[], budget = REPLAY_BU
 
 /** Every localStorage key the game used before the save module. */
 export const LEGACY_KEYS = ['svs:keys', 'svs:p2keys', 'svs:pads', 'svs:audio', 'svs:muted', 'svs:match', 'svs:training',
-  'svs:tutorial', 'svs:arcade', 'svs:replays', 'svs:rating', 'svs:ranked-pending', 'svs:lab:script'] as const;
+  'svs:tutorial', 'svs:arcade', 'svs:replays', 'svs:rating', 'svs:ranked-pending', 'svs:lab:script', 'svs:touch'] as const;
 const LEGACY_DECK = 'svs:deck:';
 
 export interface Legacy { get(key: string): string | null; set(key: string, v: string): void; keys(): string[]; remove(key: string): void }
@@ -143,7 +146,7 @@ export function importLegacy(l: Legacy): { data: SaveData; found: string[] } | n
   const raw: Obj = {
     keys: json('svs:keys'), p2keys: json('svs:p2keys'), pads: json('svs:pads'), audio: json('svs:audio'),
     match: json('svs:match'), training: json('svs:training'), arcade: json('svs:arcade'),
-    rating: json('svs:rating'), rankedPending: json('svs:ranked-pending'),
+    rating: json('svs:rating'), rankedPending: json('svs:ranked-pending'), touch: json('svs:touch'),
   };
   const flag = (k: string): string | null => { const v = l.get(k); if (v !== null) found.push(k); return v; };
   raw.muted = flag('svs:muted') === '1';
@@ -204,8 +207,26 @@ function adopt(saveText: string | null, replayText: string | null, legacy: Legac
   if (!readOnly && legacy) importLegacyInto(legacy, s === null, r === null);
 }
 
+/**
+ * The touch settings briefly had their own key (svs:touch) after save.json existed, so a save may predate them:
+ * take the key in when the save has no touch section yet, and drop it once the save is written.
+ */
+function importLateTouch(legacy: Legacy): void {
+  const raw = legacy.get('svs:touch');
+  if (raw === null || !data) return;
+  if (data.touch === null) {
+    let v: unknown = null;
+    try { v = JSON.parse(raw); } catch { /* unreadable: keep the defaults */ }
+    if (!isObj(v)) { legacy.remove('svs:touch'); return; }
+    data.touch = clean(v);
+    dirty.save = true;
+    void flushSave().then(async () => { if (await backend.read(SAVE_FILE) !== null) legacy.remove('svs:touch'); });
+  } else legacy.remove('svs:touch');
+}
+
 /** First load on a browser that ran the old layout: copy the old keys in, then drop them once the new files are written. */
 function importLegacyInto(legacy: Legacy, wantSave: boolean, wantReplays: boolean): void {
+  if (!wantSave) importLateTouch(legacy);
   const old = wantSave ? importLegacy(legacy) : null;
   const oldReplays = wantReplays ? legacy.get('svs:replays') : null;
   if (!old && oldReplays === null) return;
