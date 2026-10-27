@@ -1,8 +1,9 @@
-# Desktop builds for play-testers. Push a tag like v0.2.0, or run it by hand (Actions > Desktop builds)
-# with a version filled in, and the Windows .exe and Linux AppImage are attached to a GitHub Release of
-# that name (the run makes the tag on the commit it built). Run it with the version left blank to get the
-# files as a workflow artifact only. Both are unsigned: Windows shows a SmartScreen "More info > Run anyway".
-name: Desktop builds
+# Play-test builds: the Windows .exe, the Linux AppImage and the Android APK. Push a tag like v0.2.0, or run
+# it by hand (Actions > Play-test builds) with a version filled in, and all three are attached to a GitHub
+# Release of that name (the run makes the tag on the commit it built). Run it with the version left blank to
+# get the files as workflow artifacts only. None are store-signed: Windows shows a SmartScreen "More info >
+# Run anyway", and Android asks to allow installs from the browser or file manager.
+name: Play-test builds
 
 on:
   push:
@@ -22,7 +23,7 @@ env:
   TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || (inputs.version != '' && format('v{0}', inputs.version) || '') }}
 
 jobs:
-  build:
+  desktop:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -47,8 +48,54 @@ jobs:
             release/*.exe
             release/*.AppImage
           retention-days: 30
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - name: Player build
+        run: npm run build:prod
+      - name: Copy the game into the Android project
+        run: npx cap sync android
+      # the runner image has the Android SDK; the APK is signed with the play-test key in android/app
+      - name: Build the APK
+        working-directory: android
+        env:
+          SVS_VERSION: ${{ env.TAG != '' && env.TAG || '0.0.0' }}
+          SVS_VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Name the APK
+        run: |
+          v="${TAG#v}"; v="${v:-dev}"
+          mkdir -p release && cp android/app/build/outputs/apk/debug/app-debug.apk "release/SpellVsSteel-$v-android.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spell-vs-steel-android
+          path: release/*.apk
+          retention-days: 30
+
+  release:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.version != '' }}
+    needs: [desktop, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
       - name: Release
-        if: env.TAG != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$TAG" release/*.exe release/*.AppImage --target "$GITHUB_SHA" --title "Spell VS Steel $TAG" --generate-notes
+        run: gh release create "$TAG" release/* --target "$GITHUB_SHA" --title "Spell VS Steel $TAG" --generate-notes

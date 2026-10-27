@@ -27,9 +27,11 @@
     "test:screens": "vite build --config tests/screens/vite.config.ts && tsx tests/screens/run.ts",
     "desktop": "npm run build:prod && electron .",
     "dist:win": "npm run build:prod && electron-builder --win portable",
-    "dist:linux": "npm run build:prod && electron-builder --linux AppImage"
+    "dist:linux": "npm run build:prod && electron-builder --linux AppImage",
+    "android:sync": "npm run build:prod && cap sync android"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@types/node": "^22.20.5",
     "electron": "^45.0.0",
     "electron-builder": "^26.18.0",
@@ -41,6 +43,9 @@
     "vite-plugin-singlefile": "^2.3.4"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
     "peerjs": "^1.5.5"
   },
   "description": "Spell VS Steel",
