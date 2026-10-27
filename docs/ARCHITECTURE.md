@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at f6ae61d (2026-10-27).
+How the game is put together, one section per system. Describes `main` at 21c9b2b (2026-10-27).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -299,7 +299,7 @@ flowchart LR
 
 - `OnlineBattleScene` and `TrainingScene` extend `BattleScene`; `TutorialScene` drives one. Card previews run their own tiny muted Battle.
 - Menus are mouse-first: scenes register click zones while drawing (`zone(...)`), the next update reads `hotZone()`. Combat is keyboard, gamepad or the touch pad (`engine/touch.ts`); see Input and platform.
-- Everything kept between sessions goes through the save module (see Saves). Exception today: touch settings still write `svs:touch` straight to `localStorage`.
+- Everything kept between sessions goes through the save module (see Saves).
 
 ### Phones (#51)
 
@@ -312,10 +312,10 @@ flowchart TB
   q -- neither --> std["Standard fit, touch pad below"]
 ```
 
-- Screens with `tall()`: title, select, stage select, deck builder, options, online, arcade, training, encyclopedia. Battle and tutorial use `split()`. Lobby, ranked, replays and tournament have no tall layout yet.
+- Every menu has a `tall()` layout (#51, #63) except key mapping, the dev tools and the balance lab. Battle and tutorial use `split()`.
 - `engine/input.ts` exports `gesture` (swipe, start, delta, held, fling); a swipe in from the left edge presses `PadBack`.
-- `scenes/touchUi.ts` is the touch kit: `bigButton`, `actionBar`, `tabs`, `swipeIn` / `flickIn`, `dots`, `Scroller`, `panel`, `sheet`, `tallArea` (safe-area insets from `touch.ts` `safeInsets()`).
-- Touch settings (pad size S/M/L, left-handed, vibration) live in `engine/touch.ts`; `layout()` applies them.
+- `scenes/touchUi.ts` is the touch kit: `bigButton`, `actionBar`, `tabs`, `swipeIn` / `flickIn`, `dots`, `Scroller`, `rowList` (scrolling panel of big rows), `panel`, `sheet`, `tallArea` (safe-area insets from `touch.ts` `safeInsets()`).
+- Touch settings (pad size S/M/L, left-handed, vibration) live in `engine/touch.ts` and save in the `touch` section of `save.json` (#63, old `svs:touch` imported once); `layout()` applies them.
 
 ## CPU AI and styles
 
@@ -395,7 +395,7 @@ One module, `engine/save.ts`, on top of the platform's file storage (`platform/s
 
 ```mermaid
 flowchart LR
-  callers["input, audio, deck, match, arcade,<br/>training, tutorial, replay, net/rating"] -->|getSave / updateSave| S["save.ts<br/>in-memory SaveData"]
+  callers["input, audio, deck, match, arcade,<br/>training, tutorial, touch, replay, net/rating"] -->|getSave / updateSave| S["save.ts<br/>in-memory SaveData"]
   S -->|read once at boot<br/>flush at end of tick| P[PlatformStorage]
   P --> web["webStorage<br/>localStorage svs:file:NAME"]
   P -.later.-> native[Steam / Capacitor files]
@@ -403,7 +403,7 @@ flowchart LR
 
 | File | Holds |
 | --- | --- |
-| `save.json` | keys, P2 keys, pads, audio, mute, decks, last match, training, tutorial done, arcade, rating, pending ranked result, lab script |
+| `save.json` | keys, P2 keys, pads, audio, mute, decks, last match, training, tutorial done, arcade, rating, pending ranked result, lab script, touch controls |
 | `replays.json` | 20 recent + up to 20 starred replays, about 3 MB budget |
 
 - Each file is `{game, v, data}`. Changing the shape means bumping `SAVE_VERSION` and adding `MIGRATIONS[n]`; never edit a shipped one.
@@ -467,4 +467,4 @@ New screens go in `tests/screens/harness.ts`.
 
 - Modularize: stages are modules (#35); class folders under `src/content/classes/<id>/` come next.
 - Battle state as plain data (no closures for delayed effects), after the class move.
-- BN indicators (#32). Touch settings onto the save module.
+- BN indicators (#32).
