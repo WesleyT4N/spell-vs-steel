@@ -77,9 +77,9 @@ export const rogue: CardDef[] = [
       const { b, f } = x;
       const c = f.col + 3 * x.dir, r = f.row, r2 = r < 2 ? r + 1 : r - 1;
       const cells: Array<[number, number]> = [[c, r], [c + x.dir, r], [c, r2], [c + x.dir, r2]];
-      // a lobbed shot you can see in the air, like BN's MiniBomb: no panel warning
+      // a lob, like BN's MiniBomb: a shadow grows on the landing panels while it falls
       b.addFx('lob', f.side, f.col, r, 0.4, { to: c, color: '#b8f818' });
-      b.later(0.4, () => {
+      b.warn(f, cells, 0.4, () => {
         for (const [cc, rr] of cells) {
           const p = b.panel(cc, rr);
           if (!p) continue;
@@ -87,7 +87,7 @@ export const rogue: CardDef[] = [
           p.toxic = 4; p.toxicSide = f.side;
         }
         if (b.strike(f, cells, 20 * x.mult, { spell: true, element: 'poison' }).dealt > 0) b.addPoison(x.foe, 2);
-      });
+      }, 'shadow');
     },
     ai: (b, f) => {
       const foe = b.foe(f), d = (foe.col - f.col) * b.dir(f), r2 = f.row < 2 ? f.row + 1 : f.row - 1;
@@ -115,10 +115,9 @@ export const rogue: CardDef[] = [
     cast: x => {
       const col = x.b.frontCol(x.foe.side);
       const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
-      x.b.warn(x.f, cells, TUNING.warnTime, () => {
-        for (let r = 0; r < 3; r++) x.b.addFx('stab', x.f.side, col, r, 0.25);
-        x.b.strike(x.f, cells, 50 * x.mult, { spell: true, element: 'steel' });
-      });
+      // thrown blades, instant like BN's sword-type chips
+      for (let r = 0; r < 3; r++) x.b.addFx('stab', x.f.side, col, r, 0.25);
+      x.b.strike(x.f, cells, 50 * x.mult, { spell: true, element: 'steel' });
     },
     ai: (b, f) => b.foe(f).col === b.frontCol(b.foe(f).side),
   },

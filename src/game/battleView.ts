@@ -13,7 +13,7 @@ import { COMBO_HOLD } from './combo';
 import { CARDS, ELEMENT_COLOR } from './cards';
 import { TUNING } from './tuning';
 import { heavyChargeOf } from './battle';
-import type { Battle, BlessKind, Fighter, Fx, Pet, Projectile, Side, StatusKey, Trap, Wall } from './battle';
+import type { Battle, BlessKind, Fighter, Fx, Warn, Pet, Projectile, Side, StatusKey, Trap, Wall } from './battle';
 import { CLASS_INFO } from './classes';
 import { drawOver, drawUnder, lookOf, observe } from './fighterAnim';
 
@@ -73,7 +73,8 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
   // toxic, blessed and holy-fire panels
   for (let col = 0; col < 6; col++) for (let r = 0; r < 3; r++) drawPanelEffects(c, b, col, r, tick);
   // warned panels keep a lit rim over flames and toxic clouds, so the danger zone never disappears between flashes
-  for (const w of b.warns) drawWarnEdge(c, w.col, w.row);
+  for (const w of b.warns) if (w.kind === 'flash') drawWarnEdge(c, w.col, w.row);
+  for (const w of b.warns) if (w.kind === 'shadow') drawLobShadow(c, w);
   for (const t of b.traps) if (me === 'all' || t.side === me) drawTrap(c, t, tick);
 
   // entities, back row first
@@ -83,6 +84,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
   }
   for (const p of b.pets) drawPet(c, b, p, tick);
   for (const pr of b.projectiles) drawProjectile(c, b, pr);
+  for (const w of b.warns) if (w.kind === 'reticle') drawReticle(c, w, b.time);
   for (const e of b.fx) drawFx(c, b, e);
   drawParticles(c, b);
   c.restore();
@@ -111,7 +113,7 @@ const WARN_FILL = '#f8e000', WARN_RIM = '#f8b800';
  */
 function warnFlash(b: Battle, col: number, row: number): string | undefined {
   let w: Battle['warns'][number] | undefined;
-  for (const x of b.warns) if (x.col === col && x.row === row && (!w || x.t < w.t)) w = x;
+  for (const x of b.warns) if (x.kind === 'flash' && x.col === col && x.row === row && (!w || x.t < w.t)) w = x;
   if (!w) return undefined;
   const left = w.t, gone = w.dur - w.t;
   if (left < 0.1) return WARN_FILL;
@@ -123,6 +125,41 @@ function drawWarnEdge(c: Ctx, col: number, row: number): void {
   const x = X0 + col * PW + 2, y = Y0 + row * (FACE + LIP) + 1, w = PW - 4, h = FACE - 2;
   P(c, WARN_RIM, x, y, w, 2); P(c, WARN_RIM, x, y + h - 2, w, 2);
   P(c, WARN_RIM, x, y, 2, h); P(c, WARN_RIM, x + w - 2, y, 2, h);
+}
+
+const RETICLE = '#f83800';
+
+/** BN lock-on crosshair: corner brackets close in on the target panel as the shot nears, around a blinking center cross. */
+function drawReticle(c: Ctx, w: Warn, time: number): void {
+  const p = 1 - w.t / w.dur;
+  const at = panelCenter(w.col, w.row);
+  const cx = Math.round(at.x), cy = Math.round(at.y);
+  const rx = Math.round(18 - 8 * p), ry = Math.round(12 - 5 * p), arm = 4;
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const x = cx + sx * rx, y = cy + sy * ry;
+    P(c, '#000000', Math.min(x, x - sx * arm) - 1, y - 1, arm + 3, 3);
+    P(c, '#000000', x - 1, Math.min(y, y - sy * arm) - 1, 3, arm + 3);
+    P(c, RETICLE, Math.min(x, x - sx * arm), y, arm + 1, 1);
+    P(c, RETICLE, x, Math.min(y, y - sy * arm), 1, arm + 1);
+  }
+  if (w.t < 0.15 || Math.floor(time * 12) % 2 === 0) {
+    P(c, RETICLE, cx - 3, cy, 7, 1);
+    P(c, RETICLE, cx, cy - 3, 1, 7);
+  }
+}
+
+/** BN bomb shadow: a dark oval on the landing panel that grows as the lob comes down. */
+function drawLobShadow(c: Ctx, w: Warn): void {
+  const p = 1 - w.t / w.dur;
+  const pc = panelCenter(w.col, w.row);
+  const hw = Math.round(4 + (PW / 2 - 8) * p), hh = Math.max(1, Math.round(1 + (FACE / 2 - 4) * p));
+  c.save();
+  c.globalAlpha = 0.25 + 0.3 * p;
+  for (let dy = -hh; dy <= hh; dy++) {
+    const half = Math.round(hw * Math.sqrt(1 - (dy / (hh + 0.5)) ** 2));
+    P(c, '#000000', Math.round(pc.x) - half, Math.round(pc.y) + dy, half * 2, 1);
+  }
+  c.restore();
 }
 
 function drawPanelEffects(c: Ctx, b: Battle, col: number, row: number, tick: number): void {
