@@ -1,5 +1,5 @@
 // Ranger kit (design doc, 2026-10-25). Arrows, hidden traps and companions; Energy comes from standing still.
-import { type Battle, type CastCtx, type Fighter, type Trap, type CardDef, shuffle, allEnemyPanels, sameRow, TUNING } from '../../api';
+import { type Battle, type CastCtx, type Fighter, type Pet, type Side, type Trap, type CardDef, type EffectRec, type ShotHit, shuffle, allEnemyPanels, sameRow, TUNING, spellStep } from '../../api';
 
 /** Hide a trap on a panel until the next Draw screen. It arms after `arm` seconds and only its owner can see it.
  *  Blessed panels refuse traps. */
@@ -15,16 +15,70 @@ const randomEnemyPanel = (b: Battle, f: Fighter): [number, number] => {
   return cells[Math.floor(b.rand() * cells.length)];
 };
 
-/** An arrow-type projectile down the caster's row. */
-function arrow(x: CastCtx, kind: 'arrow' | 'net' | 'wolf' | 'sting', speed: number, onFoe: (b: Battle, t: Fighter) => void, wallDmg = 20, row = x.f.row): void {
-  x.b.shoot(x.f, {
-    row, speed: speed * x.dir, kind, reflectable: true,
-    onHit: (b, t, w) => {
-      if (w) { b.hitWall(w, wallDmg, x.f, {}); return; }
-      if (t) onFoe(b, t);
-    },
-  });
+/** An arrow-type projectile down the caster's row: `onFoe` runs on the fighter it hits, a wall takes `wallDmg`. */
+function arrow(x: CastCtx, kind: 'arrow' | 'net' | 'wolf' | 'sting', speed: number, onFoe: EffectRec<Fighter>, wallDmg = 20, row = x.f.row): void {
+  x.b.shoot(x.f, { row, speed: speed * x.dir, kind, reflectable: true, onHit: arrowHit(x, { wallDmg, onFoe }) });
 }
+const arrowHit = spellStep('ranger.arrow', (x, { wallDmg, onFoe }: { wallDmg: number; onFoe: EffectRec<Fighter> }, h: ShotHit) => {
+  if (h.w) { x.b.hitWall(h.w, wallDmg, x.f, {}); return; }
+  if (h.t) x.b.runEffect(onFoe, h.t);
+});
+
+type Cells = Array<[number, number]>;
+
+// Spells' later steps (see spellStep): what lands after a delay, a telegraph or a flight.
+const hawkHit = spellStep('hawk_strike.hit', (x, _a, h: ShotHit) => {
+  if (h.t) x.b.damage(h.t, 40 * x.mult, x.b.f[1 - h.t.side], { spell: true, element: 'nature' });
+});
+const netHit = spellStep('net.hit', (x, _a, t: Fighter) => { x.b.damage(t, 10 * x.mult, x.f, { spell: true, element: 'nature' }); x.b.root(t, 2); });
+const multiShotHit = spellStep('multi_shot.hit', (x, _a, t: Fighter) => { x.b.damage(t, 50 * x.mult, x.f, { spell: true, element: 'steel' }); });
+const wolfHit = spellStep('call_wolf.hit', (x, _a, t: Fighter) => {
+  for (let i = 0; i < 3; i++) x.b.later(i * 0.25, wolfBite(x, { side: t.side, i }));
+});
+const wolfBite = spellStep('call_wolf.bite', (x, { side, i }: { side: Side; i: number }) => {
+  const t = x.b.f[side];
+  x.b.addFx('bite', x.f.side, t.col, t.row, 0.25);
+  x.b.damage(t, 25 * x.mult, x.f, { spell: true, element: 'nature', noFlinch: i < 2 });
+});
+const volleyHit = spellStep('volley.hit', (x, { cells }: { cells: Cells }) => {
+  for (const [c, r] of cells) x.b.addFx('arrowRain', x.f.side, c, r, 0.35);
+  x.b.strike(x.f, cells, 50 * x.mult, { spell: true, element: 'steel' });
+});
+const killShotHit = spellStep('kill_shot.hit', x => {
+  const { b, f, foe } = x;
+  b.addFx('aimed', f.side, f.col, f.row, 0.35, { to: foe.col, toRow: foe.row });
+  b.shake = 0.3;
+  b.damage(foe, 220 * x.mult, f, { spell: true, element: 'steel', targeted: true, pierce: true });
+});
+const barrageArrow = spellStep('barrage.arrow', x => {
+  const { b, f, foe } = x;
+  const cells = allEnemyPanels(b, f.side);
+  const [c, r] = b.rand() < 0.35 ? [foe.col, foe.row] : cells[Math.floor(b.rand() * cells.length)];
+  b.warn(f, [[c, r]], TUNING.warnTime, barrageHit(x, { c, r }));
+});
+const barrageHit = spellStep('barrage.hit', (x, { c, r }: { c: number; r: number }) => {
+  x.b.addFx('arrowRain', x.f.side, c, r, 0.3);
+  x.b.strike(x.f, [[c, r]], 30 * x.mult, { spell: true, element: 'steel', noFlinch: true });
+});
+const explosiveHit = spellStep('explosive_shot.hit', (x, _a, t: Fighter) => {
+  if (x.b.damage(t, 40 * x.mult, x.f, { spell: true, element: 'fire' }).dealt <= 0) return;
+  x.b.text(t, 'STUCK', '#f87800');
+  // the arrow ticks on them, then the blast locks onto where they stand and flashes before it goes off
+  x.b.later(2 - TUNING.warnTime, explosiveArm(x, { side: t.side }));
+});
+const explosiveArm = spellStep('explosive_shot.arm', (x, { side }: { side: Side }) => {
+  const t = x.b.f[side];
+  const cells: Cells = [[t.col, t.row], [t.col - 1, t.row], [t.col + 1, t.row], [t.col, t.row - 1], [t.col, t.row + 1]];
+  x.b.warn(x.f, cells, TUNING.warnTime, explosiveBlast(x, { cells }));
+});
+const explosiveBlast = spellStep('explosive_shot.blast', (x, { cells }: { cells: Cells }) => {
+  const { b } = x;
+  b.shake = 0.25;
+  for (const [c, r] of cells) if (b.inGrid(c, r)) b.addFx('explode', x.f.side, c, r, 0.4);
+  b.strike(x.f, cells, 120 * x.mult, { spell: true, element: 'fire' });
+});
+const petStrike = spellStep('kill_command.strike', (x, { p }: { p: Pet }) => x.b.petAttack(p, 3 * x.mult));
+const stingHit = spellStep('wyvern_sting.hit', (x, _a, t: Fighter) => x.b.sleep(t, 3));
 
 const enemyNear = (b: Battle, f: Fighter, n: number): boolean => Math.abs(b.foe(f).col - f.col) <= n;
 let wireGroup = 0;
@@ -45,7 +99,7 @@ export const ranger: CardDef[] = [
       x.b.projectiles.push({
         side: x.f.side, row: x.f.row, x: x.f.col, speed: 0, kind: 'hawk', reflectable: false,
         homing: { p: 0, dur: 0.5, sx: x.f.col, sy: x.f.row, target: x.foe.side },
-        onHit: (b, t) => { if (t) b.damage(t, 40 * x.mult, b.f[1 - t.side], { spell: true, element: 'nature' }); },
+        onHit: hawkHit(x),
       });
       x.b.sound('shot_hawk', { pan: (x.f.col - 2.5) / 3 });
     },
@@ -62,7 +116,7 @@ export const ranger: CardDef[] = [
   {
     id: 'net', name: 'Net', cls: 'ranger', cost: 1, rarity: 'common', element: 'nature', damaging: true, lock: 0.3,
     dmg: '10', short: 'Net down your row. Roots the enemy for 2s: no moving, can still attack.',
-    cast: x => arrow(x, 'net', 12, (b, t) => { b.damage(t, 10 * x.mult, x.f, { spell: true, element: 'nature' }); b.root(t, 2); }),
+    cast: x => arrow(x, 'net', 12, netHit(x)),
     ai: (b, f) => sameRow(b, f),
   },
   {
@@ -89,17 +143,12 @@ export const ranger: CardDef[] = [
   {
     id: 'multi_shot', name: 'Multi-Shot', cls: 'ranger', cost: 2, rarity: 'common', element: 'steel', damaging: true, lock: 0.35,
     dmg: '50', short: 'Three arrows, one down each row.',
-    cast: x => { for (let r = 0; r < 3; r++) arrow(x, 'arrow', 14, (b, t) => b.damage(t, 50 * x.mult, x.f, { spell: true, element: 'steel' }), 50, r); },
+    cast: x => { for (let r = 0; r < 3; r++) arrow(x, 'arrow', 14, multiShotHit(x), 50, r); },
   },
   {
     id: 'call_wolf', name: 'Call Wolf', cls: 'ranger', cost: 2, rarity: 'common', element: 'nature', damaging: true, lock: 0.3,
     dmg: '25x3', short: 'A wolf runs down your row and bites the first enemy 3 times.',
-    cast: x => arrow(x, 'wolf', 7, (b, t) => {
-      for (let i = 0; i < 3; i++) b.later(i * 0.25, () => {
-        b.addFx('bite', x.f.side, t.col, t.row, 0.25);
-        b.damage(t, 25 * x.mult, x.f, { spell: true, element: 'nature', noFlinch: i < 2 });
-      });
-    }, 40),
+    cast: x => arrow(x, 'wolf', 7, wolfHit(x), 40),
     ai: (b, f) => sameRow(b, f),
   },
   {
@@ -141,10 +190,7 @@ export const ranger: CardDef[] = [
       const front = b.frontCol(x.foe.side);
       const cells: Array<[number, number]> = [];
       for (const c of [front + x.dir, front + 2 * x.dir]) for (let r = 0; r < 3; r++) if (b.inGrid(c, r)) cells.push([c, r]);
-      b.warn(f, cells, 1, () => {
-        for (const [c, r] of cells) b.addFx('arrowRain', f.side, c, r, 0.35);
-        b.strike(f, cells, 50 * x.mult, { spell: true, element: 'steel' });
-      });
+      b.warn(f, cells, 1, volleyHit(x, { cells }));
     },
     ai: (b, f) => b.foe(f).col !== b.frontCol(b.foe(f).side),
   },
@@ -163,47 +209,22 @@ export const ranger: CardDef[] = [
     id: 'kill_shot', name: 'Kill Shot', cls: 'ranger', cost: 5, rarity: 'legendary', element: 'steel', damaging: true, lock: 1.1,
     dmg: '220', short: 'A laser locks on for 1s, then the arrow hits the enemy wherever they are. Ignores barriers.',
     cast: x => {
-      const { b, f, foe } = x;
-      b.addFx('laser', f.side, f.col, f.row, 1);
-      b.later(1, () => {
-        b.addFx('aimed', f.side, f.col, f.row, 0.35, { to: foe.col, toRow: foe.row });
-        b.shake = 0.3;
-        b.damage(foe, 220 * x.mult, f, { spell: true, element: 'steel', targeted: true, pierce: true });
-      });
+      x.b.addFx('laser', x.f.side, x.f.col, x.f.row, 1);
+      x.b.later(1, killShotHit(x));
     },
   },
   {
     id: 'barrage', name: 'Barrage', cls: 'ranger', cost: 4, rarity: 'legendary', element: 'steel', damaging: true, lock: 0.4,
     dmg: '30 each', short: '12 arrows fall on random enemy panels over 3s.',
     cast: x => {
-      const { b, f, foe } = x;
       // like Blizzard: some arrows aim at the enemy's panel, each telegraphs for the standard warning
-      for (let i = 0; i < 12; i++) b.later(i * 0.25, () => {
-        const cells = allEnemyPanels(b, f.side);
-        const [c, r] = b.rand() < 0.35 ? [foe.col, foe.row] : cells[Math.floor(b.rand() * cells.length)];
-        b.warn(f, [[c, r]], TUNING.warnTime, () => {
-          b.addFx('arrowRain', f.side, c, r, 0.3);
-          b.strike(f, [[c, r]], 30 * x.mult, { spell: true, element: 'steel', noFlinch: true });
-        });
-      });
+      for (let i = 0; i < 12; i++) x.b.later(i * 0.25, barrageArrow(x));
     },
   },
   {
     id: 'explosive_shot', name: 'Explosive Shot', cls: 'ranger', cost: 3, rarity: 'legendary', element: 'fire', damaging: true, lock: 0.35,
     dmg: '40+120', short: 'Arrow down your row sticks to the enemy and explodes 2s later on them and around them.',
-    cast: x => arrow(x, 'arrow', 16, (b, t) => {
-      if (b.damage(t, 40 * x.mult, x.f, { spell: true, element: 'fire' }).dealt <= 0) return;
-      b.text(t, 'STUCK', '#f87800');
-      // the arrow ticks on them, then the blast locks onto where they stand and flashes before it goes off
-      b.later(2 - TUNING.warnTime, () => {
-        const cells: Array<[number, number]> = [[t.col, t.row], [t.col - 1, t.row], [t.col + 1, t.row], [t.col, t.row - 1], [t.col, t.row + 1]];
-        b.warn(x.f, cells, TUNING.warnTime, () => {
-          b.shake = 0.25;
-          for (const [c, r] of cells) if (b.inGrid(c, r)) b.addFx('explode', x.f.side, c, r, 0.4);
-          b.strike(x.f, cells, 120 * x.mult, { spell: true, element: 'fire' });
-        });
-      });
-    }),
+    cast: x => arrow(x, 'arrow', 16, explosiveHit(x)),
     ai: (b, f) => sameRow(b, f),
   },
   {
@@ -212,7 +233,7 @@ export const ranger: CardDef[] = [
     cast: x => {
       const mine = x.b.pets.filter(p => p.side === x.f.side);
       if (!mine.length) { x.b.text(x.f, 'NO PETS', '#bcbcbc'); return; }
-      mine.forEach((p, i) => x.b.later(i * 0.12, () => x.b.petAttack(p, 3 * x.mult)));
+      mine.forEach((p, i) => x.b.later(i * 0.12, petStrike(x, { p })));
       x.b.addFx('shout', x.f.side, x.f.col, x.f.row, 0.5);
     },
     ai: (b, f) => b.pets.some(p => p.side === f.side),
@@ -220,7 +241,7 @@ export const ranger: CardDef[] = [
   {
     id: 'wyvern_sting', name: 'Wyvern Sting', cls: 'ranger', cost: 2, rarity: 'legendary', element: 'poison', damaging: false, lock: 0.3,
     dmg: '-', short: 'Arrow down your row puts the enemy to sleep for 3s. Any damage wakes them (+50%).',
-    cast: x => arrow(x, 'sting', 16, (b, t) => b.sleep(t, 3)),
+    cast: x => arrow(x, 'sting', 16, stingHit(x)),
     ai: (b, f) => sameRow(b, f),
   },
   {

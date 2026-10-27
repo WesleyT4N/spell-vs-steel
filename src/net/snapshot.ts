@@ -2,12 +2,13 @@
 // out different from the guess, the battle goes back to the last frame both inputs were known and
 // runs forward again.
 //
-// The battle keeps closures in its state (scheduled timers, animations, projectile hit handlers),
-// and those closures hold on to the battle's own objects: fighters, pets, walls. A plain deep copy
-// would leave them pointing at the old objects. So a snapshot records every object reachable from
-// the battle together with its field values, and restoring writes those values back into the very
-// same objects. Every reference, inside a closure or not, stays valid, and objects created after
-// the snapshot simply drop out of the restored graph. Functions are kept as values, not walked.
+// The battle's state is plain data (delayed effects are records, see content/effects.ts), but it is a
+// graph: effect arguments point at the battle's own pets, shared counters and cast refs, and watchers
+// (post-match stats, the scenes) hold on to its fighters. A plain deep copy would leave them pointing
+// at the old objects. So a snapshot records every object reachable from the battle together with its
+// field values, and restoring writes those values back into the very same objects. Every reference
+// stays valid, and objects created after the snapshot simply drop out of the restored graph.
+// Functions (the methods watchers wrap) are kept as values, not walked.
 //
 // The one piece of hidden state, the seeded generator's counter, is saved explicitly.
 // `npm run rollcheck` proves that rolling back and resimulating gives the same battle as never
