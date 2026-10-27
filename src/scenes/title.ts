@@ -22,6 +22,7 @@ import { DEV_TOOLS } from '../flags';
 import { RED_INK } from './skin';
 import { bigButton, tallArea, panel, TAP, GAP, PAD } from './touchUi';
 import { platform } from '../platform';
+import { flushSave } from '../engine/save';
 
 // QUIT only in an app that can close itself (a web page can't)
 const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'SPELL DECK BUILDER', 'REPLAYS', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : []), ...(platform.lifecycle.canQuit ? ['QUIT'] : [])];
@@ -193,7 +194,8 @@ export class TitleScene implements Scene {
       if (item === 'REPLAYS') pushScene(new ReplaysScene());
       if (item === 'OPTIONS') pushScene(new OptionsScene());
       // loaded on demand, so the prod build (DEV_TOOLS off) carries none of the dev tools code
-      if (item === 'QUIT') platform.lifecycle.quit();
+      // write out the save first, then close the app
+      if (item === 'QUIT') void flushSave().finally(() => platform.lifecycle.quit());
       if (item === 'DEV TOOLS' && DEV_TOOLS) void import('./devMenu').then(m => pushScene(new m.DevMenuScene()));
     }
   }
