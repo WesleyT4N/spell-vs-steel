@@ -44,6 +44,7 @@ async function main(): Promise<void> {
     'svs:replays': JSON.stringify(oldReplays),
     'svs:rating': JSON.stringify({ elo: 1234 }),
     'svs:lab:script': 'run 10',
+    'svs:touch': JSON.stringify({ size: 'L', left: true }),
     'unrelated': 'keep me',
   });
   const files = resetSaveForTests({}, legacy).files;
@@ -54,6 +55,7 @@ async function main(): Promise<void> {
   check('training carried over', getSave('training')?.act === 'dodge');
   check('rating + lab carried over', getSave('rating')?.elo === 1234 && getSave('labScript') === 'run 10');
   check('arcade best carried over', loadRecords().mage?.time === 321);
+  check('touch settings carried over', getSave('touch')?.size === 'L' && getSave('touch')?.left === true);
   check('match carried over', loadMatch().p1 === 'rogue' && loadMatch().bestOf === 5);
   const deck = loadCustom('warrior');
   check('deck carried over, unknown cards dropped', deck?.step_slash === 4 && !('not-a-card' in deck) && Object.keys(getSave('decks').warrior).length === 2);
@@ -71,6 +73,15 @@ async function main(): Promise<void> {
   resetSaveForTests({ ...files }, legacyStore({ 'svs:tutorial': '1' }));
   check('round trip', getSave('tutorialDone') === false && getSave('decks').mage['m-fireball'] === 2 && getSave('keys').up === 'KeyI');
   check('legacy keys ignored once a save exists', getSave('tutorialDone') === false);
+
+  // ---- touch settings saved under their own key after save.json existed: taken in late, then dropped ----
+  const late = legacyStore({ 'svs:touch': JSON.stringify({ buzz: false }) });
+  const lf = resetSaveForTests({ 'save.json': '{"game":"spell-vs-steel","v":1,"data":{"tutorialDone":true}}' }, late).files;
+  check('late touch key taken in', getSave('touch')?.buzz === false && getSave('tutorialDone'));
+  await settle();
+  check('late touch key saved and dropped', JSON.parse(lf['save.json']).data.touch?.buzz === false && !late.map.has('svs:touch'));
+  resetSaveForTests({ ...lf }, legacyStore({ 'svs:touch': JSON.stringify({ size: 'S' }) }));
+  check('save wins over a stale touch key', getSave('touch')?.buzz === false && getSave('touch')?.size === undefined);
 
   // ---- damaged save: start fresh, keep the bad file aside ----
   const bad = resetSaveForTests({ 'save.json': '{"game":"spell-vs-steel","v":1,"data":' }).files;
