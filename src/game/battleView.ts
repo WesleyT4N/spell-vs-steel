@@ -123,12 +123,11 @@ function drawWarnEdge(c: Ctx, col: number, row: number): void {
 
 const RETICLE = '#f83800';
 
-/** BN lock-on crosshair: corner brackets close in on the target as the shot nears, around a blinking center cross.
- *  A crosshair that follows a fighter sits on their body; a locked one sits on the panel. */
+/** BN lock-on crosshair: corner brackets close in on the target panel as the shot nears, around a blinking center cross. */
 function drawReticle(c: Ctx, w: Warn, time: number): void {
   const p = 1 - w.t / w.dur;
-  const at = w.follow !== undefined ? panelFoot(w.col, w.row) : panelCenter(w.col, w.row);
-  const cx = Math.round(at.x), cy = Math.round(w.follow !== undefined ? at.y - 12 : at.y);
+  const at = panelCenter(w.col, w.row);
+  const cx = Math.round(at.x), cy = Math.round(at.y);
   const rx = Math.round(18 - 8 * p), ry = Math.round(12 - 5 * p), arm = 4;
   for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
     const x = cx + sx * rx, y = cy + sy * ry;
