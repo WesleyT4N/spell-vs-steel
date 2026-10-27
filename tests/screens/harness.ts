@@ -23,7 +23,7 @@ import { ArcadeLadderScene, ArcadeClearScene } from '../../src/scenes/arcade';
 import { buildLadder, type ArcadeRun } from '../../src/game/arcade';
 import { loadMatch, type MatchConfig } from '../../src/game/match';
 import { PLAYABLE } from '../../src/game/classes';
-import type { ClassId } from '../../src/art/sprites';
+import { SKINS, type ClassId } from '../../src/art/sprites';
 import { LobbyScene } from '../../src/scenes/lobby';
 import { RankedScene } from '../../src/scenes/ranked';
 import { ReplaysScene } from '../../src/scenes/replays';
@@ -33,6 +33,13 @@ import { lobbyId, type Lobby, type Here } from '../../src/net/lobby';
 import type { Search } from '../../src/net/matchmaking';
 import type { RatingStore } from '../../src/net/rating';
 import type { Replay } from '../../src/game/replay';
+import { NetSession } from '../../src/net/session';
+import type { Transport } from '../../src/net/transport';
+import type { Packet } from '../../src/net/protocol';
+import { OnlineBattleScene } from '../../src/scenes/onlineBattle';
+import { startRanked } from '../../src/net/rating';
+import { roundRecord } from '../../src/game/stats';
+import { presetDeck, toList } from '../../src/game/deck';
 
 const STEP = 1 / 60;
 /** Run the current screen's update for `seconds` of game time without drawing (much faster than real frames). */
@@ -110,6 +117,30 @@ function fakeTournament(state: Bracket['state']): TournamentScene {
   return s;
 }
 
+/**
+ * An online match against a made-up rival over an in-memory link: the rival's side answers every packet at once,
+ * so the session stays connected. `matched` false leaves the host alone in the room, waiting.
+ */
+function fakeNet(matched = true): NetSession {
+  const hello = (cls: ClassId) => ({ cls, skin: SKINS[cls][0].id, deck: [] as string[] });
+  const pipe = (): Transport & { peer?: Transport & { cb?: (p: Packet) => void }; cb?: (p: Packet) => void } => ({
+    kind: 'local', cb: undefined, peer: undefined,
+    send(p) { this.peer?.cb?.(JSON.parse(JSON.stringify(p)) as Packet); },
+    onPacket(cb) { this.cb = cb; }, onClose() {}, close() {},
+  });
+  const a = pipe(), b = pipe();
+  const host = new NetSession('host', 'KQZ7M', { ...hello('warrior'), deck: loadMatchDeck() }, a, 3);
+  if (!matched) return host;
+  a.peer = b; b.peer = a;
+  const guest = new NetSession('guest', 'KQZ7M', { ...hello('mage'), deck: loadMatchDeck('mage') }, b, 3);
+  // the rival answers each packet with its own
+  const onB = b.cb!;
+  b.cb = p => { onB(p); guest.tick(); };
+  host.tick();
+  return host;
+}
+const loadMatchDeck = (cls: ClassId = 'warrior'): string[] => toList(presetDeck(cls, 'starter'));
+
 const screens: Record<string, () => void> = {
   'title': title,
   'options': () => setScene(new OptionsScene(title)),
@@ -129,6 +160,25 @@ const screens: Record<string, () => void> = {
   'online-lobby': () => setScene(new OnlineScene()),
   // typing a room code to join, three letters in
   'online-code': () => { const o = new OnlineScene(); o.mode = 'code'; o.code = 'KQZ'; setScene(o); },
+  // a room opened and its code up, waiting for a friend to join
+  'online-room': () => { const o = new OnlineScene(); o.enter = () => {}; o.kind = 'peer'; o.code = 'KQZ7M'; o.net = fakeNet(false); o.mode = 'room'; setScene(o); },
+  // picking fighters against a rival who is still choosing
+  'online-select': () => setScene(new CharSelectScene(fakeNet())),
+  'online-stage': () => setScene(new StageSelectScene(fakeNet())),
+  // the Draw screen once your picks are locked in and the rival is still choosing
+  'online-draw-locked': () => { const s = new OnlineBattleScene(fakeNet(), [0, 0], 1); setScene(s); run(0.3); s.picks = [0]; (s as unknown as { confirmCustom(): void }).confirmCustom(); run(0.2); },
+  // the end of a ranked round: the results carry the ranked note
+  'online-results-ranked': () => {
+    const net = fakeNet();
+    startRanked(net, { rating: 1250, games: 19, wins: 12, losses: 7 }, 1288);
+    const s = new OnlineBattleScene(net, [0, 0], 1);
+    setScene(s);
+    run(0.2);
+    s.b.phase = 'over'; s.b.winner = 0; s.ended = true; s.score[0]++; s.rounds.push(roundRecord(s.b, s.stats));
+    run(0.5);
+  },
+  // a ready-made deck's spells open over the start-from picker (on phones in portrait; wider screens list it on hover)
+  'deck-builder-peek': () => { const d = new DeckBuilderScene('ranger', title); (d as unknown as { peek: number; pickSel: number }).peek = 1; (d as unknown as { pickSel: number }).pickSel = 1; setScene(d); },
   ...Object.fromEntries(PLAYABLE.map(c => [`deck-builder-${c}`, () => setScene(new DeckBuilderScene(c, title))])),
   // the opening Draw screen, with you on the left against the CPU
   'battle-draw': () => { setScene(new BattleScene(match({ p1: 'warrior', cpu: 'mage' }))); run(0.5); },
