@@ -1,6 +1,7 @@
-# Desktop builds
+# Desktop and Android builds
 
-The game ships to PCs as an Electron app wrapped around the player build (`dist-prod/index.html`).
+The game ships to PCs as an Electron app, and to Android phones as a Capacitor app, both wrapped around
+the player build (`dist-prod/index.html`).
 
 | Command | What it does |
 | --- | --- |
@@ -10,9 +11,12 @@ The game ships to PCs as an Electron app wrapped around the player build (`dist-
 
 Both package commands work from Linux; no Wine is needed because nothing is signed.
 
+`npm run android:sync` copies the player build into `android/`; then `cd android && ./gradlew assembleDebug`
+(needs the Android SDK, or open `android/` in Android Studio).
+
 ## Sharing a build
 
-Push a tag, and `.github/workflows/desktop.yml` builds both files and attaches them to a GitHub Release:
+Push a tag, and `.github/workflows/desktop.yml` (Play-test builds) builds the `.exe`, the AppImage and the APK and attaches them to a GitHub Release:
 
 ```
 git tag v0.2.0 && git push origin v0.2.0
@@ -24,6 +28,11 @@ same files as a workflow artifact without making a Release.
 The `.exe` is unsigned, so Windows SmartScreen says "Windows protected your PC" the first time:
 **More info > Run anyway**. Signing (and Steam) come later.
 
+The APK installs by opening it on the phone and allowing installs from that app (browser or Files) when
+Android asks. It is signed with the play-test key in `android/app/playtest.keystore` (kept in the repo on
+purpose, never for the Play Store) and each CI run raises the version code, so a newer APK installs over the
+old one and keeps saves.
+
 ## What works in the app
 
 - Everything offline: Arcade, Versus (keyboard and gamepads), Training, Tutorial, Deck Builder, Replays.
@@ -34,6 +43,14 @@ The `.exe` is unsigned, so Windows SmartScreen says "Windows protected your PC" 
 Saves live in Electron's storage for the app (localStorage under the user's app-data folder), so they
 survive updating to a newer `.exe`. F11, Alt+Enter or Options > FULLSCREEN toggles fullscreen, and the title
 screen has QUIT (it saves first).
+
+## Android app
+
+- `capacitor.config.json` + `android/`: the Capacitor project (fullscreen, black splash, Warrior icon).
+- `src/platform/capacitor.ts`: the hardware Back button acts like Esc (BACK in menus, pause in a fight),
+  QUIT closes the app, and pause/resume drive the game's background handling.
+- Saves are the web version (localStorage in the app's WebView), so they survive APK updates.
+- Online works the same as the desktop app (room codes over PeerJS).
 
 ## Files
 
