@@ -609,7 +609,8 @@ const mage: CardDef[] = [
 ];
 
 export const ALL_CARDS: CardDef[] = [...warrior, ...mage, ...rogue, ...ranger, ...priest];
-export const CARDS: Record<string, CardDef> = Object.fromEntries(ALL_CARDS.map(c => [c.id, c]));
+// No prototype, so ids from files or the network ("__proto__", "constructor") never resolve to a built-in object.
+export const CARDS: Record<string, CardDef> = Object.assign(Object.create(null), Object.fromEntries(ALL_CARDS.map(c => [c.id, c])));
 export const cardsFor = (cls: ClassId): CardDef[] => ALL_CARDS.filter(c => c.cls === cls);
 
 export const ELEMENT_COLOR: Record<Element, string> = { steel: '#bcbcbc', fire: '#f87800', frost: '#3cbcfc', arcane: '#f878f8', shadow: '#9878f8', poison: '#b8f818', nature: '#58d854', holy: '#f8d878' };
