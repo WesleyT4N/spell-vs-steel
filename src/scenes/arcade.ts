@@ -122,10 +122,11 @@ export class ArcadeLadderScene implements Scene {
       drawTextCentered(ui, name, cx, y + 134, INK, 2, false);
       lines.forEach((l, i) => drawTextCentered(ui, l, cx, y + 158 + i * 14, i ? INK2 : TRIM, 1, false));
     };
+    const best = loadRecords()[run.m.p1];
     side(x0, 'YOU', RED_INK, run.m.p1, mine, false, CLASS_INFO[run.m.p1].name,
-      [deckLabel(run.m.p1, run.m.p1Deck), `CONTINUES ${run.continues}`, `TIME ${clock(run.time)}`], 0);
+      [deckLabel(run.m.p1, run.m.p1Deck), `CONTINUES ${run.continues}`, `TIME ${clock(run.time)}`, best ? `BEST ${clock(best.time)} / ${best.continues}C` : ''], 0);
     const rl = [deckLabel(next.cls, next.deck), `CPU ${LEVEL[next.difficulty]}`, getStage(next.stage).name.toUpperCase()];
-    if (next.boss) rl.push(`HP x${BOSS_HP}`);
+    rl.push(next.boss ? `FULL KIT  HP x${BOSS_HP}` : `${Math.round(next.power * 100)}% POWER`);
     side(x0 + pw + GAP, next.boss ? 'BOSS' : 'NEXT RIVAL', BLUE_INK, next.cls, next.skin, true, next.boss ? BOSS_NAME : CLASS_INFO[next.cls].name, rl, 1);
     y += ph + GAP;
 
