@@ -3,6 +3,7 @@
 // It wraps methods on one Battle instance, so the rules in battle.ts stay untouched.
 import type { Battle, Fighter, HitOpts, Panel, Side } from '../game/battle';
 import { CARDS } from '../game/cards';
+import type { EffectRec } from '../content/effects';
 
 /** Damage multiplier per card id (1 = as written). Shared by the sandbox, the balance lab and the CLI sim. */
 export const CARD_POWER: Record<string, number> = {};
@@ -49,25 +50,17 @@ export function instrument(b: Battle, keep = 0): Probe {
   let current: Tag | null = null;
   const burnTag = new Map<Panel, Tag>();
 
-  const tagged = new WeakSet<object>();
   // Run `fn` under `tag`; projectiles it spawns (by shoot() or a direct push) carry the tag to their hit.
   const under = <R>(tag: Tag | null, fn: () => R): R => {
     const prev = current, n = b.projectiles.length;
     current = tag;
     try { return fn(); } finally {
-      if (tag) for (const p of b.projectiles.slice(n)) {
-        if (tagged.has(p)) continue;
-        tagged.add(p);
-        p.onHit = carry(p.onHit, tag);
-      }
+      if (tag) for (const p of b.projectiles.slice(n)) credit(p.onHit, tag);
       current = prev;
     }
   };
-  // run `fn` with the tag that was current when it was scheduled
-  function carry<A extends unknown[], R>(fn: (...a: A) => R, tag: Tag | null = current): (...a: A) => R {
-    if (!tag) return fn;
-    return (...a: A): R => under(tag, () => fn(...a));
-  }
+  // a scheduled effect runs with the tag that was current when it was scheduled
+  const credit = (fx: EffectRec<unknown>, tag: Tag | null = current): void => { if (tag && !fx.w?.probe) fx.w = { ...fx.w, probe: tag }; };
 
   const castTop = b.castTop.bind(b);
   b.castTop = (f, held) => {
@@ -78,7 +71,12 @@ export function instrument(b: Battle, keep = 0): Probe {
   };
 
   const later = b.later.bind(b);
-  b.later = (delay, fn) => later(delay, carry(fn));
+  b.later = (delay, fx) => { credit(fx); later(delay, fx); };
+  const runEffect = b.runEffect.bind(b);
+  b.runEffect = (fx, h) => {
+    const tag = fx.w?.probe as Tag | undefined;
+    if (tag) under(tag, () => runEffect(fx, h)); else runEffect(fx, h);
+  };
 
   const burn = b.burn.bind(b);
   b.burn = (col, row, secs, dps) => {

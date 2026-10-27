@@ -98,7 +98,7 @@ Determinism rules:
 - Observers wrap methods on one instance and only read state.
 - Each CPU rolls from `substream(b.seed, side)` (`game/rng.ts`), a stream separate from `b.rand`, so a CPU match replays exactly from its seed. Card `ai` hints get that `rand`. `tests/matches.ts` gives `Math.random` a new stream on every play, so a leak fails its replay check. Voice-line choice still uses `Math.random` (sound only).
 - Double K.O.: if both fighters hit 0 HP on the same frame, the round is a draw (`winner` stays null, nobody scores, the set plays another round).
-- `timers` and `anims` still hold closures. Rollback works anyway because `net/snapshot.ts` restores the Battle in place, so the closures keep pointing at live objects. Delayed effects must keep their mutable state in `b.keep({...})`, and the RNG state is saved with `rand.setState`.
+- Battle state is plain data. Anything that happens later (a timer, an animation, a projectile's hit, a telegraph's strike) is an effect record `{ fx, a }`: the id of an effect registered in `content/effects.ts` and its arguments. Spells register their later steps with `spellStep('<card>.<step>', (x, a, h) => ...)`, which rebuilds the cast's `CastCtx` from a plain `CastRef` when it runs. State the steps share (Blizzard's hit count) is an object in their arguments. `npm run rollcheck` fails on any function found in the battle's state. The one exception is `b.rand`, whose state is saved with `rand.setState`.
 - Replays (`game/replay.ts`): a match is a list of round tapes (seed, decks, per-frame inputs) plus a rules fingerprint, so playback just reruns the Battle. `npm run replaycheck` checks a replay ends with the same hash.
 
 ## Netcode
@@ -181,7 +181,7 @@ flowchart LR
   cast --> helpers["Battle helpers<br/>strike, shoot, warn, freeze, stun, walls, bless, curse, later"]
 ```
 
-`CardDef` (`game/cards.ts`, which also gathers every class's spells into `ALL_CARDS` / `CARDS` in class order). Spells live in `content/classes/<id>/cards.ts` and import engine helpers only through `content/api.ts`. Fields: `id, name, cls, cost (0..5 | 'all'), rarity, element, damaging, lock, dmg, short, gain, needsStealth, cast(ctx), ai(b, f)`.
+`CardDef` (`game/cards.ts`, which also gathers every class's spells into `ALL_CARDS` / `CARDS` in class order). Spells live in `content/classes/<id>/cards.ts` and import engine helpers only through `content/api.ts`. A spell's delayed steps are registered effects (`spellStep`), never closures. Fields: `id, name, cls, cost (0..5 | 'all'), rarity, element, damaging, lock, dmg, short, gain, needsStealth, cast(ctx), ai(b, f)`.
 
 | Class | HP | Light / heavy | Resource | Comes back | Cards |
 | --- | --- | --- | --- | --- | --- |
@@ -466,6 +466,5 @@ New screens go in `tests/screens/harness.ts`.
 
 ## In flight
 
-- Modularize: stages are modules (#35) and spells sit in `src/content/classes/<id>/` (#62); next the rest of each class (sprites, tuning, decks, voices, lessons) and the `content/effects.ts` registry.
-- Battle state as plain data (no closures for delayed effects), after the class move.
+- Modularize: stages are modules (#35) and spells sit in `src/content/classes/<id>/` (#62); next the rest of each class (sprites, tuning, decks, voices, lessons).
 - BN indicators (#32).

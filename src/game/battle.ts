@@ -3,6 +3,7 @@ import { TUNING } from './tuning';
 import { CARDS, type CardDef, type Element } from './cards';
 import { defaultSkin, mirrorSkin, type ClassId } from '../art/sprites';
 import { getDefaultSink, type BattleEvent, type EventSink, type SoundOpts, type VoiceKind } from './events';
+import { effect, runEffect, type EffectRec, type ShotHit } from '../content/effects';
 
 /** Sound a shot makes leaving the caster (the light Arrow plays its own). */
 const SHOT_SOUND: Partial<Record<string, string>> = { fireball: 'shot_fireball', hook: 'shot_chain', gust: 'shot_wind', knife: 'shot_knife', arrow: 'shot_arrow', sting: 'shot_arrow', net: 'shot_net', wolf: 'shot_beast', hammer: 'shot_spin', vial: 'shot_net' };
@@ -184,7 +185,8 @@ export interface Projectile {
   /** For homing missiles: progress 0..1 and start pixel. */
   homing?: { p: number; dur: number; sx: number; sy: number; target: Side };
   reflectable: boolean;
-  onHit: (b: Battle, target: Fighter | null, wall: Wall | null, col: number, p: Projectile) => void;
+  /** What happens when it lands (also when it lands on nothing: a homing shot whose target is down). */
+  onHit: EffectRec<ShotHit>;
   dead?: boolean;
 }
 
@@ -202,8 +204,8 @@ export interface Pet { side: Side; kind: 'wolf' | 'hawk' | 'bear'; row: number |
 export interface FloatText { x: number; y: number; text: string; color: string; t: number }
 export interface Fx { t: number; dur: number; kind: string; side: Side; col: number; row: number; data?: Record<string, number | string> }
 
-interface Timer { t: number; fn: () => void }
-interface Anim { t: number; dur: number; fn: (p: number) => void }
+interface Timer { t: number; fx: EffectRec }
+interface Anim { t: number; dur: number; fx: EffectRec<number> }
 
 /** Damage number colors by element. */
 const HIT_TEXT: Record<Element, string> = { steel: '#fcfcfc', fire: '#fca044', frost: '#a4e4fc', arcane: '#f878f8', shadow: '#9878f8', poison: '#b8f818', nature: '#58d854', holy: '#f8d878' };
@@ -242,8 +244,6 @@ export class Battle {
   fx: Fx[] = [];
   timers: Timer[] = [];
   anims: Anim[] = [];
-  /** See keep(). */
-  kept: object[] = [];
   phase: Phase = 'custom';
   gauge = 0;
   /** Training mode: a fighter brought to 0 HP refills instead of losing. */
@@ -341,17 +341,19 @@ export class Battle {
   }
 
   // ---------- scheduling ----------
-  later(delay: number, fn: () => void): void { this.timers.push({ t: delay, fn }); }
-  anim(dur: number, fn: (p: number) => void): void { fn(0); this.anims.push({ t: 0, dur, fn }); }
-  /**
-   * Counters a spell's timers share (hits landed so far, ...). Rollback netcode rewinds everything
-   * reachable from the battle, so mutable state a closure keeps must live in an object kept here,
-   * never in a `let` the closure captures. `npm run rollcheck` catches the slip.
-   */
-  keep<T extends object>(state: T): T {
-    this.kept.push(state);
-    if (this.kept.length > 32) this.kept.shift();
-    return state;
+  /** Run `fx` in `delay` seconds (during the fight; a K.O. or the Draw screen drops what is pending). */
+  later(delay: number, fx: EffectRec): void { this.timers.push({ t: delay, fx }); }
+  /** Run `fx` every frame for `dur` seconds, handing it the progress 0..1 (sprite offsets: looks only). */
+  anim(dur: number, fx: EffectRec<number>): void { this.runEffect(fx, 0); this.anims.push({ t: 0, dur, fx }); }
+  /** Every scheduled effect runs through here (watchers such as the post-match stats hook in). */
+  runEffect<H>(fx: EffectRec<H>, h: H): void { runEffect(this, fx, h); }
+  /** The cast a spell step belongs to, rebuilt from its ref: fighters looked up live, the rest as cast. */
+  ctxOf(ref: CastRef): CastCtx {
+    const f = this.f[ref.side];
+    return {
+      b: this, f, foe: this.foe(f), mult: ref.mult, dir: this.dir(f), held: ref.held, spent: ref.spent, stealthed: ref.stealthed, ref,
+      castsWithin: secs => ref.prior.filter(t => ref.now - t <= secs).length,
+    };
   }
   emit(e: BattleEvent): void { this.sink?.(e); }
   sound(name: string, opts?: SoundOpts): void { this.sink?.({ type: 'sound', name, opts }); }
@@ -366,7 +368,7 @@ export class Battle {
    * The standard area-spell telegraph: `cells` flash for `delay` seconds, then `hit` runs. Pass TUNING.warnTime unless the
    * spell has a longer telegraph of its own. Everything here runs on the battle clock, so it stays in lockstep online.
    */
-  warn(att: Fighter | Side, cells: Array<[number, number]>, delay: number, hit?: () => void, kind: WarnKind = 'flash'): void {
+  warn(att: Fighter | Side, cells: Array<[number, number]>, delay: number, hit?: EffectRec, kind: WarnKind = 'flash'): void {
     const side = typeof att === 'number' ? att : att.side;
     for (const [col, row] of cells) if (this.inGrid(col, row)) this.warns.push({ col, row, t: delay, dur: delay, side, kind });
     if (hit) this.later(delay, hit);
@@ -462,8 +464,8 @@ export class Battle {
     // timers and animations
     const due = this.timers.filter(t => (t.t -= dt) <= 0);
     this.timers = this.timers.filter(t => t.t > 0);
-    for (const t of due) { if (this.phase === 'fight') t.fn(); }
-    for (const a of this.anims) { a.t += dt; a.fn(Math.min(1, a.t / a.dur)); }
+    for (const t of due) { if (this.phase === 'fight') this.runEffect(t.fx, undefined); }
+    for (const a of this.anims) { a.t += dt; this.runEffect(a.fx, Math.min(1, a.t / a.dur)); }
     this.anims = this.anims.filter(a => a.t < a.dur);
     for (const m of this.marks) m.t -= dt;
     this.marks = this.marks.filter(m => m.t > 0);
@@ -844,6 +846,15 @@ export class Battle {
   }
 
   // ---------- attacks ----------
+  /** The Warrior's Cleave (light) or Heavy Cleave on `cells`. */
+  cleave(f: Fighter, kind: 'light' | 'heavy', cells: Array<[number, number]>, dmg: number): void {
+    const T = TUNING.warrior;
+    this.addFx(kind === 'light' ? 'cleave' : 'cleaveHeavy', f.side, f.col + this.dir(f), f.row, kind === 'light' ? 0.18 : 0.34);
+    const res = this.strike(f, cells, dmg, { basic: kind, element: 'steel' });
+    if (res.fighter && kind === 'heavy') this.gainRage(f, T.rageHeavyHit * (f.st.berserk > 0 ? 2 : 1));
+    if (res.fighter && kind === 'light' && T.rageLightHit) this.gainRage(f, T.rageLightHit * (f.st.berserk > 0 ? 2 : 1));
+  }
+
   basicAttack(f: Fighter, kind: 'light' | 'heavy'): void {
     const foe = this.foe(f);
     const d = this.dir(f);
@@ -855,14 +866,9 @@ export class Battle {
       const dmg = kind === 'light' ? T.lightDamage : T.heavyDamage;
       f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
       const cells: Array<[number, number]> = [[f.col + d, f.row], [f.col + 2 * d, f.row]];
-      const swing = (): void => {
-        this.addFx(kind === 'light' ? 'cleave' : 'cleaveHeavy', f.side, f.col + d, f.row, kind === 'light' ? 0.18 : 0.34);
-        const res = this.strike(f, cells, dmg, { basic: kind, element: 'steel' });
-        if (res.fighter && kind === 'heavy') this.gainRage(f, T.rageHeavyHit * (f.st.berserk > 0 ? 2 : 1));
-        if (res.fighter && kind === 'light' && T.rageLightHit) this.gainRage(f, T.rageLightHit * (f.st.berserk > 0 ? 2 : 1));
-      };
-      swing();
-      if (f.st.avatar > 0) this.later(0.12, swing);
+      this.cleave(f, kind, cells, dmg);
+      // Avatar of War: every Cleave hits twice
+      if (f.st.avatar > 0) this.later(0.12, cleaveAgain({ side: f.side, kind, cells, dmg }));
     } else if (f.cls === 'mage') {
       const T = TUNING.mage;
       const dmg = kind === 'light' ? T.lightDamage : T.heavyDamage;
@@ -897,12 +903,12 @@ export class Battle {
           this.projectiles.push({
             side: f.side, row: f.row, x: f.col, speed: 0, kind: 'arrow', reflectable: true,
             homing: { p: 0, dur: Math.max(0.15, Math.abs(foe.col - f.col) / T.arrowSpeed), sx: f.col, sy: f.row, target: foe.side },
-            onHit: (b, t) => { if (t) b.damage(t, dmg, f, opts); },
+            onHit: basicShot({ side: f.side, dmg, opts }),
           });
         } else {
           this.shoot(f, {
             speed: T.arrowSpeed * d, kind: 'arrow', reflectable: true,
-            onHit: (b, t, w) => { if (w) b.hitWall(w, dmg, f, opts); else if (t) b.damage(t, dmg, f, opts); },
+            onHit: basicShot({ side: f.side, dmg, opts }),
           });
         }
       } else {
@@ -979,7 +985,7 @@ export class Battle {
   breakStealth(f: Fighter): void {
     if (f.st.stealth <= 0 || f.st.nightsEmbrace > 0) return;
     f.st.stealth = 0;
-    if (f.st.shadowDance > 0) this.later(1, () => { if (f.st.shadowDance > 0) this.stealth(f, 2); });
+    if (f.st.shadowDance > 0) this.later(1, shadowDanceReturn({ side: f.side }));
   }
 
   stealth(f: Fighter, t: number): void {
@@ -1168,10 +1174,7 @@ export class Battle {
       out.blocked = true;
       this.text(target, 'PARRY', '#fcfcfc');
       this.addFx('guard', target.side, target.col, target.row, 0.3);
-      if (src && src !== target) this.later(0.08, () => {
-        this.addFx('stab', target.side, src.col, src.row, 0.25);
-        this.damage(src, TUNING.rogue.riposteDamage, target, { spell: true, element: 'steel' });
-      });
+      if (src && src !== target) this.later(0.08, riposte({ side: target.side }));
       return out;
     }
     if (!opts.dot && target.st.decoy > 0) {
@@ -1325,7 +1328,7 @@ export class Battle {
     if (foe.st.counterspell > 0 && card.id !== 'counterspell') {
       foe.st.counterspell = 0;
       this.text(f, 'COUNTERED', '#f878f8');
-      if (TUNING.mage.counterSilence > 0) this.later(0.3, () => this.silence(f, TUNING.mage.counterSilence));
+      if (TUNING.mage.counterSilence > 0) this.later(0.3, silence({ side: f.side, secs: TUNING.mage.counterSilence }));
       const callout = this.fx.find(e => e.kind === 'castName' && e.side === f.side);
       if (callout?.data) callout.data.countered = 1;
       this.addFx('counter', f.side, f.col, f.row, 0.5);
@@ -1343,11 +1346,10 @@ export class Battle {
     this.sound('cast_' + card.element, { pan: panOf(f.col) });
     this.emit({ type: 'cast', side: f.side, card: card.id });
     this.addFx('cast', f.side, f.col, f.row, 0.3, { el: card.element });
-    const now = this.time;
-    const castsWithin = (secs: number): number => prior.filter(t => now - t <= secs).length;
-    const ctx: CastCtx = { b: this, f, foe, mult, dir: this.dir(f), held, spent, stealthed, castsWithin };
+    const ctx = this.ctxOf({ side: f.side, mult, held, spent, stealthed, now: this.time, prior });
     card.cast(ctx);
-    if (f.st.ascendance > 0 && card.id !== 'ascendance') this.later(0.45, () => { if (!f.dead) card.cast({ ...ctx }); });
+    // Ascendance: every spell fires twice
+    if (f.st.ascendance > 0 && card.id !== 'ascendance') this.later(0.45, recast({ card: card.id, x: ctx.ref }));
   }
 
   /** Spawn a projectile from `f` down its row. */
@@ -1368,7 +1370,7 @@ export class Battle {
           const t = this.f[p.homing.target];
           if (!this.targetable(t)) { this.text(t, 'MISS', '#bcbcbc'); continue; }
           if (t.st.reflect > 0 && p.reflectable && t.side !== p.side) { this.reflect(p, t); continue; }
-          p.onHit(this, t.dead ? null : t, null, t.col, p);
+          this.runEffect(p.onHit, { t: t.dead ? null : t, w: null, col: t.col, p });
         }
         continue;
       }
@@ -1388,13 +1390,13 @@ export class Battle {
           p.dead = true;
           const owner = this.f[w.side];
           if (w.kind === 'stone' && owner.cls === 'warrior') this.gainRage(owner, 1, true);
-          p.onHit(this, null, w, c, p);
+          this.runEffect(p.onHit, { t: null, w, col: c, p });
           break;
         }
         if (!target.dead && target.col === c && target.row === p.row) {
           if (target.st.reflect > 0 && p.reflectable) { this.reflect(p, target); break; }
           p.dead = true;
-          p.onHit(this, target, null, c, p);
+          this.runEffect(p.onHit, { t: target, w: null, col: c, p });
           break;
         }
       }
@@ -1458,7 +1460,38 @@ export interface CastCtx {
   stealthed: boolean;
   /** How many other spells this fighter cast in the last `secs` seconds (Shiv, Kidney Shot). */
   castsWithin: (secs: number) => number;
+  /** The cast as plain data, for the spell's later steps (see spellStep in content/effects.ts). */
+  ref: CastRef;
 }
+
+/** A cast as plain data: what a spell's later steps need to rebuild its CastCtx. */
+export interface CastRef {
+  side: Side;
+  mult: number;
+  held: Dir | null;
+  spent: number;
+  stealthed: boolean;
+  /** Battle time of the cast, and of this fighter's casts in the 5s before it. */
+  now: number;
+  prior: number[];
+}
+
+// ---------- the battle's own delayed effects ----------
+const cleaveAgain = effect('battle.cleave', (b, a: { side: Side; kind: 'light' | 'heavy'; cells: Array<[number, number]>; dmg: number }) => b.cleave(b.f[a.side], a.kind, a.cells, a.dmg));
+/** A basic shot (the Ranger's Arrow). */
+const basicShot = effect('battle.basicShot', (b, a: { side: Side; dmg: number; opts: HitOpts }, h: ShotHit) => {
+  if (h.w) b.hitWall(h.w, a.dmg, b.f[a.side], a.opts);
+  else if (h.t) b.damage(h.t, a.dmg, b.f[a.side], a.opts);
+});
+const shadowDanceReturn = effect('battle.shadowDance', (b, a: { side: Side }) => { const f = b.f[a.side]; if (f.st.shadowDance > 0) b.stealth(f, 2); });
+/** Riposte's counter on the attacker, wherever they are. */
+const riposte = effect('battle.riposte', (b, a: { side: Side }) => {
+  const f = b.f[a.side], src = b.foe(f);
+  b.addFx('stab', f.side, src.col, src.row, 0.25);
+  b.damage(src, TUNING.rogue.riposteDamage, f, { spell: true, element: 'steel' });
+});
+const silence = effect('battle.silence', (b, a: { side: Side; secs: number }) => b.silence(b.f[a.side], a.secs));
+const recast = effect('battle.recast', (b, a: { card: string; x: CastRef }) => { if (!b.f[a.x.side].dead) CARDS[a.card].cast(b.ctxOf(a.x)); });
 
 /** Seconds to arm a fighter's heavy attack. */
 export function heavyChargeOf(f: Fighter): number {

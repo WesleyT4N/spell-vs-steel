@@ -1,10 +1,10 @@
 // Priest kit (design doc Priest tab, 2026-10-25). Out-sustain and chip: blessed fields on your own panels, cursed
 // fields on the enemy's, DoTs and auto-targeted holy damage. Fields, curses and the shield pool last until the next Draw.
-import { type Battle, type BlessKind, type CastCtx, type Fighter, type CardDef, allEnemyPanels, lowHp, TUNING } from '../../api';
+import { type Battle, type BlessKind, type CastCtx, type Fighter, type CardDef, type EffectRec, allEnemyPanels, lowHp, TUNING, spellStep } from '../../api';
 
-/** Run `fn` every `step` seconds for `secs` seconds. */
-function overTime(b: Battle, secs: number, step: number, fn: (i: number) => void): void {
-  for (let i = 1; i * step <= secs + 1e-6; i++) b.later(i * step, () => fn(i));
+/** Run `fx` every `step` seconds for `secs` seconds. */
+function overTime(b: Battle, secs: number, step: number, fx: EffectRec): void {
+  for (let i = 1; i * step <= secs + 1e-6; i++) b.later(i * step, fx);
 }
 
 const hurt = (f: Fighter, amt: number): boolean => f.maxHp - f.hp >= amt;
@@ -43,6 +43,17 @@ const ownPanels = (b: Battle, f: Fighter): Array<[number, number]> => {
 const column = (f: Fighter): Array<[number, number]> => [[f.col, 0], [f.col, 1], [f.col, 2]];
 const row = (f: Fighter): Array<[number, number]> => [[0, f.row], [1, f.row], [2, f.row], [3, f.row], [4, f.row], [5, f.row]];
 
+// Spells' later steps (see spellStep): what lands after a delay or a telegraph.
+const penanceBolt = spellStep('penance.bolt', (x, { noFlinch }: { noFlinch: boolean }) => { zap(x, 25, 'holy', noFlinch); });
+const hymnTick = spellStep('divine_hymn.tick', x => { x.b.heal(x.f, 50); x.b.addFx('healBurst', x.f.side, x.f.col, x.f.row, 0.4); });
+const haloBolt = spellStep('halo.bolt', x => { if (!x.f.dead) zap(x, 15, 'holy', true); });
+const wrathHit = spellStep('wrath_of_heaven.hit', (x, { cells }: { cells: Array<[number, number]> }) => {
+  const { b, f } = x;
+  b.shake = 0.4; b.cheer = 2;
+  for (const [c, r] of cells) b.addFx('holyPillar', f.side, c, r, 0.45);
+  b.strike(f, cells, 80 * x.mult, { spell: true, element: 'holy' });
+});
+
 export const priest: CardDef[] = [
   // Commons
   {
@@ -65,7 +76,7 @@ export const priest: CardDef[] = [
   {
     id: 'penance', name: 'Penance', cls: 'priest', cost: 2, rarity: 'common', element: 'holy', damaging: true, lock: 0.45,
     dmg: '25x3', short: 'Three holy bolts that hit the enemy wherever they are.',
-    cast: x => { for (let i = 0; i < 3; i++) x.b.later(i * 0.15, () => { zap(x, 25, 'holy', i < 2); }); },
+    cast: x => { for (let i = 0; i < 3; i++) x.b.later(i * 0.15, penanceBolt(x, { noFlinch: i < 2 })); },
     ai: canPick,
   },
   {
@@ -146,7 +157,7 @@ export const priest: CardDef[] = [
     dmg: '300 heal', short: 'Channel for 3s (no moving or attacking, cannot be knocked back). Heal 100 per second.',
     cast: x => {
       x.f.st.channel = 3; x.f.st.noKnock = 3;
-      overTime(x.b, 3, 0.5, () => { x.b.heal(x.f, 50); x.b.addFx('healBurst', x.f.side, x.f.col, x.f.row, 0.4); });
+      overTime(x.b, 3, 0.5, hymnTick(x));
     },
     ai: (_b, f) => hurt(f, 250),
   },
@@ -191,7 +202,7 @@ export const priest: CardDef[] = [
   {
     id: 'halo', name: 'Halo', cls: 'priest', cost: 4, rarity: 'legendary', element: 'holy', damaging: true, lock: 0.25,
     dmg: '15x8', short: 'A ring of light circles you for 8s, firing a bolt at the enemy every second.',
-    cast: x => { x.f.st.halo = 8; overTime(x.b, 8, 1, () => { if (!x.f.dead) zap(x, 15, 'holy', true); }); },
+    cast: x => { x.f.st.halo = 8; overTime(x.b, 8, 1, haloBolt(x)); },
   },
   // Mythics
   {
@@ -200,11 +211,7 @@ export const priest: CardDef[] = [
     cast: x => {
       const { b, f } = x;
       const cells = allEnemyPanels(b, f.side);
-      b.warn(f, cells, 1.5, () => {
-        b.shake = 0.4; b.cheer = 2;
-        for (const [c, r] of cells) b.addFx('holyPillar', f.side, c, r, 0.45);
-        b.strike(f, cells, 80 * x.mult, { spell: true, element: 'holy' });
-      });
+      b.warn(f, cells, 1.5, wrathHit(x, { cells }));
     },
   },
   {
