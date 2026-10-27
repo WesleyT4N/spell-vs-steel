@@ -1,7 +1,7 @@
 // Character select: a roster row of fighters, the left side's pick on the left and the right side's on the right.
 // Pick a fighter, then a skin, for the left side and then the right. In local Versus each side's header toggles
-// it between a player and the CPU (you vs CPU on either side, two players on one keyboard, or CPU vs CPU), and
-// each side picks its own deck. Online the right side is your rival. Stage select comes next.
+// it between a player and the CPU (you vs CPU on either side, two players on one keyboard, or CPU vs CPU).
+// Online the right side is your rival. The spell deck select comes next (deckSelect.ts), then the stage.
 // The tutorial uses it too, to pick the class to learn (the right side shows the training dummy),
 // and so does training mode, where the right side picks the dummy's class, and arcade mode, where you only pick yourself.
 import { pushScene, popScene, goHome, hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
@@ -11,22 +11,16 @@ import { drawStage } from '../art/arena';
 import { getSprite, getPortrait, drawFighterSprite, teamColor, SKINS, skinOf, mirrorSkin, type ClassId } from '../art/sprites';
 import { P, UW, screenRect, fillScreen, vy, vspan, mix, dith, spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, wrap } from '../engine/font';
-import { win, plaque, banner, vsSeal, FRAME, GOLD, INK, INK2, TRIM, PAPER, RED_INK, BLUE_INK } from './skin';
+import { win, plaque, banner, vsSeal, stepTrail, FRAME, GOLD, INK, INK2, TRIM, PAPER, RED_INK, BLUE_INK } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
-import { loadMatch, saveMatch, playerDeck, sideName, cycleDeck, deckLabel, type MatchConfig } from '../game/match';
-import { loadCustom, validate } from '../game/deck';
+import { loadMatch, saveMatch, playerDeck, sideName, type MatchConfig } from '../game/match';
 import type { NetSession } from '../net/session';
-import { DeckBuilderScene } from './deckbuilder';
-import { StageSelectScene } from './stageSelect';
+import { DeckSelectScene } from './deckSelect';
 import { TutorialScene, type TutorialClass } from './tutorial';
-import { TrainingScene } from './training';
-import { ArcadeLadderScene } from './arcade';
-import { newRun, loadRecords, clock } from '../game/arcade';
-import { useStage } from '../game/battleView';
-import { STAGE_IDS } from '../content/stages';
+import { loadRecords, clock } from '../game/arcade';
 import type { PadMode } from '../engine/touch';
-import { bigButton, actionBar, barTapped, swipeIn, tallArea, dots, TAP, GAP, PAD } from './touchUi';
+import { bigButton, actionBar, barTapped, swipeIn, tallArea, GAP, PAD } from './touchUi';
 
 /** Roster tiles: every playable class, then RANDOM. */
 const TILES = PLAYABLE.length + 1;
@@ -52,9 +46,8 @@ const PORTRAIT_IN = 0.18;
 /** Portrait frame size (UI pixels) at a zoom: the 40x32 bust inside a 2px ink border (2x by default). */
 const frameW = (z: number): number => 40 * z + 4, frameH = (z: number): number => 32 * z + 4;
 
-/** 0/1: picking the left side's fighter/skin, 2/3: the right side's (skipped online), 4: options. */
-type Step = 0 | 1 | 2 | 3 | 4;
-type Chip = 'SPELL DECK' | 'EDIT SPELL DECK' | 'CPU LEVEL' | 'MATCH' | 'NEXT';
+/** 0/1: picking the left side's fighter/skin, 2/3: the right side's (skipped online and in arcade). */
+type Step = 0 | 1 | 2 | 3;
 /** What the screen leads to: a match against the CPU, the tutorial, training mode, or an arcade run. */
 export type SelectMode = 'versus' | 'tutorial' | 'training' | 'arcade';
 
@@ -62,7 +55,7 @@ export type SelectMode = 'versus' | 'tutorial' | 'training' | 'arcade';
 const PX = [12, UW - 152], PY = 30, PW = 140, PH = 164;
 const TW = 60, TH = 54, TGAP = 8, TILE_Y = 210;
 const TX0 = Math.round(UW / 2 - (TILES * TW + (TILES - 1) * TGAP) / 2);
-const CY = 272, CH = 20;
+const CY = 272, CH = 20, NEXT_W = 150;
 
 export class CharSelectScene implements Scene {
   /** Top of the fighter panels; phone portrait moves them up into the spare height. */
@@ -71,13 +64,6 @@ export class CharSelectScene implements Scene {
   step: Step = 0;
   /** Roster cursor for the slot being picked. */
   cur: number;
-  chip = 0;
-  /** Online: picks sent and final, waiting on the rival. */
-  locked = false;
-  msg = '';
-  msgT = 0;
-  /** Local Versus: the side EDIT DECK opens, the last one picked for or clicked. */
-  focus: 0 | 1 = 0;
   t = 0;
   /** Per side: the portrait on show and when it arrived, so a new pick slides in. */
   shown: Array<{ key: string; at: number }> = [{ key: '', at: -1 }, { key: '', at: -1 }];
@@ -92,16 +78,15 @@ export class CharSelectScene implements Scene {
   pad(): PadMode { return spread.tall ? 'none' : 'back'; }
   /** Full-height phone layout: where each side's panel and the color row were drawn, for swipes. */
   private tallRects: { panel: Array<[number, number, number, number]>; colors: [number, number, number, number] | null } = { panel: [], colors: null };
-  /** Back from the deck builder, the stage select or a fight: pick up what they saved (decks, stage). */
-  resume(): void { this.m = loadMatch(); this.msgT = 0; }
+  /** Back from the spell deck select, the stage select or a fight: pick up what they saved. */
+  resume(): void { this.m = loadMatch(); }
 
   private get tutorial(): boolean { return this.mode === 'tutorial'; }
   private get training(): boolean { return this.mode === 'training'; }
   /** Arcade: you pick only your own fighter and deck; the ladder picks the rivals. */
   private get arcade(): boolean { return this.mode === 'arcade'; }
-  /** Local Versus: both sides can be a player or the CPU, and each picks a deck on its panel. */
+  /** Local Versus: both sides can be a player or the CPU. */
   private get local(): boolean { return this.mode === 'versus' && !this.net; }
-  private get chips(): Chip[] { return this.net ? ['SPELL DECK', 'NEXT'] : this.training || this.arcade ? ['SPELL DECK', 'EDIT SPELL DECK', 'NEXT'] : ['EDIT SPELL DECK', 'CPU LEVEL', 'MATCH', 'NEXT']; }
   /** What a side is called on this screen. */
   private who(s: 0 | 1): string {
     if (this.local) return sideName(this.m.sides, s);
@@ -111,28 +96,10 @@ export class CharSelectScene implements Scene {
   private slotClass(s: 0 | 1): ClassId { return s === 0 ? this.m.p1 : this.m.cpu; }
   private tileOf(cls: ClassId): number { const i = PLAYABLE.indexOf(cls); return i < 0 ? 0 : i; }
 
-  private customValid(s: 0 | 1 = 0): boolean {
-    const d = loadCustom(this.slotClass(s));
-    return !!d && validate(d).length === 0;
-  }
-  private deckOf(s: 0 | 1): string { return s === 0 ? this.m.p1Deck : this.m.cpuDeck; }
-
   private toggleCtl(s: 0 | 1): void {
     this.m.sides[s] = this.m.sides[s] === 'player' ? 'cpu' : 'player';
     sfx('move');
     saveMatch(this.m);
-  }
-  /** Steps a side's deck through the ready-made decks (starter, then one per Mythic), the custom deck and RANDOM. */
-  private toggleDeck(s: 0 | 1, d: 1 | -1 = 1): void {
-    if (s === 0) this.m.p1Deck = cycleDeck(this.m.p1, this.m.p1Deck, d);
-    else this.m.cpuDeck = cycleDeck(this.m.cpu, this.m.cpuDeck, d);
-    sfx('move');
-    saveMatch(this.m);
-  }
-  private editDeck(s: 0 | 1): void {
-    sfx('select');
-    saveMatch(this.m);
-    pushScene(new DeckBuilderScene(this.slotClass(s)));
   }
   private mySkin(): string { return skinOf(this.m.p1, this.m.p1Skin[this.m.p1]).id; }
   private cpuSkin(): string {
@@ -144,15 +111,14 @@ export class CharSelectScene implements Scene {
     const net = this.net;
     if (!net) return;
     net.hello = { cls: this.m.p1, skin: this.mySkin(), deck: playerDeck(this.m) };
-    // the rival sees 0 while we choose a fighter, 1 until we lock in, 2 once locked
-    net.lobby = { ...net.lobby, step: this.locked ? 2 : this.step === 0 ? 0 : 1, tile: this.cur };
+    // the rival sees 0 while we choose a fighter, then 1 (2 once our spell deck is locked in, on the next screen)
+    net.lobby = { ...net.lobby, step: this.step === 0 ? 0 : 1, tile: this.cur };
   }
 
   private setClass(s: 0 | 1, cls: ClassId): void {
     // a new class starts on its starter (RANDOM stays RANDOM)
     if (s === 0) { if (cls !== this.m.p1 && this.m.p1Deck !== 'random') this.m.p1Deck = 'starter'; this.m.p1 = cls; }
     else { if (cls !== this.m.cpu && this.m.cpuDeck !== 'random') this.m.cpuDeck = 'starter'; this.m.cpu = cls; }
-    this.focus = s;
     saveMatch(this.m);
   }
 
@@ -176,58 +142,31 @@ export class CharSelectScene implements Scene {
   private advance(): void {
     if (this.tutorial) { sfx('select'); pushScene(new TutorialScene(this.m.p1 as TutorialClass)); return; }
     if (this.step === 1 && !this.net && !this.arcade) { this.step = 2; this.cur = this.tileOf(this.m.cpu); sfx('select'); }
-    else if (this.step === 1 || this.step === 3) { this.step = 4; this.chip = this.chips.length - 1; sfx('select'); }
+    else if (this.step === 1 || this.step === 3) this.next();
   }
 
   private back(): void {
     sfx('back');
     if (this.net) {
-      if (this.step === 4 && !this.locked) { this.step = 1; return; }
       if (this.step === 1) { this.step = 0; return; }
-      // locked in is final online; backing out leaves the room
       this.net.leave();
       goHome();
       return;
     }
     if (this.step === 0) { popScene(); return; }
-    this.step = (this.step === 4 && (this.net || this.arcade) ? 1 : this.step - 1) as Step;
+    this.step = (this.step - 1) as Step;
     if (this.step === 0 || this.step === 2) this.cur = this.tileOf(this.slotClass(this.slot));
   }
 
-  private activateChip(c: Chip): void {
-    if (c === 'SPELL DECK') { this.toggleDeck(0); return; }
-    else if (c === 'EDIT SPELL DECK') { this.editDeck(this.local ? this.focus : 0); return; }
-    else if (c === 'CPU LEVEL') { this.m.difficulty = this.m.difficulty === 'easy' ? 'normal' : this.m.difficulty === 'normal' ? 'hard' : 'easy'; sfx('move'); }
-    else if (c === 'MATCH') { const o = [1, 3, 5] as const; this.m.bestOf = o[(o.indexOf(this.m.bestOf) + 1) % o.length]; sfx('move'); }
-    else if (c === 'NEXT') { this.next(); return; }
-    saveMatch(this.m);
-  }
-
-  /** On to the stage select (online: lock in and wait for the rival). */
+  /** On to the spell deck select, with both fighters as they are. */
   private next(): void {
-    for (const s of this.local ? [0, 1] as const : [0] as const) {
-      if (this.deckOf(s) === 'custom' && !this.customValid(s)) {
-        this.msg = this.local ? `${this.who(s)}'S CUSTOM ${CLASS_INFO[this.slotClass(s)].name} SPELL DECK IS NOT READY` : 'YOUR CUSTOM SPELL DECK IS NOT READY';
-        this.msgT = 2; sfx('deny');
-        return;
-      }
-    }
     saveMatch(this.m);
-    if (this.net) { this.locked = true; sfx('confirm'); this.sync(); return; }
     sfx('select');
-    if (this.arcade) { pushScene(new ArcadeLadderScene(newRun(this.m))); return; }
-    if (this.training) {
-      // training skips the stage select and uses the last stage picked
-      useStage(this.m.stage === 'random' || !STAGE_IDS.includes(this.m.stage) ? STAGE_IDS[Math.floor(Math.random() * STAGE_IDS.length)] : this.m.stage);
-      pushScene(new TrainingScene(this.m));
-      return;
-    }
-    pushScene(new StageSelectScene());
+    pushScene(new DeckSelectScene(this.mode, this.net));
   }
 
   update(dt: number): void {
     this.t += dt;
-    this.msgT = Math.max(0, this.msgT - dt);
     const net = this.net;
     if (net) {
       net.tick();
@@ -235,17 +174,15 @@ export class CharSelectScene implements Scene {
         if (mouse.click || wasPressed('confirm') || wasPressed('back') || mouse.rclick) { net.close(); goHome(); }
         return;
       }
-      if (this.locked && net.rivalLobby?.step === 2 && net.rival) { pushScene(new StageSelectScene(net)); return; }
-      if (this.locked) { if (wasPressed('back') || mouse.rclick) this.back(); return; }
     }
     if (wasPressed('back') || mouse.rclick) { this.back(); return; }
     if (spread.tall && this.tallInput()) { this.sync(); return; }
 
     if (mouse.click) {
-      const tile = hot('tile'), sw = hot('swatch'), csw = hot('cswatch'), chip = hot('chip');
+      const tile = hot('tile'), sw = hot('swatch'), csw = hot('cswatch');
       if (tile >= 0) {
-        // a tile picks for the slot being chosen; once both are set it re-picks yours
-        if (this.step === 4 || this.step === 1) this.step = 0;
+        // a tile picks for the slot being chosen; on a skin step it re-picks that side's fighter
+        if (this.step === 1) this.step = 0;
         if (this.step === 3) this.step = 2;
         this.cur = tile;
         this.pickTile(tile);
@@ -262,37 +199,29 @@ export class CharSelectScene implements Scene {
         this.sync();
         return;
       }
-      if (chip >= 0) { this.chip = chip; this.activateChip(this.chips[chip]); this.sync(); return; }
+      if (isHot('next')) { this.next(); return; }
       if (this.local) {
-        const ctl = hot('ctl'), deck = hot('deck'), edit = hot('edit');
+        const ctl = hot('ctl');
         if (ctl >= 0) { this.toggleCtl(ctl as 0 | 1); return; }
-        if (deck >= 0) { this.focus = deck as 0 | 1; this.toggleDeck(deck as 0 | 1); return; }
-        if (edit >= 0) { this.editDeck(edit as 0 | 1); return; }
       }
-      if (!net && !this.tutorial && !this.arcade && isHot('panel:1') && this.step !== 2) { this.step = 2; this.focus = 1; this.cur = this.tileOf(this.m.cpu); sfx('move'); return; }
-      if (isHot('panel:0') && this.step !== 0) { this.step = 0; this.focus = 0; this.cur = this.tileOf(this.m.p1); sfx('move'); this.sync(); return; }
+      if (!net && !this.tutorial && !this.arcade && isHot('panel:1') && this.step !== 2) { this.step = 2; this.cur = this.tileOf(this.m.cpu); sfx('move'); return; }
+      if (isHot('panel:0') && this.step !== 0) { this.step = 0; this.cur = this.tileOf(this.m.p1); sfx('move'); this.sync(); return; }
     }
 
     const l = navPressed('left', dt), r = navPressed('right', dt), d: 1 | -1 = r ? 1 : -1;
     const ok = wasPressed('confirm') || wasPressed('custom');
-    // local Versus: up/down flips the side being picked between player and CPU, or (on the skin step) its deck
-    const up = this.local && navPressed('up', dt), down = this.local && navPressed('down', dt), flip = up || down;
+    // local Versus: up/down flips the side being picked between player and CPU
+    const flip = this.local && (navPressed('up', dt) || navPressed('down', dt));
     if (this.step === 0 || this.step === 2) {
       const h = hot('tile');
       if (mouse.moved && h >= 0 && h !== this.cur) { this.cur = h; sfx('move'); }
       if (l || r) { this.cur = (this.cur + d + TILES) % TILES; sfx('move'); }
       if (flip) this.toggleCtl(this.slot);
       if (ok) this.pickTile(this.cur);
-    } else if (this.step === 1 || this.step === 3) {
-      if (l || r) this.stepSkin(this.slot, d);
-      if (flip) this.toggleDeck(this.slot, up ? -1 : 1);
-      if (ok) this.advance();
     } else {
-      const n = this.chips.length, h = hot('chip');
-      if (mouse.moved && h >= 0) this.chip = h;
-      if (l || r) { this.chip = (this.chip + d + n) % n; sfx('move'); }
-      if (navPressed('up', dt) || navPressed('down', dt)) this.activateChip(this.chips[this.chip]);
-      else if (ok) this.activateChip(this.chips[this.chip]);
+      if (l || r) this.stepSkin(this.slot, d);
+      if (flip) this.toggleCtl(this.slot);
+      if (ok) this.advance();
     }
     this.sync();
   }
@@ -302,7 +231,7 @@ export class CharSelectScene implements Scene {
     if (barTapped('back')) { this.back(); return true; }
     if (barTapped('primary')) {
       if (this.tutorial) { sfx('select'); pushScene(new TutorialScene(this.m.p1 as TutorialClass)); }
-      else if (!this.locked) this.next();
+      else this.next();
       return true;
     }
     // swipe a fighter panel to step its class; swipe the color row to step the skin
@@ -327,7 +256,7 @@ export class CharSelectScene implements Scene {
   /** Whose colors the phone layout's color row shows: the side being picked, else the focused one. */
   private colorSide(): 0 | 1 {
     if (this.net || this.arcade || this.tutorial) return 0;
-    return this.step === 2 || this.step === 3 ? 1 : this.step === 4 && this.local ? this.focus : 0;
+    return this.step === 2 || this.step === 3 ? 1 : 0;
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
@@ -356,7 +285,8 @@ export class CharSelectScene implements Scene {
     // drawn after the slots so its rolled ends sit on top of them
     banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING MODE' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, vy(3));
 
-    // VS and the matchup
+    // where this screen sits in the steps before a fight, then VS and the matchup
+    if (!this.tutorial) stepTrail(ui, 0, UW / 2, this.py, { stack: true });
     vsSeal(ui, UW / 2, this.py + 60);
     const status = this.statusLine();
     if (status) drawTextCentered(ui, tick % 16 < 12 || !status.blink ? status.text : '', UW / 2, this.py + 100, status.color, 1);
@@ -368,7 +298,7 @@ export class CharSelectScene implements Scene {
       zone(`tile:${n}`, x, ty, TW, TH);
       const mine = (this.step === 0 || this.step === 2) && this.cur === n && showSel();
       const theirs = net && rl && rl.step === 0 && rl.tile === n;
-      const picked0 = n === PLAYABLE.indexOf(this.m.p1) && this.step !== 0, picked1 = !net && !this.arcade && n === PLAYABLE.indexOf(this.m.cpu) && this.step >= 3;
+      const picked0 = n === PLAYABLE.indexOf(this.m.p1) && this.step !== 0, picked1 = !net && !this.arcade && n === PLAYABLE.indexOf(this.m.cpu) && this.step === 3;
       const text = plaque(ui, x, ty, TW, TH, !!mine, !mine && hot('tile') === n ? GOLD : FRAME);
       if (n === RANDOM) drawTextCentered(ui, '?', x + TW / 2, ty + 12, mine ? GOLD : RED_INK, 4, false);
       else {
@@ -389,16 +319,8 @@ export class CharSelectScene implements Scene {
       else if (picked1) tag(this.who(1), '#0000a8', true);
     }
 
-    // option chips
-    if (!this.tutorial && (this.step === 4 || !net)) {
-      const chips = this.chips, cw = net ? 140 : 110, gap = 6, x0 = Math.round(UW / 2 - (chips.length * cw + (chips.length - 1) * gap) / 2);
-      chips.forEach((ch, i) => {
-        const x = x0 + i * (cw + gap), on = this.step === 4 && this.chip === i && showSel();
-        const label = this.chipLabel(ch);
-        button(ui, `chip:${i}`, label, x, vy(CY), cw, vspan(CY, CH), on, ch === 'NEXT' ? (this.step === 4 ? '#f8b800' : '#7c7c7c') : '#fcfcfc');
-      });
-    }
-    if (this.msgT > 0) { P(ui, FRAME, screenRect(2)[0], vy(186), screenRect(2)[2], 16); drawTextCentered(ui, this.msg, UW / 2, vy(186) + 4, '#f87858', 1, false); }
+    // on to the spell decks: the last OK gets there too
+    if (!this.tutorial) button(ui, 'next', this.nextLabel, Math.round(UW / 2 - NEXT_W / 2), vy(CY), NEXT_W, vspan(CY, CH), false, '#f8b800');
 
     if (net && (net.status === 'error' || net.status === 'left' || net.status === 'lost')) {
       fillScreen(ui, 'rgba(0,0,0,0.8)', 2);
@@ -407,45 +329,30 @@ export class CharSelectScene implements Scene {
       return;
     }
     const keys = `${k('left')}/${k('right')}`, ud = `${k('up')}/${k('down')}`;
-    hint(ui, this.local && (this.step === 1 || this.step === 3) ? `${keys}: SKIN   ${ud}: SPELL DECK   ${k('attack')} / CLICK A COLOR: OK   ${k('cast')}: BACK`
-      : this.local && (this.step === 0 || this.step === 2) ? `${keys}: CHOOSE   ${ud} / CLICK THE NAME: PLAYER OR CPU   ${k('attack')}: PICK   ${k('cast')}: BACK`
-      : this.step === 1 || this.step === 3 ? `${keys}: SKIN   ${k('attack')} / CLICK A COLOR: ${this.tutorial ? 'START' : 'OK'}   ${k('cast')}: BACK`
-      : this.locked ? `${k('cast')} / RIGHT-CLICK: LEAVE ROOM`
-        : this.step === 4 ? `${keys}: MOVE   ${k('attack')}: CHANGE   ${k('cast')} / RIGHT-CLICK: BACK`
-          : `${keys} OR HOVER: CHOOSE   ${k('attack')} / CLICK: PICK   ${k('cast')} / RIGHT-CLICK: BACK`);
+    hint(ui, this.local && (this.step === 1 || this.step === 3) ? `${keys}: SKIN   ${ud}: PLAYER OR CPU   ${k('attack')} / CLICK A COLOR: OK   ${k('cast')}: BACK`
+      : this.local ? `${keys}: CHOOSE   ${ud} / CLICK THE NAME: PLAYER OR CPU   ${k('attack')}: PICK   ${k('cast')}: BACK`
+        : this.step === 1 || this.step === 3 ? `${keys}: SKIN   ${k('attack')} / CLICK A COLOR: ${this.tutorial ? 'START' : 'OK'}   ${k('cast')}: BACK`
+          : `${keys} OR HOVER: CHOOSE   ${k('attack')} / CLICK A FIGHTER: PICK   ${k('cast')} / RIGHT-CLICK: BACK`);
   }
 
-  private chipLabel(ch: Chip): string {
-    if (ch === 'SPELL DECK') return this.m.p1Deck === 'custom' ? `CUSTOM SPELL DECK${this.customValid() ? '' : '!'}` : deckLabel(this.m.p1, this.m.p1Deck);
-    if (ch === 'EDIT SPELL DECK' && this.local) return `EDIT ${this.focus === 0 ? 'P1' : 'P2'} SPELL DECK`;
-    if (ch === 'CPU LEVEL') return `CPU: ${this.m.difficulty.toUpperCase()}`;
-    if (ch === 'MATCH') return this.m.bestOf === 1 ? '1 ROUND' : `BEST OF ${this.m.bestOf}`;
-    if (ch === 'NEXT') return this.net ? (this.locked ? 'LOCKED IN' : 'LOCK IN') : this.training || this.arcade ? 'START →' : 'STAGE →';
-    return ch;
-  }
+  private get nextLabel(): string { return 'CHOOSE SPELL DECK →'; }
 
   private statusLine(): { text: string; color: string; blink: boolean } | null {
     const net = this.net;
     if (net) {
       const rl = net.rivalLobby;
-      if (this.locked) return { text: rl?.step === 2 ? 'BOTH READY!' : 'WAITING FOR RIVAL...', color: '#f8b800', blink: true };
       if (rl?.step === 2) return { text: 'RIVAL IS LOCKED IN', color: '#58d854', blink: false };
       return null;
     }
     if (this.tutorial) return { text: this.step === 0 ? 'PICK A CLASS TO LEARN' : 'PICK A COLOR TO START', color: '#fcfcfc', blink: this.step === 0 };
-    if (this.local && this.step < 4) {
+    if (this.local) {
       const who = this.who(this.slot), cpu = this.m.sides[this.slot] === 'cpu';
       const text = this.step === 1 || this.step === 3 ? `${who}: PICK A COLOR` : cpu ? `PICK THE ${who} FIGHTER` : who === 'YOU' ? 'PICK YOUR FIGHTER' : `${who}: PICK YOUR FIGHTER`;
       return { text, color: '#fcfcfc', blink: true };
     }
     if (this.step === 0) return { text: 'PICK YOUR FIGHTER', color: '#fcfcfc', blink: true };
     if (this.step === 2) return { text: this.training ? 'PICK THE DUMMY' : 'PICK THE CPU FIGHTER', color: '#fcfcfc', blink: true };
-    if (this.step === 1 || this.step === 3) return { text: 'PICK A COLOR', color: '#fcfcfc', blink: true };
-    if (this.local) {
-      const n = this.m.sides.filter(c => c === 'player').length;
-      return { text: n === 2 ? 'TWO PLAYERS, ONE KEYBOARD' : n === 0 ? 'CPU VS CPU: SIT BACK AND WATCH' : '', color: '#f8b800', blink: false };
-    }
-    return null;
+    return { text: 'PICK A COLOR', color: '#fcfcfc', blink: true };
   }
 
   /** Tutorial: the opponent is always the training dummy. */
@@ -513,7 +420,7 @@ export class CharSelectScene implements Scene {
     const x = PX[s], net = this.net;
     const cls = show.cls, skin = cls ? show.skin || SKINS[cls][0].id : '';
     zone(`panel:${s}`, x, this.py, PW, PH);
-    const active = s === this.slot && this.step < 4;
+    const active = s === this.slot;
     // a parchment page with a ribbon in the fighter's color; the slot being chosen blinks a gold frame
     win(ui, x, this.py, PW, PH, { accent: cls ? teamColor(cls, skin, false) : undefined, edge: active && tick % 8 < 6 ? GOLD : FRAME });
     const who = this.who(s);
@@ -532,14 +439,7 @@ export class CharSelectScene implements Scene {
     BLURB[cls].forEach((l, i) => drawTextCentered(ui, l, cx, this.py + 111 + i * 9, INK2, 1, false));
     // skins: clickable swatches for your slot (and the CPU's)
     const list = SKINS[cls], sw = 14, sx = Math.round(cx - (list.length * sw) / 2);
-    const editable = s === 0 || !net;
-    const deck = `${deckLabel(cls, this.deckOf(s))}${this.deckOf(s) === 'custom' && !this.customValid(s) ? '!' : ''}`;
-    if (this.local) {
-      // the deck steps through the ready-made decks, custom and RANDOM; EDIT opens the deck builder
-      button(ui, `deck:${s}`, `SPELL DECK: ${deck}`.length * 6 <= 84 ? `SPELL DECK: ${deck}` : deck, x + 8, this.py + 130, PW - 52, 12, false, TRIM);
-      button(ui, `edit:${s}`, 'EDIT', x + PW - 40, this.py + 130, 32, 12, false, TRIM);
-    } else if (!(net && s === 1)) drawTextCentered(ui, `SPELL DECK: ${deck}`.length * 6 <= PW - 8 ? `SPELL DECK: ${deck}` : deck, cx, this.py + 132, TRIM, 1, false);
-    if (!editable) return;
+    if (s === 1 && net) return;
     const skinStep = (s === 0 && this.step === 1) || (s === 1 && this.step === 3);
     list.forEach((sk, n) => {
       const px = sx + n * sw, py = this.py + 146;
@@ -559,19 +459,18 @@ export class CharSelectScene implements Scene {
     let y = a.y + 12;
     banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, y);
     y += 40;
+    if (!this.tutorial) { stepTrail(ui, 0, UW / 2, y, { scale: 2 }); y += 22 + GAP; }
 
-    // laid out from the bar up: options, colors and the roster sit in the thumb zone; the two sides fill the rest
+    // laid out from the bar up: colors and the roster sit in the thumb zone; the two sides fill the rest
     const cols = 3, tw = Math.floor((w - GAP * (cols - 1)) / cols), th = 108;
-    const chips = this.chips.map((ch, i) => ({ ch, i })).filter(o => o.ch !== 'NEXT');
-    const showChips = !this.tutorial && chips.length > 0 && (this.step === 4 || !net);
     const cs = this.colorSide(), cls = this.slotClass(cs), list = SKINS[cls];
     const sw = Math.min(52, Math.floor((w - 4 * (list.length - 1)) / list.length));
-    const chipY = barTop - 14 - (TAP + 6);
-    const colorY = (showChips ? chipY : barTop - 4) - 14 - sw;
+    const colorY = barTop - 4 - 14 - sw;
     const rosterY = colorY - 14 - 2 * th - GAP;
     const statusY = rosterY - 26;
-    const ph = Math.max(220, Math.min(360, statusY - 10 - y));
-    const z = ph >= 330 ? 4 : 3;
+    // tall enough for a 4x bust, the name and the blurb; any spare height stays open above the roster
+    const ph = Math.max(220, Math.min(272, statusY - 10 - y));
+    const z = ph >= 262 ? 4 : 3;
 
     // the two sides, with the VS seal between them
     const pw = Math.floor((w - 40) / 2);
@@ -613,7 +512,7 @@ export class CharSelectScene implements Scene {
       const theirs = net && rl && rl.step === 0 && rl.tile === n;
       if (n === PLAYABLE.indexOf(this.m.p1) && this.step !== 0) tag(this.who(0), '#881400', false);
       if (theirs || (net && rl && rl.step > 0 && rival && n === PLAYABLE.indexOf(rival.cls))) tag('RIVAL', '#0000a8', true);
-      else if (!net && !this.arcade && !this.tutorial && n === PLAYABLE.indexOf(this.m.cpu) && this.step >= 3) tag(this.who(1), '#0000a8', true);
+      else if (!net && !this.arcade && !this.tutorial && n === PLAYABLE.indexOf(this.m.cpu) && this.step === 3) tag(this.who(1), '#0000a8', true);
     }
 
     // the color row for the side being picked
@@ -629,20 +528,7 @@ export class CharSelectScene implements Scene {
       P(ui, teamColor(cls, sk.id, false), px + 6, colorY + 6, sw - 12, sw - 12);
     });
 
-    // match options (NEXT moves to the bar)
-    if (showChips) {
-      const cw = Math.floor((w - GAP * (chips.length - 1)) / chips.length);
-      chips.forEach(({ ch, i }, j) => {
-        const label = this.chipLabel(ch), [sub, val] = label.includes(': ') ? label.split(': ') : ch === 'EDIT SPELL DECK' ? ['EDIT', label.replace(/^EDIT /, '').replace('SPELL DECK', 'DECK')] : ['', label];
-        bigButton(ui, `chip:${i}`, val, x0 + j * (cw + GAP), chipY, cw, TAP + 6, { sub: sub || undefined, on: this.step === 4 && this.chip === i && showSel() });
-      });
-    }
-
-    if (this.msgT > 0) { P(ui, FRAME, a.x, barTop - 30, a.w, 26); drawTextCentered(ui, this.msg, UW / 2, barTop - 24, '#f87858', 1, false); }
-    const steps = this.net || this.arcade || this.tutorial ? 2 : 3;
-    const at = this.step <= 1 ? 0 : this.step <= 3 && steps === 3 ? 1 : steps - 1;
-    actionBar(ui, { primary: { id: 'next', label: this.tutorial ? 'START →' : this.chipLabel('NEXT'), disabled: this.locked } });
-    dots(ui, steps, at, UW / 2 + 10, barTop + 37);
+    actionBar(ui, { primary: { id: 'next', label: this.tutorial ? 'START →' : this.nextLabel } });
 
     if (net && (net.status === 'error' || net.status === 'left' || net.status === 'lost')) {
       fillScreen(ui, 'rgba(0,0,0,0.8)', 2);
@@ -651,11 +537,11 @@ export class CharSelectScene implements Scene {
     }
   }
 
-  /** A side's panel in the phone layout: who it is, a 3x portrait, the class name, its deck and a hint to swipe. */
+  /** A side's panel in the phone layout: who it is, a 3x portrait, the class name and a hint to swipe. */
   private drawTallSlot(ui: Ctx, s: 0 | 1, show: { cls: ClassId | null; skin: string }, x: number, y: number, w: number, h: number, tick: number, z: number): void {
     const net = this.net, cls = show.cls, skin = cls ? show.skin || SKINS[cls][0].id : '';
     zone(`panel:${s}`, x, y, w, h);
-    const active = s === this.slot && this.step < 4;
+    const active = s === this.slot;
     win(ui, x, y, w, h, { accent: cls ? teamColor(cls, skin, false) : undefined, edge: active && tick % 8 < 6 ? GOLD : FRAME });
     const cx = x + w / 2, who = this.who(s);
     if (this.local) bigButton(ui, `ctl:${s}`, who, x + 10, y + 10, w - 20, 36, { scale: 2 });
@@ -671,10 +557,6 @@ export class CharSelectScene implements Scene {
     drawTextCentered(ui, CLASS_INFO[cls].name, cx, ty, INK, 2, false);
     ty += 20;
     wrap(BLURB[cls][0], Math.floor((w - 16) / 6)).slice(0, 2).forEach((l, i) => drawTextCentered(ui, l, cx, ty + i * 10, INK2, 1, false));
-    const deck = `${deckLabel(cls, this.deckOf(s))}${this.deckOf(s) === 'custom' && !this.customValid(s) ? '!' : ''}`;
-    if (this.local) {
-      bigButton(ui, `deck:${s}`, deck, x + 10, y + h - 50, w - 20, 40, { sub: 'DECK', scale: deck.length * 12 < w - 30 ? 2 : 1 });
-    } else if (!(net && s === 1)) drawTextCentered(ui, `DECK: ${deck}`, cx, y + h - 26, TRIM, 1, false);
     // a nudge that the panel swipes
     if (!(net && s === 1) && !(s === 1 && (this.tutorial || this.arcade))) {
       drawText(ui, '<', x + 8, py + frameH(z) / 2 - 7, TRIM, 2);

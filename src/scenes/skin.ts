@@ -164,3 +164,20 @@ export function vsSeal(c: Ctx, cx: number, cy: number): void {
   drawText(c, 'VS', cx - 10, cy - 6, mix(WAX, BLACK, 0.5), 2);
   drawText(c, 'VS', cx - 11, cy - 7, PAPER, 2);
 }
+
+/** The steps before a fight: pick a fighter, then a spell deck, then a stage. */
+export const PREMATCH_STEPS = ['1 FIGHTER', '2 SPELL DECK', '3 STAGE'];
+/**
+ * Where you are in the steps before a fight, as small plaques with the current one in red wax and the ones
+ * done in faded ink. In a row by default; `stack` piles them up for a narrow gap.
+ */
+export function stepTrail(c: Ctx, at: number, cx: number, y: number, opts: { scale?: number; stack?: boolean } = {}): void {
+  const s = opts.scale ?? 1, pad = 5 * s, h = 11 * s, gap = 3 * s;
+  const ws = PREMATCH_STEPS.map(l => textWidth(l, s) + pad * 2), wide = Math.max(...ws);
+  let x = Math.round(cx - (opts.stack ? wide : ws.reduce((a, b) => a + b, 0) + gap * 2) / 2), yy = y;
+  PREMATCH_STEPS.forEach((l, i) => {
+    const w = opts.stack ? wide : ws[i], text = plaque(c, x, yy, w, h, i === at);
+    drawText(c, l, Math.round(x + (w - textWidth(l, s)) / 2), yy + 2 * s, i < at ? INK2 : text, s);
+    if (opts.stack) yy += h + gap; else x += w + gap;
+  });
+}
