@@ -4,5 +4,4 @@ export type { Battle, BlessKind, CastCtx, Fighter, HitResult, Trap } from '../ga
 export type { CardDef, Element, Rarity } from '../game/cards';
 export { TUNING } from '../game/tuning';
 export { shuffle } from '../game/rng';
-export { sfx } from '../engine/audio';
 export { sameRow, ahead, cellsAhead, allEnemyPanels, lowHp, lunge, targeted } from '../game/cardUtil';
