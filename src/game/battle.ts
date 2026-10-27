@@ -604,7 +604,7 @@ export class Battle {
     this.pets = this.pets.filter(p => p.t > 0);
   }
 
-  /** A companion's attack on the enemy. Kill Command forces one from anywhere at double damage. */
+  /** A companion's attack on the enemy. Kill Command forces one from anywhere at triple damage. */
   petAttack(p: Pet, mult: number): void {
     const owner = this.f[p.side], foe = this.foe(owner);
     if (p.kind === 'hawk') {
