@@ -22,7 +22,7 @@ export interface SaveData {
   /** Volume settings (see AudioSettings). */
   audio: Obj;
   muted: boolean;
-  /** Custom grimoire per class: card id -> copies. */
+  /** Custom spell deck per class: card id -> copies. */
   decks: Record<string, Record<string, number>>;
   /** Last match setup (see MatchConfig). */
   match: Obj | null;

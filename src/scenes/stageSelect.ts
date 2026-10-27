@@ -2,7 +2,7 @@
 // Online, each player votes; the same pick comes out on both machines (a tie wins, otherwise a seeded coin
 // flip between the two votes, shown as a roulette).
 import { replaceScene, popScene, goHome, hint, zone, hot, showSel, type Scene } from './scene';
-import { getStage, STAGE_IDS } from '../art/stages';
+import { getStage, STAGE_IDS } from '../content/stages';
 import { drawPanel, drawStage, panelFoot } from '../art/arena';
 import { useStage } from '../game/battleView';
 import { getSprite, drawFighterSprite, skinOf, mirrorSkin } from '../art/sprites';
@@ -10,7 +10,7 @@ import { P, W, H, UW, rng, screenRect, fillScreen, vy, type Ctx } from '../engin
 import { drawText, drawTextCentered } from '../engine/font';
 import { win, plaque, banner, FRAME, GOLD, PAPER, INK, INK2, RED_INK } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
-import { sfx } from '../engine/audio';
+import { sfx, preloadMusic, stageTrack } from '../engine/audio';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
 import type { Hello } from '../net/protocol';
 import type { NetSession } from '../net/session';
@@ -96,6 +96,7 @@ export class StageSelectScene implements Scene {
     sfx('confirm');
     if (this.net) { this.net.lobby = { ...this.net.lobby, stage: pick, voted: true }; return; }
     this.final = pick === 'random' ? STAGE_IDS[Math.floor(Math.random() * STAGE_IDS.length)] : pick;
+    preloadMusic(stageTrack(this.final));
     this.swing = null;
     this.t = ROULETTE; // straight to the reveal
   }
@@ -122,6 +123,7 @@ export class StageSelectScene implements Scene {
         const host = net.side === 0 ? net.lobby.stage : rl.stage, guest = net.side === 0 ? rl.stage : net.lobby.stage;
         const res = resolveStage(net.start!.seed, host, guest);
         this.final = res.stage;
+        preloadMusic(stageTrack(this.final));
         this.swing = res.votes[0] !== res.votes[1] ? res.votes : null;
         this.t = this.swing ? 0 : ROULETTE;
       }

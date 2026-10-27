@@ -185,7 +185,7 @@ export class TournamentScene implements Scene {
     if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, 292 + dy, '#f8b800', 1);
 
     if (this.mode === 'error') {
-      drawTextCentered(ui, 'TOURNAMENTS NEED THE CLAUDE.AI PAGE', UW / 2, 140 + dy, RED_INK, 1, false);
+      drawTextCentered(ui, 'TOURNAMENTS ARE NOT SUPPORTED YET HERE', UW / 2, 140 + dy, RED_INK, 1, false);
       drawTextCentered(ui, touchText('CLICK TO GO BACK'), UW / 2, 156 + dy, TRIM, 1, false);
       return;
     }
