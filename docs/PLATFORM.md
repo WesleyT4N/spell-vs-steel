@@ -59,7 +59,8 @@ flowchart TB
   N["window.svsNative\nElectron preload or Capacitor bootstrap\n(any part it provides overrides web)"] -.-> PF
 ```
 
-- The Electron build (`electron/main.cjs`) has no preload yet, so it runs the web platform: no QUIT item, F11 / Alt+Enter still toggle fullscreen. Adding a preload that sets `window.svsNative` with `canQuit` and `quit` is the next step.
+- The desktop app's `electron/preload.cjs` sets `window.svsNative` (id `electron`): `lifecycle.canQuit` + `quit` (IPC `svs:quit`, so the title shows QUIT; the title flushes the save first) and `fullscreen` that drives the real window (IPC `svs:set-fullscreen`; the main process reports every change on `svs:fullscreen`, so the Options toggle and F11 / Alt+Enter agree). Storage and the background events stay web.
+- A shell can give only some functions of a part; `detect()` lays each part over the web one.
 - `platform` is picked once at load: the web implementation, with any parts a native shell put on
   `window.svsNative` before the game script runs laid over it.
 - **Storage** is the file-like `PlatformStorage` shared with the save module (`src/platform/storage.ts`,
