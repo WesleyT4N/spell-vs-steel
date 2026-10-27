@@ -229,13 +229,13 @@ const warrior: CardDef[] = [
     cast: x => x.b.addShield(x.f, 'unbreakable', 150, 6),
   },
   {
-    id: 'berserk', name: 'Berserk', cls: 'warrior', cost: 3, rarity: 'legendary', element: 'steel', damaging: false, lock: 0.3,
-    dmg: '-', short: 'For 8s, basic attacks build double Rage and you cannot be knocked back.',
-    cast: x => { x.f.st.berserk = 8; x.b.addFx('shout', x.f.side, x.f.col, x.f.row, 0.6); },
+    id: 'berserk', name: 'Berserk', cls: 'warrior', cost: 1, rarity: 'legendary', element: 'steel', damaging: false, lock: 0.3,
+    dmg: '-', short: 'For 10s, basic attacks build double Rage and you cannot be knocked back.',
+    cast: x => { x.f.st.berserk = 10; x.b.addFx('shout', x.f.side, x.f.col, x.f.row, 0.6); },
   },
   {
     id: 'ground_shatter', name: 'Ground Shatter', cls: 'warrior', cost: 3, rarity: 'legendary', element: 'steel', damaging: true, lock: 0.5,
-    dmg: '80', short: 'Turn the enemy front column into holes for 8s. 80 to anyone caught.',
+    dmg: '110', short: 'Turn the enemy front column into holes for 4s. 110 to anyone caught.',
     cast: x => {
       const { b, f, foe } = x;
       const col = b.frontCol(foe.side);
@@ -244,9 +244,9 @@ const warrior: CardDef[] = [
       b.warn(f, cells, TUNING.warnTime, () => {
         b.shake = 0.3;
         b.addFx('shockwave', f.side, col, 1, 0.4);
-        b.strike(f, cells, 80 * x.mult, { spell: true, element: 'steel' });
+        b.strike(f, cells, 110 * x.mult, { spell: true, element: 'steel' });
         b.walls = b.walls.filter(w => w.col !== col);
-        for (let r = 0; r < 3; r++) b.panels[col][r].hole = 8;
+        for (let r = 0; r < 3; r++) b.panels[col][r].hole = 4;
         if (foe.col === col) { if (!b.knockback(foe, 1)) b.relocate(foe); }
       });
     },
@@ -269,27 +269,27 @@ const warrior: CardDef[] = [
   },
   {
     id: 'mortal_strike', name: 'Mortal Strike', cls: 'warrior', cost: 3, rarity: 'legendary', element: 'steel', damaging: true, lock: 0.5,
-    dmg: '120', short: 'Heavy hit on 2 panels ahead. Halves enemy healing for 10s.',
+    dmg: '145', short: 'Heavy hit on 2 panels ahead. Halves enemy healing for 10s.',
     cast: x => {
       x.b.later(0.15, () => {
         x.b.addFx('smash', x.f.side, x.f.col + x.dir, x.f.row, 0.25);
-        const res = x.b.strike(x.f, cellsAhead(x, 1, 2), 120 * x.mult, { spell: true, element: 'steel' });
+        const res = x.b.strike(x.f, cellsAhead(x, 1, 2), 145 * x.mult, { spell: true, element: 'steel' });
         if (res.fighter) x.foe.st.mortal = 10;
       });
     },
     ai: (b, f) => ahead(b, f, 2),
   },
   {
-    id: 'spell_reflection', name: 'Spell Reflection', cls: 'warrior', cost: 2, rarity: 'legendary', element: 'steel', damaging: false, lock: 0.2,
-    dmg: 'theirs', short: 'For 4s, the next projectile spell that hits you bounces back at the caster.',
-    cast: x => { x.f.st.reflect = 4; },
+    id: 'spell_reflection', name: 'Spell Reflection', cls: 'warrior', cost: 1, rarity: 'legendary', element: 'steel', damaging: false, lock: 0.2,
+    dmg: 'theirs', short: 'For 6s, the next projectile spell that hits you bounces back at the caster.',
+    cast: x => { x.f.st.reflect = 6; },
     ai: (b, f) => b.foe(f).cls === 'mage' && sameRow(b, f),
   },
   // Mythics
   {
     id: 'avatar_of_war', name: 'Avatar of War', cls: 'warrior', cost: 5, rarity: 'mythic', element: 'steel', damaging: false, lock: 0.5,
-    dmg: '-', short: 'Transform for 10s: spells cost no Rage, no knockback, Cleave hits twice.',
-    cast: x => { x.f.st.avatar = 10; x.b.cheer = 2; x.b.addFx('transform', x.f.side, x.f.col, x.f.row, 0.8); },
+    dmg: '-', short: 'Transform for 12s: spells cost no Rage, no knockback, Cleave hits twice.',
+    cast: x => { x.f.st.avatar = 12; x.b.cheer = 2; x.b.addFx('transform', x.f.side, x.f.col, x.f.row, 0.8); },
   },
   {
     id: 'last_stand', name: 'Last Stand', cls: 'warrior', cost: 5, rarity: 'mythic', element: 'steel', damaging: true, lock: 0.4,
