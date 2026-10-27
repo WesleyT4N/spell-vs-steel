@@ -38,9 +38,13 @@ const pressing = (id: string): boolean => mouse.down && isHot(id);
  * Text is 2x, 3x on tall buttons; `sub` adds a small caption line above the label (e.g. "DECK" over "BRAWLER").
  */
 export function bigButton(c: Ctx, id: string, label: string, x: number, y: number, w: number, h: number,
-  opts: { primary?: boolean; on?: boolean; disabled?: boolean; scale?: number; sub?: string } = {}): void {
+  opts: { primary?: boolean; on?: boolean; disabled?: boolean; scale?: number; sub?: string; clip?: [number, number] } = {}): void {
   x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
-  if (!opts.disabled) zone(id, x, y, w, h);
+  if (!opts.disabled) {
+    // in a scrolling list only the part showing is tappable
+    const [cy, ch] = opts.clip ?? [y, h], top = Math.max(y, cy), bot = Math.min(y + h, cy + ch);
+    if (bot > top) zone(id, x, top, w, bot - top);
+  }
   const down = !opts.disabled && pressing(id);
   const lit = !!opts.on || (showSel() && isHot(id) && !opts.disabled);
   const wax = opts.primary && !opts.disabled;
@@ -151,6 +155,32 @@ export class Scroller {
     if (top < this.pos) this.pos = top;
     if (top + h > this.pos + view) this.pos = top + h - view;
     this.pos = Math.max(0, Math.min(this.max, this.pos));
+  }
+}
+
+/**
+ * A scrolling column of big rows in a panel (replays, players, open tournaments). Row i is a plaque, zone
+ * `prefix:i` (`sel` drawn chosen), and `draw` adds its text. Drag or flick to scroll; `sc.update` it with the
+ * same rectangle in the screen's update.
+ */
+export function rowList(c: Ctx, sc: Scroller, prefix: string, n: number, sel: number, x: number, y: number, w: number, h: number,
+  rowH: number, draw: (i: number, x: number, y: number, w: number) => void): void {
+  const step = rowH + 6;
+  sc.max = Math.max(0, n * step - 6 - (h - 8));
+  panel(c, x - 6, y - 6, w + 12, h + 12);
+  c.save();
+  c.beginPath(); c.rect(x - 3, y - 3, w + 6, h + 6); c.clip();
+  for (let i = 0; i < n; i++) {
+    const ry = y + 4 + i * step - Math.round(sc.pos);
+    if (ry + rowH < y - 3 || ry > y + h + 3) continue;
+    bigButton(c, `${prefix}:${i}`, '', x, ry, w, rowH, { on: i === sel, clip: [y - 3, h + 6] });
+    draw(i, x, ry, w);
+  }
+  c.restore();
+  if (sc.max > 0) {
+    const a = tallArea(), bh = Math.max(24, Math.round(h * h / (h + sc.max)));
+    P(c, BURN, a.x + a.w - 6, y, 4, h);
+    P(c, INK2, a.x + a.w - 6, y + Math.round((sc.pos / sc.max) * (h - bh)), 4, bh);
   }
 }
 
