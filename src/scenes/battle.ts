@@ -116,6 +116,8 @@ export class BattleScene implements Scene {
   // phones in portrait: the fight on top at its usual size, the pad, Draw screen, pause and results below it
   tall(): boolean { return true; }
   split(): boolean { return true; }
+  /** Online: what the Draw screen or results are waiting on the other side for ('' for nothing). */
+  protected get waitingOn(): string { return ''; }
   /** False when a subclass draws its own pause menu. */
   protected tallPause(): boolean { return true; }
   /** Where the bottom part of a split phone screen starts (full-screen UI coordinates). */
@@ -620,7 +622,10 @@ export class BattleScene implements Scene {
     this.drawResourcePreview(ui, tick);
     ui.restore();
 
-    const barTop = actionBar(ui, { back: 'CLEAR', primary: { id: 'fight', label: this.twoPlayer && this.me === 0 ? 'DONE' : 'FIGHT!' } });
+    // online, once your picks are in, the bar says what the screen is waiting on
+    const barTop = this.waitingOn
+      ? actionBar(ui, { back: false, primary: { id: 'fight', label: tick % 16 < 12 ? this.waitingOn : '', disabled: true } })
+      : actionBar(ui, { back: 'CLEAR', primary: { id: 'fight', label: this.twoPlayer && this.me === 0 ? 'DONE' : 'FIGHT!' } });
     // the hand, resting just above the bar; picked cards rise
     const handY = barTop - 14 - CARD_H;
     offer.forEach((id, i) => {
@@ -681,6 +686,9 @@ export class BattleScene implements Scene {
     banner(ui, title, UW / 2, y, title.length > 14 ? 2 : 3);
     y += 48;
     if (this.m.bestOf > 1) { drawTextCentered(ui, score, UW / 2, y, '#fcfcfc', 2); y += 26; }
+    // online ranked: the rating change; a tournament set: where it goes next
+    const note = this.resultNote();
+    if (note) { drawTextCentered(ui, note, UW / 2, y, '#f8b800', textWidth(note, 2) <= w ? 2 : 1); y += 26; }
     const items = this.resultItems, bh = TAP + 8;
     const btnY = a.y + a.h - PAD - items.length * (bh + GAP) + GAP;
     const data = this.statsData();
@@ -697,8 +705,10 @@ export class BattleScene implements Scene {
       const done = best[1].heal > best[1].dmg ? `+${Math.round(best[1].heal)} HEALED` : `${Math.round(best[1].dmg)} DAMAGE`;
       drawText(ui, done, x0 + w - 12 - textWidth(done, 2), by + 24, INK2, 2);
     }
-    items.forEach((it, i) => bigButton(ui, `menu:${i}`, it, x0, btnY + i * (bh + GAP), w, bh, { primary: i === 0, on: i === this.resultSel && showSel() && i > 0 }));
-    void tick;
+    items.forEach((it, i) => {
+      const wait = i === 0 && this.waitingOn;
+      bigButton(ui, `menu:${i}`, wait ? (tick % 16 < 12 ? wait : '') : it, x0, btnY + i * (bh + GAP), w, bh, { primary: i === 0, disabled: !!wait, on: i === this.resultSel && showSel() && i > 0 });
+    });
   }
 
   private drawCastOrder(ui: Ctx, short: number[], builds: boolean, total: number): void {

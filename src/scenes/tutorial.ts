@@ -888,7 +888,7 @@ export class TutorialScene implements Scene {
 
   private drawDoneTall(ui: Ctx): void {
     this.drawMenuTall(ui, 'TUTORIAL COMPLETE!', TutorialScene.DONE, this.doneSel, [
-      'YOU KNOW THE BASICS: MOVE, ATTACK,', 'DODGE, DRAW AND CAST. NEXT, FIGHT THE CPU', 'OR BUILD YOUR OWN 30-SPELL GRIMOIRE.',
+      'YOU KNOW THE BASICS: MOVE, ATTACK,', 'DODGE, DRAW AND CAST. NEXT, FIGHT THE CPU', 'OR BUILD YOUR OWN SPELL DECK.',
     ]);
   }
 }
