@@ -1,15 +1,25 @@
-# Desktop builds for play-testers. Push a tag like v0.2.0 and the Windows .exe and Linux AppImage are
-# attached to a GitHub Release of that name; run it by hand (Actions > Desktop builds) to get them as a
-# workflow artifact instead. Both are unsigned: Windows shows a SmartScreen "More info > Run anyway".
+# Desktop builds for play-testers. Push a tag like v0.2.0, or run it by hand (Actions > Desktop builds)
+# with a version filled in, and the Windows .exe and Linux AppImage are attached to a GitHub Release of
+# that name (the run makes the tag on the commit it built). Run it with the version left blank to get the
+# files as a workflow artifact only. Both are unsigned: Windows shows a SmartScreen "More info > Run anyway".
 name: Desktop builds
 
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version, e.g. 0.2.0 (blank: build only, no Release)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
+
+env:
+  # the tag being released: the pushed tag, or v<version> from a manual run (empty: no Release)
+  TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || (inputs.version != '' && format('v{0}', inputs.version) || '') }}
 
 jobs:
   build:
@@ -23,8 +33,8 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Version from the tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
+        if: env.TAG != ''
+        run: npm version --no-git-tag-version --allow-same-version "${TAG#v}"
       - name: Player build
         run: npm run build:prod
       # electron-builder makes the Windows portable .exe on Linux without Wine (no signing)
@@ -38,7 +48,7 @@ jobs:
             release/*.AppImage
           retention-days: 30
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.TAG != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" release/*.exe release/*.AppImage --title "Spell VS Steel $GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$TAG" release/*.exe release/*.AppImage --target "$GITHUB_SHA" --title "Spell VS Steel $TAG" --generate-notes
