@@ -132,6 +132,10 @@ Thanks for wanting to help! Here's how to get going.
 - **New classes get tutorial lessons** and show up in every character select.
 - **Balance changes come with numbers.** `npm run sim` and `npm run balance` run thousands of CPU-vs-CPU matches; include the before and after win rates in your PR.
 
+## Desktop builds
+
+A portable Windows `.exe` and a Linux AppImage for play-testers: push a `v*` tag and they are attached to a GitHub Release. See [docs/DESKTOP.md](docs/DESKTOP.md).
+
 ## Credits
 
 Designed by Wes, built with Claude.

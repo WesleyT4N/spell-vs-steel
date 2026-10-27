@@ -24,7 +24,7 @@ type RowName = (typeof ROWS)[number];
 type Mode = 'menu' | 'code' | 'busy' | 'room' | 'error';
 
 const RX = 140, RW = UW - 164, Y0 = 44, RH = 18;
-const NET_NAME: Record<TransportKind, string> = { room: 'CLAUDE.AI ROOM', peer: 'PEER TO PEER (WEBRTC)', local: 'LOCAL TABS (TEST)' };
+const NET_NAME: Record<TransportKind, string> = { room: 'HOSTED ROOM', peer: 'PEER TO PEER (WEBRTC)', local: 'LOCAL TABS (TEST)' };
 
 export class OnlineScene implements Scene {
   /** How far the top half of the screen moves in phone portrait (set each draw). */
@@ -115,8 +115,11 @@ export class OnlineScene implements Scene {
     return u.toString();
   }
 
+  /** Share the bare code where a link can't be opened by the other player (claude.ai rooms, the desktop app). */
+  private get codeOnly(): boolean { return this.kind === 'room' || !/^https?:$/.test(location.protocol); }
+
   private copy(): void {
-    const text = this.kind === 'room' ? this.code : this.link;
+    const text = this.codeOnly ? this.code : this.link;
     navigator.clipboard?.writeText(text).then(() => { this.copied = 2; sfx('select'); }, () => sfx('deny'));
   }
 
@@ -253,7 +256,7 @@ export class OnlineScene implements Scene {
     else status = `RIVAL: ${rival!.cls.toUpperCase()}   STARTING...`;
     drawTextCentered(ui, tick % 8 < 6 || net.matched ? status : '', cx, 100 + dy, net.matched ? '#007800' : INK, 1, false);
     if (rival) P(ui, teamColor(rival.cls, rival.skin, false), cx - textWidth(status) / 2 - 12, 100 + dy, 7, 7);
-    if (host) button(ui, 'btn:1', this.copied > 0 ? 'COPIED!' : this.kind === 'room' ? 'COPY CODE' : 'COPY LINK', cx - 104, 128 + dy, 100, 20, false, INK);
+    if (host) button(ui, 'btn:1', this.copied > 0 ? 'COPIED!' : this.codeOnly ? 'COPY CODE' : 'COPY LINK', cx - 104, 128 + dy, 100, 20, false, INK);
     button(ui, 'btn:2', 'CANCEL', host ? cx + 4 : cx - 50, 128 + dy, 100, 20, false, INK2);
   }
 }
