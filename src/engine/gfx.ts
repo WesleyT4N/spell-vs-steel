@@ -25,6 +25,14 @@ export function setView(aspect: number, min = MIN_ASPECT): boolean {
   Object.assign(view, { w, h, ox: (w - W) / 2, oy: (h - H) / 2 });
   return true;
 }
+/**
+ * Phone portrait leaves spare height above and below the 480×320 UI area, and menus spread their layout into it:
+ * `vy` moves a UI-layer y away from the middle by `k` (up to 1.5×), and `vspan` is a box's height once both its
+ * edges move. Only positions and box heights change; sprites and text keep their size. `k` is 1 everywhere else.
+ */
+export const spread = { portrait: false, k: 1 };
+export const vy = (y: number): number => Math.round(UH / 2 + (y - UH / 2) * spread.k);
+export const vspan = (y: number, h: number): number => vy(y + h) - vy(y);
 /** The whole visible screen as [x, y, w, h] in layer coordinates (`s` = 2 for the UI layer). */
 export const screenRect = (s = 1): [number, number, number, number] => [-view.ox * s, -view.oy * s, view.w * s, view.h * s];
 /** Fill the whole visible screen, margins included. */
@@ -41,6 +49,44 @@ export type Ctx = CanvasRenderingContext2D;
 export function P(c: Ctx, col: string, x: number, y: number, w = 1, h = 1): void {
   c.fillStyle = col;
   c.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+}
+
+/**
+ * Single pixels for a hot loop, merged into same-color runs (along a row or down a column): the same
+ * pixels as calling P for each, with far fewer fillRects. Only one run is ever pending and it is painted
+ * before the next one starts, so overlaps land in the same order. Call done() before anything else draws on `c`.
+ */
+export function pixels(c: Ctx): { px(col: string, x: number, y: number): void; done(): void } {
+  let col = '', x0 = 0, y0 = 0, w = 0, h = 0;
+  const done = (): void => { if (w) { c.fillStyle = col; c.fillRect(x0, y0, w, h); w = 0; } };
+  return {
+    px(cl, x, y) {
+      x = Math.round(x); y = Math.round(y);
+      if (w && cl === col) {
+        if (h === 1 && y === y0 && x === x0 + w) { w++; return; }
+        if (w === 1 && x === x0 && y === y0 + h) { h++; return; }
+      }
+      done();
+      col = cl; x0 = x; y0 = y; w = 1; h = 1;
+    },
+    done,
+  };
+}
+
+/** Prepainted pieces can only be stamped in place of drawing when nothing is see-through or blended. */
+export const plain = (c: Ctx): boolean => c.globalAlpha === 1 && c.globalCompositeOperation === 'source-over';
+
+const pieces = new Map<string, HTMLCanvasElement>();
+/** A small piece painted once into its own canvas (origin at its top-left) and kept under `key`. */
+export function piece(key: string, w: number, h: number, paint: (c: Ctx) => void): HTMLCanvasElement {
+  let o = pieces.get(key);
+  if (!o) {
+    o = document.createElement('canvas');
+    o.width = w; o.height = h;
+    paint(o.getContext('2d')!);
+    pieces.set(key, o);
+  }
+  return o;
 }
 
 export function rng(seed: number): () => number {

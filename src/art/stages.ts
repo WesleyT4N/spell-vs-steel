@@ -1,6 +1,6 @@
 // The stages besides the Grand Colosseum, drawn "Inked" like the fighters (see ink.ts).
 // Every stage keeps the same grid and red/blue panel rims; only the scenery and panel faces change.
-import { P, rng, clamp, vnoise, hash, mix, type Ctx } from '../engine/gfx';
+import { P, rng, clamp, vnoise, hash, mix, pixels, type Ctx } from '../engine/gfx';
 import { Colosseum, stoneTex, PURPLE, GOLD, type PanelLook, type Stage } from './arena';
 import { stamp, wide, put, sky, mod, tone, bands, disc, ball, halo, blocks, inkBanner, inkTorch, inkCloud, cone, inkPine, clump, sparks, BW, XL, XR, YT, YB } from './ink';
 
@@ -467,13 +467,18 @@ const DRAFTS: StageDef[] = [
     for (const lx of [-40, 36, 200, 268]) {
       halo(c, lx + 4, 50, 26, '255,90,20', 0.18);
       P(c, '#3a0800', lx - 1, 10, 1, 77); P(c, '#3a0800', lx + 9, 10, 1, 77);
-      for (let y = 10; y < 87; y++) for (let i = 0; i < 9; i++) {
+      const lava = pixels(c);
+      // every pixel is painted once, so going down each column (where the color changes least) is the same picture
+      for (let i = 0; i < 9; i++) for (let y = 10; y < 87; y++) {
         const v = 0.55 + Math.sin((y - t * 2.2) * 0.45 + i * 1.7) * 0.25 + (i > 1 && i < 7 ? 0.2 : -0.25);
-        P(c, tone(LAVA, v), lx + i, y);
+        lava.px(tone(LAVA, v), lx + i, y);
       }
+      lava.done();
       for (let i = 0; i < 4; i++) { const ph = (t * 0.7 + i * 5) % 8; ball(c, lx + 1 + i * 2.5, 86 - ph * 0.6, 1.5, 1.5, ['#c83000', '#ff8a20', '#ffe890']); }
     }
-    for (let x = XL; x < XR; x++) for (let y = 86; y < 91; y++) P(c, tone(LAVA, 0.55 + Math.sin(x * 0.25 - t * 0.9 + y * 1.4) * 0.3), x, y);
+    const floor = pixels(c);
+    for (let y = 86; y < 91; y++) for (let x = XL; x < XR; x++) floor.px(tone(LAVA, 0.55 + Math.sin(x * 0.25 - t * 0.9 + y * 1.4) * 0.3), x, y);
+    floor.done();
     P(c, '#3a0800', XL, 85, BW, 1);
     // fire in the forge mouth: flat tongues
     for (let x = 110; x <= 130; x++) {

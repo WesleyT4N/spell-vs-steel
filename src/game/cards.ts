@@ -2,7 +2,6 @@
 // interpretations are called out in the `short` text or a comment.
 import type { Battle, CastCtx, Fighter } from './battle';
 import type { ClassId } from '../art/sprites';
-import { sfx } from '../engine/audio';
 import { shuffle } from './rng';
 import { TUNING } from './tuning';
 
@@ -29,8 +28,8 @@ export interface CardDef {
   /** One-line rules text (keep under ~90 chars, it has to fit a 240px screen). */
   short: string;
   cast: (x: CastCtx) => void;
-  /** CPU hint: is now a good moment to cast this? */
-  ai?: (b: Battle, f: Fighter) => boolean;
+  /** CPU hint: is now a good moment to cast this? Rolls use `rand` (the CPU's seeded generator), never Math.random. */
+  ai?: (b: Battle, f: Fighter, rand: () => number) => boolean;
 }
 
 export const MAX_COPIES: Record<Rarity, number> = { common: 4, uncommon: 2, legendary: 1, mythic: 1 };
@@ -58,7 +57,7 @@ const warrior: CardDef[] = [
     id: 'guard', name: 'Guard', cls: 'warrior', cost: 0, rarity: 'common', element: 'steel', damaging: false, lock: 0.2,
     dmg: '-', short: 'For 2s, block the next hit completely. A block gives 1 Rage.',
     cast: x => x.b.addShield(x.f, 'guard', 1, 2),
-    ai: (b, f) => b.projectiles.some(p => p.side !== f.side && p.row === f.row) || b.foe(f).lock > 0 || Math.random() < 0.3,
+    ai: (b, f, rand) => b.projectiles.some(p => p.side !== f.side && p.row === f.row) || b.foe(f).lock > 0 || rand() < 0.3,
   },
   {
     id: 'lunge', name: 'Lunge', cls: 'warrior', cost: 2, rarity: 'common', element: 'steel', damaging: true, lock: 0.45,
@@ -212,14 +211,14 @@ const warrior: CardDef[] = [
   },
   {
     id: 'rampage', name: 'Rampage', cls: 'warrior', cost: 5, rarity: 'legendary', element: 'steel', damaging: true, lock: 1.3,
-    dmg: '70x3', short: 'Charge the enemy wherever they are: 3 heavy slashes. Cannot be interrupted.',
+    dmg: '50x3', short: 'Charge the enemy wherever they are: 3 heavy slashes. Cannot be interrupted.',
     cast: x => {
       const { b, f, foe } = x;
       f.st.noKnock = 1.4;
       lunge(x, foe.col - x.dir, foe.row, 0.18, 0.85, 0.2);
       for (let i = 0; i < 3; i++) b.later(0.22 + i * 0.25, () => {
         b.addFx('cleaveHeavy', f.side, foe.col, foe.row, 0.18);
-        b.damage(foe, 70 * x.mult, f, { spell: true, element: 'steel', targeted: true });
+        b.damage(foe, 50 * x.mult, f, { spell: true, element: 'steel', targeted: true });
       });
     },
   },
@@ -299,7 +298,7 @@ const warrior: CardDef[] = [
   },
   {
     id: 'titans_fall', name: "Titan's Fall", cls: 'warrior', cost: 5, rarity: 'mythic', element: 'steel', damaging: true, lock: 1.1,
-    dmg: '200', short: 'Leap into the enemy area and smash all their panels, cracking them. Only blockable.',
+    dmg: '140', short: 'Leap into the enemy area and smash all their panels, cracking them. Only blockable.',
     cast: x => {
       const { b, f, foe } = x;
       const mid = b.frontCol(foe.side) + x.dir;
@@ -309,7 +308,7 @@ const warrior: CardDef[] = [
         b.shake = 0.5;
         b.cheer = 2;
         for (const [c, r] of cells) { b.addFx('quake', f.side, c, r, 0.4); b.panels[c][r].cracked = true; }
-        b.strike(f, cells, 200 * x.mult, { spell: true, element: 'steel' });
+        b.strike(f, cells, 140 * x.mult, { spell: true, element: 'steel' });
       });
       void foe;
     },
@@ -334,7 +333,7 @@ const mage: CardDef[] = [
           homing: { p: 0, dur: 0.4, sx: x.f.col, sy: x.f.row, target: x.foe.side },
           onHit: (b, t) => { if (t) b.damage(t, 25 * x.mult, b.f[1 - t.side], { spell: true, element: 'arcane', noFlinch: true }); },
         });
-        sfx('missile');
+        x.b.sound('missile');
       });
     },
   },
@@ -464,7 +463,7 @@ const mage: CardDef[] = [
       x.b.warn(x.f, [[x.foe.col, x.foe.row]], 1, undefined, 'reticle');
       targeted(x, 1, (c, r) => {
         x.b.addFx('pillar', x.f.side, c, r, 0.45);
-        sfx('explode');
+        x.b.sound('explode');
         x.b.strike(x.f, [[c, r]], 155 * x.mult, { spell: true, element: 'fire' });
         for (let rr = 0; rr < 3; rr++) x.b.burn(c, rr, 5, 15);
       });
@@ -475,7 +474,7 @@ const mage: CardDef[] = [
     dmg: '30 each', short: '4s of ice shards on random enemy panels. Hit 2 times = frozen 2s.',
     cast: x => {
       const { b, f, foe } = x;
-      let hits = 0;
+      const n = b.keep({ hits: 0 });
       // ~2 shards/s; each telegraphs 0.5s. Prototype: 40% of shards aim at the enemy's panel.
       for (let i = 0; i < 8; i++) b.later(i * 0.5, () => {
         const cells = allEnemyPanels(b, f.side);
@@ -484,7 +483,7 @@ const mage: CardDef[] = [
         b.warn(f, [[c, r]], 0.5, () => {
           b.addFx('shard', f.side, c, r, 0.3);
           const res = b.strike(f, [[c, r]], 30 * x.mult, { spell: true, element: 'frost', noFlinch: true });
-          if (res.fighter && ++hits === 2) b.freeze(foe, 2);
+          if (res.fighter && ++n.hits === 2) b.freeze(foe, 2);
         });
       });
     },

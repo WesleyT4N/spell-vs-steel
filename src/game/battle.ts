@@ -2,7 +2,7 @@
 import { TUNING } from './tuning';
 import { CARDS, type CardDef, type Element } from './cards';
 import { defaultSkin, mirrorSkin, type ClassId } from '../art/sprites';
-import { sfx, sfxFx } from '../engine/audio';
+import { getDefaultSink, type BattleEvent, type EventSink, type SoundOpts, type VoiceKind } from './events';
 
 /** Sound a shot makes leaving the caster (the light Arrow plays its own). */
 const SHOT_SOUND: Partial<Record<string, string>> = { fireball: 'shot_fireball', hook: 'shot_chain', gust: 'shot_wind', knife: 'shot_knife', arrow: 'shot_arrow', sting: 'shot_arrow', net: 'shot_net', wolf: 'shot_beast', hammer: 'shot_spin', vial: 'shot_net' };
@@ -41,6 +41,8 @@ export interface Fighter {
   name: string;
   hp: number;
   maxHp: number;
+  /** Multiplies the damage this fighter deals (1 everywhere but arcade's weakened rivals). */
+  power: number;
   col: number;
   row: number;
   /** Pixel offset for dashes and leaps (drawing only). */
@@ -237,12 +239,16 @@ export class Battle {
   fx: Fx[] = [];
   timers: Timer[] = [];
   anims: Anim[] = [];
+  /** See keep(). */
+  kept: object[] = [];
   phase: Phase = 'custom';
   gauge = 0;
   /** Training mode: a fighter brought to 0 HP refills instead of losing. */
   noKo = false;
   turn = 0;
   time = 0;
+  /** When each side last let out a hurt voice. */
+  hurtT: [number, number] = [-9, -9];
   koT = 0;
   winner: Side | null = null;
   /** Offered cards on the current custom screen, per side. */
@@ -257,7 +263,19 @@ export class Battle {
   /** Every random roll in the rules comes from here, so two machines given the same seed play the same battle. */
   rand: ReturnType<typeof seeded>;
 
+  /** The seed and fighters this battle was built from, so a replay can build it again. */
+  readonly seed: number;
+  readonly specs: [FighterSpec, FighterSpec];
+  /**
+   * Where events go (sounds, hits, casts, K.O.s). Not part of the battle's state: rollback snapshots
+   * skip it, which is why it is not a plain field.
+   */
+  declare sink: EventSink | null;
+
   constructor(a: FighterSpec, bSpec: FighterSpec, seed: number = randomSeed()) {
+    Object.defineProperty(this, 'sink', { value: getDefaultSink(), writable: true, enumerable: false });
+    this.seed = seed;
+    this.specs = [{ ...a, deck: a.deck.slice() }, { ...bSpec, deck: bSpec.deck.slice() }];
     this.rand = seeded(seed);
     // same class in the same color: the second fighter takes the next color
     const aSkin = a.skin ?? defaultSkin(a.cls);
@@ -322,9 +340,24 @@ export class Battle {
   // ---------- scheduling ----------
   later(delay: number, fn: () => void): void { this.timers.push({ t: delay, fn }); }
   anim(dur: number, fn: (p: number) => void): void { fn(0); this.anims.push({ t: 0, dur, fn }); }
+  /**
+   * Counters a spell's timers share (hits landed so far, ...). Rollback netcode rewinds everything
+   * reachable from the battle, so mutable state a closure keeps must live in an object kept here,
+   * never in a `let` the closure captures. `npm run rollcheck` catches the slip.
+   */
+  keep<T extends object>(state: T): T {
+    this.kept.push(state);
+    if (this.kept.length > 32) this.kept.shift();
+    return state;
+  }
+  emit(e: BattleEvent): void { this.sink?.(e); }
+  sound(name: string, opts?: SoundOpts): void { this.sink?.({ type: 'sound', name, opts }); }
+  voice(f: Fighter, kind: VoiceKind, element?: string, chance?: number): void {
+    this.sink?.({ type: 'voice', cls: f.cls, kind, pan: panOf(f.col), side: f.side, element, chance });
+  }
   addFx(kind: string, side: Side, col: number, row: number, dur: number, data?: Record<string, number | string>): void {
     this.fx.push({ t: 0, dur, kind, side, col, row, data });
-    sfxFx(kind, { pan: panOf(col), dur, data: { ...data, d: side === 0 ? 1 : -1 } });
+    this.sink?.({ type: 'fxSound', kind, opts: { pan: panOf(col), dur, data: { ...data, d: side === 0 ? 1 : -1 } } });
   }
   /**
    * The standard area-spell telegraph: `cells` flash for `delay` seconds, then `hit` runs. Pass TUNING.warnTime unless the
@@ -387,7 +420,7 @@ export class Battle {
       f.charging = false;
       f.charge = 0;
     }
-    sfx('open');
+    this.sound('open');
   }
 
   /** Apply both sides' picks (indices into the offer, in cast order) and resume the fight. */
@@ -396,14 +429,14 @@ export class Battle {
       const offer = this.offer[f.side];
       const chosen = picks[f.side].filter((i, k, a) => i >= 0 && i < offer.length && a.indexOf(i) === k);
       f.queue = chosen.map(i => offer[i]);
-      // the rest go back into the grimoire, BN style
+      // the rest go back into the spell deck, BN style
       const rest = offer.filter((_, i) => !chosen.includes(i));
       f.deck = shuffle([...f.deck, ...rest], this.rand);
       this.offer[f.side] = [];
     }
     this.gauge = 0;
     this.phase = 'fight';
-    sfx('confirm');
+    this.sound('confirm');
   }
 
   canOpenCustom(): boolean { return this.phase === 'fight' && this.gauge >= 1; }
@@ -451,6 +484,8 @@ export class Battle {
     this.updateZones();
     this.combo.update(this, dt);
 
+    // both fighters down on the same frame: a double K.O., the round is a draw (winner stays null)
+    const double = !this.noKo && this.f.every(f => !f.dead && f.hp <= 0);
     for (const f of this.f) {
       if (!f.dead && f.hp <= 0 && this.noKo) {
         f.hp = f.maxHp;
@@ -459,9 +494,11 @@ export class Battle {
         f.dead = true;
         this.phase = 'ko';
         this.koT = 0;
-        this.winner = (1 - f.side) as Side;
+        this.winner = double ? null : (1 - f.side) as Side;
         this.cheer = 3;
-        sfx('ko', { pan: panOf(f.col) });
+        this.sound('ko', { pan: panOf(f.col) });
+        this.voice(f, 'death');
+        this.emit({ type: 'ko', side: f.side });
       }
     }
   }
@@ -648,7 +685,7 @@ export class Battle {
       const R = TUNING.ranger;
       while (f.stillT >= R.stillSeconds) {
         f.stillT -= R.stillSeconds;
-        if (f.res < R.energyCap) { f.res = Math.min(R.energyCap, f.res + 1); sfx('pip'); }
+        if (f.res < R.energyCap) { f.res = Math.min(R.energyCap, f.res + 1); this.sound('pip'); }
       }
     }
     f.lastCol = f.col; f.lastRow = f.row;
@@ -679,7 +716,7 @@ export class Battle {
         const before = f.charge;
         f.charge += dt;
         const need = heavyChargeOf(f);
-        if (before < need && f.charge >= need) sfx('charged', { pan: panOf(f.col) });
+        if (before < need && f.charge >= need) this.sound('charged', { pan: panOf(f.col) });
       } else {
         if (f.charge >= heavyChargeOf(f) && f.lock <= 0 && f.st.flinch <= 0) this.basicAttack(f, 'heavy');
         f.charging = false;
@@ -691,7 +728,7 @@ export class Battle {
   }
 
   private onStatusEnd(f: Fighter, k: StatusKey): void {
-    if (k === 'frozen' || k === 'iceBlock') sfx('thaw', { pan: panOf(f.col) });
+    if (k === 'frozen' || k === 'iceBlock') this.sound('thaw', { pan: panOf(f.col) });
     if (k === 'lastStand') {
       const dmg = Math.round(f.lastStandAbsorbed);
       f.lastStandAbsorbed = 0;
@@ -719,7 +756,7 @@ export class Battle {
     f.col = nc; f.row = nr;
     f.moveCd = TUNING.moveRepeat;
     f.stepCd = TUNING.moveCooldown;
-    sfx('step', { pan: panOf(nc) });
+    this.sound('step', { pan: panOf(nc) });
     return true;
   }
 
@@ -760,7 +797,7 @@ export class Battle {
     if (f.cls !== 'warrior' || amt <= 0) return;
     const before = Math.floor(f.res);
     f.res = Math.min(TUNING.warrior.rageMax, f.res + amt);
-    if (Math.floor(f.res) > before && fromCard) sfx('pip');
+    if (Math.floor(f.res) > before && fromCard) this.sound('pip');
   }
 
   /** Energy, Mana or Rage from a card or effect, up to the class cap. */
@@ -768,7 +805,7 @@ export class Battle {
     if (f.cls === 'warrior') { this.gainRage(f, amt, true); return; }
     const cap = f.cls === 'mage' ? 99 : f.resMax;
     f.res = Math.min(cap, f.res + amt);
-    sfx('pip');
+    this.sound('pip');
   }
 
   costOf(f: Fighter, card: CardDef): number {
@@ -817,6 +854,7 @@ export class Battle {
     const d = this.dir(f);
     f.pose = kind === 'light' ? 'attack' : 'heavy';
     f.poseT = kind === 'light' ? 0.2 : 0.32;
+    if (kind === 'heavy') this.voice(f, 'grunt');
     if (f.cls === 'warrior') {
       const T = TUNING.warrior;
       const dmg = kind === 'light' ? T.lightDamage : T.heavyDamage;
@@ -860,7 +898,7 @@ export class Battle {
         const dmg = T.lightDamage * (f.st.deadeye > 0 ? 3 : 1);
         const opts: HitOpts = { basic: kind, element: 'steel' };
         if (homing) {
-          sfx('shot_arrow', { pan: panOf(f.col), data: { dir: d } });
+          this.sound('shot_arrow', { pan: panOf(f.col), data: { dir: d } });
           this.projectiles.push({
             side: f.side, row: f.row, x: f.col, speed: 0, kind: 'arrow', reflectable: true,
             homing: { p: 0, dur: Math.max(0.15, Math.abs(foe.col - f.col) / T.arrowSpeed), sx: f.col, sy: f.row, target: foe.side },
@@ -1096,7 +1134,7 @@ export class Battle {
     f.st.frozen = Math.max(f.st.frozen, t, TUNING.ccMin);
     f.charging = false;
     this.text(f, 'FROZEN', '#3cbcfc');
-    sfx('freeze', { pan: panOf(f.col) });
+    this.sound('freeze', { pan: panOf(f.col) });
   }
 
   stun(f: Fighter, t: number): void {
@@ -1112,13 +1150,14 @@ export class Battle {
     amt = Math.round(amt);
     f.hp = Math.min(f.maxHp, f.hp + amt);
     this.text(f, '+' + amt, '#58d854');
-    sfx('heal', { pan: panOf(f.col) });
+    this.sound('heal', { pan: panOf(f.col) });
   }
 
   /** Core damage pipeline: immunity, guard, multipliers, shields, last stand, Rage. */
   damage(target: Fighter, base: number, src: Fighter | null, opts: HitOpts): { dealt: number; broke: boolean; blocked: boolean } {
     const out = { dealt: 0, broke: false, blocked: false };
     if (target.dead || base <= 0) return out;
+    if (src && src !== target) base *= src.power;
     if (target.st.iceBlock > 0) { this.text(target, 'IMMUNE', '#a4e4fc'); return out; }
     if (!opts.dot && (target.st.untargetable > 0 || (opts.targeted && target.st.stealth > 0))) { this.text(target, 'MISS', '#bcbcbc'); return out; }
     if (opts.spell && target.st.spellImmune > 0) { this.text(target, 'IMMUNE', '#9878f8'); return out; }
@@ -1167,7 +1206,7 @@ export class Battle {
         out.broke = true;
         amt *= 2;
         this.text(target, 'BREAK', '#fcfcfc');
-        sfx('break', { pan: panOf(target.col) });
+        this.sound('break', { pan: panOf(target.col) });
       }
     }
 
@@ -1193,7 +1232,12 @@ export class Battle {
       if (s.kind === 'barrier' && s.hp <= 0) { target.bonusManaNext += 1; this.text(target, '+1 MANA NEXT', '#f878f8'); }
       this.addFx('shieldHit', target.side, target.col, target.row, 0.25);
     }
-    if (amt <= 0) { out.blocked = true; sfx('block', { pan: panOf(target.col) }); return out; }
+    if (amt <= 0) {
+      out.blocked = true;
+      this.sound('block', { pan: panOf(target.col) });
+      this.emit({ type: 'hit', side: target.side, col: target.col, row: target.row, amt: 0, element: opts.element, basic: opts.basic, spell: opts.spell, dot: opts.dot, blocked: true });
+      return out;
+    }
 
     if (target.st.lastStand > 0) {
       target.lastStandAbsorbed += amt;
@@ -1229,7 +1273,13 @@ export class Battle {
     if (vanishStun) this.stun(target, vanishStun);
     if (opts.freeze) this.freeze(target, opts.freeze);
     if (opts.knockback) this.knockback(target, 1);
-    sfx(opts.basic === 'heavy' ? 'heavyImpact' : 'hit', { pan: panOf(target.col), amt, element: opts.element });
+    this.sound(opts.basic === 'heavy' ? 'heavyImpact' : 'hit', { pan: panOf(target.col), amt, element: opts.element });
+    this.emit({ type: 'hit', side: target.side, col: target.col, row: target.row, amt, element: opts.element, basic: opts.basic, spell: opts.spell, dot: opts.dot, blocked: false });
+    // hurt voice: not for damage over time or chip hits, not from inside a block of ice, and not every hit of a flurry
+    if (target.hp > 0 && !opts.dot && amt >= 8 && target.st.frozen <= 0 && target.st.iceBlock <= 0 && this.time - this.hurtT[target.side] > 0.35) {
+      this.hurtT[target.side] = this.time;
+      this.voice(target, amt >= 60 ? 'hurtBig' : 'hurt');
+    }
     return out;
   }
 
@@ -1238,11 +1288,11 @@ export class Battle {
     if (!f.queue.length || f.castCd > 0) return;
     const card = CARDS[f.queue[0]];
     if (f.st.evoLock > 0) { this.text(f, 'CAN\'T CAST', '#bcbcbc'); return; }
-    if (f.st.silenced > 0) { this.text(f, 'SILENCED', '#9878f8'); sfx('deny'); f.lock = 0.15; return; }
-    if (card.needsStealth && f.st.stealth <= 0) { this.text(f, 'NEED STEALTH', '#bcbcbc'); sfx('deny'); f.lock = 0.15; return; }
+    if (f.st.silenced > 0) { this.text(f, 'SILENCED', '#9878f8'); this.sound('deny'); f.lock = 0.15; return; }
+    if (card.needsStealth && f.st.stealth <= 0) { this.text(f, 'NEED STEALTH', '#bcbcbc'); this.sound('deny'); f.lock = 0.15; return; }
     if (!this.canAfford(f, card)) {
       this.text(f, `NEED ${CLASS_INFO[f.cls].res}`, '#bcbcbc');
-      sfx('deny');
+      this.sound('deny');
       f.lock = 0.15;
       return;
     }
@@ -1268,6 +1318,9 @@ export class Battle {
     f.pose = 'cast';
     f.poseT = 0.3;
     f.lock = Math.max(f.lock, card.lock ?? 0.3);
+    const big = card.rarity === 'legendary' || card.rarity === 'mythic' || card.cost === 'all' || card.cost >= 4;
+    // big spells always get a line; everyday casts only some of the time so it doesn't get chatty
+    this.voice(f, big ? 'castBig' : 'cast', card.element, big ? 1 : 0.6);
 
     if (foe.st.counterspell > 0 && card.id !== 'counterspell') {
       foe.st.counterspell = 0;
@@ -1276,7 +1329,7 @@ export class Battle {
       const callout = this.fx.find(e => e.kind === 'castName' && e.side === f.side);
       if (callout?.data) callout.data.countered = 1;
       this.addFx('counter', f.side, f.col, f.row, 0.5);
-      sfx('deny');
+      this.sound('deny');
       return;
     }
 
@@ -1287,7 +1340,8 @@ export class Battle {
       if (f.coldBlood) { mult *= 2; f.coldBlood = false; }
       if (f.st.vanishStun > 0) { f.st.vanishStun = 0; f.castStun = TUNING.rogue.vanishStun; }
     }
-    sfx('cast_' + card.element, { pan: panOf(f.col) });
+    this.sound('cast_' + card.element, { pan: panOf(f.col) });
+    this.emit({ type: 'cast', side: f.side, card: card.id });
     this.addFx('cast', f.side, f.col, f.row, 0.3, { el: card.element });
     const now = this.time;
     const castsWithin = (secs: number): number => prior.filter(t => now - t <= secs).length;
@@ -1299,7 +1353,7 @@ export class Battle {
   /** Spawn a projectile from `f` down its row. */
   shoot(f: Fighter, p: Omit<Projectile, 'side' | 'row' | 'x'> & { row?: number }): void {
     const reach = Math.max(1, f.side === 0 ? 5 - f.col : f.col);
-    sfx(SHOT_SOUND[p.kind] ?? 'shot_magic', { pan: panOf(f.col), dur: Math.min(1.2, reach / Math.max(1, Math.abs(p.speed))), data: { dir: this.dir(f) } });
+    this.sound(SHOT_SOUND[p.kind] ?? 'shot_magic', { pan: panOf(f.col), dur: Math.min(1.2, reach / Math.max(1, Math.abs(p.speed))), data: { dir: this.dir(f) } });
     this.projectiles.push({ side: f.side, row: p.row ?? f.row, x: f.col + this.dir(f) * 0.5, ...p });
   }
 
@@ -1352,7 +1406,7 @@ export class Battle {
   private reflect(p: Projectile, by: Fighter): void {
     by.st.reflect = 0;
     this.text(by, 'REFLECT', '#fcfcfc');
-    sfx('reflect', { pan: panOf(by.col) });
+    this.sound('reflect', { pan: panOf(by.col) });
     const back: Projectile = { ...p, dead: false, side: by.side, reflectable: false };
     if (p.homing) {
       back.homing = { p: 0, dur: p.homing.dur, sx: by.col, sy: by.row, target: (1 - by.side) as Side };
@@ -1422,7 +1476,7 @@ function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => nu
   for (const k of STATUS_KEYS) st[k] = 0;
   const maxHp = TUNING.hp[cls];
   return {
-    side, cls, skin: spec.skin ?? defaultSkin(cls), alt, name, hp: maxHp, maxHp,
+    side, cls, skin: spec.skin ?? defaultSkin(cls), alt, name, hp: maxHp, maxHp, power: 1,
     col: side === 0 ? 1 : 4, row: 1, dx: 0, dy: 0,
     lock: 0, moveCd: 0, stepCd: 0, moveBuf: null, castCd: 0, charging: false, charge: 0,
     res: START_RES[cls],

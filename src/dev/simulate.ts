@@ -2,6 +2,8 @@
 import { PLAYABLE } from '../game/classes';
 import { Battle, type Side } from '../game/battle';
 import { Cpu } from '../game/ai';
+import { randomSeed } from '../game/rng';
+import { styleById } from '../game/playstyles';
 import { CARDS } from '../game/cards';
 import { starterDeck, toList, type DeckCounts } from '../game/deck';
 import type { Difficulty } from '../game/tuning';
@@ -11,7 +13,7 @@ import { instrument } from './instrument';
 /** Every class with sprites; new classes show up in the dev tools as soon as they are added. */
 export const classIds = (): ClassId[] => (Object.keys(SKINS) as ClassId[]).filter(c => PLAYABLE.includes(c));
 
-export interface SideSpec { cls: ClassId; deck: DeckCounts; cpu: Difficulty; label?: string }
+export interface SideSpec { cls: ClassId; deck: DeckCounts; cpu: Difficulty; label?: string; /** Playstyle id (default: balanced). */ style?: string }
 
 export interface MatchResult {
   winner: Side | null;
@@ -23,26 +25,33 @@ export interface MatchResult {
   hpLeft: [number, number];
 }
 
-const DT = 1 / 60;
+/** The game's own frame step. */
+export const DT = 1 / 60;
 /** Matches that run longer than this are called a draw. */
 export const TIME_LIMIT = 600;
 
-export function runMatch(a: SideSpec, bSpec: SideSpec): MatchResult {
-  const b = new Battle({ cls: a.cls, deck: toList(a.deck), name: 'A' }, { cls: bSpec.cls, deck: toList(bSpec.deck), name: 'B' });
+/**
+ * `tick` = seconds per simulation step. Every rule in Battle and the CPU is written in seconds,
+ * so a coarser tick (e.g. 1/30) plays the same match in fewer steps; scripts/balance.ts --tick checks it against 1/60.
+ */
+export function runMatch(a: SideSpec, bSpec: SideSpec, tick: number = DT, seed: number = randomSeed()): MatchResult {
+  // the CPUs seed their rolls from the battle, so the same seed plays the same match
+  const b = new Battle({ cls: a.cls, deck: toList(a.deck), name: 'A' }, { cls: bSpec.cls, deck: toList(bSpec.deck), name: 'B' }, seed);
   const probe = instrument(b);
   const dmg: MatchResult['dmg'] = [{}, {}];
   probe.onHit = h => {
     if (h.by === null || !h.dealt) return;
     dmg[h.by][h.source] = (dmg[h.by][h.source] ?? 0) + h.dealt;
   };
-  const cpus = [new Cpu(a.cpu), new Cpu(bSpec.cpu)];
+  const cpus = [new Cpu(a.cpu, styleById(a.style ?? '')), new Cpu(bSpec.cpu, styleById(bSpec.style ?? ''))];
   let t = 0;
-  while (b.phase !== 'over' && t < TIME_LIMIT) {
+  // the winner is known at the KO, so the 2s KO animation is skipped
+  while (b.phase !== 'over' && b.phase !== 'ko' && t < TIME_LIMIT) {
     if (b.phase === 'custom') b.endCustom([cpus[0].pick(b, b.f[0]), cpus[1].pick(b, b.f[1])]);
-    // the player opens the Draw screen whenever they like; this opens it a little after it fills
-    else if (b.canOpenCustom() && Math.random() < 0.02) b.beginCustom();
-    b.update(DT, [cpus[0].intent(b, b.f[0], DT), cpus[1].intent(b, b.f[1], DT)]);
-    t += DT;
+    // the player opens the Draw screen whenever they like; side A's CPU opens it a little after it fills
+    else if (cpus[0].wantsDraw(b, b.f[0], tick)) b.beginCustom();
+    b.update(tick, [cpus[0].intent(b, b.f[0], tick), cpus[1].intent(b, b.f[1], tick)]);
+    t += tick;
   }
   return { winner: b.winner, time: t, turns: b.turn, dmg, casts: probe.casts, hpLeft: [b.f[0].hp / b.f[0].maxHp, b.f[1].hp / b.f[1].maxHp] };
 }

@@ -1,19 +1,23 @@
-// Grimoire builder: 30 spells, 4/2/1 copy limits, max 5 Legendaries, exactly 1 Mythic. Autosaves to the browser.
-import { hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
+// Spell deck builder: 30 spells, 4/2/1 copy limits, max 5 Legendaries, exactly 1 Mythic. Autosaves to the browser.
+// Opening it (or switching class) first asks what to start from: your saved deck, a ready-made deck or an empty one.
+import { popScene, hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { teamColor, type ClassId } from '../art/sprites';
-import { P, UW, screenRect, type Ctx } from '../engine/gfx';
+import { P, UW, screenRect, spread, vy, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, mouse } from '../engine/input';
+import { touchActive } from '../engine/touch';
 import { sfx } from '../engine/audio';
 import { cardsFor, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef } from '../game/cards';
-import { canAdd, countRarity, deckSize, loadCustom, saveCustom, starterDeck, validate, DECK_SIZE, MAX_LEGENDARIES, type DeckCounts } from '../game/deck';
+import { canAdd, countRarity, deckSize, loadCustom, saveCustom, presetDeck, presetsFor, validate, DECK_SIZE, MAX_LEGENDARIES, type DeckCounts, type DeckPreset } from '../game/deck';
 import { loadMatch, saveMatch } from '../game/match';
 import { PLAYABLE } from '../game/classes';
-import { drawCardDetail, resInk } from './cardView';
+import { drawCardDetail, drawCardFace, resInk, CARD_W, CARD_H } from './cardView';
 import { CardPreview } from './cardPreview';
-import { win, selRow, ink, PAPER, BURN, INK, INK2, RED_INK, GOLD, TRIM } from './skin';
+import { openDeckPanel } from './deckPanel';
+import type { SpellDeck } from '../game/deckYaml';
+import { win, selRow, plaque, ink, PAPER, BURN, INK, INK2, RED_INK, GOLD, TRIM } from './skin';
 
 const RARITY_ORDER = { common: 0, uncommon: 1, legendary: 2, mythic: 3 };
 const CLASSES: ClassId[] = PLAYABLE;
@@ -24,6 +28,8 @@ const LX = 8, LY = 52, LW = 268;
 const DX = 286, DW = UW - DX - 8;
 /** Height of the card's clip at the top of the detail window. */
 const PREVIEW_H = 80;
+// touch: a scrollable grid of card tiles instead of thin rows; each tile has its count and -/+ buttons under the card
+const COLS = 3, TX = LX + 8, TPX = 86, TPY = CARD_H + 28, TBTN = 26, TBH = 18;
 
 export class DeckBuilderScene implements Scene {
   deck: DeckCounts = {};
@@ -34,18 +40,77 @@ export class DeckBuilderScene implements Scene {
   msgT = 0;
 
   private preview = new CardPreview();
+  /** Closes the YAML panel while it is open. */
+  private closeYaml: (() => void) | null = null;
+  /** The start-from picker: its choices ('custom', a ready-made deck id, 'empty'), or null once a start is picked. */
+  private picks: string[] | null = null;
+  private pickSel = 0;
+  /** Tile grid scroll in UI pixels (touch). */
+  private tscroll = 0;
+  /** The tile grid's window this frame, for scrolling and keeping the selection in view. */
+  private grid = { top: 0, h: 0 };
 
-  constructor(public cls: ClassId, private back: () => void) {
+  constructor(public cls: ClassId, private back: () => void = popScene) {
     this.load();
   }
 
   private load(): void {
-    this.cards = cardsFor(this.cls).sort((a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity] || costNum(a) - costNum(b));
-    this.deck = loadCustom(this.cls) ?? starterDeck(this.cls);
-    this.sel = 0; this.scroll = 0;
+    this.loadCards();
+    this.deck = loadCustom(this.cls) ?? presetDeck(this.cls, 'starter');
+    this.openPicker();
   }
 
-  private get rows(): number { return this.cards.length + 2; }
+  private loadCards(): void {
+    this.cards = cardsFor(this.cls).sort((a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity] || costNum(a) - costNum(b));
+    this.sel = this.top; this.scroll = 0; this.tscroll = 0;
+  }
+
+  /** The YAML import/export panel (a DOM overlay); while it is open the builder ignores input. */
+  private openYaml(): void {
+    sfx('select');
+    this.closeYaml = openDeckPanel({
+      current: { cls: this.cls, deck: this.deck },
+      onImport: g => this.applyImport(g),
+      onClose: () => { this.closeYaml = null; },
+    });
+  }
+
+  /** A legal imported spell deck replaces the saved deck of its class (switching to that class if needed). */
+  private applyImport(g: SpellDeck): void {
+    if (g.cls !== this.cls) { this.cls = g.cls; this.loadCards(); }
+    this.deck = { ...g.deck };
+    saveCustom(this.cls, this.deck);
+    this.picks = null;
+    this.sel = this.top; this.scroll = 0; this.tscroll = 0;
+    this.flash(`IMPORTED ${(g.name ?? 'SPELL DECK').toUpperCase()}`);
+    sfx('confirm');
+  }
+
+  /** Show the start-from picker, on your saved deck if there is one, else the deck picked on the character select. */
+  private openPicker(): void {
+    const saved = loadCustom(this.cls), hasSaved = !!saved && deckSize(saved) > 0;
+    this.picks = [...(hasSaved ? ['custom'] : []), ...this.presets.map(p => p.id), 'empty', 'import'];
+    const m = loadMatch(), picked = m.p1 === this.cls ? m.p1Deck : m.cpu === this.cls ? m.cpuDeck : 'starter';
+    const want = hasSaved ? 'custom' : picked;
+    this.pickSel = Math.max(0, this.picks.indexOf(want));
+  }
+
+  private choosePick(id: string): void {
+    if (id === 'import') { this.openYaml(); return; }
+    const p = this.presets.find(x => x.id === id);
+    if (id === 'custom') this.deck = loadCustom(this.cls) ?? {};
+    else { this.deck = p ? { ...p.cards } : {}; saveCustom(this.cls, this.deck); }
+    this.flash(id === 'custom' ? 'EDITING YOUR SPELL DECK' : p ? `STARTED FROM ${p.name.toUpperCase()}` : 'EMPTY SPELL DECK');
+    this.picks = null;
+    this.sel = this.top; this.scroll = 0; this.tscroll = 0;
+    sfx('select');
+  }
+
+  /** The one row above the cards reopens the start-from picker. */
+  private get presets(): DeckPreset[] { return presetsFor(this.cls); }
+  private readonly top = 1;
+  private get rows(): number { return this.top + this.cards.length; }
+  private cardAt(idx: number): CardDef | undefined { return idx >= this.top ? this.cards[idx - this.top] : undefined; }
 
   private flash(s: string): void { this.msg = s; this.msgT = 1.6; }
 
@@ -71,55 +136,103 @@ export class DeckBuilderScene implements Scene {
     sfx('move');
   }
 
-  private special(idx: number): void {
-    if (idx === this.cards.length) { this.deck = starterDeck(this.cls); this.flash('RESET TO STARTER'); }
-    else { this.deck = {}; this.flash('CLEARED'); }
-    saveCustom(this.cls, this.deck);
-    sfx('select');
+  private special(): void { this.openPicker(); sfx('select'); }
+
+  /** The start-from picker takes the input while it is open. */
+  private updatePicker(dt: number): void {
+    const picks = this.picks!;
+    const h = hot('pick');
+    if (h >= 0 && mouse.moved) this.pickSel = h;
+    if (h >= 0 && mouse.click) { this.choosePick(picks[h]); return; }
+    if (navPressed('up', dt)) { this.pickSel = (this.pickSel + picks.length - 1) % picks.length; sfx('move'); }
+    if (navPressed('down', dt)) { this.pickSel = (this.pickSel + 1) % picks.length; sfx('move'); }
+    if (wasPressed('confirm')) { this.choosePick(picks[this.pickSel]); return; }
+    if (wasPressed('back') || wasPressed('pause') || mouse.rclick) { sfx('back'); this.back(); }
   }
 
+  /** Phones and tablets get the tile grid. */
+  private get tiles(): boolean { return touchActive(); }
+  private maxTileScroll(): number { return Math.max(0, Math.ceil(this.cards.length / COLS) * TPY - this.grid.h + 6); }
+
   private follow(): void {
+    if (this.tiles) {
+      if (!this.cardAt(this.sel)) return;
+      const top = Math.floor((this.sel - this.top) / COLS) * TPY;
+      if (top < this.tscroll) this.tscroll = top;
+      if (top + TPY > this.tscroll + this.grid.h) this.tscroll = top + TPY - this.grid.h;
+      return;
+    }
     if (this.sel < this.scroll) this.scroll = this.sel;
     if (this.sel >= this.scroll + VISIBLE) this.scroll = this.sel - VISIBLE + 1;
   }
 
+  /** Touch: tap a tile or its + to add a copy, - to remove one; holding a tile reads it; dragging scrolls. */
+  private updateTiles(): boolean {
+    if (mouse.wheel) this.tscroll = Math.max(0, Math.min(this.maxTileScroll(), this.tscroll + mouse.wheel * 28));
+    if (isHot('change') && mouse.click) { this.sel = 0; this.special(); return true; }
+    const minus = hot('tminus'), plus = hot('tplus'), tile = hot('tile');
+    if (minus >= 0 && mouse.click) { this.sel = this.top + minus; this.change(this.cards[minus], -1); return true; }
+    if (plus >= 0 && mouse.click) { this.sel = this.top + plus; this.change(this.cards[plus], 1); return true; }
+    const over = Math.max(tile, minus, plus);
+    if (over >= 0 && mouse.moved) this.sel = this.top + over;
+    if (tile >= 0 && (mouse.click || mouse.rclick)) { this.sel = this.top + tile; this.change(this.cards[tile], mouse.click ? 1 : -1); return true; }
+    return false;
+  }
+
   update(dt: number): void {
     this.msgT = Math.max(0, this.msgT - dt);
-    this.preview.show(showSel() ? this.cards[this.sel] ?? null : null);
+    this.preview.show(!this.picks && showSel() ? this.cardAt(this.sel) ?? null : null);
     this.preview.update(dt);
+    if (this.closeYaml) return;
+    if (isHot('yaml') && mouse.click) { this.openYaml(); return; }
+    if (this.picks) {
+      // class tabs still switch class (and reopen the picker for it)
+      const tab = hot('tab');
+      if (tab >= 0 && mouse.click) { this.switchClass(CLASSES[tab]); return; }
+      if (wasPressed('lb') || wasPressed('rb')) {
+        const step = wasPressed('lb') ? -1 : 1;
+        this.switchClass(CLASSES[(CLASSES.indexOf(this.cls) + step + CLASSES.length) % CLASSES.length]);
+        return;
+      }
+      this.updatePicker(dt);
+      return;
+    }
 
+    if (this.tiles && this.updateTiles()) return;
     // mouse: hover reads a card, click adds, right-click removes, wheel scrolls
     if (mouse.wheel && hot('row') >= 0) this.scroll = Math.max(0, Math.min(this.rows - VISIBLE, this.scroll + mouse.wheel * 2));
     const tab = hot('tab');
     if (tab >= 0 && mouse.click) { this.switchClass(CLASSES[tab]); return; }
     if (isHot('done') && mouse.click) { this.exit(); return; }
     const minus = hot('minus'), plus = hot('plus'), row = hot('row');
-    if (minus >= 0 && mouse.click) { this.sel = minus; this.change(this.cards[minus], -1); return; }
-    if (plus >= 0 && mouse.click) { this.sel = plus; this.change(this.cards[plus], 1); return; }
+    if (minus >= 0 && mouse.click) { this.sel = minus; this.change(this.cardAt(minus)!, -1); return; }
+    if (plus >= 0 && mouse.click) { this.sel = plus; this.change(this.cardAt(plus)!, 1); return; }
     const over = Math.max(row, minus, plus);
     if (over >= 0 && mouse.moved) this.sel = over;
     if (row >= 0 && (mouse.click || mouse.rclick)) {
       this.sel = row;
-      const card = this.cards[row];
+      const card = this.cardAt(row);
       if (card) this.change(card, mouse.click ? 1 : -1);
-      else if (mouse.click) this.special(row);
+      else if (mouse.click) this.special();
       return;
     }
 
-    if (navPressed('up', dt)) { this.sel = (this.sel + this.rows - 1) % this.rows; sfx('move'); this.follow(); }
-    if (navPressed('down', dt)) { this.sel = (this.sel + 1) % this.rows; sfx('move'); this.follow(); }
+    // the tile grid steps a whole row up and down
+    const step = this.tiles && this.cardAt(this.sel) ? COLS : 1;
+    if (navPressed('up', dt)) { this.sel = Math.max(0, this.sel - step); sfx('move'); this.follow(); }
+    if (navPressed('down', dt)) { this.sel = Math.min(this.rows - 1, this.sel + step); sfx('move'); this.follow(); }
     if (wasPressed('lb') || wasPressed('rb')) {
       const step = wasPressed('lb') ? -1 : 1;
       this.switchClass(CLASSES[(CLASSES.indexOf(this.cls) + step + CLASSES.length) % CLASSES.length]);
       return;
     }
     if (wasPressed('pause')) { this.exit(); return; }
-    const card = this.cards[this.sel];
+    const card = this.cardAt(this.sel);
     if (card) {
       if (wasPressed('confirm') || navPressed('right', dt)) this.change(card, 1);
       else if (navPressed('left', dt)) this.change(card, -1);
       else if (wasPressed('cast')) { this.change(card, -1); return; }
-    } else if (wasPressed('confirm')) this.special(this.sel);
+    } else if (wasPressed('confirm')) this.special();
     // BACK leaves even with a card selected (the cast key removes a copy first, above)
     if (wasPressed('back')) this.exit();
   }
@@ -139,73 +252,157 @@ export class DeckBuilderScene implements Scene {
     c.fillStyle = 'rgba(40,20,0,0.5)';
     c.fillRect(...screenRect());
 
-    // header: class tabs, counts, done
-    win(ui, 8, 4, UW - 16, 40, { accent: teamColor(this.cls, loadMatch().p1Skin[this.cls], false), burn: 3 });
-    CLASSES.forEach((cl, i) => button(ui, `tab:${i}`, cl.toUpperCase(), 14 + i * 54, 12, 52, 14, cl === this.cls, cl === this.cls ? RED_INK : INK2));
-    drawText(ui, 'GRIMOIRE', 300, 11, INK);
+    // header: class tabs, counts, done (phone portrait moves it up, and the list rows grow, into the spare height)
+    const hy = vy(4) - 4;
+    win(ui, 8, 4 + hy, UW - 16, 40, { accent: teamColor(this.cls, loadMatch().p1Skin[this.cls], false), burn: 3 });
+    CLASSES.forEach((cl, i) => button(ui, `tab:${i}`, cl.toUpperCase(), 14 + i * 54, 12 + hy, 52, 14, cl === this.cls, cl === this.cls ? RED_INK : INK2));
+    drawText(ui, 'SPELL DECK', 300, 11 + hy, INK);
     const n = deckSize(this.deck), leg = countRarity(this.deck, 'legendary'), myth = countRarity(this.deck, 'mythic');
-    drawText(ui, `SPELLS ${n}/${DECK_SIZE}`, 14, 31, n === DECK_SIZE ? '#007800' : RED_INK);
-    drawText(ui, `LEGENDARY ${leg}/${MAX_LEGENDARIES}`, 104, 31, leg <= MAX_LEGENDARIES ? ink(RARITY_COLOR.legendary) : RED_INK);
-    drawText(ui, `MYTHIC ${myth}/1`, 212, 31, myth === 1 ? ink(RARITY_COLOR.mythic) : RED_INK);
+    drawText(ui, `SPELLS ${n}/${DECK_SIZE}`, 14, 31 + hy, n === DECK_SIZE ? '#007800' : RED_INK);
+    drawText(ui, `LEGENDARY ${leg}/${MAX_LEGENDARIES}`, 104, 31 + hy, leg <= MAX_LEGENDARIES ? ink(RARITY_COLOR.legendary) : RED_INK);
+    drawText(ui, `MYTHIC ${myth}/1`, 212, 31 + hy, myth === 1 ? ink(RARITY_COLOR.mythic) : RED_INK);
     const ok = validate(this.deck).length === 0;
-    drawText(ui, ok ? 'READY' : 'NOT READY', 300, 23, ok ? '#007800' : RED_INK);
-    button(ui, 'done', 'DONE', UW - 86, 13, 70, 24, false, RED_INK);
+    drawText(ui, ok ? 'READY' : 'NOT READY', 300, 23 + hy, ok ? '#007800' : RED_INK);
+    button(ui, 'yaml', 'YAML', UW - 112, 13 + hy, 46, 24, false, INK2);
+    button(ui, 'done', 'DONE', UW - 60, 13 + hy, 46, 24, false, RED_INK);
 
     // list
-    win(ui, LX, LY - 4, LW, VISIBLE * RH + 6);
-    for (let i = 0; i < VISIBLE; i++) {
-      const idx = this.scroll + i;
-      if (idx >= this.rows) break;
-      const y = LY + i * RH, ty = y + 3;
-      const on = idx === this.sel && showSel();
-      zone(`row:${idx}`, LX + 1, y - 1, LW - 2, RH);
-      if (on) selRow(ui, LX + 1, y - 1, LW - 2, RH);
-      const card = this.cards[idx];
-      if (!card) {
-        drawText(ui, idx === this.cards.length ? 'RESET TO STARTER' : 'CLEAR ALL', LX + 64, ty, on ? INK : INK2);
-        continue;
+    const ly = vy(LY), rh = Math.round(RH * spread.k), off = Math.round((rh - RH) / 2);
+    win(ui, LX, ly - 4, LW, VISIBLE * rh + 6);
+    if (this.tiles) this.drawTiles(ui, ly, VISIBLE * rh);
+    else {
+      for (let i = 0; i < VISIBLE; i++) {
+        const idx = this.scroll + i;
+        if (idx >= this.rows) break;
+        const y = ly + i * rh, ty = y + 3 + off;
+        const on = idx === this.sel && showSel();
+        zone(`row:${idx}`, LX + 1, y - 1, LW - 2, rh);
+        if (on) selRow(ui, LX + 1, y - 1, LW - 2, rh);
+        const card = this.cardAt(idx);
+        if (!card) {
+          drawText(ui, 'CHANGE STARTING SPELL DECK...', LX + 64, ty, on ? INK : INK2);
+          continue;
+        }
+        const have = this.deck[card.id] ?? 0, max = MAX_COPIES[card.rarity];
+        zone(`minus:${idx}`, LX + 2, y - 1, 14, rh);
+        zone(`plus:${idx}`, LX + 42, y - 1, 14, rh);
+        if (on) {
+          drawText(ui, '-', LX + 6, ty, hot('minus') === idx ? GOLD : have ? PAPER : BURN);
+          drawText(ui, '+', LX + 46, ty, hot('plus') === idx ? RED_INK : have < max ? INK : BURN);
+        }
+        drawText(ui, `${have}/${max}`, LX + 18, ty, have ? INK : TRIM);
+        P(ui, ELEMENT_COLOR[card.element], LX + 58, y + 2 + off, 3, 8);
+        drawText(ui, card.name.toUpperCase(), LX + 66, ty, card.rarity === 'common' ? INK : ink(RARITY_COLOR[card.rarity]));
+        drawText(ui, card.cost === 'all' ? 'A' : String(card.cost), LX + LW - 14, ty, resInk(card));
       }
-      const have = this.deck[card.id] ?? 0, max = MAX_COPIES[card.rarity];
-      zone(`minus:${idx}`, LX + 2, y - 1, 14, RH);
-      zone(`plus:${idx}`, LX + 42, y - 1, 14, RH);
-      if (on) {
-        drawText(ui, '-', LX + 6, ty, hot('minus') === idx ? GOLD : have ? PAPER : BURN);
-        drawText(ui, '+', LX + 46, ty, hot('plus') === idx ? RED_INK : have < max ? INK : BURN);
-      }
-      drawText(ui, `${have}/${max}`, LX + 18, ty, have ? INK : TRIM);
-      P(ui, ELEMENT_COLOR[card.element], LX + 58, y + 2, 3, 8);
-      drawText(ui, card.name.toUpperCase(), LX + 66, ty, card.rarity === 'common' ? INK : ink(RARITY_COLOR[card.rarity]));
-      drawText(ui, card.cost === 'all' ? 'A' : String(card.cost), LX + LW - 14, ty, resInk(card));
+      // scrollbar
+      const total = this.rows, trackH = VISIBLE * rh;
+      const bh = Math.max(10, Math.round((VISIBLE / total) * trackH));
+      const by = ly + Math.round((this.scroll / Math.max(1, total - VISIBLE)) * (trackH - bh));
+      P(ui, BURN, LX + LW + 1, ly - 2, 3, trackH);
+      P(ui, INK2, LX + LW + 1, by - 2, 3, bh);
     }
-    // scrollbar
-    const total = this.rows, trackH = VISIBLE * RH;
-    const bh = Math.max(10, Math.round((VISIBLE / total) * trackH));
-    const by = LY + Math.round((this.scroll / Math.max(1, total - VISIBLE)) * (trackH - bh));
-    P(ui, BURN, LX + LW + 1, LY - 2, 3, trackH);
-    P(ui, INK2, LX + LW + 1, by - 2, 3, bh);
 
     // detail: the card's clip, then its numbers and rules
-    const card = showSel() ? this.cards[this.sel] : undefined;
-    const dh = VISIBLE * RH + 6;
-    win(ui, DX, LY - 4, DW, dh, { accent: card ? ELEMENT_COLOR[card.element] : undefined });
+    const card = showSel() ? this.cardAt(this.sel) : undefined;
+    const dh = VISIBLE * rh + 6;
+    win(ui, DX, ly - 4, DW, dh, { accent: card ? ELEMENT_COLOR[card.element] : undefined });
     if (card) {
       const have = this.deck[card.id] ?? 0;
-      this.preview.draw(ui, DX + 8, LY + 6, DW - 16, PREVIEW_H);
-      const y = drawCardDetail(ui, card, DX + 8, LY + PREVIEW_H + 14, DW - 16) + 6;
-      drawText(ui, `IN DECK ${have} / ${MAX_COPIES[card.rarity]}`, DX + 8, y, have ? INK : TRIM);
+      this.preview.draw(ui, DX + 8, ly + 6, DW - 16, PREVIEW_H);
+      const y = drawCardDetail(ui, card, DX + 8, ly + PREVIEW_H + 14, DW - 16) + 6;
+      drawText(ui, `IN SPELL DECK ${have} / ${MAX_COPIES[card.rarity]}`, DX + 8, y, have ? INK : TRIM);
     } else if (!showSel()) {
-      drawText(ui, 'TOUCH A CARD TO READ IT', DX + 8, LY + 8, INK2);
+      drawText(ui, 'TOUCH A CARD TO READ IT', DX + 8, ly + 8, INK2);
     } else {
-      drawText(ui, this.sel === this.cards.length ? 'PUT THE STARTER DECK BACK' : 'REMOVE EVERY SPELL', DX + 8, LY + 8, INK2);
+      drawText(ui, 'START FROM YOUR SPELL DECK,', DX + 8, ly + 8, INK2);
+      drawText(ui, 'A READY-MADE ONE OR NOTHING', DX + 8, ly + 20, INK2);
     }
 
     // footer
     const errs = validate(this.deck);
-    const fy = LY + VISIBLE * RH + 10;
+    const fy = ly + VISIBLE * rh + 10;
     if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, fy, '#f8b800');
     else if (errs.length) drawTextCentered(ui, errs[0], UW / 2, fy, '#f83800');
-    else drawTextCentered(ui, 'GRIMOIRE READY. SAVED IN THIS BROWSER.', UW / 2, fy, '#58d854');
-    hint(ui, `HOVER TO READ   CLICK: ADD   RIGHT-CLICK: REMOVE   WHEEL: SCROLL`);
+    else drawTextCentered(ui, 'SPELL DECK READY. SAVED IN THIS BROWSER.', UW / 2, fy, '#58d854');
+    if (this.picks) { this.drawPicker(ui); return; }
+    hint(ui, this.tiles ? 'TAP: ADD   -: REMOVE   HOLD: READ   DRAG: SCROLL' : `HOVER TO READ   CLICK: ADD   RIGHT-CLICK: REMOVE   WHEEL: SCROLL`);
+  }
+
+  /** Touch: the start-from button over a scrolling grid of card tiles, inside the list window (top `ly`, height `h`). */
+  private drawTiles(ui: Ctx, ly: number, h: number): void {
+    const bh = Math.round(18 * spread.k), on = this.sel === 0 && showSel();
+    button(ui, 'change', 'CHANGE STARTING SPELL DECK...', LX + 6, ly, LW - 12, bh, on, INK2);
+    const top = ly + bh + 4, gh = h - bh - 4;
+    this.grid = { top, h: gh };
+    this.tscroll = Math.min(this.tscroll, this.maxTileScroll());
+    ui.save();
+    ui.beginPath();
+    ui.rect(LX, top, LW, gh);
+    ui.clip();
+    this.cards.forEach((card, i) => {
+      const x = TX + (i % COLS) * TPX, y = top + 4 + Math.floor(i / COLS) * TPY - this.tscroll;
+      if (y + TPY < top || y > top + gh) return;
+      const have = this.deck[card.id] ?? 0, max = MAX_COPIES[card.rarity], lit = this.sel === this.top + i && showSel();
+      // hit zones only over the visible part of the tile
+      const clip = (zy: number, zh: number): [number, number] => { const a = Math.max(zy, top), b = Math.min(zy + zh, top + gh); return [a, b - a]; };
+      const [fy, fh] = clip(y, CARD_H);
+      if (fh > 0) zone(`tile:${i}`, x, fy, CARD_W, fh);
+      // cards not in the deck are faded
+      drawCardFace(ui, card, x, y, { lit, faded: !have });
+      const by = y + CARD_H + 5, [zy, zh] = clip(by, TBH);
+      if (zh > 0) { zone(`tminus:${i}`, x - 2, zy, TBTN + 2, zh); zone(`tplus:${i}`, x + CARD_W - TBTN, zy, TBTN + 2, zh); }
+      // drawn as plain plaques: button() would add zones outside the clip
+      const mt = plaque(ui, x, by, TBTN, TBH, isHot(`tminus:${i}`));
+      drawTextCentered(ui, '-', x + TBTN / 2, by + 6, isHot(`tminus:${i}`) ? mt : have ? INK : BURN, 1, false);
+      drawTextCentered(ui, `${have}/${max}`, x + CARD_W / 2, by + 6, have ? INK : TRIM, 1, false);
+      const pt = plaque(ui, x + CARD_W - TBTN, by, TBTN, TBH, isHot(`tplus:${i}`));
+      drawTextCentered(ui, '+', x + CARD_W - TBTN / 2, by + 6, isHot(`tplus:${i}`) ? pt : have < max ? RED_INK : BURN, 1, false);
+    });
+    ui.restore();
+    // scrollbar
+    const max = this.maxTileScroll();
+    if (max > 0) {
+      const sh = Math.max(16, Math.round(gh * gh / (gh + max)));
+      P(ui, BURN, LX + LW + 1, top, 3, gh);
+      P(ui, INK2, LX + LW + 1, top + Math.round((this.tscroll / max) * (gh - sh)), 3, sh);
+    }
+  }
+
+  /** The start-from picker: choices on the left, the hovered deck's list on the right. */
+  private drawPicker(ui: Ctx): void {
+    const picks = this.picks!;
+    ui.fillStyle = 'rgba(40,20,0,0.55)';
+    // phone portrait: placed and sized like the list window, with taller rows
+    const ly = vy(LY), lh = VISIBLE * Math.round(RH * spread.k);
+    ui.fillRect(0, ly - 6, UW, lh + 30);
+    const x = 24, y = ly - 2, w = UW - 48, hgt = lh + 2, colW = 176, rh = Math.round(22 * spread.k), ro = Math.round((rh - 22) / 2);
+    win(ui, x, y, w, hgt, { accent: teamColor(this.cls, loadMatch().p1Skin[this.cls], false) });
+    drawText(ui, 'START YOUR SPELL DECK FROM', x + 10, y + 8, INK);
+    const saved = loadCustom(this.cls);
+    picks.forEach((id, i) => {
+      const ry = y + 24 + i * rh, on = i === this.pickSel && showSel();
+      zone(`pick:${i}`, x + 4, ry - 2, colW, rh);
+      if (on) selRow(ui, x + 4, ry - 2, colW, rh);
+      const p = this.presets.find(q => q.id === id);
+      const name = id === 'custom' ? 'YOUR SPELL DECK' : id === 'empty' ? 'EMPTY SPELL DECK' : id === 'import' ? 'IMPORT YAML...' : p!.name.toUpperCase() + (id === 'starter' ? ' (STARTER)' : '');
+      const sub = id === 'custom' ? (saved && !validate(saved).length ? 'SAVED, READY' : `SAVED, ${deckSize(saved ?? {})}/${DECK_SIZE} SPELLS`)
+        : id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE OR PICK A FILE'
+          : `MYTHIC: ${(this.cards.find(c => c.id === p!.mythic)?.name ?? '').toUpperCase()}`;
+      drawText(ui, name, x + 22, ry + 2 + ro, on ? INK : INK2);
+      drawText(ui, sub, x + 22, ry + 11 + ro, p ? ink(RARITY_COLOR.mythic) : TRIM);
+    });
+    // the hovered choice's list
+    const lx = x + colW + 16, id = showSel() ? picks[this.pickSel] : undefined;
+    P(ui, BURN, lx - 8, y + 22, 1, hgt - 30);
+    const list = id === 'custom' ? saved ?? {} : this.presets.find(q => q.id === id)?.cards ?? {};
+    const cards = this.cards.filter(c => list[c.id]);
+    if (!id) drawText(ui, 'TOUCH A SPELL DECK TO SEE IT', lx, y + 24, INK2);
+    else if (id === 'import') ['PASTE A SPELL DECK OR PICK A', '.YAML FILE. IMPORTS THAT', 'BREAK A DECK RULE ARE', 'REFUSED. YAML IN THE', 'HEADER EXPORTS YOUR DECK.'].forEach((l, i) => drawText(ui, l, lx, y + 24 + i * 11, INK2));
+    else if (!cards.length && id !== 'import') drawText(ui, id === 'empty' ? 'NO SPELLS YET' : 'YOUR SPELL DECK IS EMPTY', lx, y + 24, INK2);
+    cards.forEach((c, i) => drawText(ui, `${list[c.id]}X ${c.name.toUpperCase()}`, lx, y + 24 + i * 11, c.rarity === 'common' ? INK2 : ink(RARITY_COLOR[c.rarity])));
+    if (id && id !== 'custom' && picks[0] === 'custom') drawText(ui, 'REPLACES YOUR SAVED SPELL DECK', lx, y + hgt - 14, RED_INK);
+    hint(ui, `HOVER TO SEE A SPELL DECK   CLICK: START FROM IT   RIGHT-CLICK: BACK`);
   }
 }
 
