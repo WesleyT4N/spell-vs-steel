@@ -3,6 +3,7 @@
 // Menus themselves take taps on the canvas (see the finger handling in input.ts).
 import { virtualKey, releaseVirtual, getKey, keyName, type Bindable } from './input';
 import { view, spread } from './gfx';
+import { getSave, setSave } from './save';
 
 /** What the current screen needs: nothing, a back button, or the fight pad (`fight-ready` lights DRAW). */
 export type PadMode = 'none' | 'back' | 'fight' | 'fight-ready';
@@ -62,25 +63,25 @@ const root = el('div', 'svs-pad');
 root.hidden = true;
 document.body.appendChild(root);
 
-// ---------- touch settings (Options > Touch controls), saved in the browser ----------
+// ---------- touch settings (Options > Touch controls), kept in the save ----------
 export type PadSize = 'S' | 'M' | 'L';
 export interface TouchSettings { size: PadSize; left: boolean; buzz: boolean }
 const SIZE_K: Record<PadSize, number> = { S: 0.82, M: 1, L: 1.16 };
-const touchSettings: TouchSettings = { size: 'M', left: false, buzz: true };
-try {
-  const saved = JSON.parse(localStorage.getItem('svs:touch') || '{}') as Partial<TouchSettings>;
-  if (saved.size === 'S' || saved.size === 'M' || saved.size === 'L') touchSettings.size = saved.size;
-  if (typeof saved.left === 'boolean') touchSettings.left = saved.left;
-  if (typeof saved.buzz === 'boolean') touchSettings.buzz = saved.buzz;
-} catch { /* storage blocked */ }
-export const getTouchSettings = (): Readonly<TouchSettings> => touchSettings;
+/** The saved settings, checked field by field (old or hand-edited saves fall back to the defaults). */
+export function getTouchSettings(): Readonly<TouchSettings> {
+  const t = getSave('touch') ?? {};
+  return {
+    size: t.size === 'S' || t.size === 'L' ? t.size : 'M',
+    left: t.left === true,
+    buzz: t.buzz !== false,
+  };
+}
 export function setTouchSettings(to: Partial<TouchSettings>): void {
-  Object.assign(touchSettings, to);
-  try { localStorage.setItem('svs:touch', JSON.stringify(touchSettings)); } catch { /* storage blocked */ }
+  setSave('touch', { ...getTouchSettings(), ...to });
   layout();
 }
 
-const buzz = (): void => { if (!touchSettings.buzz) return; try { navigator.vibrate?.(8); } catch { /* not allowed */ } };
+const buzz = (): void => { if (!getTouchSettings().buzz) return; try { navigator.vibrate?.(8); } catch { /* not allowed */ } };
 
 /** A button that holds a Pad code down while a finger is on it. */
 function holdButton(e: HTMLElement, code: string): void {
@@ -229,6 +230,7 @@ export function layout(canvas = canvasEl): void {
   canvasEl = canvas;
   document.documentElement.classList.toggle('svs-touch', active);
   if (!canvas) return;
+  const touchSettings = getTouchSettings();
   const full = canvas.getBoundingClientRect();
   // a full-height phone screen keeps the game in its top part (as tall as the half-screen layout) and the pad below it
   const screen = spread.tall ? new DOMRect(full.left, full.top, full.width, full.height * spread.halfH / view.h) : full;
