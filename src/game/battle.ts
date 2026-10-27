@@ -193,7 +193,7 @@ export interface Mark { col: number; row: number; t: number; color: string }
 /** A danger telegraph: a panel an area spell is about to hit. Every class's area spells use the same flash (BN style). */
 /** How a telegraph looks, after Battle Network: a panel flash (area attacks), a crosshair (lock-on shots) or a landing shadow (lobs). */
 export type WarnKind = 'flash' | 'reticle' | 'shadow';
-export interface Warn { col: number; row: number; t: number; dur: number; side: Side; kind: WarnKind; follow?: Side }
+export interface Warn { col: number; row: number; t: number; dur: number; side: Side; kind: WarnKind }
 /** A hidden Ranger trap. Only its owner sees it. */
 /** Traps last until the next Draw screen. A Tripwire is one trap per panel of a column, sharing a `group`. */
 export interface Trap { side: Side; col: number; row: number; arm: number; kind: 'freeze' | 'explode' | 'mine' | 'blast' | 'wire'; group?: number; fired?: boolean }
@@ -368,14 +368,9 @@ export class Battle {
     for (const [col, row] of cells) if (this.inGrid(col, row)) this.warns.push({ col, row, t: delay, dur: delay, side, kind });
     if (hit) this.later(delay, hit);
   }
-  /** A crosshair that rides `target` for `delay` seconds (a shot that will find them wherever they are). */
-  reticle(att: Fighter, target: Fighter, delay: number): void {
-    this.warns.push({ col: target.col, row: target.row, t: delay, dur: delay, side: att.side, kind: 'reticle', follow: target.side });
-  }
-  /** Is this panel about to be hit by `side`'s enemy? Lob shadows and following crosshairs don't count: stepping aside doesn't dodge
-   *  a crosshair, and a lob is a shot you read from the air, like BN's bombs. */
+  /** Is this panel about to be hit by `side`'s enemy? Lob shadows don't count: a lob is a shot you read from the air, like BN's bombs. */
   warned(col: number, row: number, side?: Side): boolean {
-    return this.warns.some(w => w.col === col && w.row === row && w.side !== side && w.kind !== 'shadow' && w.follow === undefined);
+    return this.warns.some(w => w.col === col && w.row === row && w.side !== side && w.kind !== 'shadow');
   }
   text(f: Fighter, s: string, color: string): void {
     this.texts.push({ x: f.col, y: f.row, text: s, color, t: 0 });
@@ -469,10 +464,7 @@ export class Battle {
     this.anims = this.anims.filter(a => a.t < a.dur);
     for (const m of this.marks) m.t -= dt;
     this.marks = this.marks.filter(m => m.t > 0);
-    for (const w of this.warns) {
-      w.t -= dt;
-      if (w.follow !== undefined) { const f = this.f[w.follow]; w.col = f.col; w.row = f.row; }
-    }
+    for (const w of this.warns) w.t -= dt;
     this.warns = this.warns.filter(w => w.t > 0);
 
     this.updatePanels(dt);
