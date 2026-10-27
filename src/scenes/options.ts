@@ -1,4 +1,4 @@
-import { setScene, hint, zone, hot, listMouse, showSel, type Scene } from './scene';
+import { pushScene, popScene, hint, zone, hot, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { P, UW, screenRect, vy, vspan, type Ctx } from '../engine/gfx';
@@ -46,7 +46,7 @@ const rowY = (i: number): number => Y0 + i * RH + (i >= 8 ? 10 : 0);
 /** Audio settings and a door to the key mapping screen. Settings save in the browser. */
 export class OptionsScene implements Scene {
   sel = 0;
-  constructor(private back: () => void) {}
+  constructor(private back: () => void = popScene) {}
 
   update(dt: number): void {
     if (navPressed('up', dt)) { this.sel = (this.sel + ROWS.length - 1) % ROWS.length; sfx('move'); }
@@ -88,7 +88,7 @@ export class OptionsScene implements Scene {
     const toggle = ok || l || r;
     if (toggle && (row === 'musicOn' || row === 'sfxOn')) { setAudioSettings({ [row]: !s[row] }); sfx('select'); }
     if (toggle && row === 'mute') { toggleMute(); sfx('select'); }
-    if (ok && row === 'keys') { sfx('select'); setScene(new ControlsScene(() => setScene(this))); }
+    if (ok && row === 'keys') { sfx('select'); pushScene(new ControlsScene()); }
     if (ok && row === 'back') { sfx('back'); this.back(); }
   }
 

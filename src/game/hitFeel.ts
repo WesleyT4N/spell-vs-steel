@@ -1,8 +1,8 @@
 // Hit feel: a directional screen kick and a short hit-stop freeze on solid hits.
 // Render-only. The battle keeps running underneath a freeze (the screen just holds the impact frame), so nothing here
-// touches the rules and lockstep online play stays in sync.
+// touches the rules and online play (rollback included) stays in sync.
 import type { Ctx } from '../engine/gfx';
-import type { Battle, Fx } from './battle';
+import type { Battle } from './battle';
 
 /** Seconds the picture holds on an impact, by hit tier (light, solid, big, KO). */
 const STOP = [0, 0.06, 0.1, 0.22];
@@ -11,11 +11,11 @@ const KICK = [0, 2, 3, 4];
 /** After a freeze, hits this soon after don't freeze again (a flurry would stutter). */
 const STOP_GAP = 0.12;
 
-interface Feel { seen: WeakSet<Fx>; stopFrom: number; stopUntil: number; snap: HTMLCanvasElement | null; kick: number; kickT: number; kickDir: number }
+interface Feel { seen: Map<string, number>; stopFrom: number; stopUntil: number; snap: HTMLCanvasElement | null; kick: number; kickT: number; kickDir: number }
 const feels = new WeakMap<Battle, Feel>();
 const feelOf = (b: Battle): Feel => {
   let f = feels.get(b);
-  if (!f) { f = { seen: new WeakSet(), stopFrom: -9, stopUntil: -9, snap: null, kick: 0, kickT: -9, kickDir: 1 }; feels.set(b, f); }
+  if (!f) { f = { seen: new Map(), stopFrom: -9, stopUntil: -9, snap: null, kick: 0, kickT: -9, kickDir: 1 }; feels.set(b, f); }
   return f;
 };
 
@@ -55,11 +55,15 @@ export function noteImpacts(c: Ctx, b: Battle, stop: boolean): void {
   const f = feelOf(b);
   let best = -1, dir = 1;
   for (const e of b.fx) {
-    if (e.kind !== 'impact' || f.seen.has(e)) continue;
-    f.seen.add(e);
+    if (e.kind !== 'impact') continue;
+    // keyed by when and where the hit landed, not by object: a rollback resimulates the same hit as a new fx
+    const at = b.time - e.t, key = `${at.toFixed(3)}|${e.side}|${e.col}|${e.row}`;
+    if (f.seen.has(key)) continue;
+    f.seen.set(key, at);
     const tier = Number(e.data?.tier ?? 0);
     if (tier > best) { best = tier; dir = e.side === 0 ? 1 : -1; }
   }
+  for (const [key, at] of f.seen) if (b.time - at > 1 || at - b.time > 1) f.seen.delete(key);
   if (best <= 0) return;
   if (KICK[best] >= f.kick || b.time - f.kickT > 0.12) { f.kick = KICK[best]; f.kickT = b.time; f.kickDir = dir; }
   if (!stop || b.time < f.stopUntil + STOP_GAP && best < 3) return;

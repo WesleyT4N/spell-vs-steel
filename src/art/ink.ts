@@ -1,6 +1,6 @@
 // The "Inked" stage toolkit: scenery drawn like the 24px fighters. Every piece gets a 1px outline in a dark
 // ink of its own material, shading is flat 3-5 tone bands (no dithering, no noise), and gradients step in hard bands.
-import { P, W, H, clamp, mix, type Ctx } from '../engine/gfx';
+import { P, W, H, clamp, mix, pixels, type Ctx } from '../engine/gfx';
 
 /** Paint into a transparent layer, then trace a 1px outline around everything opaque. */
 export function inked(ink: string | null, fn: (c: Ctx) => void, w = W, h = H): HTMLCanvasElement {
@@ -120,10 +120,12 @@ export function inkBanner(c: Ctx, x: number, y: number, w: number, h: number, cl
   for (let i = 0; i < h; i++) {
     const off = Math.round(Math.sin(t * 0.5 + i * 0.35 + x) * 0.6);
     const tail = i >= h - 3 ? h - i : 0;
+    const row = pixels(c);
     for (let j = -1; j <= w; j++) {
       if (tail && j >= tail - 1 && j < w - tail + 1) continue;
-      P(c, j === -1 || j === w ? ink : j < 3 ? cloth[2] : j > w - 3 ? cloth[0] : cloth[1], x + off + j, y + i);
+      row.px(j === -1 || j === w ? ink : j < 3 ? cloth[2] : j > w - 3 ? cloth[0] : cloth[1], x + off + j, y + i);
     }
+    row.done();
     if (i === 3) P(c, gold[2], x + off, y + i, w, 1);
     if (i >= 7 && i <= 10) { P(c, gold[1], x + off + 3, y + i, w - 6, 1); if (i === 8 || i === 9) P(c, gold[2], x + off + 4, y + i, w - 8, 1); }
   }

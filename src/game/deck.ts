@@ -1,4 +1,5 @@
-// Grimoire rules, starter decks and browser storage for custom decks.
+// Spell deck rules, starter decks and browser storage for custom decks.
+import { getSave, updateSave, saveIsReadOnly } from '../engine/save';
 import { CARDS, MAX_COPIES, type CardDef } from './cards';
 import type { ClassId } from '../art/sprites';
 
@@ -221,18 +222,15 @@ export function validate(d: DeckCounts): string[] {
 
 export const toList = (d: DeckCounts): string[] => Object.entries(d).flatMap(([id, n]) => Array(n).fill(id));
 
-const KEY = (cls: ClassId): string => `svs:deck:${cls}`;
-
 export function loadCustom(cls: ClassId): DeckCounts | null {
-  try {
-    const raw = localStorage.getItem(KEY(cls));
-    if (!raw) return null;
-    const d = JSON.parse(raw) as DeckCounts;
-    for (const id of Object.keys(d)) if (!CARDS[id] || CARDS[id].cls !== cls) delete d[id];
-    return d;
-  } catch { return null; }
+  const saved = getSave('decks')[cls];
+  if (!saved) return null;
+  const d: DeckCounts = {};
+  for (const [id, n] of Object.entries(saved)) if (CARDS[id]?.cls === cls) d[id] = n;
+  return d;
 }
 
 export function saveCustom(cls: ClassId, d: DeckCounts): boolean {
-  try { localStorage.setItem(KEY(cls), JSON.stringify(d)); return true; } catch { return false; }
+  updateSave('decks', all => ({ ...all, [cls]: { ...d } }));
+  return !saveIsReadOnly();
 }

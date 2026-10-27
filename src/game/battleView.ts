@@ -1,6 +1,6 @@
 // Draws a Battle: arena, panels, fighters, spell effects and the HUD.
 import { k } from '../engine/input';
-import { drawPanel, drawStage, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, TEAM_RIM, type PanelState } from '../art/arena';
+import { drawPanel, drawHole, drawStage, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState, type PanelTint } from '../art/arena';
 import { getStage } from '../art/stages';
 import type { Stage } from '../art/arena';
 import { getSprite, getFrame, drawFighterSprite, drawFighterPosed, teamColor, type Tint } from '../art/sprites';
@@ -43,8 +43,11 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
   // panels
   for (let r = 0; r < 3; r++) for (let col = 0; col < 6; col++) {
     const p = b.panels[col][r];
-    if (p.hole > 0) { drawHole(c, col, r, p.owner); continue; }
-    const state: PanelState = p.burn > 0 ? 'burning' : p.cracked ? 'cracked' : 'clean';
+    const holeAge = since(b, 'hole', col, r, p.hole > 0), crackAge = since(b, 'crack', col, r, p.cracked && p.hole <= 0);
+    // a broken panel blinks back in over its last 0.8s, like BN
+    if (p.hole > 0 && !(p.hole < 0.8 && Math.floor(p.hole * 10) % 2 === 0)) { drawHole(c, col, r, p.owner, a, holeAge); continue; }
+    const state: PanelState = p.hole > 0 ? 'clean' : p.burn > 0 ? 'burning' : p.cracked ? 'cracked' : 'clean';
+    const tint: PanelTint | undefined = p.hole > 0 ? undefined : p.burn > 0 ? 'fire' : p.toxic > 0 ? 'poison' : p.curse > 0 ? 'shadow' : p.bless > 0 ? 'holy' : undefined;
     const mark = b.marks.find(m => m.col === col && m.row === r);
     let hl = mark && Math.floor(b.time * 10) % 2 ? mark.color : undefined;
     const warn = warnFlash(b, col, r);
@@ -55,7 +58,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
         if (f.st.frostNova > 0 && !f.frostNovaUsed && p.owner !== f.side && Math.abs(col - f.col) <= TUNING.frostNovaRange) hl = '#a4e4fc';
       }
     }
-    drawPanel(c, col, r, state, tick, p.owner, hl, a);
+    drawPanel(c, col, r, state, tick, p.owner, hl, a, { crackAge, tint, time: b.time });
   }
   // Frost Nova / Glacial zones get a frosty tint on the trigger columns
   for (const f of b.f) {
@@ -84,6 +87,19 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
   drawParticles(c, b);
   c.restore();
   noteImpacts(c, b, hitStop);
+}
+
+/** When each panel's crack and hole appeared, in battle time: view-only, for the crack-in and crumble animations. */
+const panelT = new WeakMap<Battle, Record<'crack' | 'hole', number[]>>();
+/** Seconds since a panel's crack or hole appeared (0 the frame it is first drawn). */
+function since(b: Battle, kind: 'crack' | 'hole', col: number, row: number, on: boolean): number {
+  let m = panelT.get(b);
+  if (!m) panelT.set(b, m = { crack: [], hole: [] });
+  const i = col * 3 + row, t0 = m[kind][i];
+  if (!on) { m[kind][i] = NaN; return 9; }
+  // a rewound battle (training reset) starts the clock again
+  if (t0 === undefined || Number.isNaN(t0) || t0 > b.time) { m[kind][i] = b.time; return 0; }
+  return b.time - t0;
 }
 
 /** Area-spell telegraph colors: the whole panel flashes, and a rim stays lit between flashes. */
@@ -115,8 +131,7 @@ function drawPanelEffects(c: Ctx, b: Battle, col: number, row: number, tick: num
   const pc = panelCenter(col, row);
   if (p.burn > 0) drawBurn(c, b, col, row);
   if (p.toxic > 0) {
-    // bubbles rising out of a green haze
-    c.globalAlpha = 0.35; P(c, TOX[1], pc.x - PW / 2 + 3, pc.y - 4, PW - 6, 8); c.globalAlpha = 1;
+    // bubbles rising off the sludge (the green face comes from drawPanel)
     for (let i = 0; i < 4; i++) {
       const t = (b.time * 0.9 + i / 4 + col * 0.13) % 1;
       P(c, t > 0.7 ? TOX[3] : TOX[2], pc.x - 12 + i * 7, pc.y + 2 - Math.floor(t * 12), 2, 2);
@@ -141,8 +156,7 @@ function drawPanelEffects(c: Ctx, b: Battle, col: number, row: number, tick: num
     P(c, pal[0], pc.x - PW / 2 + 3, pc.y + 4, PW - 6, 1);
   }
   if (p.curse > 0) {
-    // a dark-purple haze with shadow motes sinking into it
-    c.globalAlpha = 0.4; P(c, SHADOW[0], pc.x - PW / 2 + 3, pc.y - 3, PW - 6, 8); c.globalAlpha = 1;
+    // shadow motes sinking into the cursed face (the purple face comes from drawPanel)
     for (let i = 0; i < 4; i++) {
       const t = (b.time * 0.8 + i / 4 + col * 0.17) % 1;
       P(c, t > 0.6 ? SHADOW[1] : SHADOW[2], pc.x - 11 + i * 7, pc.y - 10 + Math.floor(t * 12), 2, 2);
@@ -244,13 +258,6 @@ const HAWK_DOWN = [
 const HAWK_COL: Record<string, string> = { b: '#ac7c00', h: '#f8d878', w: '#fcfcfc', e: '#f8b800', k: '#503000' };
 function drawHawk(c: Ctx, x: number, y: number, d: number, up: boolean): void {
   drawPix(c, up ? HAWK_UP : HAWK_DOWN, HAWK_COL, x, y + 4, d);
-}
-
-function drawHole(c: Ctx, col: number, row: number, owner: 0 | 1): void {
-  const x = X0 + col * PW, y = Y0 + row * (FACE + LIP);
-  P(c, '#000000', x, y - 1, PW, FACE + LIP + 1);
-  P(c, TEAM_RIM[owner][1], x + 1, y, PW - 2, 1);
-  P(c, '#1a1218', x + 3, y + 2, PW - 6, FACE - 2);
 }
 
 function drawWall(c: Ctx, w: Wall, time: number): void {
@@ -717,13 +724,13 @@ function drawCastCallout(ui: Ctx, e: Fx): void {
   ui.save();
   ui.globalAlpha = Math.max(0, fade);
   win(ui, x, y, w, h, { accent: ELEMENT_COLOR[card.element], burn: 4 });
-  drawCardIcon(ui, card, x + 7, y + 10, 32);
-  const tx = x + 45;
+  drawCardIcon(ui, card, x + 7, y + 11, 40);
+  const tx = x + 52;
   drawText(ui, card.name.toUpperCase(), tx, y + 9, INK);
   const info = CLASS_INFO[card.cls];
   const meta = `${card.cost === 'all' ? 'ALL' : card.cost} ${info.res}${card.dmg !== '-' ? `  DMG ${card.dmg.toUpperCase()}` : ''}`;
   drawText(ui, meta, tx, y + 19, RES_INK[info.res]);
-  wrap(card.short.toUpperCase(), Math.floor((w - 52) / 6)).slice(0, 3).forEach((l, i) => drawText(ui, l, tx, y + 30 + i * 9, INK2));
+  wrap(card.short.toUpperCase(), Math.floor((w - 58) / 6)).slice(0, 3).forEach((l, i) => drawText(ui, l, tx, y + 30 + i * 9, INK2));
   if (e.data?.countered) {
     ui.fillStyle = 'rgba(40,20,0,0.6)'; ui.fillRect(x, y, w, h);
     drawTextCentered(ui, 'COUNTERED', x + w / 2, y + h / 2 - 7, '#f878f8', 2);

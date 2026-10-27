@@ -1,6 +1,6 @@
-// Grimoire builder: 30 spells, 4/2/1 copy limits, max 5 Legendaries, exactly 1 Mythic. Autosaves to the browser.
+// Spell deck builder: 30 spells, 4/2/1 copy limits, max 5 Legendaries, exactly 1 Mythic. Autosaves to the browser.
 // Opening it (or switching class) first asks what to start from: your saved deck, a ready-made deck or an empty one.
-import { hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
+import { popScene, hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { teamColor, type ClassId } from '../art/sprites';
@@ -15,8 +15,8 @@ import { loadMatch, saveMatch } from '../game/match';
 import { PLAYABLE } from '../game/classes';
 import { drawCardDetail, drawCardFace, resInk, CARD_W, CARD_H } from './cardView';
 import { CardPreview } from './cardPreview';
-import { openGrimoirePanel } from './grimoirePanel';
-import type { Grimoire } from '../game/grimoireYaml';
+import { openDeckPanel } from './deckPanel';
+import type { SpellDeck } from '../game/deckYaml';
 import { win, selRow, plaque, ink, PAPER, BURN, INK, INK2, RED_INK, GOLD, TRIM } from './skin';
 
 const RARITY_ORDER = { common: 0, uncommon: 1, legendary: 2, mythic: 3 };
@@ -50,7 +50,7 @@ export class DeckBuilderScene implements Scene {
   /** The tile grid's window this frame, for scrolling and keeping the selection in view. */
   private grid = { top: 0, h: 0 };
 
-  constructor(public cls: ClassId, private back: () => void) {
+  constructor(public cls: ClassId, private back: () => void = popScene) {
     this.load();
   }
 
@@ -68,21 +68,21 @@ export class DeckBuilderScene implements Scene {
   /** The YAML import/export panel (a DOM overlay); while it is open the builder ignores input. */
   private openYaml(): void {
     sfx('select');
-    this.closeYaml = openGrimoirePanel({
+    this.closeYaml = openDeckPanel({
       current: { cls: this.cls, deck: this.deck },
       onImport: g => this.applyImport(g),
       onClose: () => { this.closeYaml = null; },
     });
   }
 
-  /** A legal imported grimoire replaces the saved deck of its class (switching to that class if needed). */
-  private applyImport(g: Grimoire): void {
+  /** A legal imported spell deck replaces the saved deck of its class (switching to that class if needed). */
+  private applyImport(g: SpellDeck): void {
     if (g.cls !== this.cls) { this.cls = g.cls; this.loadCards(); }
     this.deck = { ...g.deck };
     saveCustom(this.cls, this.deck);
     this.picks = null;
     this.sel = this.top; this.scroll = 0; this.tscroll = 0;
-    this.flash(`IMPORTED ${(g.name ?? 'GRIMOIRE').toUpperCase()}`);
+    this.flash(`IMPORTED ${(g.name ?? 'SPELL DECK').toUpperCase()}`);
     sfx('confirm');
   }
 
@@ -100,7 +100,7 @@ export class DeckBuilderScene implements Scene {
     const p = this.presets.find(x => x.id === id);
     if (id === 'custom') this.deck = loadCustom(this.cls) ?? {};
     else { this.deck = p ? { ...p.cards } : {}; saveCustom(this.cls, this.deck); }
-    this.flash(id === 'custom' ? 'EDITING YOUR DECK' : p ? `STARTED FROM ${p.name.toUpperCase()}` : 'EMPTY DECK');
+    this.flash(id === 'custom' ? 'EDITING YOUR SPELL DECK' : p ? `STARTED FROM ${p.name.toUpperCase()}` : 'EMPTY SPELL DECK');
     this.picks = null;
     this.sel = this.top; this.scroll = 0; this.tscroll = 0;
     sfx('select');
@@ -256,7 +256,7 @@ export class DeckBuilderScene implements Scene {
     const hy = vy(4) - 4;
     win(ui, 8, 4 + hy, UW - 16, 40, { accent: teamColor(this.cls, loadMatch().p1Skin[this.cls], false), burn: 3 });
     CLASSES.forEach((cl, i) => button(ui, `tab:${i}`, cl.toUpperCase(), 14 + i * 54, 12 + hy, 52, 14, cl === this.cls, cl === this.cls ? RED_INK : INK2));
-    drawText(ui, 'GRIMOIRE', 300, 11 + hy, INK);
+    drawText(ui, 'SPELL DECK', 300, 11 + hy, INK);
     const n = deckSize(this.deck), leg = countRarity(this.deck, 'legendary'), myth = countRarity(this.deck, 'mythic');
     drawText(ui, `SPELLS ${n}/${DECK_SIZE}`, 14, 31 + hy, n === DECK_SIZE ? '#007800' : RED_INK);
     drawText(ui, `LEGENDARY ${leg}/${MAX_LEGENDARIES}`, 104, 31 + hy, leg <= MAX_LEGENDARIES ? ink(RARITY_COLOR.legendary) : RED_INK);
@@ -280,7 +280,7 @@ export class DeckBuilderScene implements Scene {
         if (on) selRow(ui, LX + 1, y - 1, LW - 2, rh);
         const card = this.cardAt(idx);
         if (!card) {
-          drawText(ui, 'CHANGE STARTING DECK...', LX + 64, ty, on ? INK : INK2);
+          drawText(ui, 'CHANGE STARTING SPELL DECK...', LX + 64, ty, on ? INK : INK2);
           continue;
         }
         const have = this.deck[card.id] ?? 0, max = MAX_COPIES[card.rarity];
@@ -311,12 +311,12 @@ export class DeckBuilderScene implements Scene {
       const have = this.deck[card.id] ?? 0;
       this.preview.draw(ui, DX + 8, ly + 6, DW - 16, PREVIEW_H);
       const y = drawCardDetail(ui, card, DX + 8, ly + PREVIEW_H + 14, DW - 16) + 6;
-      drawText(ui, `IN DECK ${have} / ${MAX_COPIES[card.rarity]}`, DX + 8, y, have ? INK : TRIM);
+      drawText(ui, `IN SPELL DECK ${have} / ${MAX_COPIES[card.rarity]}`, DX + 8, y, have ? INK : TRIM);
     } else if (!showSel()) {
       drawText(ui, 'TOUCH A CARD TO READ IT', DX + 8, ly + 8, INK2);
     } else {
-      drawText(ui, 'START FROM YOUR DECK, A', DX + 8, ly + 8, INK2);
-      drawText(ui, 'READY-MADE DECK OR NOTHING', DX + 8, ly + 20, INK2);
+      drawText(ui, 'START FROM YOUR SPELL DECK,', DX + 8, ly + 8, INK2);
+      drawText(ui, 'A READY-MADE ONE OR NOTHING', DX + 8, ly + 20, INK2);
     }
 
     // footer
@@ -324,7 +324,7 @@ export class DeckBuilderScene implements Scene {
     const fy = ly + VISIBLE * rh + 10;
     if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, fy, '#f8b800');
     else if (errs.length) drawTextCentered(ui, errs[0], UW / 2, fy, '#f83800');
-    else drawTextCentered(ui, 'GRIMOIRE READY. SAVED IN THIS BROWSER.', UW / 2, fy, '#58d854');
+    else drawTextCentered(ui, 'SPELL DECK READY. SAVED IN THIS BROWSER.', UW / 2, fy, '#58d854');
     if (this.picks) { this.drawPicker(ui); return; }
     hint(ui, this.tiles ? 'TAP: ADD   -: REMOVE   HOLD: READ   DRAG: SCROLL' : `HOVER TO READ   CLICK: ADD   RIGHT-CLICK: REMOVE   WHEEL: SCROLL`);
   }
@@ -332,7 +332,7 @@ export class DeckBuilderScene implements Scene {
   /** Touch: the start-from button over a scrolling grid of card tiles, inside the list window (top `ly`, height `h`). */
   private drawTiles(ui: Ctx, ly: number, h: number): void {
     const bh = Math.round(18 * spread.k), on = this.sel === 0 && showSel();
-    button(ui, 'change', 'CHANGE STARTING DECK...', LX + 6, ly, LW - 12, bh, on, INK2);
+    button(ui, 'change', 'CHANGE STARTING SPELL DECK...', LX + 6, ly, LW - 12, bh, on, INK2);
     const top = ly + bh + 4, gh = h - bh - 4;
     this.grid = { top, h: gh };
     this.tscroll = Math.min(this.tscroll, this.maxTileScroll());
@@ -378,14 +378,14 @@ export class DeckBuilderScene implements Scene {
     ui.fillRect(0, ly - 6, UW, lh + 30);
     const x = 24, y = ly - 2, w = UW - 48, hgt = lh + 2, colW = 176, rh = Math.round(22 * spread.k), ro = Math.round((rh - 22) / 2);
     win(ui, x, y, w, hgt, { accent: teamColor(this.cls, loadMatch().p1Skin[this.cls], false) });
-    drawText(ui, 'START YOUR GRIMOIRE FROM', x + 10, y + 8, INK);
+    drawText(ui, 'START YOUR SPELL DECK FROM', x + 10, y + 8, INK);
     const saved = loadCustom(this.cls);
     picks.forEach((id, i) => {
       const ry = y + 24 + i * rh, on = i === this.pickSel && showSel();
       zone(`pick:${i}`, x + 4, ry - 2, colW, rh);
       if (on) selRow(ui, x + 4, ry - 2, colW, rh);
       const p = this.presets.find(q => q.id === id);
-      const name = id === 'custom' ? 'YOUR DECK' : id === 'empty' ? 'EMPTY DECK' : id === 'import' ? 'IMPORT YAML...' : p!.name.toUpperCase() + (id === 'starter' ? ' (STARTER)' : '');
+      const name = id === 'custom' ? 'YOUR SPELL DECK' : id === 'empty' ? 'EMPTY SPELL DECK' : id === 'import' ? 'IMPORT YAML...' : p!.name.toUpperCase() + (id === 'starter' ? ' (STARTER)' : '');
       const sub = id === 'custom' ? (saved && !validate(saved).length ? 'SAVED, READY' : `SAVED, ${deckSize(saved ?? {})}/${DECK_SIZE} SPELLS`)
         : id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE OR PICK A FILE'
           : `MYTHIC: ${(this.cards.find(c => c.id === p!.mythic)?.name ?? '').toUpperCase()}`;
@@ -397,12 +397,12 @@ export class DeckBuilderScene implements Scene {
     P(ui, BURN, lx - 8, y + 22, 1, hgt - 30);
     const list = id === 'custom' ? saved ?? {} : this.presets.find(q => q.id === id)?.cards ?? {};
     const cards = this.cards.filter(c => list[c.id]);
-    if (!id) drawText(ui, 'TOUCH A DECK TO SEE IT', lx, y + 24, INK2);
-    else if (id === 'import') ['PASTE A GRIMOIRE OR PICK A', '.YAML FILE. IMPORTS THAT', 'BREAK A DECK RULE ARE', 'REFUSED. YAML IN THE', 'HEADER EXPORTS YOUR DECK.'].forEach((l, i) => drawText(ui, l, lx, y + 24 + i * 11, INK2));
-    else if (!cards.length && id !== 'import') drawText(ui, id === 'empty' ? 'NO SPELLS YET' : 'YOUR DECK IS EMPTY', lx, y + 24, INK2);
+    if (!id) drawText(ui, 'TOUCH A SPELL DECK TO SEE IT', lx, y + 24, INK2);
+    else if (id === 'import') ['PASTE A SPELL DECK OR PICK A', '.YAML FILE. IMPORTS THAT', 'BREAK A DECK RULE ARE', 'REFUSED. YAML IN THE', 'HEADER EXPORTS YOUR DECK.'].forEach((l, i) => drawText(ui, l, lx, y + 24 + i * 11, INK2));
+    else if (!cards.length && id !== 'import') drawText(ui, id === 'empty' ? 'NO SPELLS YET' : 'YOUR SPELL DECK IS EMPTY', lx, y + 24, INK2);
     cards.forEach((c, i) => drawText(ui, `${list[c.id]}X ${c.name.toUpperCase()}`, lx, y + 24 + i * 11, c.rarity === 'common' ? INK2 : ink(RARITY_COLOR[c.rarity])));
-    if (id && id !== 'custom' && picks[0] === 'custom') drawText(ui, 'REPLACES YOUR SAVED DECK', lx, y + hgt - 14, RED_INK);
-    hint(ui, `HOVER TO SEE A DECK   CLICK: START FROM IT   RIGHT-CLICK: BACK`);
+    if (id && id !== 'custom' && picks[0] === 'custom') drawText(ui, 'REPLACES YOUR SAVED SPELL DECK', lx, y + hgt - 14, RED_INK);
+    hint(ui, `HOVER TO SEE A SPELL DECK   CLICK: START FROM IT   RIGHT-CLICK: BACK`);
   }
 }
 
