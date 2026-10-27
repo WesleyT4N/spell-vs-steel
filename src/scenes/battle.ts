@@ -380,7 +380,7 @@ export class BattleScene implements Scene {
     const b = this.b;
     // one player sees their side's hidden things (traps, stealth); sharing a screen or watching, everything shows
     const shared = this.humans.length !== 1;
-    drawBattle(c, b, tick, shared ? 'all' : this.me);
+    drawBattle(c, b, tick, shared ? 'all' : this.me, true);
     if (b.phase !== 'custom') {
       if (!shared) drawBattleUi(ui, b, tick, this.me);
       else drawBattleUi(ui, b, tick, 0, this.twoPlayer
