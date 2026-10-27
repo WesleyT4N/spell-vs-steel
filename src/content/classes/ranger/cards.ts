@@ -1,9 +1,5 @@
 // Ranger kit (design doc, 2026-10-25). Arrows, hidden traps and companions; Energy comes from standing still.
-import type { Battle, CastCtx, Fighter, Trap } from './battle';
-import type { CardDef } from './cards';
-import { shuffle } from './rng';
-import { allEnemyPanels, sameRow } from './cardUtil';
-import { TUNING } from './tuning';
+import { type Battle, type CastCtx, type Fighter, type Trap, type CardDef, shuffle, allEnemyPanels, sameRow, TUNING } from '../../api';
 
 /** Hide a trap on a panel until the next Draw screen. It arms after `arm` seconds and only its owner can see it.
  *  Blessed panels refuse traps. */
