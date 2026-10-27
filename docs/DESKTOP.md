@@ -46,7 +46,7 @@ screen has QUIT (it saves first).
 
 ## Android app
 
-- `capacitor.config.json` + `android/`: the Capacitor project (fullscreen, black splash, Warrior icon).
+- `capacitor.config.json` + `android/`: the Capacitor project (fullscreen, black splash with the logo, logo icon).
 - `src/platform/capacitor.ts`: the hardware Back button acts like Esc (BACK in menus, pause in a fight),
   QUIT closes the app, and pause/resume drive the game's background handling.
 - Saves are the web version (localStorage in the app's WebView), so they survive APK updates.
@@ -58,5 +58,5 @@ screen has QUIT (it saves first).
   no background throttling so an alt-tabbed online match keeps stepping).
 - `electron/preload.cjs`: gives the game its desktop platform (`window.svsNative`): QUIT and window
   fullscreen. See [PLATFORM.md](PLATFORM.md).
-- `build/icon.png`: app icon (the Warrior sprite, 10x nearest-neighbour).
+- `build/icon.png`: app icon (the logo cut square: SPELL / VS shield / STEEL on blue | red). The Android icons in `android/app/src/main/res` use the same art.
 - `package.json` `build` key: electron-builder settings.
