@@ -23,6 +23,8 @@ import { win, RED_INK, INK2 } from './skin';
 const roundSeed = (seed: number, r: number): number => (seed + Math.imul(r, 0x9e3779b9)) >>> 0;
 
 export class OnlineBattleScene extends BattleScene {
+  /** The match runs on in the background for the other player, so going away doesn't open the pause menu. */
+  suspend(): void { /* keep playing */ }
   ls: Netplay;
   /** The replay records agreed frames only (a guessed frame may be undone). */
   private tape: TapeWriter;

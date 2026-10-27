@@ -24,7 +24,7 @@ import { TrainingScene } from './training';
 import { ArcadeLadderScene } from './arcade';
 import { newRun, loadRecords, clock } from '../game/arcade';
 import { useStage } from '../game/battleView';
-import { STAGE_IDS } from '../art/stages';
+import { STAGE_IDS } from '../content/stages';
 import type { PadMode } from '../engine/touch';
 import { bigButton, actionBar, barTapped, swipeIn, tallArea, dots, TAP, GAP, PAD } from './touchUi';
 

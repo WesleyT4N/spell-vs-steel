@@ -560,6 +560,9 @@ export class TutorialScene implements Scene {
   // phones in portrait: the lesson fight on top, its pages, the Draw screen and the pad below
   tall(): boolean { return true; }
   split(): boolean { return true; }
+  suspend(): void {
+    if (!this.paused && !this.done && this.b.phase === 'fight') { this.paused = true; this.pauseSel = 0; resetSel(); this.quiet(); }
+  }
 
   pad(): PadMode {
     if (this.paused) return spread.tall ? 'none' : 'back';

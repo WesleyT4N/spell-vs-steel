@@ -4,7 +4,9 @@ import { drawStage } from '../art/arena';
 import { UW, screenRect, vy, vspan, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, BINDABLE, getKey, setKey, resetKeys, keyName, k, captureNextKey, RESERVED, mouse, type Bindable,
-  LOCAL_ACTS, getP2Key, setP2Key, resetP2Keys, type LocalAct } from '../engine/input';
+  LOCAL_ACTS, getP2Key, setP2Key, resetP2Keys, type LocalAct,
+  getPadButton, getP2PadButton, setPadButton, resetPads, padReserved } from '../engine/input';
+import { parsePad, padName, padCount } from '../engine/gamepad';
 import { sfx } from '../engine/audio';
 import { win, selRow, plaque, PAPER, INK, INK2, RED_INK, BLUE_INK, TRIM } from './skin';
 
@@ -15,10 +17,13 @@ const LABELS: Record<Bindable, string> = {
 /** Tabs: player 1's keys (used everywhere), then player 2's for two players on one keyboard in Versus. */
 const TABS = ['PLAYER 1', 'PLAYER 2'] as const;
 type Row = Bindable | 'reset' | 'back';
-const PX = 64, PW = UW - 128, Y0 = 64, RH = 18;
+const PX = 64, PW = UW - 128, Y0 = 64, RH = 18, KEY_X = 232, PAD_X = 330;
 const TY = 40, TW = 104, TGAP = 8, TX0 = Math.round(UW / 2 - (TABS.length * TW + (TABS.length - 1) * TGAP) / 2);
 
-/** Rebinding screen: pick an action, press the new key. Tabs switch between player 1's and player 2's keys. */
+/**
+ * Rebinding screen: pick an action, then press the new key or pad button (whichever you press is the one that
+ * changes). Tabs switch between player 1's and player 2's keys and buttons.
+ */
 export class ControlsScene implements Scene {
   sel = 0;
   tab = 0;
@@ -54,6 +59,7 @@ export class ControlsScene implements Scene {
     if (row === 'back') { sfx('back'); this.back(); return; }
     if (row === 'reset') {
       if (this.tab === 0) resetKeys(); else resetP2Keys();
+      resetPads(this.tab as 0 | 1);
       sfx('select'); this.flash('DEFAULTS RESTORED');
       return;
     }
@@ -63,6 +69,14 @@ export class ControlsScene implements Scene {
     captureNextKey(code => {
       this.waiting = false;
       if (code === 'Escape') { sfx('back'); return; }
+      const pad = parsePad(code);
+      if (pad) {
+        if (pad.button === 'Back') { sfx('back'); return; }
+        if (padReserved(pad.button, row as Bindable)) { sfx('deny'); this.flash(`${padName(pad.button)} IS RESERVED`); return; }
+        setPadButton(tabAt as 0 | 1, row as Bindable, pad.button);
+        sfx('select');
+        return;
+      }
       // player 1's pause key pauses for both players in Versus, so player 2 can't take it
       if (RESERVED.has(code) || (tabAt === 1 && code === getKey('pause'))) { sfx('deny'); this.flash(`${keyName(code)} IS RESERVED`); return; }
       if (tabAt === 0) setKey(row as Bindable, code);
@@ -98,18 +112,20 @@ export class ControlsScene implements Scene {
         return;
       }
       drawText(ui, LABELS[row], PX + 10, ty, on ? INK : INK2);
-      const key = this.tab === 0 ? getKey(row) : getP2Key(row as LocalAct);
-      const v = on && this.waiting ? (tick % 4 < 3 ? 'PRESS A KEY' : '') : keyName(key);
-      drawText(ui, v, 240, ty, on && this.waiting ? RED_INK : BLUE_INK);
+      if (on && this.waiting) { if (tick % 4 < 3) drawText(ui, 'PRESS A KEY OR BUTTON', KEY_X, ty, RED_INK); return; }
+      drawText(ui, keyName(this.tab === 0 ? getKey(row) : getP2Key(row as LocalAct)), KEY_X, ty, BLUE_INK);
+      drawText(ui, padName(this.tab === 0 ? getPadButton(row) : getP2PadButton(row as LocalAct)), PAD_X, ty, BLUE_INK);
     });
+    drawText(ui, 'KEY', KEY_X, vy(Y0 - 8), TRIM);
+    drawText(ui, padCount() ? 'PAD' : 'PAD (NONE)', PAD_X, vy(Y0 - 8), TRIM);
     if (this.tab === 0) {
       drawText(ui, `HOLD ${k('attack')}: HEAVY ATTACK    ${k('cast')} + DIRECTION: AIM SPELL`, PX, vy(262), TRIM);
       drawText(ui, 'ARROWS ALSO MOVE (NOT IN 2P VERSUS)   ESC: PAUSE   M: MUTE', PX, vy(262) + 12, TRIM);
     } else {
-      drawText(ui, 'FOR TWO PLAYERS ON ONE KEYBOARD IN VERSUS', PX, vy(262), TRIM);
+      drawText(ui, 'FOR TWO PLAYERS IN VERSUS: PAD 2 PLAYS PLAYER 2', PX, vy(262), TRIM);
       drawText(ui, `NUMPAD ALSO WORKS: 8456 MOVE, 1 2 3   ${keyName(getKey('pause'))}/ESC: PAUSE`, PX, vy(262) + 12, TRIM);
     }
     if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, vy(262) + 26, RED_INK, 1, false);
-    hint(ui, this.waiting ? 'PRESS A KEY   ESC: CANCEL' : `CLICK A ROW OR ${k('attack')}: REBIND   ←/→: TAB   ${k('cast')} / RIGHT-CLICK: BACK`);
+    hint(ui, this.waiting ? 'PRESS A KEY OR PAD BUTTON   ESC / SELECT: CANCEL' : `CLICK A ROW OR ${k('attack')}: REBIND   ←/→: TAB   ${k('cast')} / RIGHT-CLICK: BACK`);
   }
 }

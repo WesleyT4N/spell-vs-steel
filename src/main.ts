@@ -1,7 +1,8 @@
 import { W, H, UW, UH, P, view, setView, viewSize, splitLift, screenRect, spread, MIN_ASPECT, PORTRAIT_MIN_ASPECT, TALL_MIN_ASPECT } from './engine/gfx';
 import { drawTextCentered } from './engine/font';
-import { initInput, endFrame, wasPressed, page } from './engine/input';
-import { toggleMute } from './engine/audio';
+import { initInput, endFrame, wasPressed, page, pollInput, releaseAll } from './engine/input';
+import { toggleMute, setAudioSuspended } from './engine/audio';
+import { platform } from './platform';
 import { setScene, setHome, goHome, getScene, commitZones, hotZone, noteTouch, liveZones, shiftZones } from './scenes/scene';
 import { TitleScene } from './scenes/title';
 import { OnlineScene } from './scenes/online';
@@ -76,10 +77,13 @@ initInput(canvas);
 // battles speak through events; the game plays them
 setDefaultSink(playBattleEvent);
 // Inside an embedded frame, keys only arrive after the page gets focus.
-let engaged = false;
-const engage = (): void => { engaged = page.engaged = true; canvas.focus(); };
+// (a gamepad press engages too: pads read without focus)
+const engage = (): void => { page.engaged = true; canvas.focus(); };
 window.addEventListener('pointerdown', engage);
-window.addEventListener('keydown', () => { engaged = page.engaged = true; });
+window.addEventListener('keydown', () => { page.engaged = true; });
+// in the background: let go of held keys, hush the audio and let the screen pause itself (single-player fights do)
+platform.lifecycle.onHide(() => { releaseAll(); setAudioSuspended(true); getScene()?.suspend?.(); });
+platform.lifecycle.onShow(() => setAudioSuspended(false));
 // a shared online link (?room=CODE) goes straight to joining that room
 const room = new URLSearchParams(location.search).get('room');
 // the title is always the bottom of the scene stack: BACK from the first screen lands there
@@ -99,6 +103,7 @@ function frame(now: number): void {
   last = now;
   while (acc >= STEP) {
     acc -= STEP;
+    pollInput();
     if (wasPressed('mute')) toggleMute();
     noteTouch();
     getScene()?.update(STEP);
@@ -131,7 +136,7 @@ function frame(now: number): void {
     ui.setTransform(1, 0, 0, 1, view.ox * 2, view.oy * 2);
     scene.drawBelow?.(ui, tick);
   } else scene?.draw(world, tick, ui);
-  if (!engaged) {
+  if (!page.engaged) {
     const [sx, , sw] = screenRect(2);
     P(ui, '#000000', sx, 128, sw, 30);
     drawTextCentered(ui, touchText('CLICK HERE TO START'), UW / 2, 133, tick % 8 < 6 ? '#f8b800' : '#fcfcfc', 1, false);

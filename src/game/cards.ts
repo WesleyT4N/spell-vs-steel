@@ -175,10 +175,9 @@ const warrior: CardDef[] = [
     cast: x => {
       const col = x.b.frontCol(x.foe.side);
       const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
-      x.b.warn(x.f, cells, TUNING.warnTime, () => {
-        x.b.addFx('wide', x.f.side, col, 1, 0.3);
-        x.b.strike(x.f, cells, 90 * x.mult, { spell: true, element: 'steel' });
-      });
+      // BN WideSword: a sword swing lands instantly, no warning
+      x.b.addFx('wide', x.f.side, col, 1, 0.3);
+      x.b.strike(x.f, cells, 90 * x.mult, { spell: true, element: 'steel' });
     },
     ai: (b, f) => b.foe(f).col === b.frontCol(b.foe(f).side),
   },
@@ -460,7 +459,8 @@ const mage: CardDef[] = [
     id: 'flamestrike', name: 'Flamestrike', cls: 'mage', cost: 3, rarity: 'uncommon', element: 'fire', damaging: true, lock: 0.35,
     dmg: '155', short: 'After 1s, a fire pillar hits their panel and sets that whole column burning.',
     cast: x => {
-      x.b.warn(x.f, [[x.foe.col, x.foe.row]], 1);
+      // BN Canodumb style: a crosshair locks onto their panel, then the pillar comes down
+      x.b.warn(x.f, [[x.foe.col, x.foe.row]], 1, undefined, 'reticle');
       targeted(x, 1, (c, r) => {
         x.b.addFx('pillar', x.f.side, c, r, 0.45);
         x.b.sound('explode');
@@ -547,10 +547,9 @@ const mage: CardDef[] = [
       const c1 = b.frontCol(foe.side), c2 = c1 + x.dir;
       const cells: Array<[number, number]> = [];
       for (const c of [c1, c2]) for (let r = 0; r < 3; r++) cells.push([c, r]);
-      b.warn(f, cells, TUNING.warnTime, () => {
-        for (const [c, r] of cells) { b.addFx('explode', f.side, c, r, 0.4); b.burn(c, r, 5, 15); }
-        b.strike(f, cells, 120 * x.mult, { spell: true, element: 'fire' });
-      });
+      // like BN's fire arms, the breath is instant; the burning panels it leaves are the warning
+      for (const [c, r] of cells) { b.addFx('explode', f.side, c, r, 0.4); b.burn(c, r, 5, 15); }
+      b.strike(f, cells, 120 * x.mult, { spell: true, element: 'fire' });
     },
     ai: (b, f) => { const foe = b.foe(f); return Math.abs(foe.col - b.frontCol(foe.side)) <= 1; },
   },
@@ -609,7 +608,8 @@ const mage: CardDef[] = [
 ];
 
 export const ALL_CARDS: CardDef[] = [...warrior, ...mage, ...rogue, ...ranger, ...priest];
-export const CARDS: Record<string, CardDef> = Object.fromEntries(ALL_CARDS.map(c => [c.id, c]));
+// No prototype, so ids from files or the network ("__proto__", "constructor") never resolve to a built-in object.
+export const CARDS: Record<string, CardDef> = Object.assign(Object.create(null), Object.fromEntries(ALL_CARDS.map(c => [c.id, c])));
 export const cardsFor = (cls: ClassId): CardDef[] => ALL_CARDS.filter(c => c.cls === cls);
 
 export const ELEMENT_COLOR: Record<Element, string> = { steel: '#bcbcbc', fire: '#f87800', frost: '#3cbcfc', arcane: '#f878f8', shadow: '#9878f8', poison: '#b8f818', nature: '#58d854', holy: '#f8d878' };

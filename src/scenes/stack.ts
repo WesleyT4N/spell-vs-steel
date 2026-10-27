@@ -27,6 +27,8 @@ export interface Scene {
    */
   split?(): boolean;
   drawBelow?(ui: Ctx, tick: number): void;
+  /** The game went to the background (tab hidden, app switched away): pause if it makes sense. */
+  suspend?(): void;
 }
 
 const stack: Scene[] = [];
