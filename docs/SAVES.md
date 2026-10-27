@@ -8,7 +8,7 @@ flowchart LR
   subgraph Game
     input[input.ts keys] --> S
     audio[audio.ts volume, mute] --> S
-    deck[deck.ts grimoires] --> S
+    deck[deck.ts spell decks] --> S
     match[match.ts last setup] --> S
     arcade[arcade.ts bests] --> S
     scenes[training, tutorial] --> S
@@ -24,7 +24,7 @@ flowchart LR
 
 | File | Holds | Written |
 | --- | --- | --- |
-| `save.json` | key bindings (P1, P2, pads), audio + mute, custom grimoire per class, last match setup, training settings, tutorial done, arcade bests, ranked rating + pending match, lab script | on every change |
+| `save.json` | key bindings (P1, P2, pads), audio + mute, custom spell deck per class, last match setup, training settings, tutorial done, arcade bests, ranked rating + pending match, lab script | on every change |
 | `replays.json` | saved replays, newest first | when replays change |
 
 Each file is `{ "game": "spell-vs-steel", "v": <SAVE_VERSION>, "data": ... }`.

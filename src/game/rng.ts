@@ -3,7 +3,7 @@
 export type Rng = () => number;
 
 /** mulberry32: tiny, fast, good enough for card draws and random panels. Returns [0, 1). */
-export function seeded(seed: number): Rng & { state: () => number } {
+export function seeded(seed: number): Rng & { state: () => number; setState: (v: number) => void } {
   let s = seed >>> 0;
   const next = (() => {
     s = (s + 0x6d2b79f5) >>> 0;
@@ -11,9 +11,16 @@ export function seeded(seed: number): Rng & { state: () => number } {
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  }) as Rng & { state: () => number };
+  }) as Rng & { state: () => number; setState: (v: number) => void };
   next.state = () => s;
+  /** Rewind the generator (rollback netcode restores it with the rest of the battle). */
+  next.setState = v => { s = v >>> 0; };
   return next;
+}
+
+/** A second, independent stream from the same seed (`salt` picks which), so e.g. a CPU's rolls never shift the rules' own rolls. */
+export function substream(seed: number, salt: number): ReturnType<typeof seeded> {
+  return seeded((Math.imul(seed ^ 0x5bd1e995, 0x9e3779b9) + Math.imul(salt + 1, 0x85ebca6b)) >>> 0);
 }
 
 export const randomSeed = (): number => Math.floor(Math.random() * 4294967296);

@@ -1,7 +1,6 @@
 // Ranger kit (design doc, 2026-10-25). Arrows, hidden traps and companions; Energy comes from standing still.
 import type { Battle, CastCtx, Fighter, Trap } from './battle';
 import type { CardDef } from './cards';
-import { sfx } from '../engine/audio';
 import { shuffle } from './rng';
 import { allEnemyPanels, sameRow } from './cardUtil';
 import { TUNING } from './tuning';
@@ -52,7 +51,7 @@ export const ranger: CardDef[] = [
         homing: { p: 0, dur: 0.5, sx: x.f.col, sy: x.f.row, target: x.foe.side },
         onHit: (b, t) => { if (t) b.damage(t, 40 * x.mult, b.f[1 - t.side], { spell: true, element: 'nature' }); },
       });
-      sfx('shot_hawk', { pan: (x.f.col - 2.5) / 3 });
+      x.b.sound('shot_hawk', { pan: (x.f.col - 2.5) / 3 });
     },
   },
   {

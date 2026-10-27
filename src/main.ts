@@ -2,11 +2,13 @@ import { W, H, UW, UH, P, view, setView, screenRect, spread, MIN_ASPECT, PORTRAI
 import { drawTextCentered } from './engine/font';
 import { initInput, endFrame, wasPressed, page } from './engine/input';
 import { toggleMute } from './engine/audio';
-import { setScene, getScene, commitZones, hotZone, noteTouch, liveZones } from './scenes/scene';
+import { setScene, setHome, goHome, getScene, commitZones, hotZone, noteTouch, liveZones } from './scenes/scene';
 import { TitleScene } from './scenes/title';
 import { OnlineScene } from './scenes/online';
 import { DEV_TOOLS } from './flags';
 import { endTextFields } from './engine/textField';
+import { setDefaultSink } from './game/events';
+import { playBattleEvent } from './engine/battleAudio';
 import { touchActive, onTouchChange, layout as layoutPad, syncPad, touchText, viewport } from './engine/touch';
 
 // The game screen is the sharp UI resolution. The world draws at 240×160 offscreen and is scaled up 2×
@@ -63,6 +65,8 @@ onTouchChange(fit);
 fit();
 
 initInput(canvas);
+// battles speak through events; the game plays them
+setDefaultSink(playBattleEvent);
 // Inside an embedded frame, keys only arrive after the page gets focus.
 let engaged = false;
 const engage = (): void => { engaged = page.engaged = true; canvas.focus(); };
@@ -70,9 +74,11 @@ window.addEventListener('pointerdown', engage);
 window.addEventListener('keydown', () => { engaged = page.engaged = true; });
 // a shared online link (?room=CODE) goes straight to joining that room
 const room = new URLSearchParams(location.search).get('room');
-setScene(room ? new OnlineScene(room) : new TitleScene());
+// the title is always the bottom of the scene stack: BACK from the first screen lands there
+setHome(() => new TitleScene());
+if (room) setScene(new OnlineScene(room)); else goHome();
 // dev builds can open a dev tool straight from the URL (#cards, #sandbox, #lab, #dev)
-if (DEV_TOOLS && !room && location.hash.length > 1) void import('./scenes/devMenu').then(m => m.devFromHash(() => setScene(new TitleScene())));
+if (DEV_TOOLS && !room && location.hash.length > 1) void import('./scenes/devMenu').then(m => m.devFromHash());
 
 const STEP = 1 / 60;
 let acc = 0;

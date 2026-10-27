@@ -2,6 +2,7 @@
 import { PLAYABLE } from '../game/classes';
 import { Battle, type Side } from '../game/battle';
 import { Cpu } from '../game/ai';
+import { randomSeed } from '../game/rng';
 import { styleById } from '../game/playstyles';
 import { CARDS } from '../game/cards';
 import { starterDeck, toList, type DeckCounts } from '../game/deck';
@@ -33,8 +34,9 @@ export const TIME_LIMIT = 600;
  * `tick` = seconds per simulation step. Every rule in Battle and the CPU is written in seconds,
  * so a coarser tick (e.g. 1/30) plays the same match in fewer steps; scripts/balance.ts --tick checks it against 1/60.
  */
-export function runMatch(a: SideSpec, bSpec: SideSpec, tick: number = DT): MatchResult {
-  const b = new Battle({ cls: a.cls, deck: toList(a.deck), name: 'A' }, { cls: bSpec.cls, deck: toList(bSpec.deck), name: 'B' });
+export function runMatch(a: SideSpec, bSpec: SideSpec, tick: number = DT, seed: number = randomSeed()): MatchResult {
+  // the CPUs seed their rolls from the battle, so the same seed plays the same match
+  const b = new Battle({ cls: a.cls, deck: toList(a.deck), name: 'A' }, { cls: bSpec.cls, deck: toList(bSpec.deck), name: 'B' }, seed);
   const probe = instrument(b);
   const dmg: MatchResult['dmg'] = [{}, {}];
   probe.onHit = h => {
@@ -42,13 +44,12 @@ export function runMatch(a: SideSpec, bSpec: SideSpec, tick: number = DT): Match
     dmg[h.by][h.source] = (dmg[h.by][h.source] ?? 0) + h.dealt;
   };
   const cpus = [new Cpu(a.cpu, styleById(a.style ?? '')), new Cpu(bSpec.cpu, styleById(bSpec.style ?? ''))];
-  // the player opens the Draw screen whenever they like; this opens it a little after it fills (2% a frame at 60fps)
-  const openChance = 1 - Math.pow(0.98, tick / DT);
   let t = 0;
   // the winner is known at the KO, so the 2s KO animation is skipped
   while (b.phase !== 'over' && b.phase !== 'ko' && t < TIME_LIMIT) {
     if (b.phase === 'custom') b.endCustom([cpus[0].pick(b, b.f[0]), cpus[1].pick(b, b.f[1])]);
-    else if (b.canOpenCustom() && Math.random() < openChance) b.beginCustom();
+    // the player opens the Draw screen whenever they like; side A's CPU opens it a little after it fills
+    else if (cpus[0].wantsDraw(b, b.f[0], tick)) b.beginCustom();
     b.update(tick, [cpus[0].intent(b, b.f[0], tick), cpus[1].intent(b, b.f[1], tick)]);
     t += tick;
   }

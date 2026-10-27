@@ -1,7 +1,7 @@
 // Import / export panel for the deck builder: a plain DOM overlay (a canvas can't take a paste or open a
-// file picker). It shows the current grimoire as YAML to copy or download, and imports pasted text or a
+// file picker). It shows the current spell deck as YAML to copy or download, and imports pasted text or a
 // .yaml file, refusing anything that breaks the deck rules.
-import { exportYaml, importYaml, type Grimoire } from '../game/grimoireYaml';
+import { exportYaml, importYaml, type SpellDeck } from '../game/deckYaml';
 
 const CSS = `
 .svs-yaml { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: rgba(40,20,0,.6); }
@@ -20,11 +20,11 @@ const CSS = `
 .svs-yaml .good { color: #007800; }
 `;
 
-export interface GrimoirePanelOpts {
-  /** The grimoire to show for export. */
-  current: Grimoire;
-  /** Called with a legal imported grimoire; the panel closes after. */
-  onImport: (g: Grimoire) => void;
+export interface DeckPanelOpts {
+  /** The spell deck to show for export. */
+  current: SpellDeck;
+  /** Called with a legal imported spell deck; the panel closes after. */
+  onImport: (g: SpellDeck) => void;
   onClose: () => void;
 }
 
@@ -35,7 +35,7 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLEl
 };
 
 /** Opens the panel; returns a function that closes it. */
-export function openGrimoirePanel(o: GrimoirePanelOpts): () => void {
+export function openDeckPanel(o: DeckPanelOpts): () => void {
   if (!document.getElementById('svs-yaml-css')) document.head.append(el('style', { id: 'svs-yaml-css', textContent: CSS }));
   const yaml = exportYaml(o.current);
   const text = el('textarea', { value: yaml, spellcheck: false });
@@ -48,12 +48,12 @@ export function openGrimoirePanel(o: GrimoirePanelOpts): () => void {
     const r = importYaml(src);
     if (!r.ok) { say(`Not imported: ${r.error.toLowerCase()}.`); return; }
     close();
-    o.onImport(r.grimoire);
+    o.onImport(r.spellDeck);
   };
   file.addEventListener('change', () => {
     const f = file.files?.[0];
     if (!f) return;
-    if (f.size > 20000) { say('Not imported: that file is too big for a grimoire.'); return; }
+    if (f.size > 20000) { say('Not imported: that file is too big for a spell deck.'); return; }
     void f.text().then(t => { text.value = t; tryImport(t); });
   });
 
@@ -78,8 +78,8 @@ export function openGrimoirePanel(o: GrimoirePanelOpts): () => void {
 
   const root = el('div', { className: 'svs-yaml' },
     el('div', { className: 'box' },
-      el('h2', { textContent: 'GRIMOIRE AS YAML' }),
-      el('p', { textContent: 'Copy or download this deck, or paste a grimoire (or pick a .yaml file) to import it. Importing replaces your saved deck for that class; imports that break a deck rule are refused.' }),
+      el('h2', { textContent: 'SPELL DECK AS YAML' }),
+      el('p', { textContent: 'Copy or download this spell deck, or paste one (or pick a .yaml file) to import it. Importing replaces your saved spell deck for that class; imports that break a deck rule are refused.' }),
       text, msg,
       el('div', { className: 'row' }, copy, download, fromFile, pasted, cancel, file)));
   // keep game keys and clicks from reaching the game while the panel is open (releases still pass, so nothing sticks down)

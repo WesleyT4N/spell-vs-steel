@@ -21,7 +21,7 @@ const DT = 1 / 60;
 const MAX_FRAMES = 60 * 240;
 const DIRS: Dir[] = ['up', 'down', 'left', 'right'];
 
-/** A random legal grimoire: one Mythic, up to five Legendaries, filled with whatever fits. */
+/** A random legal spell deck: one Mythic, up to five Legendaries, filled with whatever fits. */
 function randomDeck(cls: ClassId, r: Rng): DeckCounts {
   const pool = cardsFor(cls);
   const d: DeckCounts = {};

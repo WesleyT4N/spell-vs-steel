@@ -16,6 +16,8 @@ export interface Rung {
   deck: string;
   stage: string;
   boss: boolean;
+  /** The rival's HP and damage as a share of the full kit (1 = full power, the boss only). */
+  power: number;
 }
 
 /** How a won fight went, for the clear screen. */
@@ -49,10 +51,18 @@ export interface ArcadeRun {
   fights: FightRecord[];
 }
 
-/** Difficulty of the rival fights, in order; the boss comes after. */
-const CLIMB: Difficulty[] = ['easy', 'normal', 'normal', 'hard'];
+/**
+ * The rival fights, in order: CPU level, deck, and power (HP and damage as a share of the full kit).
+ * Every rival is weaker than a real opponent and each one a step tougher; only the boss fights at full power.
+ */
+const CLIMB: Array<{ difficulty: Difficulty; mythic: boolean; power: number }> = [
+  { difficulty: 'easy', mythic: false, power: 0.6 },
+  { difficulty: 'normal', mythic: false, power: 0.7 },
+  { difficulty: 'normal', mythic: true, power: 0.8 },
+  { difficulty: 'hard', mythic: true, power: 0.9 },
+];
 /** The Shadow Self boss: your class and deck in black, on Hard, with this much HP. */
-export const BOSS_HP = 1.5;
+export const BOSS_HP = 1.25;
 export const BOSS_SKIN = 'black';
 
 function shuffle<T>(list: T[], rand: () => number): T[] {
@@ -66,7 +76,7 @@ const pick = <T>(list: T[], rand: () => number): T => list[Math.floor(rand() * l
 
 /**
  * The four other classes in a random order, Easy to Hard, then the boss: your own class with your own deck.
- * Easy rivals play their starter, later ones a Mythic deck; every fight is on a different stage.
+ * The first two rivals play their starter, later ones a Mythic deck; every fight is on a different stage.
  */
 export function buildLadder(m: MatchConfig, rand: () => number = Math.random): Rung[] {
   const stages = shuffle(STAGE_IDS, rand);
@@ -74,13 +84,14 @@ export function buildLadder(m: MatchConfig, rand: () => number = Math.random): R
   const rungs: Rung[] = rivals.map((cls, i) => ({
     cls,
     skin: pick(SKINS[cls], rand).id,
-    difficulty: CLIMB[i],
-    deck: CLIMB[i] === 'easy' ? 'starter' : pick(mythics(cls), rand),
+    difficulty: CLIMB[i].difficulty,
+    deck: CLIMB[i].mythic ? pick(mythics(cls), rand) : 'starter',
     stage: stages[i % stages.length],
     boss: false,
+    power: CLIMB[i].power,
   }));
   // in black, unless you already wear it
-  rungs.push({ cls: m.p1, skin: mirrorSkin(m.p1, skinOf(m.p1, m.p1Skin[m.p1]).id, BOSS_SKIN), difficulty: 'hard', deck: m.p1Deck, stage: stages[rungs.length % stages.length], boss: true });
+  rungs.push({ cls: m.p1, skin: mirrorSkin(m.p1, skinOf(m.p1, m.p1Skin[m.p1]).id, BOSS_SKIN), difficulty: 'hard', deck: m.p1Deck, stage: stages[rungs.length % stages.length], boss: true, power: 1 });
   return rungs;
 }
 

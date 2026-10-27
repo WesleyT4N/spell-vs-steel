@@ -1,11 +1,11 @@
-// One online match between two machines: the handshake, readiness for each round, and the
-// delay-based lockstep input buffers. Both machines run the same seeded battle and only trade
-// controls, so the simulation itself never crosses the wire.
+// One online match between two machines: the handshake, readiness for each round, and the input
+// buffers. Both machines run the same seeded battle and only trade controls, so the simulation
+// itself never crosses the wire.
 //
-// Lockstep: the input you press now is scheduled `delay` frames ahead and sent to the other side;
-// frame N only runs once both sides' inputs for N are in. With the delay covering the one-way trip,
-// play never waits; on a lag spike it pauses instead of rubber-banding, and both players feel the
-// same delay (fair, and in keeping with "no tight timing windows").
+// The input you press now is scheduled a small `delay` ahead and sent to the other side. The battle
+// does not wait for the other side's inputs: rollback netcode (rollback.ts) guesses them, and goes
+// back and replays when the real ones land. The delay grows a little with ping so corrections stay
+// short; a long silence still waits (after MAX_ROLLBACK guessed frames).
 import { CARDS } from '../game/cards';
 import { SKINS, type ClassId } from '../art/sprites';
 import { PROTOCOL, decodeInput, encodeInput, type Hello, type Lobby, type NetInput, type Packet } from './protocol';
@@ -17,7 +17,7 @@ const LOST_AFTER = 30000;    // ms of silence before the match counts as dropped
 const AWAY_LOST_AFTER = 180000; // the same while the rival's tab is in the background (it still pings once a second)
 const REVIVE_EVERY = 3000;   // ms between attempts to rebuild a quiet link
 const STEP_MS = 1000 / 60;
-const MAX_DELAY = 15;
+const MAX_DELAY = 8;
 
 /** Where the session reads the time; the soak test swaps in a simulated clock. */
 export const clock = { now: (): number => performance.now() };
@@ -37,7 +37,11 @@ export class NetSession {
   start?: { seed: number; bestOf: 1 | 3 | 5 };
   myReady = 0;
   round = 0;
-  delay = 4;
+  delay = 2;
+  /** This side's current battle frame, sent so the other side can keep pace. */
+  frame = 0;
+  /** When the latest packet from the other side arrived (performance.now()). */
+  heardAt = 0;
   /** Smoothed round-trip time in ms (0 until measured). */
   rtt = 0;
   desync = false;
@@ -101,7 +105,7 @@ export class NetSession {
       v: PROTOCOL, id: this.id, role: this.role, seq: ++this.seq,
       t: Math.round(now), et: this.remoteT, ed: this.remoteT ? Math.round(now - this.remoteAt) : 0,
       hello: this.hello, lobby: this.lobby, start: this.role === 'host' ? this.start : undefined,
-      ready: this.myReady, round: this.round, delay: this.delay,
+      ready: this.myReady, round: this.round, delay: this.delay, fr: this.frame,
       base: from, inp: this.local.slice(from).join(''), ack: this.remoteContig,
       picks: this.picks, hash: this.hash, bye: this.bye || undefined, away: this.away || undefined,
     };
@@ -117,7 +121,7 @@ export class NetSession {
       this.lastSeq = -1;
     }
     if (p.seq <= this.lastSeq) return; // late, out-of-order packet
-    if (!validHello(p.hello)) { this.status = 'error'; this.error = 'THE OTHER PLAYER SENT A BAD DECK'; return; }
+    if (!validHello(p.hello)) { this.status = 'error'; this.error = 'THE OTHER PLAYER SENT A BAD SPELL DECK'; return; }
     this.lastSeq = p.seq;
     const now = clock.now();
     if (p.et > 0) {
@@ -131,6 +135,7 @@ export class NetSession {
     this.remoteT = p.t;
     this.remoteAt = now;
     this.lastHeard = now;
+    this.heardAt = now;
     this.remote = p;
     if (p.bye) { this.status = 'left'; return; }
     if (this.status === 'waiting' || this.status === 'reconnecting' || this.status === 'lost') this.status = 'connected';
@@ -151,22 +156,20 @@ export class NetSession {
   }
 
   /**
-   * Input delay (frames) that covers the line: the one-way trip plus room for its jitter, so play
-   * rarely has to wait on a packet.
+   * Input delay (frames) for a round. Two covers a good connection; on a slow or jittery one, delay
+   * takes over part of the trip so rollback corrections stay around six frames or less.
    */
   targetDelay(): number {
-    if (!this.rtt) return 4;
-    let d = Math.ceil((this.rtt / 2 + this.rttDev * 1.5) / STEP_MS) + 1;
-    if (this.transport.kind === 'room') d += 2; // presence is sent about 30 times a second
+    if (!this.rtt) return 2;
+    let d = Math.ceil((this.rtt / 2 + this.rttDev) / STEP_MS) - 6;
+    if (this.transport.kind === 'room') d += 1; // presence is sent about 30 times a second
     return Math.min(MAX_DELAY, Math.max(2, d));
   }
-
-  /** Mid-round retune (see Lockstep): one frame at a time, so nobody feels a jump. */
-  nudgeDelay(up: boolean): void { this.delay = Math.min(MAX_DELAY, Math.max(2, this.delay + (up ? 1 : -1))); }
 
   /** Start round `r`: clear the buffers and pick an input delay from the measured ping. */
   beginRound(r: number): void {
     this.round = r;
+    this.frame = 0;
     this.delay = this.targetDelay();
     this.local = Array(this.delay).fill(encodeInput({ move: null, held: null, attackPressed: false, attackHeld: false, castPressed: false, draw: false }));
     this.remoteIn = [];

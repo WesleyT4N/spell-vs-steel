@@ -1,7 +1,7 @@
 // Stage select: a live preview of the stage under the cursor with both fighters on it, and a row of stage tiles.
 // Online, each player votes; the same pick comes out on both machines (a tie wins, otherwise a seeded coin
 // flip between the two votes, shown as a roulette).
-import { setScene, hint, zone, hot, showSel, type Scene } from './scene';
+import { replaceScene, popScene, goHome, hint, zone, hot, showSel, type Scene } from './scene';
 import { getStage, STAGE_IDS } from '../art/stages';
 import { drawPanel, drawStage, panelFoot } from '../art/arena';
 import { useStage } from '../game/battleView';
@@ -16,8 +16,6 @@ import type { Hello } from '../net/protocol';
 import type { NetSession } from '../net/session';
 import { BattleScene } from './battle';
 import { OnlineBattleScene } from './onlineBattle';
-import { CharSelectScene } from './select';
-import { TitleScene } from './title';
 
 /** Stage tiles: every stage, then RANDOM. */
 const TILES = [...STAGE_IDS, 'random'];
@@ -104,8 +102,9 @@ export class StageSelectScene implements Scene {
 
   private start(): void {
     useStage(this.final!);
-    if (this.net) { setScene(new OnlineBattleScene(this.net, [0, 0], 1)); return; }
-    setScene(new BattleScene(this.m, [0, 0], undefined, [], this.m.sides));
+    // the fight takes this screen's place: leaving it goes back to the character select
+    if (this.net) { replaceScene(new OnlineBattleScene(this.net, [0, 0], 1)); return; }
+    replaceScene(new BattleScene(this.m, [0, 0], undefined, [], this.m.sides));
   }
 
   update(dt: number): void {
@@ -114,7 +113,7 @@ export class StageSelectScene implements Scene {
     if (net) {
       net.tick();
       if (net.status === 'error' || net.status === 'left' || net.status === 'lost') {
-        if (mouse.click || wasPressed('confirm') || wasPressed('back') || mouse.rclick) { net.close(); setScene(new TitleScene()); }
+        if (mouse.click || wasPressed('confirm') || wasPressed('back') || mouse.rclick) { net.close(); goHome(); }
         return;
       }
       const rl = net.rivalLobby;
@@ -151,8 +150,8 @@ export class StageSelectScene implements Scene {
 
     if (wasPressed('back') || mouse.rclick) {
       sfx('back');
-      if (net) { if (!this.voted) { net.leave(); setScene(new TitleScene()); } return; }
-      setScene(new CharSelectScene(undefined, 4));
+      if (net) { if (!this.voted) { net.leave(); goHome(); } return; }
+      popScene();
       return;
     }
     if (this.voted) { this.view = this.tileStage(net!.lobby.stage); return; }
