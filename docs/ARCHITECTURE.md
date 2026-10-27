@@ -12,6 +12,7 @@ The full version, with a drawn diagram per system, is the living doc: https://cl
 - [Rendering and art pipeline](#rendering-and-art-pipeline)
 - [Audio](#audio)
 - [UI and screens](#ui-and-screens)
+- [Input and platform](#input-and-platform)
 - [CPU AI and styles](#cpu-ai-and-styles)
 - [Balance tooling](#balance-tooling)
 - [Build and publish](#build-and-publish)
@@ -190,7 +191,7 @@ flowchart LR
 | Ranger | 740 | 8 / 20 | Energy | Starts 2, +1 per Draw, grows standing still | `cardsRanger.ts` |
 | Priest | 700 | 6 / 28 | Mana | Starts 3, +3 per Draw (cap 5) | `cardsPriest.ts` |
 
-`tuning.ts` is the source of truth for numbers. Each class has 26 cards, a starter deck and 3 Mythic decks (`game/deck.ts`). Deck rules: exactly 30, 4 / 2 / 1 copies by rarity, max 5 Legendaries, exactly 1 Mythic. Custom decks save per class in `save.json`; `game/grimoireYaml.ts` imports and exports YAML.
+`tuning.ts` is the source of truth for numbers. Each class has 26 cards, a starter deck and 3 Mythic decks (`game/deck.ts`). Deck rules: exactly 30, 4 / 2 / 1 copies by rarity, max 5 Legendaries, exactly 1 Mythic. Custom decks save per class in `save.json`; `game/deckYaml.ts` imports and exports YAML.
 
 Adding a class today touches: `art/sprites.ts` (+ generated sprites and frames), `game/classes.ts`, a `tuning.ts` block, a `cardsX.ts` merged into `CARDS`, resource rules in `battle.ts`, decks in `deck.ts`, `game/fighterAnim.ts`, voice lines, and tutorial lessons (every new character gets tutorial support). The modularize pass will gather these into `src/content/classes/<id>/`.
 
@@ -210,14 +211,14 @@ flowchart BT
 
 | Id | Name | File |
 | --- | --- | --- |
-| `colosseum` | Grand Colosseum | `art/arena.ts` |
-| `courtyard` | Castle Courtyard | `art/stages.ts` |
-| `archive` | Arcane Archive | `art/stages.ts` |
-| `frostpeak` | Frostpeak Pass | `art/stages.ts` |
-| `emberforge` | Emberforge | `art/stages.ts` |
-| `elderwood` | Elderwood Ruins | `art/stages.ts` |
+| `colosseum` | Grand Colosseum | `content/stages/colosseum.ts` |
+| `courtyard` | Castle Courtyard | `content/stages/courtyard.ts` |
+| `archive` | Arcane Archive | `content/stages/archive.ts` |
+| `frostpeak` | Frostpeak Pass | `content/stages/frostpeak.ts` |
+| `emberforge` | Emberforge | `content/stages/emberforge.ts` |
+| `elderwood` | Elderwood Ruins | `content/stages/elderwood.ts` |
 
-`StageDef` = id, name, tag, `PanelLook`, panel `tex()`, up to four layer painters. `getStage(id)` builds and caches; `STAGE_IDS` feeds stage select. `art/ink.ts` is the Inked toolkit. Online, both players vote; a tie wins, otherwise a seeded coin flip.
+Each stage is a module in `content/stages/`, registered in `content/stages/index.ts` (order = stage select and online vote order; new stages go at the end). `StageDef` (`content/stages/inked.ts`) = id, name, tag, `PanelLook`, panel `tex()`, up to four layer painters; `inkedStage(def)` wraps one as a `StageModule`. `getStage(id)` builds and caches; `STAGE_IDS` feeds stage select. `art/ink.ts` is the Inked toolkit. Online, both players vote; a tie wins, otherwise a seeded coin flip.
 
 ## Rendering and art pipeline
 
@@ -259,7 +260,7 @@ The Battle calls `sfx()`, `sfxFx()` and `voiceLine()` directly; sounds never fee
 
 ## UI and screens
 
-Screens live on a stack (`scenes/stack.ts`, re-exported by `scenes/scene.ts`). A `Scene` has `update`, `draw(world, tick, ui)`, `enter?` (first open), `resume?` (shown again after the screen on top closes) and `pad?`.
+Screens live on a stack (`scenes/stack.ts`, re-exported by `scenes/scene.ts`). A `Scene` has `update`, `draw(world, tick, ui)`, `enter?` (first open), `resume?` (shown again after the screen on top closes), `pad?` and `suspend?` (the game went to the background).
 
 ```mermaid
 flowchart LR
@@ -287,7 +288,7 @@ flowchart LR
 ```
 
 - `OnlineBattleScene` and `TrainingScene` extend `BattleScene`; `TutorialScene` drives one. Card previews run their own tiny muted Battle.
-- Menus are mouse-first: scenes register click zones while drawing (`zone(...)`), the next update reads `hotZone()`. Combat is keyboard or the touch pad (`engine/touch.ts`).
+- Menus are mouse-first: scenes register click zones while drawing (`zone(...)`), the next update reads `hotZone()`. Combat is keyboard, gamepad or the touch pad (`engine/touch.ts`); see Input and platform.
 - Everything kept between sessions goes through the save module (see Saves).
 
 ## CPU AI and styles
@@ -336,6 +337,32 @@ flowchart LR
 
 Reports live in project files under `balance/`.
 
+## Input and platform
+
+Keys, pads and the touch pad all become digital codes before any scene reads them, so the sim and `NetInput` only see on/off presses (lockstep and rollback stay deterministic). Full detail: [PLATFORM.md](PLATFORM.md).
+
+```mermaid
+flowchart LR
+  KB[Keyboard events] --> P[press code]
+  TP["Touch pad<br/>Pad* codes"] --> P
+  GP["engine/gamepad.ts<br/>polled each fixed step<br/>Gp1A, Gp2Start ..."] --> P
+  P --> B["BINDINGS<br/>P1 keys + P1 pad buttons, every pad"] --> A[isDown / wasPressed / heldDir]
+  P --> L["LOCAL_KEYS (2P Versus)<br/>P1: keys + pad 1, P2: keys + numpad + pad 2"] --> LA[localDown / localPressed]
+  A --> I[Intent / NetInput]
+  LA --> I
+```
+
+- Pads use the standard mapping; the left stick becomes the d-pad with hysteresis. Pad 1 is player 1 and pad 2 player 2 in local Versus. Key Mapping has a PAD column per player; bindings save as `pads`.
+- `platform/index.ts` exports one `platform`: `storage` (the `PlatformStorage` the save module uses), `fullscreen` (Options FULLSCREEN row) and `lifecycle` (background: release input, suspend audio, `scene.suspend()`; QUIT on the title only when `canQuit`). A native shell overrides parts by setting `window.svsNative` before the game script runs.
+
+```mermaid
+flowchart TB
+  G[Game code] --> PF[platform]
+  PF --> ST[storage] & FS[fullscreen] & LC[lifecycle]
+  W["web: localStorage, Fullscreen API, visibilitychange"] -.default.-> PF
+  N["window.svsNative<br/>Electron preload / Capacitor"] -.overrides.-> PF
+```
+
 ## Saves
 
 One module, `engine/save.ts`, on top of the platform's file storage (`platform/storage.ts`). Nothing else touches `localStorage`. Full detail: [SAVES.md](SAVES.md).
@@ -381,7 +408,7 @@ Release: PR → Wes says "lgtm" → merge → rebuild from latest main → publi
 flowchart LR
   pr[Pull request] --> a["Job 1<br/>typecheck, dev build, prod build"]
   a --> sv["tests/saves.ts<br/>migrations, legacy import"] --> m["tests/matches.ts<br/>CPU vs CPU, every class pair"]
-  m --> ss["tests/scene-stack.ts<br/>BACK rules"] --> n["netcheck 25<br/>online determinism"]
+  m --> ss["tests/scene-stack.ts<br/>BACK rules"] --> gp["tests/gamepad.ts<br/>fake pads"] --> n["netcheck 25<br/>online determinism"]
   n --> c[combocheck] --> rc["rollcheck 25<br/>rollback = straight play"]
   pr --> b["Job 2: screens<br/>Playwright, every screen at 7 shapes"]
   b --> d["Pixel diff vs base branch<br/>screens-report artifact"]
@@ -394,6 +421,7 @@ flowchart LR
 | `npx tsx tests/saves.ts` | CI | Save migrations, legacy import, caps |
 | `npx tsx tests/matches.ts` | CI | Crashes, stuck or broken full matches, a seed not replaying (unseeded CPU or rule rolls) |
 | `npx tsx tests/scene-stack.ts` | CI | BACK not returning to the screen it came from |
+| `npx tsx tests/gamepad.ts` | CI | Pad buttons, stick, 2P pad split or pad rebinding broken |
 | `npm run netcheck` | CI | Two seeded battles with the same inputs drifting apart |
 | `npm run combocheck` | CI | Combo counter counting escapable hits |
 | `tests/screens/run.ts` | CI | Screens changing vs the base branch (report, not a hard fail) |
@@ -410,5 +438,4 @@ New screens go in `tests/screens/harness.ts`.
 
 - Modularize (#35): `src/content/registry.ts` and `src/content/stages/`, plus `npm run golden`; class folders follow.
 - Sim events: `BattleEvent` sink feeding `engine/battleAudio.ts` (rollback thread).
-- Engine primitives: gamepads and platform layer (#49).
 - Touch UI (#51), BN indicators (#32), hit feel (#34), soundtrack, card pass on the outliers the balance sweep found.

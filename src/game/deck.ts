@@ -1,4 +1,4 @@
-// Grimoire rules, starter decks and browser storage for custom decks.
+// Spell deck rules, starter decks and browser storage for custom decks.
 import { getSave, updateSave, saveIsReadOnly } from '../engine/save';
 import { CARDS, MAX_COPIES, type CardDef } from './cards';
 import type { ClassId } from '../art/sprites';
