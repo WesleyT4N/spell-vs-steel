@@ -1,7 +1,7 @@
 // Online Mode > LOBBY: everyone on the page right now, a chat, and challenges. Pick a player and
 // challenge them; once they accept, both go through the usual online flow (fighters, stage vote) as a
 // friendly room match. The challenger's match length is used.
-import { setScene, hint, zone, hot, listMouse, button, showSel, type Scene } from './scene';
+import { popScene, replaceScene, hint, zone, hot, listMouse, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { teamColor, skinOf } from '../art/sprites';
@@ -18,7 +18,6 @@ import { openTransport, pickTransport } from '../net/transport';
 import { Lobby, CHAT_MAX, type Here } from '../net/lobby';
 import { ratingStore, settlePending } from '../net/rating';
 import { CharSelectScene } from './select';
-import { OnlineScene } from './online';
 import { win, selRow, banner, INK, INK2, RED_INK, TRIM, BURN } from './skin';
 
 type Mode = 'loading' | 'lobby' | 'meeting' | 'error';
@@ -59,7 +58,7 @@ export class LobbyScene implements Scene {
     this.lobby?.leave();
     this.net?.leave();
     sfx('back');
-    setScene(new OnlineScene());
+    popScene();
   }
 
   private send(): void {
@@ -113,7 +112,7 @@ export class LobbyScene implements Scene {
       if (!net) { if (this.t > MEET_TIMEOUT) this.fallThrough(); return; }
       net.tick();
       if (net.status === 'error' || net.status === 'left' || (this.t > MEET_TIMEOUT && !net.matched)) { this.fallThrough(); return; }
-      if (net.matched) { this.gone = true; blurTextField(); this.lobby?.leave(); setScene(new CharSelectScene(net)); }
+      if (net.matched) { this.gone = true; blurTextField(); this.lobby?.leave(); replaceScene(new CharSelectScene(net)); }
       return;
     }
     const l = this.lobby;
@@ -157,7 +156,7 @@ export class LobbyScene implements Scene {
     win(ui, LX, TOP + dy, LW, H);
     win(ui, RX, TOP + dy, RW, H);
     if (this.mode === 'error') {
-      drawTextCentered(ui, 'THE LOBBY NEEDS THE CLAUDE.AI PAGE', UW / 2, 140 + dy, RED_INK, 1, false);
+      drawTextCentered(ui, 'THE LOBBY IS NOT SUPPORTED YET HERE', UW / 2, 140 + dy, RED_INK, 1, false);
       drawTextCentered(ui, touchText('CLICK TO GO BACK'), UW / 2, 156 + dy, TRIM, 1, false);
       return;
     }

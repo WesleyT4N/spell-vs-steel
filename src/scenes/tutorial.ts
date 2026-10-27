@@ -2,9 +2,8 @@
 // It drives a regular BattleScene (so the fight and the Draw screen look and play exactly like a match)
 // and layers lessons, goals and pointers on top. Every step can be skipped from the pause menu.
 import { getSave, setSave } from '../engine/save';
-import { setScene, dim, drawMenu, hint, listMouse, isHot, resetSel, type Scene } from './scene';
+import { pushScene, replaceScene, popTo, goHome, dim, drawMenu, hint, listMouse, isHot, resetSel, type Scene } from './scene';
 import { BattleScene } from './battle';
-import { TitleScene } from './title';
 import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { Battle, NO_INTENT, COLS, type Fighter, type Intent, type Mark, type Projectile } from '../game/battle';
@@ -328,7 +327,7 @@ const STEPS: Step[] = [
       {
         title: 'THE DRAW GAUGE',
         body: [
-          'YOUR REAL POWER IS YOUR GRIMOIRE: A DECK OF 30 SPELLS YOU BUILD BEFORE THE MATCH.',
+          'YOUR REAL POWER IS YOUR SPELL DECK: 30 SPELLS YOU BUILD BEFORE THE MATCH.',
           'THE DRAW GAUGE AT THE TOP OF THE SCREEN FILLS OVER 10 SECONDS. WHEN IT IS FULL IT FLASHES, AND YOU CAN PAUSE THE FIGHT TO DRAW NEW SPELLS.',
           `KEEP FIGHTING WHILE IT FILLS, THEN PRESS ${k('custom')}.`,
         ],
@@ -352,7 +351,7 @@ const STEPS: Step[] = [
       {
         title: 'THE DRAW SCREEN',
         body: [
-          'THE FIGHT IS PAUSED. YOU DREW 5 SPELLS FROM YOUR GRIMOIRE. THEY ARE THE CARDS ALONG THE BOTTOM.',
+          'THE FIGHT IS PAUSED. YOU DREW 5 SPELLS FROM YOUR SPELL DECK. THEY ARE THE CARDS ALONG THE BOTTOM.',
           `HOVER A CARD (OR USE ${k('left')}/${k('right')}) TO READ IT ON THE LEFT: WHAT IT DOES, ITS DAMAGE AND ITS ${res(t)} COST.`,
           'EVERY ROUND STARTS ON THIS SCREEN, AND YOU COME BACK EACH TIME THE GAUGE FILLS. IN A MATCH YOU HAVE 20 SECONDS TO CHOOSE. HERE THE CLOCK IS STOPPED.',
         ],
@@ -362,7 +361,7 @@ const STEPS: Step[] = [
         title: 'PICK YOUR SPELLS',
         body: [
           'CLICK CARDS TO QUEUE THEM. YOU CAST THEM IN THE ORDER YOU PICK THEM (CAST ORDER, RIGHT). RIGHT-CLICK UNDOES A PICK.',
-          'SPELLS YOU SKIP GO BACK INTO YOUR GRIMOIRE. SPELLS YOU PICK BUT NEVER CAST ARE THROWN AWAY AT THE NEXT DRAW, SO DON\'T TAKE MORE THAN YOU CAN USE.',
+          'SPELLS YOU SKIP GO BACK INTO YOUR SPELL DECK. SPELLS YOU PICK BUT NEVER CAST ARE THROWN AWAY AT THE NEXT DRAW, SO DON\'T TAKE MORE THAN YOU CAN USE.',
           `${L(t).tryText}. THEN CLICK FIGHT! OR PRESS ${k('custom')}.`,
         ],
       },
@@ -422,7 +421,7 @@ const STEPS: Step[] = [
         body: [
           'THE DUMMY FIGHTS BACK FOR REAL NOW: IT MOVES AND SHOOTS. KNOCK IT OUT!',
           'DODGE THE RED ROWS, ATTACK WHEN YOU ARE LINED UP, OPEN THE DRAW SCREEN WHENEVER THE GAUGE FILLS, AND CAST YOUR SPELLS.',
-          'FROM HERE THE DRAW SCREEN DEALS FROM YOUR STARTER GRIMOIRE, JUST LIKE A REAL MATCH.',
+          'FROM HERE THE DRAW SCREEN DEALS FROM YOUR STARTER SPELL DECK, JUST LIKE A REAL MATCH.',
         ],
       },
     ],
@@ -712,12 +711,12 @@ export class TutorialScene implements Scene {
       sfx('select');
       this.paused = false;
       if (this.pauseSel === 1) { this.dummy.shooting = false; this.dummy.warn = -1; this.next(); }
-      if (this.pauseSel === 2) setScene(new TutorialScene(this.cls));
-      if (this.pauseSel === 3) { stopMusic(); setScene(new TitleScene()); }
+      if (this.pauseSel === 2) replaceScene(new TutorialScene(this.cls));
+      if (this.pauseSel === 3) { stopMusic(); goHome(); }
     }
   }
 
-  private static DONE = ['VERSUS MODE', 'DECK BUILDER', 'TRY ANOTHER CLASS', 'TITLE'];
+  private static DONE = ['VERSUS MODE', 'SPELL DECK BUILDER', 'TRY ANOTHER CLASS', 'TITLE'];
   private updateDone(dt: number): void {
     const items = TutorialScene.DONE.length;
     const clicked = listMouse('menu', this.doneSel, i => { this.doneSel = i; sfx('move'); });
@@ -728,10 +727,11 @@ export class TutorialScene implements Scene {
       sfx('select');
       stopMusic();
       const choice = TutorialScene.DONE[this.doneSel];
-      if (choice === 'VERSUS MODE') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); setScene(new CharSelectScene()); }
-      if (choice === 'DECK BUILDER') setScene(new DeckBuilderScene(this.cls, () => setScene(new TitleScene())));
-      if (choice === 'TRY ANOTHER CLASS') setScene(new CharSelectScene(undefined, 0, 'tutorial'));
-      if (choice === 'TITLE') setScene(new TitleScene());
+      // these start a new path from the title, so BACK from them lands there
+      if (choice === 'VERSUS MODE') { const m = loadMatch(); m.p1 = this.cls; saveMatch(m); goHome(); pushScene(new CharSelectScene()); }
+      if (choice === 'SPELL DECK BUILDER') { goHome(); pushScene(new DeckBuilderScene(this.cls)); }
+      if (choice === 'TRY ANOTHER CLASS') popTo(s => s instanceof CharSelectScene, () => new CharSelectScene(undefined, 0, 'tutorial'));
+      if (choice === 'TITLE') goHome();
     }
   }
 
@@ -815,7 +815,7 @@ export class TutorialScene implements Scene {
     drawTextCentered(ui, 'TUTORIAL COMPLETE!', UW / 2, 44, '#f8b800', 3);
     const lines = [
       'YOU KNOW THE BASICS: MOVE, ATTACK, DODGE, DRAW AND CAST.',
-      'NEXT, FIGHT THE CPU, OR BUILD YOUR OWN 30-SPELL GRIMOIRE.',
+      'NEXT, FIGHT THE CPU, OR BUILD YOUR OWN SPELL DECK.',
     ];
     lines.forEach((l, i) => drawTextCentered(ui, l, UW / 2, 82 + i * 12, '#fcfcfc', 1, true));
     drawMenu(ui, TutorialScene.DONE, this.doneSel, UW / 2, 130, tick, { width: 220, gap: 24 });

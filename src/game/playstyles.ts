@@ -107,7 +107,7 @@ export function playedAt(s: Playstyle, d: Difficulty): Playstyle {
  * The style a CPU of this class brings to a match: Easy always plays its readable aggro style,
  * Normal any of its three, Hard the one that does best against the player's class (COUNTER, from sims).
  */
-export function styleFor(cls: ClassId, d: Difficulty, foe: ClassId, rand: () => number = Math.random): Playstyle {
+export function styleFor(cls: ClassId, d: Difficulty, foe: ClassId, rand: () => number): Playstyle {
   const mine = stylesFor(cls);
   if (!mine.length) return BALANCED;
   if (d === 'easy') return mine.find(s => s.kind === 'aggro') ?? mine[0];

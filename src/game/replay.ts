@@ -27,8 +27,8 @@ export interface RoundTape {
   n: number;
   hash: number;
   winner: Side | null;
-  /** Fighters changed after the battle was made (arcade's boss): [name, max HP] a side. */
-  fx?: [[string, number], [string, number]];
+  /** Fighters changed after the battle was made (arcade's rivals and boss): [name, max HP, power] a side. */
+  fx?: [[string, number, number?], [string, number, number?]];
 }
 
 export type ReplayMode = 'cpu' | 'arcade' | 'versus' | 'watch' | 'online' | 'ranked';
@@ -49,34 +49,53 @@ export interface Replay {
   keep?: boolean;
 }
 
-/** Start recording `b`; `done` gets the tape once the round is over. Call before the first update. */
-export function recordRound(b: Battle, done: (t: RoundTape) => void): void {
-  const tape: RoundTape = { seed: b.seed, specs: [copySpec(b.specs[0]), copySpec(b.specs[1])], frames: [], events: [], n: 0, hash: 0, winner: null };
-  let finished = false;
-  const update = b.update.bind(b), begin = b.beginCustom.bind(b), end = b.endCustom.bind(b);
-  b.update = (dt: number, ins: [Intent, Intent]): void => {
-    if (finished) { update(dt, ins); return; }
+/**
+ * Builds a tape from a battle's updates and Draw screens as they happen. recordRound feeds it by
+ * wrapping the battle; online play feeds it from rollback's confirmed frames instead, since a
+ * guessed frame may be undone.
+ */
+export class TapeWriter {
+  readonly tape: RoundTape;
+  finished = false;
+  constructor(readonly b: Battle) {
+    this.tape = { seed: b.seed, specs: [copySpec(b.specs[0]), copySpec(b.specs[1])], frames: [], events: [], n: 0, hash: 0, winner: null };
+  }
+  /** The update about to run on `ins`. */
+  update(ins: [Intent, Intent]): void {
+    const tape = this.tape, b = this.b;
+    if (this.finished) return;
     if (!tape.n) {
-      const f = b.f.map(x => [x.name, x.maxHp] as [string, number]) as [[string, number], [string, number]];
-      if (f.some((x, i) => x[0] !== tape.specs[i].name || x[1] !== TUNING.hp[tape.specs[i].cls as ClassId])) tape.fx = f;
+      const f = b.f.map(x => [x.name, x.maxHp, x.power] as [string, number, number]) as [[string, number, number], [string, number, number]];
+      if (f.some((x, i) => x[0] !== tape.specs[i].name || x[1] !== TUNING.hp[tape.specs[i].cls as ClassId] || x[2] !== 1)) tape.fx = f;
     }
     const code = encode(ins[0]) + encode(ins[1]);
     const last = tape.frames[tape.frames.length - 1];
     if (last && last[0] === code) last[1]++; else tape.frames.push([code, 1]);
     tape.n++;
+  }
+  beginCustom(): void { if (!this.finished) this.tape.events.push(['b', this.tape.n]); }
+  endCustom(picks: [number[], number[]]): void { if (!this.finished) this.tape.events.push(['e', this.tape.n, picks[0].slice(), picks[1].slice()]); }
+  /** The round is over: seal the tape. */
+  finish(): RoundTape {
+    this.finished = true;
+    this.tape.hash = battleHash(this.b);
+    this.tape.winner = this.b.winner;
+    return this.tape;
+  }
+}
+
+/** Start recording `b`; `done` gets the tape once the round is over. Call before the first update. */
+export function recordRound(b: Battle, done: (t: RoundTape) => void): void {
+  const w = new TapeWriter(b);
+  const update = b.update.bind(b), begin = b.beginCustom.bind(b), end = b.endCustom.bind(b);
+  b.update = (dt: number, ins: [Intent, Intent]): void => {
+    if (w.finished) { update(dt, ins); return; }
+    w.update(ins);
     update(dt, ins);
-    if (b.phase === 'over') {
-      finished = true;
-      tape.hash = battleHash(b);
-      tape.winner = b.winner;
-      done(tape);
-    }
+    if (b.phase === 'over') done(w.finish());
   };
-  b.beginCustom = (): void => { if (!finished) tape.events.push(['b', tape.n]); begin(); };
-  b.endCustom = (picks: [number[], number[]]): void => {
-    if (!finished) tape.events.push(['e', tape.n, picks[0].slice(), picks[1].slice()]);
-    end(picks);
-  };
+  b.beginCustom = (): void => { w.beginCustom(); begin(); };
+  b.endCustom = (picks: [number[], number[]]): void => { w.endCustom(picks); end(picks); };
 }
 
 const copySpec = (s: FighterSpec): FighterSpec => ({ cls: s.cls, deck: s.deck.slice(), name: s.name, skin: s.skin });
@@ -93,7 +112,7 @@ export class TapePlayer {
 
   constructor(readonly tape: RoundTape) {
     this.b = new Battle(copySpec(tape.specs[0]), copySpec(tape.specs[1]), tape.seed);
-    tape.fx?.forEach(([name, hp], i) => { const f = this.b.f[i]; f.name = name; f.maxHp = f.hp = hp; });
+    tape.fx?.forEach(([name, hp, power], i) => { const f = this.b.f[i]; f.name = name; f.maxHp = f.hp = hp; f.power = power ?? 1; });
   }
 
   get done(): boolean { return this.b.phase === 'over' || this.i >= this.tape.n; }

@@ -5,7 +5,7 @@ import { deckPool, type PoolDeck, type PoolKind } from './archetypes';
 import type { ClassId } from '../art/sprites';
 import type { Difficulty } from '../game/tuning';
 
-export interface GridJob { i: number; a: SideSpec; b: SideSpec; n: number; tick: number }
+export interface GridJob { i: number; a: SideSpec; b: SideSpec; n: number; /** Match m plays on seed + m, so a grid run replays exactly from its --seed. */ seed: number; tick: number }
 /** Wins and losses are from deck `a`'s point of view, whichever side it started on. */
 export interface GridJobResult {
   i: number; wins: number; losses: number; draws: number; time: number;
@@ -44,7 +44,7 @@ export function planGrid(classes: ClassId[], kind: PoolKind, k: number, seed: nu
   for (let x = 0; x < decks.length; x++) for (let y = x + 1; y < decks.length; y++) {
     if (decks[x].cls === decks[y].cls) continue;
     pairs.push([decks[x], decks[y]]);
-    jobs.push({ i: jobs.length, a: spec(decks[x], cpu), b: spec(decks[y], cpu), n, tick: 1 / hz });
+    jobs.push({ i: jobs.length, a: spec(decks[x], cpu), b: spec(decks[y], cpu), n, tick: 1 / hz, seed: (Math.imul(seed, 0x9e3779b9) + jobs.length * 7919 * n) >>> 0 });
   }
   return { kind, decks, pairs, jobs };
 }
@@ -55,7 +55,7 @@ export function runJob(job: GridJob): GridJobResult {
   const r: GridJobResult = { i: job.i, wins: 0, losses: 0, draws: 0, time: 0, casts: [{}, {}] };
   for (let m = 0; m < job.n; m++) {
     const flip = m % 2 === 1;
-    const res = flip ? runMatch(job.b, job.a, job.tick) : runMatch(job.a, job.b, job.tick);
+    const res = flip ? runMatch(job.b, job.a, job.tick, (job.seed + m) >>> 0) : runMatch(job.a, job.b, job.tick, (job.seed + m) >>> 0);
     const aSide = flip ? 1 : 0;
     r.time += res.time;
     if (res.winner === null) r.draws++; else if (res.winner === aSide) r.wins++; else r.losses++;

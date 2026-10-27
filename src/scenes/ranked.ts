@@ -1,6 +1,6 @@
 // Ranked: search for a rival near your rating, then the usual online flow (fighters, stage vote) for
 // one best-of-3 set that moves both ratings. Shows your rating and the top of the ladder while you wait.
-import { setScene, hint, button, hot, type Scene } from './scene';
+import { popScene, replaceScene, hint, button, hot, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, skinOf } from '../art/sprites';
@@ -15,7 +15,6 @@ import { openTransport, pickTransport } from '../net/transport';
 import { Search, searchGap } from '../net/matchmaking';
 import { ratingStore, settlePending, startRanked, rankedForfeit, rankedOf, type LadderRow, type Rating, type RatingStore } from '../net/rating';
 import { CharSelectScene } from './select';
-import { OnlineScene } from './online';
 import { win, banner, INK, INK2, RED_INK, TRIM } from './skin';
 
 type Mode = 'loading' | 'search' | 'found' | 'error';
@@ -44,7 +43,7 @@ export class RankedScene implements Scene {
     if (this.gone) return;
     const s = await Search.start(this.rating.rating);
     if (this.gone) { s?.cancel(); return; }
-    if (!s) { this.fail('RANKED NEEDS THE CLAUDE.AI PAGE'); return; }
+    if (!s) { this.fail('RANKED IS NOT SUPPORTED YET HERE'); return; }
     this.search = s;
     this.mode = 'search';
     this.t = 0;
@@ -82,7 +81,7 @@ export class RankedScene implements Scene {
     this.search?.cancel();
     this.net?.leave();
     sfx('back');
-    setScene(new OnlineScene());
+    popScene();
   }
 
   update(dt: number): void {
@@ -103,7 +102,7 @@ export class RankedScene implements Scene {
       if (net.matched && this.rating) {
         startRanked(net, this.rating, this.search!.match!.rival.rating);
         watchForfeit(net);
-        setScene(new CharSelectScene(net));
+        replaceScene(new CharSelectScene(net));
       }
     }
   }
@@ -131,7 +130,6 @@ export class RankedScene implements Scene {
     if (this.mode === 'loading') drawTextCentered(ui, 'LOADING YOUR RATING...', cx, 90 + dy, INK, 1, false);
     if (this.mode === 'error') {
       drawTextCentered(ui, this.msg, cx, 76 + dy, RED_INK, 1, false);
-      drawTextCentered(ui, 'OPEN THE PROTOTYPE ON CLAUDE.AI TO PLAY RANKED.', cx, 92 + dy, INK2, 1, false);
       drawTextCentered(ui, touchText('CLICK TO GO BACK'), cx, 112 + dy, TRIM, 1, false);
     }
     if (this.mode === 'search' && this.search) {

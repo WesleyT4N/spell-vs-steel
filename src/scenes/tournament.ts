@@ -1,7 +1,7 @@
 // Online Mode > TOURNAMENT: open or join a single-elimination bracket of 4 or 8, then play your sets
 // as they come up. Each set is best of 3 through the usual online flow; when it is decided, both
 // players come back here and the winner moves on. See src/net/tournament.ts.
-import { setScene, hint, zone, listMouse, button, hot, showSel, type Scene } from './scene';
+import { popScene, replaceScene, hint, zone, listMouse, button, hot, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { skinOf } from '../art/sprites';
@@ -17,7 +17,6 @@ import { Lobby, lobbyId } from '../net/lobby';
 import { ratingStore } from '../net/rating';
 import { tournaments, rounds, setsIn, setIndex, setPlayers, nextSet, champion, setCode, type Bracket, type Size } from '../net/tournament';
 import { CharSelectScene } from './select';
-import { OnlineScene } from './online';
 import { win, selRow, banner, INK, INK2, RED_INK, TRIM, BURN } from './skin';
 
 const MEET_TIMEOUT = 20;
@@ -37,7 +36,7 @@ export function tournamentRound(net: NetSession, score: [number, number], need: 
   DONE.add(net);
   tournaments.report(t.k, score[0] > score[1] ? t.top : t.bottom);
   // a moment on the results screen, then back to the bracket
-  window.setTimeout(() => { net.leave(); setScene(new TournamentScene()); }, 5000);
+  window.setTimeout(() => { net.leave(); replaceScene(new TournamentScene()); }, 5000);
 }
 
 type Mode = 'loading' | 'browse' | 'in' | 'meeting' | 'error';
@@ -77,7 +76,7 @@ export class TournamentScene implements Scene {
     this.lobby?.leave();
     this.net?.leave();
     sfx('back');
-    setScene(new OnlineScene());
+    popScene();
   }
 
   private get open(): Bracket[] { return tournaments.all().filter(b => b.state === 'open' && b.tid !== tournaments.tid); }
@@ -125,7 +124,7 @@ export class TournamentScene implements Scene {
       if (!net) { if (this.t > MEET_TIMEOUT) this.fallBack(); return; }
       net.tick();
       if (net.status === 'error' || net.status === 'left' || (this.t > MEET_TIMEOUT && !net.matched)) { this.fallBack(); return; }
-      if (net.matched) { this.gone = true; tournaments.ready(null); this.lobby?.leave(); setScene(new CharSelectScene(net)); }
+      if (net.matched) { this.gone = true; tournaments.ready(null); this.lobby?.leave(); replaceScene(new CharSelectScene(net)); }
       return;
     }
 
@@ -186,7 +185,7 @@ export class TournamentScene implements Scene {
     if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, 292 + dy, '#f8b800', 1);
 
     if (this.mode === 'error') {
-      drawTextCentered(ui, 'TOURNAMENTS NEED THE CLAUDE.AI PAGE', UW / 2, 140 + dy, RED_INK, 1, false);
+      drawTextCentered(ui, 'TOURNAMENTS ARE NOT SUPPORTED YET HERE', UW / 2, 140 + dy, RED_INK, 1, false);
       drawTextCentered(ui, touchText('CLICK TO GO BACK'), UW / 2, 156 + dy, TRIM, 1, false);
       return;
     }
