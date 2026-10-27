@@ -203,6 +203,9 @@ export interface Fx { t: number; dur: number; kind: string; side: Side; col: num
 interface Timer { t: number; fn: () => void }
 interface Anim { t: number; dur: number; fn: (p: number) => void }
 
+/** Damage number colors by element. */
+const HIT_TEXT: Record<Element, string> = { steel: '#fcfcfc', fire: '#fca044', frost: '#a4e4fc', arcane: '#f878f8', shadow: '#9878f8', poison: '#b8f818', nature: '#58d854', holy: '#f8d878' };
+
 export interface HitOpts {
   spell?: boolean;
   basic?: 'light' | 'heavy';
@@ -604,7 +607,7 @@ export class Battle {
     this.pets = this.pets.filter(p => p.t > 0);
   }
 
-  /** A companion's attack on the enemy. Kill Command forces one from anywhere at double damage. */
+  /** A companion's attack on the enemy. Kill Command forces one from anywhere at triple damage. */
   petAttack(p: Pet, mult: number): void {
     const owner = this.f[p.side], foe = this.foe(owner);
     if (p.kind === 'hawk') {
@@ -1248,12 +1251,17 @@ export class Battle {
     target.flash = 0.12;
     target.pose = 'hurt';
     target.poseT = 0.15;
-    this.texts.push({ x: target.col, y: target.row, text: String(amt), color: opts.element === 'fire' ? '#fca044' : opts.element === 'frost' ? '#a4e4fc' : opts.element === 'poison' ? '#b8f818' : opts.element === 'holy' ? '#f8d878' : opts.element === 'shadow' ? '#9878f8' : '#fcfcfc', t: 0 });
+    this.texts.push({ x: target.col, y: target.row, text: String(amt), color: HIT_TEXT[opts.element ?? 'steel'], t: 0 });
     if (target.cls === 'warrior') this.gainRage(target, Math.min(TUNING.warrior.rageWhenHitMax, amt / TUNING.warrior.rageDamagePerPip));
     if (amt >= TUNING.flinchThreshold && !opts.noFlinch && target.st.noKnock <= 0 && target.st.avatar <= 0) {
       target.st.flinch = TUNING.flinchTime;
       target.charging = false;
       target.charge = 0;
+    }
+    // impact spark + hit-stop cue for the view (display only: fx are not part of the rules or the net hash)
+    if (!opts.dot) {
+      const tier = target.hp <= 0 ? 3 : amt >= 80 ? 2 : opts.basic === 'heavy' || amt >= TUNING.flinchThreshold ? 1 : 0;
+      this.addFx('impact', src && src !== target ? src.side : (1 - target.side) as Side, target.col, target.row, 0.3 + tier * 0.06, { el: opts.element ?? 'steel', tier });
     }
     if (amt >= 80) { this.shake = Math.max(this.shake, 0.25); this.cheer = 1.5; }
     if (opts.basic === 'heavy') this.shake = Math.max(this.shake, 0.18);
