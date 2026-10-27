@@ -1,5 +1,5 @@
 // Rogue kit from the design doc's Rogue tab (2026-10-25). Stealth, Poison and backstabs; spells cost Energy, which refills every Draw.
-import { type CastCtx, type HitResult, type CardDef, TUNING, ahead, allEnemyPanels, cellsAhead } from '../../api';
+import { type CastCtx, type HitResult, type CardDef, TUNING, ahead, allEnemyPanels, cellsAhead, spellStep } from '../../api';
 
 /** Blink to the panel in front of the enemy and attack the panel they stand on (a wall in the way takes it instead).
  *  Opens the backstab window: the Rogue may keep acting from there until a move or the window blinks them home. */
@@ -26,6 +26,23 @@ function thrust(x: CastCtx, reach: number, dmg: number): HitResult {
 /** Poison stacks a finisher cashes in (Pandemic Poison can't be consumed). */
 const stacksOf = (x: CastCtx): number => (x.foe.st.pandemic > 0 ? 0 : x.foe.poison);
 const consume = (x: CastCtx): void => { if (x.foe.st.pandemic <= 0) { x.foe.poison = 0; x.foe.poisonT = 0; } };
+
+type Cells = Array<[number, number]>;
+
+// Spells' later steps (see spellStep): what lands after a delay or a telegraph.
+const vialHit = spellStep('poison_vial.hit', (x, { cells }: { cells: Cells }) => {
+  const { b, f } = x;
+  for (const [cc, rr] of cells) {
+    const p = b.panel(cc, rr);
+    if (!p) continue;
+    b.addFx('toxicPuff', f.side, cc, rr, 0.5);
+    p.toxic = 4; p.toxicSide = f.side;
+  }
+  if (b.strike(f, cells, 20 * x.mult, { spell: true, element: 'poison' }).dealt > 0) b.addPoison(x.foe, 2);
+});
+const flurrySweep = spellStep('blade_flurry.sweep', (x, { c, r }: { c: number; r: number }) => { slash(x, [[c, r - 1], [c, r], [c, r + 1]], 30); });
+const spreeStrike = spellStep('killing_spree.strike', x => { const at = x.b.blinkFront(x.f); slash(x, [[at.col, at.row]], 35); });
+const spreeEnd = spellStep('killing_spree.end', x => x.b.blinkHome(x.f));
 
 export const rogue: CardDef[] = [
   // ---------- Commons ----------
@@ -76,15 +93,7 @@ export const rogue: CardDef[] = [
       const cells: Array<[number, number]> = [[c, r], [c + x.dir, r], [c, r2], [c + x.dir, r2]];
       // a lob, like BN's MiniBomb: a shadow grows on the landing panels while it falls
       b.addFx('lob', f.side, f.col, r, 0.4, { to: c, color: '#b8f818' });
-      b.warn(f, cells, 0.4, () => {
-        for (const [cc, rr] of cells) {
-          const p = b.panel(cc, rr);
-          if (!p) continue;
-          b.addFx('toxicPuff', f.side, cc, rr, 0.5);
-          p.toxic = 4; p.toxicSide = f.side;
-        }
-        if (b.strike(f, cells, 20 * x.mult, { spell: true, element: 'poison' }).dealt > 0) b.addPoison(x.foe, 2);
-      }, 'shadow');
+      b.warn(f, cells, 0.4, vialHit(x, { cells }), 'shadow');
     },
     ai: (b, f) => {
       const foe = b.foe(f), d = (foe.col - f.col) * b.dir(f), r2 = f.row < 2 ? f.row + 1 : f.row - 1;
@@ -123,7 +132,7 @@ export const rogue: CardDef[] = [
     id: 'blade_flurry', name: 'Blade Flurry', cls: 'rogue', cost: 3, rarity: 'uncommon', element: 'shadow', damaging: true, lock: 0.5,
     dmg: '30x3', short: 'Blink in front of the enemy: 3 sweeps over their panel and the ones above and below.',
     cast: x => backstab(x, (c, r) => {
-      for (let i = 0; i < 3; i++) x.b.later(i * 0.12, () => slash(x, [[c, r - 1], [c, r], [c, r + 1]], 30));
+      for (let i = 0; i < 3; i++) x.b.later(i * 0.12, flurrySweep(x, { c, r }));
     }),
     ai: (b, f) => b.targetable(b.foe(f)),
   },
@@ -191,8 +200,8 @@ export const rogue: CardDef[] = [
       if (!b.targetable(foe)) { b.text(foe, 'MISS', '#bcbcbc'); return; }
       f.st.backstab = 0;
       f.st.untargetable = 2.1;
-      for (let i = 0; i < 5; i++) b.later(0.1 + i * 0.45, () => { const at = b.blinkFront(f); slash(x, [[at.col, at.row]], 35); });
-      b.later(2.15, () => b.blinkHome(f));
+      for (let i = 0; i < 5; i++) b.later(0.1 + i * 0.45, spreeStrike(x));
+      b.later(2.15, spreeEnd(x));
     },
     ai: (b, f) => b.targetable(b.foe(f)),
   },

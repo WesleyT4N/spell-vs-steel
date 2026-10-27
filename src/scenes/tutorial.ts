@@ -6,7 +6,8 @@ import { pushScene, replaceScene, popTo, goHome, dim, drawMenu, hint, listMouse,
 import { BattleScene } from './battle';
 import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
-import { Battle, NO_INTENT, COLS, type Fighter, type Intent, type Mark, type Projectile } from '../game/battle';
+import { Battle, NO_INTENT, COLS, type Fighter, type Intent, type Mark, type Projectile, type Side } from '../game/battle';
+import { effect, type ShotHit } from '../content/effects';
 import { drawBattle, getArena } from '../game/battleView';
 import { CLASS_INFO } from '../game/classes';
 import type { Cpu } from '../game/ai';
@@ -442,7 +443,14 @@ const STEPS: Step[] = [
 ];
 
 /** Shots the dummy has fired, so the tutorial can tell a dodge from a hit. */
-interface Shot { p: Projectile; hit: boolean }
+interface Shot { p: Projectile; hit: boolean; side: Side }
+/** A dummy's practice shot. The record's arguments are the Shot itself, so the lesson sees whether it hit. */
+const practiceShot = effect('tutorial.shot', (b, shot: Shot, h: ShotHit) => {
+  if (h.w) { b.hitWall(h.w, SHOT_DAMAGE, b.f[shot.side], {}); return; }
+  if (!h.t) return;
+  const out = b.damage(h.t, SHOT_DAMAGE, b.f[1 - h.t.side], { element: 'fire' });
+  if (!out.blocked) shot.hit = true;
+});
 
 /** Drives the training dummy in place of the CPU: walks to rows, telegraphs and fires slow shots. */
 class Dummy {
@@ -486,16 +494,8 @@ class Dummy {
 
   private fire(t: TutorialScene): void {
     const b = t.b, f = t.dummyF;
-    const shot: Shot = { p: null as unknown as Projectile, hit: false };
-    b.shoot(f, {
-      speed: 6 * b.dir(f), kind: 'fireball', reflectable: true,
-      onHit: (bb, target, wall) => {
-        if (wall) { bb.hitWall(wall, SHOT_DAMAGE, f, {}); return; }
-        if (!target) return;
-        const out = bb.damage(target, SHOT_DAMAGE, bb.f[1 - target.side], { element: 'fire' });
-        if (!out.blocked) shot.hit = true;
-      },
-    });
+    const shot: Shot = { p: null as unknown as Projectile, hit: false, side: f.side };
+    b.shoot(f, { speed: 6 * b.dir(f), kind: 'fireball', reflectable: true, onHit: practiceShot(shot) });
     shot.p = b.projectiles[b.projectiles.length - 1];
     this.shots.push(shot);
     this.shotCd = this.roaming ? 1.6 + Math.random() * 1.6 : 1.1;
