@@ -94,25 +94,6 @@ function poof(c: Ctx, x: number, y: number, k: number): void {
 /** 0 to 1 as t goes from a to b. */
 const span = (t: number, [a, b]: number[]): number => clamp((t - a) / (b - a));
 
-/** The warrior's steel wave, drawn heading right (k outline, d m l w the steel ramp). */
-const WAVE = [
-  '..............kkkk....',
-  '............kkwwwwkk..',
-  '...........kwwlllllwk.',
-  '..........kwllmmmmllwk',
-  '.........kwlmmkkkkmlwk',
-  '........kllmmk.kddkmlk',
-  '.......kllmmk..kdk.kwk',
-  '......kllmmmk...k...k.',
-  '....kkllmmmmk.........',
-  '..kkllmmmmmmdk........',
-  'kkllmmmmmmmmddk.......',
-  'kdddddddddddddk.......',
-  '.kkkkkkkkkkkkk........',
-];
-/** The WAVE column over the shot's position. */
-const WAVE_FRONT = 14;
-
 /** A shot in flight at (x, y), heading `dir` (1 right, -1 left). */
 function drawShot(c: Ctx, cls: ClassId, x: number, y: number, dir: number, t: number): void {
   const { ramp, kind } = SHOT[cls], [d, m, l, w] = ramp;
@@ -135,20 +116,31 @@ function drawShot(c: Ctx, cls: ClassId, x: number, y: number, dir: number, t: nu
     else { P(c, l, x, y - 3, 1, 6); P(c, d, x - 1, y + 2, 3, 1); }
     P(c, m, x - dir * 6, y, 1, 1); P(c, d, x - dir * 9, y, 1, 1);
   } else {
-    // a wave of steel rolling along the ground, (x, y) on the floor under its front: a long back rising to a crest
-    // that curls over toward the target, shade in the hollow under the lip, foam on top and grit kicked up behind
-    const pal: Record<string, string> = { k: '#000000', d: d, m: m, l: l, w: w };
-    WAVE.forEach((row, r) => {
-      for (let i = 0; i < row.length; i++) {
-        const ch = row[i];
-        if (ch !== '.') P(c, pal[ch], x + dir * (i - WAVE_FRONT), y - WAVE.length + r, 1, 1);
+    // a shockwave tearing along the floor, (x, y) on the floor at its front: arcs of pressure bowing toward the
+    // target, rocks bursting up where it is, a crack and dust left behind
+    const ph = Math.floor(t * 20);
+    // three rings of pressure bowing toward the target, the biggest in front, thick in the middle and tapering
+    for (let n = 2; n >= 0; n--) {
+      const h = 8 - n * 2, cx = x - dir * (n * 4 + (ph % 2)), cy = y - h - 1, col = [w, l, m][n];
+      for (let i = -h; i <= h; i++) {
+        const bx = cx + dir * Math.round(3 * (1 - (i / h) ** 2)), thick = Math.abs(i) < h - 2 ? 2 : 1;
+        if (n === 0) P(c, '#000000', Math.min(bx + dir, bx + dir * thick), cy + i, 1, 1);
+        P(c, col, dir > 0 ? bx - thick + 1 : bx, cy + i, thick, 1);
       }
-    });
-    // foam flickering along the crest, spray off the lip and grit behind
-    const fl = Math.floor(t * 12) % 2;
-    P(c, w, x + dir * (fl ? 1 : 3), y - WAVE.length - 1, 1, 1);
-    P(c, w, x + dir * (fl ? 8 : 7), y - WAVE.length + 7 + fl, 1, 1);
-    for (let i = 0; i < 3; i++) P(c, '#804d42', x - dir * (WAVE_FRONT + 2 + i * 2), y - 1 - ((i + Math.floor(t * 14)) % 3), 1, 1);
+    }
+    // a white burst on the floor where it is
+    if (ph % 2) { P(c, w, x - 2, y - 2, 5, 1); P(c, l, x - 4, y - 1, 9, 1); }
+    // rocks flung up at the front, each on its own little hop
+    for (let i = 0; i < 4; i++) {
+      const k = ((t * 3 + i * 0.27) % 1), rx = x - dir * (i * 3 + Math.round(k * 4)), ry = y - 2 - Math.round(Math.sin(k * Math.PI) * (4 + i * 2));
+      P(c, i % 2 ? '#7c4c1c' : '#a0703c', rx, ry, i % 2 ? 1 : 2, 1); P(c, '#000000', rx, ry + 1, i % 2 ? 1 : 2, 1);
+    }
+    // the crack it leaves in the floor, and dust curling up off it
+    for (let i = 0; i < 12; i++) P(c, '#3c2410', x - dir * (6 + i), y - 1 + ((i * 5) % 3 === 0 ? -1 : 0), 1, 1);
+    for (let i = 0; i < 3; i++) {
+      const k = (t * 2 + i / 3) % 1, s = k < 0.5 ? 2 : 1;
+      P(c, k < 0.4 ? '#d8c8a8' : '#a89878', x - dir * (10 + i * 5) - s / 2, y - 2 - Math.round(k * 6), s, s);
+    }
   }
 }
 
@@ -290,7 +282,7 @@ export class TitleScene implements Scene {
     if (intro >= INTRO && this.swapT >= FIRE && this.swapT < HIT) {
       const a = this.swapSide, dir = a ? -1 : 1, f = (this.swapT - FIRE) / (HIT - FIRE), cls = this.fighters[a];
       const x0 = X[a] + dir * 20, x1 = X[1 - a] - dir * 10;
-      // the warrior's wave rolls along the floor; the others fly at hand height on a slight arc
+      // the warrior's shockwave tears along the floor; the others fly at hand height on a slight arc
       const y = SHOT[cls].kind === 'wave' ? FOOT : FOOT - 26 - Math.sin(f * Math.PI) * 6;
       onFighterGrid(c, x0 + (x1 - x0) * f, y, () => drawShot(c, cls, 0, 0, dir, this.t));
     }
