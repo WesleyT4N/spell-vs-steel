@@ -5,7 +5,7 @@ import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { teamColor, type ClassId } from '../art/sprites';
 import { P, UW, screenRect, spread, vy, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered } from '../engine/font';
+import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, gesture } from '../engine/input';
 import { touchActive, type PadMode } from '../engine/touch';
 import { sfx } from '../engine/audio';
@@ -63,6 +63,8 @@ export class DeckBuilderScene implements Scene {
   private holdT = 0;
   /** The card a resting finger is reading (shown in a sheet from the bottom), or -1. */
   private reading = -1;
+  /** The start-from choice whose spell list is open in a sheet, or -1. */
+  private peek = -1;
 
   private load(): void {
     this.loadCards();
@@ -99,6 +101,7 @@ export class DeckBuilderScene implements Scene {
   /** Show the start-from picker, on your saved deck if there is one, else the deck picked on the character select. */
   private openPicker(): void {
     const saved = loadCustom(this.cls), hasSaved = !!saved && deckSize(saved) > 0;
+    this.peek = -1;
     this.picks = [...(hasSaved ? ['custom'] : []), ...this.presets.map(p => p.id), 'empty', 'import'];
     const m = loadMatch(), picked = m.p1 === this.cls ? m.p1Deck : m.cpu === this.cls ? m.cpuDeck : 'starter';
     const want = hasSaved ? 'custom' : picked;
@@ -152,7 +155,9 @@ export class DeckBuilderScene implements Scene {
   private updatePicker(dt: number): void {
     const picks = this.picks!;
     const h = hot('pick');
-    if (h >= 0 && mouse.moved) this.pickSel = h;
+    // touch: the first tap shows a deck's spells, a second tap on it starts from it
+    if (h >= 0 && mouse.click && touchActive() && h !== this.pickSel && picks[h] !== 'empty' && picks[h] !== 'import') { this.pickSel = h; sfx('move'); return; }
+    if (h >= 0 && mouse.moved && !touchActive()) this.pickSel = h;
     if (h >= 0 && mouse.click) { this.choosePick(picks[h]); return; }
     if (navPressed('up', dt)) { this.pickSel = (this.pickSel + picks.length - 1) % picks.length; sfx('move'); }
     if (navPressed('down', dt)) { this.pickSel = (this.pickSel + 1) % picks.length; sfx('move'); }
@@ -262,6 +267,12 @@ export class DeckBuilderScene implements Scene {
   private updateTall(dt: number): void {
     const tab = hot('tab');
     if (tab >= 0 && mouse.click) { this.switchClass(CLASSES[tab]); return; }
+    // a ready-made deck's list, open in a sheet over the picker: START takes it, any other tap closes it
+    if (this.picks && this.peek >= 0) {
+      if (mouse.click && isHot('t:start')) { this.choosePick(this.picks[this.peek]); this.peek = -1; return; }
+      if (mouse.click || wasPressed('back') || mouse.rclick) { this.peek = -1; sfx('back'); }
+      return;
+    }
     if (barTapped('mid')) { this.openYaml(); return; }
     if (barTapped('back') || barTapped('primary') || wasPressed('back') || mouse.rclick) {
       if (this.picks) { sfx('back'); this.back(); } else this.exit();
@@ -271,8 +282,12 @@ export class DeckBuilderScene implements Scene {
     const sw = swipeIn(...this.tgrid);
     if (sw) { this.switchClass(CLASSES[(CLASSES.indexOf(this.cls) + sw + CLASSES.length) % CLASSES.length]); return; }
     if (this.picks) {
-      const h = hot('pick');
-      if (h >= 0 && mouse.click) this.choosePick(this.picks[h]);
+      const h = hot('pick'), id = this.picks[h];
+      // a deck with spells in it opens its list first, like hovering one does on wider screens
+      if (h >= 0 && mouse.click) {
+        if (id === 'empty' || id === 'import') this.choosePick(id);
+        else { this.pickSel = this.peek = h; sfx('open'); }
+      }
       return;
     }
     if (isHot('change') && mouse.click) { this.special(); return; }
@@ -444,7 +459,7 @@ export class DeckBuilderScene implements Scene {
     else if (!cards.length && id !== 'import') drawText(ui, id === 'empty' ? 'NO SPELLS YET' : 'YOUR SPELL DECK IS EMPTY', lx, y + 24, INK2);
     cards.forEach((c, i) => drawText(ui, `${list[c.id]}X ${c.name.toUpperCase()}`, lx, y + 24 + i * 11, c.rarity === 'common' ? INK2 : ink(RARITY_COLOR[c.rarity])));
     if (id && id !== 'custom' && picks[0] === 'custom') drawText(ui, 'REPLACES YOUR SAVED SPELL DECK', lx, y + hgt - 14, RED_INK);
-    hint(ui, `HOVER TO SEE A SPELL DECK   CLICK: START FROM IT   RIGHT-CLICK: BACK`);
+    hint(ui, touchActive() ? 'TAP: SEE A SPELL DECK   TAP IT AGAIN: START FROM IT' : `HOVER TO SEE A SPELL DECK   CLICK: START FROM IT   RIGHT-CLICK: BACK`);
   }
 
   // ---------- full-height phone layout ----------
@@ -468,7 +483,7 @@ export class DeckBuilderScene implements Scene {
     const barTop = a.y + a.h - 84, msgY = barTop - 22;
     actionBar(ui, { mid: { id: 'yaml', label: 'YAML' }, primary: { id: 'done', label: 'DONE' } });
     const errs = validate(this.deck);
-    const note = this.msgT > 0 ? [this.msg, '#f8b800'] : errs.length ? [errs[0], '#f83800'] : ['GRIMOIRE READY. SAVED HERE.', '#58d854'];
+    const note = this.msgT > 0 ? [this.msg, '#f8b800'] : errs.length ? [errs[0], '#f83800'] : ['SPELL DECK READY. SAVED HERE.', '#58d854'];
     drawTextCentered(ui, note[0], UW / 2, msgY, note[1], note[0].length * 12 < w ? 2 : 1);
 
     if (this.picks) { this.drawTallPicker(ui, x0, y, w, msgY - 10 - y); return; }
@@ -519,7 +534,7 @@ export class DeckBuilderScene implements Scene {
   private drawTallPicker(ui: Ctx, x: number, y: number, w: number, h: number): void {
     const picks = this.picks!;
     panel(ui, x - 6, y, w + 12, h);
-    drawTextCentered(ui, 'START YOUR GRIMOIRE FROM', UW / 2, y + 14, INK, 2, false);
+    drawTextCentered(ui, 'START YOUR SPELL DECK FROM', UW / 2, y + 14, INK, 2, false);
     const saved = loadCustom(this.cls);
     const rh = Math.min(TAP + 16, Math.floor((h - 44) / picks.length) - 6);
     picks.forEach((id, i) => {
@@ -528,7 +543,23 @@ export class DeckBuilderScene implements Scene {
       const sub = id === 'custom' ? (saved && !validate(saved).length ? 'SAVED, READY' : `SAVED, ${deckSize(saved ?? {})}/${DECK_SIZE} SPELLS`)
         : id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE OR PICK A FILE'
           : `MYTHIC: ${(this.cards.find(c => c.id === p!.mythic)?.name ?? '').toUpperCase()}`;
-      bigButton(ui, `pick:${i}`, name, x + 6, y + 40 + i * (rh + 6), w - 12, rh, { sub, scale: name.length * 12 < w - 30 ? 2 : 1 });
+      bigButton(ui, `pick:${i}`, name, x + 6, y + 40 + i * (rh + 6), w - 12, rh, { sub, scale: name.length * 12 < w - 30 ? 2 : 1, on: i === this.peek });
+    });
+    // the tapped deck's spells, and START to take it
+    const id = this.peek >= 0 ? picks[this.peek] : undefined;
+    if (!id) return;
+    const p = this.presets.find(q => q.id === id);
+    const list = id === 'custom' ? saved ?? {} : p?.cards ?? {};
+    const cards = this.cards.filter(c => list[c.id]), half = Math.ceil(cards.length / 2);
+    sheet(ui, 150 + Math.max(1, half) * 16 + 70, (sx, sy, sw, sh) => {
+      drawText(ui, id === 'custom' ? 'YOUR SPELL DECK' : p!.name.toUpperCase(), sx, sy, INK, 2);
+      drawText(ui, `${deckSize(list)} SPELLS`, sx + sw - textWidth(`${deckSize(list)} SPELLS`, 1), sy + 4, TRIM, 1);
+      if (!cards.length) drawText(ui, 'YOUR SPELL DECK IS EMPTY', sx, sy + 34, INK2, 1);
+      const cw = Math.floor(sw / 2), max = Math.floor((cw - 8) / 6);
+      cards.forEach((c, i) => drawText(ui, `${list[c.id]}X ${c.name.toUpperCase()}`.slice(0, max), sx + (i < half ? 0 : cw), sy + 32 + (i % half) * 16,
+        c.rarity === 'common' ? INK2 : ink(RARITY_COLOR[c.rarity]), 1));
+      if (id !== 'custom' && picks[0] === 'custom') drawText(ui, 'REPLACES YOUR SAVED SPELL DECK', sx, sy + sh - 84, RED_INK, 1);
+      bigButton(ui, 't:start', 'START FROM IT', sx, sy + sh - 66, sw, TAP, { primary: true });
     });
   }
 }
