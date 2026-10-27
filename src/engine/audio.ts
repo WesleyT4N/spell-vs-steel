@@ -1,4 +1,5 @@
 // WebAudio sound: realistic combat/spell effects (sfxReal), NES-style blips for menus, and a tiny SNES-style sequencer for the BGM.
+import { getSave, setSave } from './save';
 import { playReal, type RealOpts } from './sfxReal';
 import { playVoice, loadClips, type VoiceKind } from './voice';
 import { playCall, type Call } from './announcer';
@@ -11,14 +12,13 @@ let muted = false;
 
 /** Player audio settings. Volumes run 0-10. */
 export interface AudioSettings { master: number; sfx: number; music: number; sfxOn: boolean; musicOn: boolean; voice: number; announcer: number }
-const AUDIO_KEY = 'svs:audio';
-let settings: AudioSettings = { master: 8, sfx: 10, music: 10, sfxOn: true, musicOn: true, voice: 8, announcer: 8 };
-
-try {
-  muted = localStorage.getItem('svs:muted') === '1';
-  const raw = localStorage.getItem(AUDIO_KEY);
-  if (raw) settings = { ...settings, ...(JSON.parse(raw) as Partial<AudioSettings>) };
-} catch { /* storage blocked */ }
+const DEFAULT_AUDIO: AudioSettings = { master: 8, sfx: 10, music: 10, sfxOn: true, musicOn: true, voice: 8, announcer: 8 };
+let settings: AudioSettings = { ...DEFAULT_AUDIO };
+muted = getSave('muted');
+// keep only known settings of the right type, so a hand-edited save can't break the mix
+for (const [k, v] of Object.entries(getSave('audio'))) {
+  if (k in DEFAULT_AUDIO && typeof v === typeof DEFAULT_AUDIO[k as keyof AudioSettings]) (settings as unknown as Record<string, unknown>)[k] = v;
+}
 
 // Base mix levels at full volume.
 const MASTER = 1, SFX_LEVEL = 0.45, MUSIC_LEVEL = 0.32, VOICE_LEVEL = 0.5, ANN_LEVEL = 0.55;
@@ -41,7 +41,7 @@ function applyGains(): void {
 export const getAudioSettings = (): AudioSettings => ({ ...settings });
 export function setAudioSettings(patch: Partial<AudioSettings>): void {
   settings = { ...settings, ...patch };
-  try { localStorage.setItem(AUDIO_KEY, JSON.stringify(settings)); } catch { /* storage blocked */ }
+  setSave('audio', { ...settings });
   applyGains();
 }
 
@@ -87,7 +87,7 @@ export function unlockAudio(): void {
 
 export function toggleMute(): boolean {
   muted = !muted;
-  try { localStorage.setItem('svs:muted', muted ? '1' : '0'); } catch { /* storage blocked */ }
+  setSave('muted', muted);
   applyGains();
   return muted;
 }

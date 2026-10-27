@@ -1,10 +1,12 @@
 // Local Versus: runs a Battle, the custom screen, pause and results. Either side can be a player at this
 // keyboard or the CPU, so it covers you vs the CPU (on either side), two players on one keyboard, and CPU vs CPU.
-import { setScene, dim, drawMenu, hint, zone, zoneAt, hot, isHot, listMouse, showSel, resetSel, type Scene } from './scene';
+import { pushScene, replaceScene, popTo, goHome, dim, drawMenu, hint, zone, zoneAt, hot, isHot, listMouse, showSel, resetSel, type Scene } from './scene';
 import { CLASS_INFO } from '../game/classes';
 import { Battle, NO_INTENT, heavyChargeOf, type Dir, type Intent, type Side } from '../game/battle';
-import { drawBattle, drawBattleUi } from '../game/battleView';
+import { drawBattle, drawBattleUi, getArena } from '../game/battleView';
 import { Cpu } from '../game/ai';
+import { styleFor } from '../game/playstyles';
+import { substream } from '../game/rng';
 import { CARDS, ELEMENT_COLOR } from '../game/cards';
 
 // Draw screen layout (UI pixels): the hand fans along the bottom, details and cast order above it.
@@ -15,7 +17,7 @@ const LIFT = 12;
 import { deckLabel, rollDeck, sideDeck, sideName, type Ctl, type MatchConfig } from '../game/match';
 import { TUNING } from '../game/tuning';
 import { P, UW, screenRect, spread, view, mix, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered, textWidth } from '../engine/font';
+import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse, gesture, localDir, localDown, localPressed, localNav, localKey } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx, chargeHum, announce, voiceLine } from '../engine/audio';
@@ -27,8 +29,11 @@ import { bigButton, actionBar, barTapped, swipeIn, tallArea, TAP, GAP, PAD } fro
 import { CharSelectScene } from './select';
 import { StatsPanel, type StatsData } from './statsView';
 import { trackStats, roundRecord, setTotals, topSpell, type BattleStats, type RoundRecord } from '../game/stats';
-import { TitleScene } from './title';
 import { OptionsScene } from './options';
+import { recordRound, saveReplay, newReplayId, RULES_VERSION, type Replay, type ReplayMode, type RoundTape } from '../game/replay';
+
+/** The replay being recorded for each set, keyed by the set's list of rounds (a new set starts a new list). */
+const SET_REPLAYS = new WeakMap<RoundRecord[], Replay>();
 
 export class BattleScene implements Scene {
   b: Battle;
@@ -80,9 +85,12 @@ export class BattleScene implements Scene {
       { cls: m.p1, deck: sideDeck(m, 0, this.decks[0]), name: sideName(ctl, 0), skin: m.p1Skin[m.p1] },
       { cls: m.cpu, deck: sideDeck(m, 1, this.decks[1]), name: sideName(ctl, 1), skin: m.cpuSkin[m.cpu] },
     );
-    this.cpu = new Cpu(m.difficulty);
+    // the CPUs' styles come from the match seed too, so a seed replays the whole match
+    const pickStyle = substream(this.b.seed, 0x57);
+    this.cpu = new Cpu(m.difficulty, styleFor(m.cpu, m.difficulty, m.p1, pickStyle));
     this.stats = trackStats(this.b);
-    if (ctl[0] === 'cpu') this.cpu0 = new Cpu(m.difficulty);
+    if (this.keepsReplays) recordRound(this.b, t => this.keepRound(t));
+    if (ctl[0] === 'cpu') this.cpu0 = new Cpu(m.difficulty, styleFor(m.p1, m.difficulty, m.cpu, pickStyle));
     this.me = this.home;
     this.rivalName = sideName(ctl, this.home === 0 ? 1 : 0);
   }
@@ -112,6 +120,7 @@ export class BattleScene implements Scene {
   protected tallPause(): boolean { return true; }
   /** Where the bottom part of a split phone screen starts (full-screen UI coordinates). */
   protected get splitTop(): number { return -view.oy * 2 + spread.halfH * 2; }
+  resume(): void { playMusic('battle', BATTLE_SONG); }
 
   pad(): PadMode {
     const b = this.b;
@@ -152,7 +161,7 @@ export class BattleScene implements Scene {
     if (b.phase === 'fight' && pause) { this.paused = true; this.pauseSel = 0; resetSel(); sfx('select'); return; }
 
     // a player opens the Draw screen when the gauge is full; with nobody playing, the CPUs do, a moment after
-    const wantsDraw = this.watching ? Math.random() < 0.02 : this.humans.some(s => this.pressedOf(s, 'custom'));
+    const wantsDraw = this.watching ? !!this.cpu0?.wantsDraw(b, b.f[0], dt) : this.humans.some(s => this.pressedOf(s, 'custom'));
     if (b.phase === 'fight' && wantsDraw && b.canOpenCustom()) {
       b.beginCustom();
       this.openCustom();
@@ -317,18 +326,42 @@ export class BattleScene implements Scene {
     if (wasPressed('confirm') || clicked >= 0 || (wasPressed('pause') && this.pauseSel === 0)) {
       sfx('select');
       if (this.pauseSel === 0) this.paused = false;
-      if (this.pauseSel === 1) setScene(new OptionsScene(() => setScene(this)));
-      if (this.pauseSel === 2) setScene(this.again(this.score, this.rounds));
-      if (this.pauseSel === 3) { stopMusic(); setScene(new TitleScene()); }
+      if (this.pauseSel === 1) pushScene(new OptionsScene());
+      if (this.pauseSel === 2) replaceScene(this.again(this.score, this.rounds));
+      if (this.pauseSel === 3) { stopMusic(); goHome(); }
     }
   }
+
+  /** False where a round is not a real match (training, replays): nothing gets recorded. */
+  protected get keepsReplays(): boolean { return true; }
+  protected get replayMode(): ReplayMode { return this.watching ? 'watch' : this.twoPlayer ? 'versus' : 'cpu'; }
+
+  /** A round just ended: add it to this set's replay and save it, so even an unfinished set keeps its rounds. */
+  protected keepRound(t: RoundTape): void {
+    let r = SET_REPLAYS.get(this.rounds);
+    if (!r) {
+      r = { id: newReplayId(), v: RULES_VERSION, at: Date.now(), mode: this.replayMode, me: this.humans.length === 1 ? this.me : null, bestOf: this.m.bestOf, stage: getArena().id, rounds: [] };
+      SET_REPLAYS.set(this.rounds, r);
+    }
+    r.rounds.push(t);
+    r.at = Date.now();
+    saveReplay(r);
+    this.afterRound(r);
+  }
+
+  /** The set's replay so far, once a round of it has ended. */
+  protected get setReplay(): Replay | null { return SET_REPLAYS.get(this.rounds) ?? null; }
+  /** Called as each round ends, with the set's replay so far. */
+  protected afterRound(_r: Replay): void { /* online play scores ranked sets here */ }
+  /** An extra line on the results screen, under the score. */
+  protected resultNote(): string { return ''; }
 
   /** Hooks the online scene overrides. */
   protected rivalName = 'CPU';
   protected pauseItems = ['RESUME', 'OPTIONS', 'RESTART', 'QUIT TO TITLE'];
   protected rivalDeckText(): string {
     const foe: Side = this.me === 0 ? 1 : 0, f = this.b.f[foe];
-    return `${f.name} DECK: ${deckLabel(f.cls, this.decks[foe])}`;
+    return `${f.name} SPELL DECK: ${deckLabel(f.cls, this.decks[foe])}`;
   }
 
   /** The next round (or a fresh set) of this match; arcade fights carry their run along. */
@@ -370,10 +403,11 @@ export class BattleScene implements Scene {
 
   /** A results menu item was picked. */
   protected onResult(choice: string): void {
-    if (choice === 'NEXT ROUND') setScene(this.again(this.score, this.rounds));
-    if (choice === 'REMATCH') setScene(this.again([0, 0], []));
-    if (choice === 'CHARACTER SELECT') setScene(new CharSelectScene());
-    if (choice === 'TITLE') setScene(new TitleScene());
+    if (choice === 'NEXT ROUND') replaceScene(this.again(this.score, this.rounds));
+    if (choice === 'REMATCH') replaceScene(this.again([0, 0], []));
+    // back to the character select this match came from, picks intact
+    if (choice === 'CHARACTER SELECT') popTo(s => s instanceof CharSelectScene, () => new CharSelectScene());
+    if (choice === 'TITLE') goHome();
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
@@ -399,7 +433,7 @@ export class BattleScene implements Scene {
       const s = this.fightBanner > 0.45 ? 'READY' : 'FIGHT!';
       drawTextCentered(ui, s, UW / 2, 124, s === 'FIGHT!' ? '#f8b800' : '#fcfcfc', 6);
     }
-    if (b.phase === 'ko' && b.koT > 0.4) drawTextCentered(ui, 'K.O.', UW / 2, 116, '#f83800', 6);
+    if (b.phase === 'ko' && b.koT > 0.4) drawTextCentered(ui, b.winner === null ? 'DOUBLE K.O.' : 'K.O.', UW / 2, 116, '#f83800', b.winner === null ? 4 : 6);
     if (spread.tall) return;
     if (b.phase === 'over') this.drawResult(ui, tick);
     if (this.paused) {
@@ -436,7 +470,11 @@ export class BattleScene implements Scene {
       score = `${b.f[0].name} ${this.score[0]} - ${this.score[1]} ${b.f[1].name}`;
     }
     banner(ui, title, UW / 2, 6);
-    if (this.m.bestOf > 1) drawTextCentered(ui, score, UW / 2, 34, '#fcfcfc');
+    // the score, and any note (online ranked: the rating change) after it on the same line
+    const note = this.resultNote(), line = this.m.bestOf > 1 ? score : '';
+    const gap = line && note ? '   ' : '', x0 = Math.round(UW / 2 - textWidth(line + gap + note) / 2);
+    if (line) drawTextOutlined(ui, line, x0, 34, '#fcfcfc');
+    if (note) drawTextOutlined(ui, note, x0 + textWidth(line + gap), 34, '#f8b800');
     const data = this.statsData();
     this.statsPanel.draw(ui, data, 8, 46, 344, 254);
     const items = this.resultItems;

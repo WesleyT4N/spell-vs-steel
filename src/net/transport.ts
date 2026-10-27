@@ -15,6 +15,8 @@ export interface Transport {
   onPacket(cb: (p: Packet) => void): void;
   /** The link died for good (the other side may still show up again on a new one). */
   onClose(cb: (reason: string) => void): void;
+  /** The other side has gone quiet mid-match: rebuild the link if it can be (called every few seconds). */
+  revive?(): void;
   close(): void;
 }
 
@@ -84,14 +86,41 @@ function peerOptions(): PeerOptions {
 class PeerTransport extends Base implements Transport {
   readonly kind = 'peer';
   conn: DataConnection | null = null;
-  constructor(private peer: Peer) { super(); }
+  /** `hostId`: the guest's way back to the host when the data channel drops. */
+  constructor(private peer: Peer, private hostId?: string) {
+    super();
+    // lost the signaling server (needed to dial or be dialed again): get back on it with the same id
+    peer.on('disconnected', () => { if (!this.closed) setTimeout(() => this.rejoinServer(), 1000); });
+  }
   attach(c: DataConnection): void {
     if (this.conn && this.conn !== c) this.conn.close();
     this.conn = c;
-    c.on('data', d => this.deliver(d));
-    c.on('close', () => { if (this.conn === c) this.conn = null; });
+    c.on('data', d => { if (this.conn === c) this.deliver(d); });
+    c.on('close', () => {
+      if (this.conn !== c) return;
+      this.conn = null;
+      // the guest dials back; the host keeps listening for it
+      if (!this.closed && this.hostId) setTimeout(() => this.dial(), 500);
+    });
+    c.on('error', () => { /* the close handler or revive() takes it from here */ });
   }
-  send(p: Packet): void { if (this.conn?.open) this.conn.send(p); }
+  private rejoinServer(): void {
+    if (this.closed || this.peer.destroyed || !this.peer.disconnected) return;
+    try { this.peer.reconnect(); } catch { /* next revive() tries again */ }
+  }
+  private dial(): void {
+    if (this.closed || !this.hostId || this.peer.destroyed) return;
+    if (this.peer.disconnected) { this.rejoinServer(); return; }
+    if (this.conn?.open) return;
+    this.attach(this.peer.connect(this.hostId, { reliable: false, serialization: 'json' }));
+  }
+  revive(): void {
+    if (this.closed) return;
+    this.rejoinServer();
+    // a channel can sit "open" over a dead route for a long while: the guest drops it and dials again
+    if (this.hostId) { const c = this.conn; this.conn = null; c?.close(); this.dial(); }
+  }
+  send(p: Packet): void { if (this.conn?.open) try { this.conn.send(p); } catch { /* dropped; the next packet repeats it */ } }
   close(): void { this.closed = true; this.conn?.close(); this.peer.destroy(); }
   fail(reason: string): void { this.die(reason); }
 }
@@ -110,10 +139,11 @@ function openPeer(role: 'host' | 'guest', code: string): Promise<Transport> {
   return new Promise((resolve, reject) => {
     const id = `spell-vs-steel-${code}`;
     const peer = role === 'host' ? new Peer(id, peerOptions()) : new Peer(peerOptions());
-    const t = new PeerTransport(peer);
+    const t = new PeerTransport(peer, role === 'guest' ? id : undefined);
     let settled = false;
     const done = (err?: string): void => {
-      if (settled) { if (err) t.fail(err); return; }
+      // once playing, errors (server hiccups, a redial that missed) are left to reconnecting; only silence ends a match
+      if (settled) return;
       settled = true;
       clearTimeout(timer);
       if (err) { peer.destroy(); reject(new Error(err)); } else resolve(t);
@@ -154,24 +184,45 @@ function getRoom(): Promise<Room | null> {
 /** Packets ride in our presence as { c: room code, p: packet }; the code filters out other games in a shared room. */
 class RoomTransport extends Base implements Transport {
   readonly kind = 'room';
-  constructor(private r: NamedRoom, private code: string, private named: boolean) {
+  private unsub: (() => void) | null = null;
+  private rejoining = false;
+  constructor(private r: NamedRoom, private code: string, private named: boolean, private main: Room) {
     super();
-    r.onPeers(c => {
-      for (const p of [...c.joined, ...c.updated]) if (!p.sameTab && p.presence.c === code && p.presence.p) this.deliver(p.presence.p);
-    }, e => this.die(`ROOM ERROR (${e.code})`));
+    this.listen();
+  }
+  private listen(): void {
+    try { this.unsub?.(); } catch { /* already gone */ }
+    this.unsub = this.r.onPeers(c => {
+      for (const p of [...c.joined, ...c.updated]) if (!p.sameTab && p.presence.c === this.code && p.presence.p) this.deliver(p.presence.p);
+    }, () => { this.unsub = null; /* a mid-match room error: revive() rejoins; only silence ends the match */ });
+  }
+  /** Rejoin the room (and listen again) after an error or a long silence. */
+  revive(): void {
+    if (this.closed || this.rejoining) return;
+    this.rejoining = true;
+    const back = this.named ? this.main.join(roomName(this.code)) : Promise.resolve(this.r);
+    back.then(r => {
+      if (this.closed) { if (this.named) r.leave().catch(() => {}); return; }
+      if (r !== this.r && this.named) this.r.leave().catch(() => {});
+      this.r = r;
+      this.listen();
+    }, () => { /* try again on the next revive() */ }).finally(() => { this.rejoining = false; });
   }
   send(p: Packet): void { if (!this.closed) this.r.presence({ c: this.code, p }).catch(() => { /* dropped; the next packet repeats it */ }); }
   close(): void {
     this.closed = true;
+    try { this.unsub?.(); } catch { /* already gone */ }
     this.r.presence({ c: null, p: null }).catch(() => {});
     if (this.named) this.r.leave().catch(() => {});
   }
 }
 
+const roomName = (code: string): string => `svs-${code.toLowerCase()}`;
+
 async function openRoom(code: string): Promise<Transport> {
   const room = await getRoom();
   if (!room) throw new Error('ONLINE ROOMS ARE NOT AVAILABLE HERE');
   // a named room per code; where named rooms are refused, share the page's main room instead
-  try { return new RoomTransport(await room.join(`svs-${code.toLowerCase()}`), code, true); }
-  catch { return new RoomTransport(room, code, false); }
+  try { return new RoomTransport(await room.join(roomName(code)), code, true, room); }
+  catch { return new RoomTransport(room, code, false, room); }
 }

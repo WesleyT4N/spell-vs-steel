@@ -1,6 +1,9 @@
 // Dev tools menu: card encyclopedia, debug sandbox and balance lab.
-import { setScene, drawMenu, hint, listMouse, showSel, type Scene } from './scene';
-import { getArena } from '../game/battleView';
+import { pushScene, popScene, drawMenu, hint, listMouse, showSel, type Scene } from './scene';
+import { getArena, useStage } from '../game/battleView';
+import { BattleScene } from './battle';
+import { loadMatch } from '../game/match';
+import type { ClassId } from '../art/sprites';
 import { drawStage } from '../art/arena';
 import { UW, screenRect, spread, type Ctx } from '../engine/gfx';
 import { drawTextCentered } from '../engine/font';
@@ -20,22 +23,21 @@ const ABOUT = [
   '',
 ];
 
-export const openEncyclopedia = (back: () => void): void => {
-  const enc: EncyclopediaScene = new EncyclopediaScene(back, card => setScene(new SandboxScene(() => setScene(enc), { you: card.cls, queue: [card.id] })));
-  setScene(enc);
+/** The encyclopedia; TEST on a card opens the sandbox on top of it with that card queued. */
+export const openEncyclopedia = (): void => {
+  pushScene(new EncyclopediaScene(popScene, card => pushScene(new SandboxScene(popScene, { you: card.cls, queue: [card.id] }))));
 };
 
 export class DevMenuScene implements Scene {
   sel = 0;
 
-  constructor(private back: () => void) {}
+  constructor(private back: () => void = popScene) {}
 
   private open(i: number): void {
-    const here = (): void => setScene(new DevMenuScene(this.back));
-    if (i === 0) openEncyclopedia(here);
-    if (i === 1) setScene(new SandboxScene(here));
-    if (i === 2) setScene(new LabScene(here));
-    if (i === 3) setScene(new VoiceTestScene(here));
+    if (i === 0) openEncyclopedia();
+    if (i === 1) pushScene(new SandboxScene());
+    if (i === 2) pushScene(new LabScene());
+    if (i === 3) pushScene(new VoiceTestScene());
     if (i === 4) { sfx('back'); this.back(); }
   }
 
@@ -60,15 +62,21 @@ export class DevMenuScene implements Scene {
   }
 }
 
-/** Open a dev tool straight from the URL hash (#cards, #sandbox, #lab), for local work. */
-export function devFromHash(home: () => void): boolean {
+/** Open a dev tool straight from the URL hash (#cards, #sandbox, #lab), for local work. BACK leads to the dev menu, then the title.
+ *  #bench=stage[,classA,classB] starts a CPU vs CPU match to watch, for frame-rate profiling. */
+export function devFromHash(): boolean {
   const tag = location.hash.slice(1);
-  const menu = (): void => setScene(new DevMenuScene(home));
-  if (tag === 'cards') openEncyclopedia(menu);
-  else if (tag === 'sandbox') setScene(new SandboxScene(menu));
-  else if (tag === 'lab') setScene(new LabScene(menu));
-  else if (tag === 'voices') setScene(new VoiceTestScene(menu));
-  else if (tag === 'dev') menu();
-  else return false;
+  if (tag.startsWith('bench')) {
+    const [stage = 'colosseum', a = 'mage', b = 'priest'] = tag.split('=')[1]?.split(',') ?? [];
+    useStage(stage);
+    pushScene(new BattleScene({ ...loadMatch(), p1: a as ClassId, cpu: b as ClassId, p1Deck: 'starter', cpuDeck: 'starter', stage, bestOf: 5 }, [0, 0], undefined, [], ['cpu', 'cpu']));
+    return true;
+  }
+  if (!['cards', 'sandbox', 'lab', 'voices', 'dev'].includes(tag)) return false;
+  pushScene(new DevMenuScene());
+  if (tag === 'cards') openEncyclopedia();
+  else if (tag === 'sandbox') pushScene(new SandboxScene());
+  else if (tag === 'lab') pushScene(new LabScene());
+  else if (tag === 'voices') pushScene(new VoiceTestScene());
   return true;
 }

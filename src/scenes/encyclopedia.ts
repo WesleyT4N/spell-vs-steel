@@ -1,6 +1,6 @@
 // Card encyclopedia: every spell of every class as a browsable grid of card faces, with filters.
 // Classes come from the card list itself, so new classes appear here as soon as their cards exist.
-import { hint, zone, hot, isHot, button, type Scene } from './scene';
+import { popScene, hint, zone, hot, isHot, button, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import type { ClassId } from '../art/sprites';
@@ -41,7 +41,7 @@ export class EncyclopediaScene implements Scene {
   private preview = new CardPreview();
   private classes: ClassId[] = [...new Set(ALL_CARDS.map(c => c.cls))].filter(c => PLAYABLE.includes(c));
 
-  constructor(private back: () => void, private test?: (card: CardDef) => void) {}
+  constructor(private back: () => void = popScene, private test?: (card: CardDef) => void) {}
 
   // phones in portrait: filters on top, a scrolling grid, and a tapped card's rules in a sheet
   tall(): boolean { return true; }

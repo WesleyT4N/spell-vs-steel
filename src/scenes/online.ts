@@ -1,6 +1,6 @@
 // Online Versus lobby: create a room (and share its code or link) or join one. Fighters and the stage
 // are picked together once both players are in (see select.ts and stageSelect.ts).
-import { setScene, hint, zone, hot, isHot, listMouse, button, showSel, type Scene } from './scene';
+import { pushScene, replaceScene, popScene, hint, zone, hot, isHot, listMouse, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getSprite, drawFighterSprite, teamColor, skinOf } from '../art/sprites';
@@ -15,16 +15,18 @@ import { CODE_LEN, isCodeChar, newRoomCode } from '../net/protocol';
 import { NetSession } from '../net/session';
 import { openTransport, pickTransport, type TransportKind } from '../net/transport';
 import { CharSelectScene } from './select';
-import { TitleScene } from './title';
+import { RankedScene } from './ranked';
+import { LobbyScene } from './lobby';
+import { TournamentScene } from './tournament';
 import { win, selRow, banner, PAPER, BURN, INK, INK2, RED_INK, TRIM } from './skin';
 import { CLASS_INFO } from '../game/classes';
 
-const ROWS = ['MATCH', 'CREATE ROOM', 'JOIN ROOM'] as const;
+const ROWS = ['LOBBY', 'RANKED MATCH', 'TOURNAMENT', 'MATCH', 'CREATE ROOM', 'JOIN ROOM'] as const;
 type RowName = (typeof ROWS)[number];
 type Mode = 'menu' | 'code' | 'busy' | 'room' | 'error';
 
 const RX = 140, RW = UW - 164, Y0 = 44, RH = 18;
-const NET_NAME: Record<TransportKind, string> = { room: 'CLAUDE.AI ROOM', peer: 'PEER TO PEER (WEBRTC)', local: 'LOCAL TABS (TEST)' };
+const NET_NAME: Record<TransportKind, string> = { room: 'HOSTED ROOM', peer: 'PEER TO PEER (WEBRTC)', local: 'LOCAL TABS (TEST)' };
 
 export class OnlineScene implements Scene {
   /** How far the top half of the screen moves in phone portrait (set each draw). */
@@ -52,7 +54,7 @@ export class OnlineScene implements Scene {
       if (this.mode === 'code') { this.mode = 'menu'; captureNextKey(null); sfx('back'); }
       else if (this.mode === 'busy' || this.mode === 'room') this.cancel();
       else if (this.mode === 'error') { this.mode = 'menu'; sfx('back'); }
-      else { sfx('back'); setScene(new TitleScene()); }
+      else { sfx('back'); popScene(); }
       return true;
     }
     if (barTapped('primary') && this.mode === 'code' && this.code.length === CODE_LEN) { captureNextKey(null); this.connect('guest'); return true; }
@@ -82,6 +84,9 @@ export class OnlineScene implements Scene {
   }
 
   private activate(row: RowName): void {
+    if (row === 'LOBBY') { sfx('select'); saveMatch(this.m); pushScene(new LobbyScene()); return; }
+    if (row === 'TOURNAMENT') { sfx('select'); saveMatch(this.m); pushScene(new TournamentScene()); return; }
+    if (row === 'RANKED MATCH') { sfx('select'); saveMatch(this.m); pushScene(new RankedScene()); return; }
     if (row === 'CREATE ROOM') { this.code = newRoomCode(); this.connect('host'); return; }
     if (row === 'JOIN ROOM') { this.mode = 'code'; this.code = ''; this.typeCode(); sfx('select'); return; }
     this.change(row, 1);
@@ -136,8 +141,11 @@ export class OnlineScene implements Scene {
     return u.toString();
   }
 
+  /** Share the bare code where a link can't be opened by the other player (claude.ai rooms, the desktop app). */
+  private get codeOnly(): boolean { return this.kind === 'room' || !/^https?:$/.test(location.protocol); }
+
   private copy(): void {
-    const text = this.kind === 'room' ? this.code : this.link;
+    const text = this.codeOnly ? this.code : this.link;
     navigator.clipboard?.writeText(text).then(() => { this.copied = 2; sfx('select'); }, () => sfx('deny'));
   }
 
@@ -158,13 +166,13 @@ export class OnlineScene implements Scene {
       const net = this.net!;
       net.tick();
       if (net.status === 'error' || net.status === 'left') { this.net = null; this.fail(net.status === 'left' ? 'THE OTHER PLAYER LEFT' : net.error); return; }
-      if (net.matched) { sfx('confirm'); setScene(new CharSelectScene(net)); return; }
+      if (net.matched) { sfx('confirm'); replaceScene(new CharSelectScene(net)); return; }
       if (mouse.click && hot('btn') === 1) this.copy();
       if (back || (mouse.click && hot('btn') === 2)) this.cancel();
       return;
     }
 
-    if (back) { sfx('back'); setScene(new TitleScene()); return; }
+    if (back) { sfx('back'); popScene(); return; }
     if (mouse.click) {
       const arrow = hot('arrow');
       if (arrow >= 0) { this.sel = arrow >> 1; this.change(ROWS[this.sel], arrow & 1 ? 1 : -1); return; }
@@ -201,11 +209,11 @@ export class OnlineScene implements Scene {
     win(ui, 16, 176 + db, UW - 32, 112);
     drawText(ui, 'HOW IT WORKS', 26, 184 + db, RED_INK);
     const lines = [
-      'ONE PLAYER PICKS CREATE ROOM AND SHARES THE 5-LETTER CODE.',
+      'LOBBY: SEE WHO IS ON THIS PAGE, CHAT, AND CHALLENGE THEM.',
+      'RANKED MATCH FINDS A RIVAL NEAR YOUR RATING. TOURNAMENT: A BRACKET.',
+      'FOR A FRIENDLY, ONE PLAYER PICKS CREATE ROOM AND SHARES THE CODE.',
       'THE OTHER OPENS THIS SAME PAGE, PICKS JOIN ROOM, TYPES IT IN.',
-      'THEN BOTH PICK FIGHTERS AND VOTE ON THE STAGE (SPLIT VOTES',
-      'FLIP A COIN). THE HOST\'S MATCH LENGTH IS USED. EITHER PLAYER',
-      'CAN OPEN THE DRAW SCREEN. THERE IS NO PAUSE ONLINE.',
+      'THEN BOTH PICK FIGHTERS AND VOTE ON THE STAGE. NO PAUSE ONLINE.',
     ];
     lines.forEach((l, i) => drawText(ui, l, 26, 198 + db + i * 12, INK2));
     drawText(ui, `NETWORK: ${this.kind ? NET_NAME[this.kind] : 'CHECKING...'}`, 26, 266 + db, TRIM);
@@ -223,7 +231,7 @@ export class OnlineScene implements Scene {
       zone(`row:${i}`, RX - 6, y - 1, RW + 12, rh - 1);
       if (on) selRow(ui, RX - 6, y - 1, RW + 12, rh - 2);
       if (on && tick % 8 < 6) drawText(ui, '→', RX, ty, PAPER);
-      if (row === 'CREATE ROOM' || row === 'JOIN ROOM') {
+      if (row === 'LOBBY' || row === 'RANKED MATCH' || row === 'TOURNAMENT' || row === 'CREATE ROOM' || row === 'JOIN ROOM') {
         drawTextCentered(ui, row, RX + RW / 2, ty, RED_INK, 1, false);
         return;
       }
@@ -276,7 +284,7 @@ export class OnlineScene implements Scene {
     else status = `RIVAL: ${rival!.cls.toUpperCase()}   STARTING...`;
     drawTextCentered(ui, tick % 8 < 6 || net.matched ? status : '', cx, 100 + dy, net.matched ? '#007800' : INK, 1, false);
     if (rival) P(ui, teamColor(rival.cls, rival.skin, false), cx - textWidth(status) / 2 - 12, 100 + dy, 7, 7);
-    if (host) button(ui, 'btn:1', this.copied > 0 ? 'COPIED!' : this.kind === 'room' ? 'COPY CODE' : 'COPY LINK', cx - 104, 128 + dy, 100, 20, false, INK);
+    if (host) button(ui, 'btn:1', this.copied > 0 ? 'COPIED!' : this.codeOnly ? 'COPY CODE' : 'COPY LINK', cx - 104, 128 + dy, 100, 20, false, INK);
     button(ui, 'btn:2', 'CANCEL', host ? cx + 4 : cx - 50, 128 + dy, 100, 20, false, INK2);
   }
 

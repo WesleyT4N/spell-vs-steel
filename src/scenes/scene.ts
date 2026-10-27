@@ -1,39 +1,14 @@
-// Scene switching, mouse hit zones and small UI widgets shared by the menus.
+// Scene switching (the stack lives in stack.ts), mouse hit zones and small UI widgets shared by the menus.
 import { spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { win, selRow, plaque, footer, sepia, toInk, INK, INK2, TRIM } from './skin';
 import { mouse } from '../engine/input';
-import { touchActive, touchText, type PadMode } from '../engine/touch';
+import { touchActive, touchText } from '../engine/touch';
+import { onSceneSwitch } from './stack';
 
-export interface Scene {
-  update(dt: number): void;
-  /** `c` is the 240×160 world; `ui` is the 480×320 sharp layer drawn on top of it. */
-  draw(c: Ctx, tick: number, ui: Ctx): void;
-  enter?(): void;
-  /** Which touch controls this screen shows on phones (a BACK button when left out). */
-  pad?(): PadMode;
-  /**
-   * True when this screen has a full-height phone layout: in phone portrait it then takes the whole screen
-   * (`spread.tall`) instead of the top half, and draws its own touch controls (see touchUi.ts).
-   */
-  tall?(): boolean;
-  /**
-   * True when, in the full-height layout, the game still draws in the top part at its half-screen size and the
-   * screen's phone controls go underneath: `draw` paints the top part, then `drawBelow` paints the rest of the
-   * screen (and anything that covers the whole of it) in full-screen UI coordinates.
-   */
-  split?(): boolean;
-  drawBelow?(ui: Ctx, tick: number): void;
-}
-
-let current: Scene | null = null;
-export function setScene(s: Scene): void {
-  current = s;
-  fresh = true;
-  zones = []; nextZones = [];
-  s.enter?.();
-}
-export const getScene = (): Scene | null => current;
+export * from './stack';
+// every screen change starts with no hit zones and, on phones, nothing preselected
+onSceneSwitch(() => { fresh = true; zones = []; nextZones = []; });
 
 // ---------- nothing preselected on phones ----------
 // With keys a highlighted row is the cursor, so a menu opens with one. By touch it reads as a choice
@@ -57,6 +32,8 @@ export function zone(id: string, x: number, y: number, w: number, h: number): vo
 export function shiftZones(dy: number): void { zoneDY = dy; }
 /** Swap in the zones drawn this frame. Called by the main loop after drawing. */
 export function commitZones(): void { zones = nextZones; nextZones = []; }
+/** The clickable zones live this frame (for automated playtests). */
+export const liveZones = (): readonly Zone[] => zones;
 /** Id of the topmost zone under the pointer, or null. */
 export function hotZone(): string | null {
   for (let i = zones.length - 1; i >= 0; i--) {
