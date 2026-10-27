@@ -2,7 +2,7 @@
 // button for menus, a text box for typing room codes, and tap-friendly wording for the hints.
 // Menus themselves take taps on the canvas (see the finger handling in input.ts).
 import { virtualKey, releaseVirtual, getKey, keyName, type Bindable } from './input';
-import { view } from './gfx';
+import { view, spread } from './gfx';
 
 /** What the current screen needs: nothing, a back button, or the fight pad (`fight-ready` lights DRAW). */
 export type PadMode = 'none' | 'back' | 'fight' | 'fight-ready';
@@ -34,16 +34,17 @@ body.svs-portrait { align-items: flex-start; }
 .svs-pad [hidden] { display: none !important; }
 .svs-pad > * { position: absolute; pointer-events: auto; touch-action: none; box-sizing: border-box; }
 .svs-pad .over { opacity: 0.55; }
-.svs-dpad > div { position: absolute; background: #3c3c3c; border: 3px solid #fcfcfc; box-sizing: border-box; }
-.svs-dpad > .on { background: #f8b800; }
-.svs-dpad > .mid { border: 0; background: #3c3c3c; }
-.svs-btn { border-radius: 50%; border: 3px solid #fcfcfc; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
+.svs-dpad > div { position: absolute; background: #8c6020; border: 3px solid #fce0a8; box-sizing: border-box; box-shadow: inset 0 -4px 0 #503000; }
+.svs-dpad > .on { background: #f8b800; box-shadow: none; }
+.svs-dpad > .mid { border: 0; background: #8c6020; box-shadow: none; }
+.svs-btn { border-radius: 50%; border: 3px solid #fce0a8; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; box-shadow: inset 0 -5px 0 rgba(0,0,0,0.35); }
 .svs-btn small { font-size: 10px; margin-top: 3px; letter-spacing: 1px; }
-.svs-btn.on { filter: brightness(1.6); transform: scale(0.94); }
-.svs-pill { border-radius: 14px; border: 3px solid #7c7c7c; background: #000; display: flex; align-items: center; justify-content: center; font-size: 12px; letter-spacing: 1px; }
-.svs-pill.ready { border-color: #f8b800; color: #f8b800; }
-.svs-pill.on { background: #0000a8; }
-.svs-pill.big { font-size: 18px; letter-spacing: 2px; border-radius: 22px; }
+.svs-btn.on { filter: brightness(1.4); transform: scale(0.94); box-shadow: none; }
+.svs-pill { border-radius: 4px; border: 3px solid #503000; outline: 1px solid #000; background: #f0c880; color: #503000; display: flex; align-items: center; justify-content: center; font-size: 12px; letter-spacing: 1px; box-shadow: inset 0 -3px 0 #d8a060; }
+.svs-pill.ready { background: #a81000; color: #fce0a8; box-shadow: inset 0 -3px 0 #6c0800; }
+.svs-pill.on { filter: brightness(0.85); box-shadow: none; }
+.svs-pill.big { font-size: 18px; letter-spacing: 2px; }
+.svs-pill.big:not(.ready) { background: #503000; color: #ac7c00; border-color: #8c6020; box-shadow: none; }
 .svs-code { opacity: 0.01; font-size: 16px; border: 0; padding: 0; color: transparent; background: transparent; caret-color: transparent; }
 `;
 
@@ -61,7 +62,25 @@ const root = el('div', 'svs-pad');
 root.hidden = true;
 document.body.appendChild(root);
 
-const buzz = (): void => { try { navigator.vibrate?.(8); } catch { /* not allowed */ } };
+// ---------- touch settings (Options > Touch controls), saved in the browser ----------
+export type PadSize = 'S' | 'M' | 'L';
+export interface TouchSettings { size: PadSize; left: boolean; buzz: boolean }
+const SIZE_K: Record<PadSize, number> = { S: 0.82, M: 1, L: 1.16 };
+const touchSettings: TouchSettings = { size: 'M', left: false, buzz: true };
+try {
+  const saved = JSON.parse(localStorage.getItem('svs:touch') || '{}') as Partial<TouchSettings>;
+  if (saved.size === 'S' || saved.size === 'M' || saved.size === 'L') touchSettings.size = saved.size;
+  if (typeof saved.left === 'boolean') touchSettings.left = saved.left;
+  if (typeof saved.buzz === 'boolean') touchSettings.buzz = saved.buzz;
+} catch { /* storage blocked */ }
+export const getTouchSettings = (): Readonly<TouchSettings> => touchSettings;
+export function setTouchSettings(to: Partial<TouchSettings>): void {
+  Object.assign(touchSettings, to);
+  try { localStorage.setItem('svs:touch', JSON.stringify(touchSettings)); } catch { /* storage blocked */ }
+  layout();
+}
+
+const buzz = (): void => { if (!touchSettings.buzz) return; try { navigator.vibrate?.(8); } catch { /* not allowed */ } };
 
 /** A button that holds a Pad code down while a finger is on it. */
 function holdButton(e: HTMLElement, code: string): void {
@@ -129,9 +148,9 @@ function roundButton(code: string, bg: string): { e: HTMLDivElement; key: HTMLSp
   holdButton(e, code);
   return { e, key };
 }
-const attack = roundButton('PadAttack', '#a80020');
+const attack = roundButton('PadAttack', '#a81000');
 el('small', '', attack.e).textContent = 'ATTACK';
-const cast = roundButton('PadCast', '#0058f8');
+const cast = roundButton('PadCast', '#0028a8');
 el('small', '', cast.e).textContent = 'CAST';
 const pill = (code: string, label: string): HTMLDivElement => {
   const e = el('div', 'svs-pill', root);
@@ -189,6 +208,16 @@ const place = (e: HTMLElement, x: number, y: number, w: number, h: number, canva
 };
 
 
+// the notch and home bar: phones report them as CSS env() values, read back through a hidden probe
+const safeProbe = el('div', '');
+safeProbe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
+document.body.appendChild(safeProbe);
+/** Screen space under the notch (top) and the home bar (bottom), in CSS pixels. 0 on most screens. */
+export function safeInsets(): { top: number; bottom: number } {
+  const st = getComputedStyle(safeProbe);
+  return { top: parseFloat(st.paddingTop) || 0, bottom: parseFloat(st.paddingBottom) || 0 };
+}
+
 /** Visible screen size. Phones can grow the layout viewport past the screen when anything overflows, so trust the visual one. */
 export function viewport(): [number, number] {
   const v = window.visualViewport;
@@ -200,16 +229,19 @@ export function layout(canvas = canvasEl): void {
   canvasEl = canvas;
   document.documentElement.classList.toggle('svs-touch', active);
   if (!canvas) return;
-  const screen = canvas.getBoundingClientRect();
+  const full = canvas.getBoundingClientRect();
+  // a full-height phone screen keeps the game in its top part (as tall as the half-screen layout) and the pad below it
+  const screen = spread.tall ? new DOMRect(full.left, full.top, full.width, full.height * spread.halfH / view.h) : full;
+  const oy = spread.tall ? (spread.halfH - 160) / 2 : view.oy;
   // the game itself, centered on a screen that may show extra stage around it; buttons keep off it
   const k = screen.width / view.w;
-  const r = new DOMRect(screen.left + view.ox * k, screen.top + view.oy * k, screen.width - 2 * view.ox * k, screen.height - 2 * view.oy * k);
+  const r = new DOMRect(screen.left + view.ox * k, screen.top + oy * k, screen.width - 2 * view.ox * k, screen.height - 2 * oy * k);
   const [vw, vh] = viewport();
   let size: number, cy: number, dx: number, ax: number;
   if (vh > vw) {
     // portrait: the screen sits on top, the pad underneath like a handheld
     const below = vh - screen.bottom;
-    size = Math.min(180, vw * 0.42, below * 0.62);
+    size = Math.min(180 * SIZE_K[touchSettings.size], vw * 0.46, below * 0.68);
     cy = screen.bottom + below * 0.5;
     dx = 14 + size / 2;
     ax = vw - 14 - size / 2;
@@ -218,7 +250,7 @@ export function layout(canvas = canvasEl): void {
     place(draw, ax - size * 0.5, cy - size / 2 - 60, size, 46, r);
   } else {
     // landscape: thumbs on either side of the screen
-    size = Math.min(160, vh * 0.38);
+    size = Math.min(160 * SIZE_K[touchSettings.size], vh * 0.44);
     cy = Math.min(vh - size / 2 - 14, r.top + r.height * 0.64);
     const side = (vw - r.width) / 2;
     dx = Math.max(10 + size / 2, side / 2);
@@ -228,6 +260,12 @@ export function layout(canvas = canvasEl): void {
     // DRAW over the buttons, kept off the screen when the side has room
     const w = Math.max(size * 0.8, Math.min(size, side - 12));
     place(draw, ax - w / 2, cy - size / 2 - 54, w, 42, r);
+  }
+  // left-handed: the buttons go under the left thumb and the d-pad under the right
+  if (touchSettings.left) {
+    [dx, ax] = [ax, dx];
+    const st = draw.style, w = parseFloat(st.width);
+    place(draw, vw - parseFloat(st.left) - w, parseFloat(st.top), w, parseFloat(st.height), r);
   }
   place(dpad, dx - size / 2, cy - size / 2, size, size, r);
   const arm = size / 3;
