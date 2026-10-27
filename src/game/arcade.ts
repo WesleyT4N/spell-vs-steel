@@ -2,7 +2,7 @@
 // A run lives in memory; only the best clear per class is saved.
 import { getSave, setSave } from '../engine/save';
 import { SKINS, mirrorSkin, skinOf, type ClassId } from '../art/sprites';
-import { STAGE_IDS } from '../art/stages';
+import { STAGE_IDS } from '../content/stages';
 import { PLAYABLE } from './classes';
 import { presetsFor } from './deck';
 import type { MatchConfig } from './match';

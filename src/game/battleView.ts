@@ -1,7 +1,7 @@
 // Draws a Battle: arena, panels, fighters, spell effects and the HUD.
 import { k } from '../engine/input';
 import { drawPanel, drawHole, drawStage, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState, type PanelTint } from '../art/arena';
-import { getStage } from '../art/stages';
+import { getStage } from '../content/stages';
 import type { Stage } from '../art/arena';
 import { getSprite, getFrame, drawFighterSprite, drawFighterPosed, teamColor, type Tint } from '../art/sprites';
 import type { FrameId } from '../art/fighterFrames';
@@ -17,6 +17,7 @@ import type { Battle, BlessKind, Fighter, Fx, Warn, Pet, Projectile, Side, Statu
 import { CLASS_INFO } from './classes';
 import { drawOver, drawUnder, lookOf, observe } from './fighterAnim';
 
+import { frozen, holdFrame, kickOffset, noteImpacts } from './hitFeel';
 import { ARC, FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, useParticles } from './fxView';
 
 /** Whose hidden things (traps, a stealthed fighter) are visible: one side's, or everything in the dev sandbox. */
@@ -28,11 +29,15 @@ export const getArena = (): Stage => (arena ??= getStage('colosseum'));
 /** Switch the stage that fights (and menus) are drawn on. */
 export function useStage(id: string): void { arena = getStage(id); }
 
-export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): void {
+/** `hitStop` holds the picture for a moment on solid hits (the fight itself never pauses). Off for card previews. */
+export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitStop = false): void {
+  if (hitStop && frozen(b)) { holdFrame(c, b); return; }
   const a = getArena();
   useParticles(b);
   c.save();
+  const kick = kickOffset(b);
   if (b.shake > 0) c.translate(Math.round((Math.random() - 0.5) * 4 * Math.min(1, b.shake * 4)), Math.round((Math.random() - 0.5) * 3 * Math.min(1, b.shake * 4)));
+  if (kick.x || kick.y) c.translate(kick.x, kick.y);
   drawStage(c, a, tick, b.cheer);
 
   // panels
@@ -83,6 +88,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0): voi
   for (const e of b.fx) drawFx(c, b, e);
   drawParticles(c, b);
   c.restore();
+  noteImpacts(c, b, hitStop);
 }
 
 /** When each panel's crack and hole appeared, in battle time: view-only, for the crack-in and crumble animations. */
@@ -618,7 +624,12 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0, sha
   for (const t of b.texts) {
     const pc = panelFoot(t.x, t.y);
     const big = /^\d+$/.test(t.text);
-    drawTextCentered(ui, t.text, pc.x * UI, (pc.y - 34) * UI - t.t * 28, t.color, big ? 2 : 1);
+    if (!big) { drawTextCentered(ui, t.text, pc.x * UI, (pc.y - 34) * UI - t.t * 28, t.color, 1); continue; }
+    // damage numbers pop in a size up and white-hot, then settle into the element color as they float off
+    const n = Number(t.text), pop = t.t < 0.07;
+    const scale = (n >= 80 ? 3 : 2) + (pop ? 1 : 0);
+    const k = Math.min(1, t.t / 0.35), rise = 22 * (1 - (1 - k) * (1 - k)) + Math.max(0, t.t - 0.35) * 12;
+    drawTextCentered(ui, t.text, pc.x * UI, (pc.y - 34) * UI - rise - (pop ? 4 : 0), pop ? '#fcfcfc' : t.color, scale);
   }
   for (const f of b.f) drawFighterHud(ui, b, f, tick);
   for (const f of b.f) drawChargeBar(ui, b, f, tick);

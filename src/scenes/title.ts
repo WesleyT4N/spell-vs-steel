@@ -11,7 +11,6 @@ import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engi
 import { wasPressed, navPressed, anyPressed, k, mouse, page } from '../engine/input';
 import type { PadMode } from '../engine/touch';
 import { playMusic, sfx, isMuted } from '../engine/audio';
-import { MENU_SONG } from '../engine/music';
 import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { OptionsScene } from './options';
@@ -21,8 +20,10 @@ import { tutorialDone } from './tutorial';
 import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
 import { RED_INK } from './skin';
+import { platform } from '../platform';
 
-const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'SPELL DECK BUILDER', 'REPLAYS', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : [])];
+// QUIT only in an app that can close itself (a web page can't)
+const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'SPELL DECK BUILDER', 'REPLAYS', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : []), ...(platform.lifecycle.canQuit ? ['QUIT'] : [])];
 
 // eight rows (nine in dev builds) still clear the version line
 const MENU_Y = ITEMS.length > 8 ? 156 : ITEMS.length > 7 ? 162 : ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 8 ? 14 : ITEMS.length > 7 ? 15 : ITEMS.length > 6 ? 16 : 18;
@@ -129,9 +130,9 @@ export class TitleScene implements Scene {
   /** Drifting motes in the air, x/y in world pixels. */
   motes = Array.from({ length: 14 }, (_, i) => ({ x: (i * 53) % W, y: 40 + ((i * 37) % 100), s: 6 + (i % 4) * 3 }));
 
-  enter(): void { playMusic('menu', MENU_SONG); }
+  enter(): void { playMusic('menu'); }
   // a screen opened from here (the sandbox, a fight) may have changed the music
-  resume(): void { playMusic('menu', MENU_SONG); }
+  resume(): void { playMusic('menu'); }
   pad(): PadMode { return 'none'; }
 
   /** The side about to be knocked out, and the one knocking it. */
@@ -190,6 +191,7 @@ export class TitleScene implements Scene {
       if (item === 'REPLAYS') pushScene(new ReplaysScene());
       if (item === 'OPTIONS') pushScene(new OptionsScene());
       // loaded on demand, so the prod build (DEV_TOOLS off) carries none of the dev tools code
+      if (item === 'QUIT') platform.lifecycle.quit();
       if (item === 'DEV TOOLS' && DEV_TOOLS) void import('./devMenu').then(m => pushScene(new m.DevMenuScene()));
     }
   }

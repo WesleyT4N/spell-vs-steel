@@ -3,7 +3,7 @@
 import { replaceScene, goHome, drawMenu, hint, listMouse, type Scene } from './scene';
 import { getArena, useStage } from '../game/battleView';
 import { drawStage } from '../art/arena';
-import { getStage } from '../art/stages';
+import { getStage } from '../content/stages';
 import { getSprite, drawFighterSprite, skinOf, type ClassId } from '../art/sprites';
 import { CLASS_INFO } from '../game/classes';
 import { TUNING } from '../game/tuning';
@@ -16,7 +16,6 @@ import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import type { PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx } from '../engine/audio';
-import { MENU_SONG, RESULT_SONG } from '../engine/music';
 import { win, plaque, banner, FRAME, GOLD, INK, INK2, TRIM, RED_INK, BLUE_INK } from './skin';
 import { BattleScene } from './battle';
 import type { ReplayMode } from '../game/replay';
@@ -33,7 +32,7 @@ export class ArcadeLadderScene implements Scene {
   t = 0;
   constructor(private run: ArcadeRun) {}
 
-  enter(): void { playMusic('menu', MENU_SONG); }
+  enter(): void { playMusic('menu'); }
   pad(): PadMode { return 'none'; }
 
   private get items(): string[] { return [this.run.ladder[this.run.at].boss ? 'FACE THE BOSS!' : 'FIGHT!', 'GIVE UP']; }
@@ -169,7 +168,7 @@ export class ArcadeClearScene implements Scene {
   constructor(private run: ArcadeRun) {
     this.record = saveClear(run.m.p1, { time: run.time, continues: run.continues });
   }
-  enter(): void { playMusic('result', RESULT_SONG); sfx('win'); }
+  enter(): void { playMusic('victory'); sfx('win'); }
   pad(): PadMode { return 'none'; }
 
   update(dt: number): void {
