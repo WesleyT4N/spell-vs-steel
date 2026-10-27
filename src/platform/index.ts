@@ -35,13 +35,25 @@ export interface Platform {
   lifecycle: PlatformLifecycle;
 }
 
-/** What a native shell provides; every part is optional. */
-export type NativePlatform = Partial<Platform> & { id: Platform['id'] };
+/** What a native shell provides; every part, and every function in a part, is optional. */
+export interface NativePlatform {
+  id: Platform['id'];
+  storage?: Partial<PlatformStorage>;
+  fullscreen?: Partial<PlatformFullscreen>;
+  lifecycle?: Partial<PlatformLifecycle>;
+}
 
 function detect(): Platform {
   const web: Platform = { id: 'web', storage: webStorage, fullscreen: webFullscreen, lifecycle: webLifecycle };
   const native = typeof window === 'undefined' ? undefined : (window as unknown as { svsNative?: NativePlatform }).svsNative;
-  return native ? { ...web, ...native } : web;
+  if (!native) return web;
+  // a shell may give only some functions of a part (say QUIT, but not the background events)
+  return {
+    id: native.id,
+    storage: native.storage ? { ...web.storage, ...native.storage } : web.storage,
+    fullscreen: { ...web.fullscreen, ...native.fullscreen },
+    lifecycle: { ...web.lifecycle, ...native.lifecycle },
+  };
 }
 
 export const platform: Platform = detect();
