@@ -1,14 +1,14 @@
-// Stage select: a live preview of the stage under the cursor with both fighters on it, and a row of stage tiles.
-// Online, each player votes; the same pick comes out on both machines (a tie wins, otherwise a seeded coin
+// Stage select, the last step before a fight: a live preview of the stage under the cursor with both fighters
+// on it, and a row of stage tiles. Clicking or tapping a tile only picks it; FIGHT! (or OK) starts. Online, each player votes; the same pick comes out on both machines (a tie wins, otherwise a seeded coin
 // flip between the two votes, shown as a roulette).
-import { replaceScene, popScene, goHome, hint, zone, hot, showSel, type Scene } from './scene';
+import { replaceScene, popScene, goHome, hint, zone, hot, isHot, showSel, type Scene } from './scene';
 import { getStage, STAGE_IDS } from '../content/stages';
 import { drawPanel, drawStage, panelFoot } from '../art/arena';
 import { useStage } from '../game/battleView';
 import { getSprite, drawFighterSprite, skinOf, mirrorSkin } from '../art/sprites';
 import { P, W, H, UW, rng, screenRect, fillScreen, vy, spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
-import { win, plaque, banner, FRAME, GOLD, PAPER, INK, INK2, RED_INK } from './skin';
+import { win, plaque, banner, stepTrail, FRAME, GOLD, PAPER, INK, INK2, RED_INK } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx, preloadMusic, stageTrack } from '../engine/audio';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
@@ -27,6 +27,8 @@ const ROULETTE = 2.4, REVEAL = 1.2;
 const VX = 120, PREVIEW_Y = 28;              // live preview, 240x160 (half the fight's size)
 const TW = 60, TH = 40, TGAP = 4, TILE_Y = 238;
 const TX0 = Math.round(UW / 2 - (TILES.length * TW + (TILES.length - 1) * TGAP) / 2);
+/** FIGHT! sits right of the stage's name plate. */
+const FX = UW - 100, FW = 88, FH = 36;
 
 /**
  * The stage both machines play, from the host's and the guest's votes. A RANDOM vote rolls first;
@@ -167,19 +169,17 @@ export class StageSelectScene implements Scene {
     if (this.voted) { this.view = this.tileStage(net!.lobby.stage); return; }
 
     const h = hot('stile');
-    if (mouse.moved && h >= 0 && h !== this.cur) { this.cur = h; sfx('move'); }
     const l = navPressed('left', dt), r = navPressed('right', dt);
     if (l || r) { this.cur = (this.cur + (r ? 1 : -1) + TILES.length) % TILES.length; sfx('move'); }
     // phones: swipe the preview through the stages, and FIGHT in the bar picks
     const sw = spread.tall ? swipeIn(...this.previewRect) : 0;
     if (sw) { this.cur = (this.cur + sw + TILES.length) % TILES.length; sfx('move'); }
     if (spread.tall && barTapped('primary')) { if (net) net.lobby = { ...net.lobby, stage: TILES[this.cur] }; this.view = this.cursorStage(); this.vote(); return; }
+    // a click or tap on a tile only picks it; FIGHT! (VOTE online) or OK starts
+    if (mouse.click && h >= 0 && h !== this.cur) { this.cur = h; sfx('move'); }
     if (net) net.lobby = { ...net.lobby, stage: TILES[this.cur] };
     this.view = this.cursorStage();
-    if ((mouse.click && h >= 0) || wasPressed('confirm') || wasPressed('custom')) {
-      if (mouse.click && h >= 0) this.cur = h;
-      this.vote();
-    }
+    if ((mouse.click && isHot('fight')) || wasPressed('confirm') || wasPressed('custom')) this.vote();
   }
 
   /** A vote as a stage to show ('random' shows a cycling stage). */
@@ -208,6 +208,7 @@ export class StageSelectScene implements Scene {
     ui.drawImage(this.preview, VX, previewY);
 
     banner(ui, 'SELECT STAGE', UW / 2, vy(2));
+    stepTrail(ui, 2, 58, ny - 2, { stack: true });
     win(ui, UW / 2 - 130, ny, 260, 36, { burn: 3 });
     drawTextCentered(ui, st.name.toUpperCase(), UW / 2, ny + 5, INK, 2, false);
     drawTextCentered(ui, st.tag.toUpperCase(), UW / 2, ny + 23, INK2, 1, false);
@@ -242,6 +243,13 @@ export class StageSelectScene implements Scene {
       } else if (mine && showSel()) tag('YOU', '#d82800', false, true);
     });
 
+    // FIGHT! starts on the picked stage (online it casts your vote)
+    if (!this.voted) {
+      zone('fight', FX, ny, FW, FH);
+      const text = plaque(ui, FX, ny, FW, FH, true, isHot('fight') ? GOLD : FRAME);
+      drawTextCentered(ui, net ? 'VOTE' : 'FIGHT!', FX + FW / 2, ny + 11, text, 2, false);
+    }
+
     let status = '';
     if (this.final && this.t >= ROULETTE) status = tick % 8 < 6 ? 'GET READY!' : '';
     else if (this.final) status = 'VOTES SPLIT: FLIPPING A COIN...';
@@ -255,7 +263,7 @@ export class StageSelectScene implements Scene {
       hint(ui, 'CLICK: BACK TO TITLE');
       return;
     }
-    hint(ui, `${k('left')}/${k('right')} OR HOVER: CHOOSE   ${k('attack')} / CLICK: ${net ? 'VOTE' : 'FIGHT'}   ${k('cast')} / RIGHT-CLICK: ${net ? 'LEAVE' : 'BACK'}`);
+    hint(ui, `${k('left')}/${k('right')} OR CLICK: CHOOSE   ${k('attack')} / ${net ? 'VOTE' : 'FIGHT!'}: ${net ? 'VOTE' : 'START'}   ${k('cast')} / RIGHT-CLICK: ${net ? 'LEAVE' : 'BACK'}`);
   }
 
   /** The full-height phone layout: the preview at the fight's own size, edge to edge, and big stage tiles under it. */
@@ -265,6 +273,8 @@ export class StageSelectScene implements Scene {
     let y = a.y + 12;
     banner(ui, 'SELECT STAGE', UW / 2, y);
     y += 38;
+    stepTrail(ui, 2, UW / 2, y, { scale: 2 });
+    y += 22 + GAP;
     // 2x, like the fight: the preview is 480 wide, the whole screen
     P(ui, FRAME, a.x, y - 3, a.w, H * 2 + 6);
     ui.drawImage(this.preview, a.x, y, W * 2, H * 2);

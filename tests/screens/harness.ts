@@ -11,6 +11,7 @@ import { OptionsScene } from '../../src/scenes/options';
 import { ControlsScene } from '../../src/scenes/controls';
 import { CharSelectScene } from '../../src/scenes/select';
 import { StageSelectScene } from '../../src/scenes/stageSelect';
+import { DeckSelectScene } from '../../src/scenes/deckSelect';
 import { DeckBuilderScene } from '../../src/scenes/deckbuilder';
 import { OnlineScene } from '../../src/scenes/online';
 import { BattleScene } from '../../src/scenes/battle';
@@ -153,7 +154,12 @@ const screens: Record<string, () => void> = {
   'select-skin': () => setScene(new CharSelectScene(undefined, 1)),
   'select-rival': () => setScene(new CharSelectScene(undefined, 2)),
   'select-rival-skin': () => setScene(new CharSelectScene(undefined, 3)),
-  'select-decks': () => setScene(new CharSelectScene(undefined, 4)),
+  // the spell deck select: both sides in versus, the cursor on the CPU's list, on the bottom row; arcade and training
+  'deck-select': () => setScene(new DeckSelectScene()),
+  'deck-select-cpu': () => { const d = new DeckSelectScene(); d.side = 1; setScene(d); },
+  'deck-select-options': () => { const d = new DeckSelectScene(); d.low = true; d.chip = 1; setScene(d); },
+  'deck-select-arcade': () => setScene(new DeckSelectScene('arcade')),
+  'deck-select-training': () => setScene(new DeckSelectScene('training')),
   'select-training': () => setScene(new CharSelectScene(undefined, 0, 'training')),
   'select-tutorial': () => setScene(new CharSelectScene(undefined, 0, 'tutorial')),
   'stage-select': () => setScene(new StageSelectScene()),
