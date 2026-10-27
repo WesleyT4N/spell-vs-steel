@@ -113,6 +113,11 @@ export class BattleScene implements Scene {
   enter(): void { playMusic(stageTrack(getArena().id)); }
   resume(): void { playMusic(stageTrack(getArena().id)); }
 
+  /** Tabbing away mid-fight pauses it (online play keeps running: the other side decides). */
+  suspend(): void {
+    if (this.b.phase === 'fight' && !this.paused && !this.watching) { this.paused = true; this.pauseSel = 0; resetSel(); }
+  }
+
   pad(): PadMode {
     const b = this.b;
     if (this.paused) return 'back';
