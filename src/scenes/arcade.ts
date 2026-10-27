@@ -79,7 +79,7 @@ export class ArcadeLadderScene implements Scene {
       const hidden = r.boss && !now;
       drawFighterSprite(ui, getSprite(r.cls, r.skin, false), RX + 20, y + RH - 2, true, hidden ? 'ghost' : 'none', 1);
       drawText(ui, r.boss ? (hidden ? 'BOSS  ???' : `BOSS  ${BOSS_NAME}`) : `${i + 1}  ${CLASS_INFO[r.cls].name}`, RX + 38, y + 6, text, 1);
-      drawText(ui, r.boss ? 'HARD+' : LEVEL[r.difficulty], RX + 38, y + 16, now ? text : INK2, 1);
+      drawText(ui, r.boss ? 'HARD  FULL POWER' : `${LEVEL[r.difficulty]}  ${Math.round(r.power * 100)}% POWER`, RX + 38, y + 16, now ? text : INK2, 1);
       if (done) drawTextCentered(ui, 'CLEAR', RX + RW - 30, y + 10, RED_INK, 1, false);
     });
 
@@ -90,7 +90,7 @@ export class ArcadeLadderScene implements Scene {
     drawFighterSprite(ui, getSprite(next.cls, next.skin, false), rcx, py + 92 - (Math.floor(tick / 4 + 1) % 2) * 2, true, 'none', 3);
     drawTextCentered(ui, next.boss ? BOSS_NAME : CLASS_INFO[next.cls].name, rcx, py + 100, INK, 2, false);
     const lines = [deckLabel(next.cls, next.deck), `CPU ${LEVEL[next.difficulty]}`, getStage(next.stage).name.toUpperCase()];
-    if (next.boss) lines.push(`HP x${BOSS_HP}`);
+    lines.push(next.boss ? `FULL KIT  HP x${BOSS_HP}` : `${Math.round(next.power * 100)}% POWER`);
     lines.forEach((l, i) => drawTextCentered(ui, l, rcx, py + 124 + i * 12, i ? INK2 : TRIM, 1, false));
 
     drawMenu(ui, this.items, this.sel, UW / 2, vy(PY + SIDE_H + 12), tick, { width: 160, gap: 18 });
@@ -114,11 +114,11 @@ export class ArcadeBattleScene extends BattleScene {
     this.rivalName = rung.boss ? BOSS_NAME : 'CPU';
     // GIVE UP stands where QUIT TO TITLE does, and does the same
     this.pauseItems = ['RESUME', 'OPTIONS', 'RESTART', 'GIVE UP'];
-    if (rung.boss) {
-      const f = this.b.f[1];
-      f.name = BOSS_NAME;
-      f.maxHp = f.hp = Math.round(TUNING.hp[f.cls as ClassId] * BOSS_HP);
-    }
+    // rivals fight with a weakened kit (less HP, less damage); the boss at full power with extra HP
+    const f = this.b.f[1];
+    f.power = rung.power;
+    f.maxHp = f.hp = Math.round(TUNING.hp[f.cls as ClassId] * (rung.boss ? BOSS_HP : rung.power));
+    if (rung.boss) f.name = BOSS_NAME;
   }
 
   protected get replayMode(): ReplayMode { return 'arcade'; }

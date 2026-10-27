@@ -41,6 +41,8 @@ export interface Fighter {
   name: string;
   hp: number;
   maxHp: number;
+  /** Multiplies the damage this fighter deals (1 everywhere but arcade's weakened rivals). */
+  power: number;
   col: number;
   row: number;
   /** Pixel offset for dashes and leaps (drawing only). */
@@ -1143,6 +1145,7 @@ export class Battle {
   damage(target: Fighter, base: number, src: Fighter | null, opts: HitOpts): { dealt: number; broke: boolean; blocked: boolean } {
     const out = { dealt: 0, broke: false, blocked: false };
     if (target.dead || base <= 0) return out;
+    if (src && src !== target) base *= src.power;
     if (target.st.iceBlock > 0) { this.text(target, 'IMMUNE', '#a4e4fc'); return out; }
     if (!opts.dot && (target.st.untargetable > 0 || (opts.targeted && target.st.stealth > 0))) { this.text(target, 'MISS', '#bcbcbc'); return out; }
     if (opts.spell && target.st.spellImmune > 0) { this.text(target, 'IMMUNE', '#9878f8'); return out; }
@@ -1461,7 +1464,7 @@ function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => nu
   for (const k of STATUS_KEYS) st[k] = 0;
   const maxHp = TUNING.hp[cls];
   return {
-    side, cls, skin: spec.skin ?? defaultSkin(cls), alt, name, hp: maxHp, maxHp,
+    side, cls, skin: spec.skin ?? defaultSkin(cls), alt, name, hp: maxHp, maxHp, power: 1,
     col: side === 0 ? 1 : 4, row: 1, dx: 0, dy: 0,
     lock: 0, moveCd: 0, stepCd: 0, moveBuf: null, castCd: 0, charging: false, charge: 0,
     res: START_RES[cls],
