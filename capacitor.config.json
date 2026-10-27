@@ -1,0 +1,8 @@
+{
+  "appId": "com.wesleyt4n.spellvssteel",
+  "appName": "Spell VS Steel",
+  "webDir": "dist-prod",
+  "android": {
+    "backgroundColor": "#000000"
+  }
+}
