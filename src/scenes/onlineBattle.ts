@@ -1,34 +1,34 @@
-// An online round: the Versus scene, driven by the lockstep session instead of a CPU.
-import { setScene, dim, hint, resetSel } from './scene';
+// An online round: the Versus scene, driven by rollback netcode (src/net/netplay.ts) instead of a CPU.
+import { replaceScene, goHome, dim, hint, resetSel } from './scene';
 import { BattleScene } from './battle';
-import { TitleScene } from './title';
 import { Battle, heavyChargeOf, type Side } from '../game/battle';
 import { loadMatch } from '../game/match';
-import { battleHash } from '../net/hash';
+import { Netplay } from '../net/netplay';
+import { statsRollbackRoots } from '../game/stats';
+import { TapeWriter } from '../game/replay';
 import { NO_INPUT, type NetInput } from '../net/protocol';
 import type { NetSession } from '../net/session';
 import { roundRecord, type RoundRecord } from '../game/stats';
+import { replayScore, type Replay, type ReplayMode } from '../game/replay';
+import { rankedOf, rankedRound, rankedNote } from '../net/rating';
+import { tournamentRound, tournamentNote } from './tournament';
 import { UW, type Ctx } from '../engine/gfx';
 import { drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
 import { playMusic, stopMusic, sfx, chargeHum } from '../engine/audio';
 import { listMouse } from './scene';
-import { win, RED_INK } from './skin';
-
-const STEP = 1 / 60;
+import { win, RED_INK, INK2 } from './skin';
 
 /** Seed for round `r` of a match, the same on both machines. */
 const roundSeed = (seed: number, r: number): number => (seed + Math.imul(r, 0x9e3779b9)) >>> 0;
 
 export class OnlineBattleScene extends BattleScene {
-  /** Next lockstep frame to run. */
-  frame = 0;
-  /** Presses seen while waiting on the other side, merged into the next scheduled input. */
-  private pend: NetInput | null = null;
-  /** Frames in a row spent waiting for the other side's input. */
-  stall = 0;
-  /** Picks sent for this Draw screen; waiting on the rival's. */
-  locked = false;
+  ls: Netplay;
+  /** The replay records agreed frames only (a guessed frame may be undone). */
+  private tape: TapeWriter;
+  /** Longest correction in about the last second, for the connection readout. */
+  private shownRollback = 0;
+  private shownRollbackT = 0;
   waitingNext = false;
 
   constructor(public net: NetSession, score: [number, number], public roundNo: number, rounds: RoundRecord[] = []) {
@@ -42,14 +42,28 @@ export class OnlineBattleScene extends BattleScene {
     this.rivalName = 'RIVAL';
     this.pauseItems = ['RESUME', 'LEAVE MATCH'];
     net.beginRound(roundNo);
+    this.ls = new Netplay(net, this.b, statsRollbackRoots(this.stats));
+    this.tape = new TapeWriter(this.b);
+    this.ls.onFrame = (_f, ins, kind) => { if (kind === 'draw') this.tape.beginCustom(); else this.tape.update(ins); };
+    this.ls.onPicks = (_t, picks) => this.tape.endCustom(picks);
   }
+
+  get locked(): boolean { return this.ls.locked; }
+
+  protected get replayMode(): ReplayMode { return rankedOf(this.net) ? 'ranked' : 'online'; }
+  /** Recorded from the agreed frames instead (see the constructor). */
+  protected get keepsReplays(): boolean { return false; }
+  protected afterRound(r: Replay): void {
+    void rankedRound(this.net, this.net.side, r.id, replayScore(r), this.need);
+    tournamentRound(this.net, replayScore(r), this.need);
+  }
+  protected resultNote(): string { return tournamentNote(this.net) || rankedNote(this.net, this.setReplay?.id); }
 
   protected rivalDeckText(): string { return `RIVAL: ${this.net.rival?.cls.toUpperCase() ?? ''}`; }
 
   protected confirmCustom(): void {
     if (this.locked) return;
-    this.locked = true;
-    this.net.setPicks(this.b.turn, this.picks);
+    this.ls.lock(this.picks);
     sfx('confirm');
   }
 
@@ -62,49 +76,25 @@ export class OnlineBattleScene extends BattleScene {
 
     if (b.phase === 'custom') {
       if (!this.locked) this.updateCustom(dt);
-      const theirs = net.remotePicks(b.turn);
-      if (this.locked && theirs) {
-        const mine = this.picks.slice();
-        b.endCustom(this.me === 0 ? [mine, theirs] : [theirs, mine]);
-        this.locked = false;
-        this.fightBanner = 0.9;
-      }
+      if (this.ls.settle()) this.fightBanner = 0.9;
       return;
     }
-    if (b.phase === 'over') { this.updateResult(dt); return; }
+    if (b.phase === 'over' && this.ended) { this.updateResult(dt); return; }
 
     // the fight keeps running under the pause menu: there is no pausing an online match
     if (this.paused) this.updatePause(dt);
     else if (b.phase === 'fight' && wasPressed('pause')) { this.paused = true; this.pauseSel = 0; resetSel(); sfx('select'); }
     const live = b.phase === 'fight' && !this.paused;
     const now: NetInput = live ? { ...this.playerIntent(dt), draw: wasPressed('custom') } : NO_INPUT;
-    this.pend = this.pend ? merge(this.pend, now) : now;
-
-    // run one frame, or two when the other side is ahead of us
-    const behind = net.remoteContig - net.remoteDelay > this.frame + 2;
-    for (let n = behind ? 2 : 1; n > 0; n--) {
-      if (net.scheduled <= this.frame + net.delay) {
-        net.pushLocal(this.pend ?? held(now));
-        this.pend = null;
-      }
-      const theirs = net.remoteInput(this.frame), mine = net.localInput(this.frame);
-      if (!theirs || !mine) { this.stall++; break; }
-      this.stall = 0;
-      const ins: [NetInput, NetInput] = this.me === 0 ? [mine, theirs] : [theirs, mine];
-      this.frame++;
-      if (b.phase === 'fight' && (ins[0].draw || ins[1].draw) && b.canOpenCustom()) {
-        b.beginCustom();
-        this.openCustom();
-        this.paused = false;
-        break;
-      }
-      b.update(STEP, ins);
-      if (this.frame % 30 === 0) net.recordHash(this.frame, battleHash(b));
-      if ((b.phase as string) !== 'fight' && (b.phase as string) !== 'ko') break;
-    }
+    const res = this.ls.advance(now);
+    const rb = this.ls.rb;
+    if (rb.lastRollback >= this.shownRollback || ++this.shownRollbackT > 60) { this.shownRollback = rb.lastRollback; this.shownRollbackT = 0; }
+    if (res === 'custom') { this.openCustom(); this.paused = false; return; }
     for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / heavyChargeOf(f)) : null);
-    if ((b.phase as string) === 'over' && !this.ended) {
+    // the round ends on a frame both sides agree on
+    if ((b.phase as string) === 'over' && this.ls.settled && !this.ended) {
       this.ended = true;
+      this.keepRound(this.tape.finish());
       resetSel();
       if (b.winner !== null) this.score[b.winner]++;
       this.rounds.push(roundRecord(b, this.stats));
@@ -136,7 +126,7 @@ export class OnlineBattleScene extends BattleScene {
     const net = this.net, next = this.roundNo + 1;
     if (this.waitingNext && net.remoteReady >= next) {
       stopMusic();
-      setScene(new OnlineBattleScene(net, this.setOver ? [0, 0] : this.score, next, this.setOver ? [] : this.rounds));
+      replaceScene(new OnlineBattleScene(net, this.setOver ? [0, 0] : this.score, next, this.setOver ? [] : this.rounds));
       return;
     }
     if (this.waitingNext) return;
@@ -161,16 +151,16 @@ export class OnlineBattleScene extends BattleScene {
 
   private quit(): void {
     if (this.net.status !== 'left') this.net.leave();
-    else this.net.transport.close();
+    else this.net.close();
     stopMusic();
-    setScene(new TitleScene());
+    goHome();
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
     super.draw(c, tick, ui);
     const b = this.b, net = this.net;
     // connection readout, top corner under the HUD
-    const ping = net.rtt ? `PING ${Math.round(net.rtt)}MS  DELAY ${net.delay}F` : '';
+    const ping = net.rtt ? `PING ${Math.round(net.rtt)}MS  DELAY ${net.delay}F  ROLLBACK ${this.shownRollback}F` : '';
     if (b.phase === 'fight') drawTextOutlined(ui, ping, Math.round(UW / 2 - textWidth(ping) / 2), 48, '#bcbcbc');
     if (net.desync) drawTextCentered(ui, 'DESYNC: THE TWO GAMES DISAGREE', UW / 2, 270, '#f83800', 1);
     if (b.phase === 'custom' && this.locked) {
@@ -178,9 +168,15 @@ export class OnlineBattleScene extends BattleScene {
       drawTextCentered(ui, tick % 8 < 6 ? 'WAITING FOR' : '', 358, 157, RED_INK, 1, false);
       drawTextCentered(ui, 'RIVAL...', 358, 168, RED_INK, 1, false);
     }
-    if ((b.phase === 'fight' || b.phase === 'ko') && this.stall > 20) {
-      win(ui, UW / 2 - 90, 139, 180, 20, { burn: 3 });
-      drawTextCentered(ui, 'WAITING FOR RIVAL...', UW / 2, 146, RED_INK, 1, false);
+    // the other side went quiet (anywhere in the match): say why, and how long the game will wait
+    const quiet = net.status === 'reconnecting' || net.rivalAway;
+    if (quiet || ((b.phase === 'fight' || b.phase === 'ko') && this.ls.stall > 20)) {
+      const msg = net.rivalAway ? 'RIVAL SWITCHED AWAY' : net.status === 'reconnecting' ? `RECONNECTING... ${Math.ceil(net.graceLeft)}` : 'WAITING FOR RIVAL...';
+      const sub = !quiet ? '' : net.rivalAway ? 'THE MATCH WAITS FOR THEM' : 'THE MATCH PICKS UP WHERE IT WAS';
+      const w = Math.max(180, textWidth(msg), textWidth(sub)) + 24;
+      win(ui, UW / 2 - w / 2, 139, w, quiet ? 32 : 20, { burn: 3 });
+      drawTextCentered(ui, msg, UW / 2, 146, RED_INK, 1, false);
+      if (sub) drawTextCentered(ui, sub, UW / 2, 158, INK2, 1, false);
     }
     if (b.phase === 'over' && this.waitingNext) {
       win(ui, 360, 38, 112, 20, { burn: 3 });
@@ -194,12 +190,3 @@ export class OnlineBattleScene extends BattleScene {
     }
   }
 }
-
-function merge(a: NetInput, b: NetInput): NetInput {
-  return {
-    move: b.move ?? a.move, held: b.held, attackHeld: b.attackHeld,
-    attackPressed: a.attackPressed || b.attackPressed, castPressed: a.castPressed || b.castPressed, draw: a.draw || b.draw,
-  };
-}
-/** Same held keys, no new presses. */
-const held = (i: NetInput): NetInput => ({ ...NO_INPUT, held: i.held, attackHeld: i.attackHeld });

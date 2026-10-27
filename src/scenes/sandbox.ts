@@ -1,7 +1,7 @@
 // Debug sandbox: a fight with no rules in the way. Cast any spell on demand, park a training dummy,
 // turn off dying and resource costs, slow time down, move fighters around and read every hit.
 // The fight is the real Battle; the controls live in a DOM panel docked on the right.
-import { zone, hot, type Scene } from './scene';
+import { popScene, zone, hot, type Scene } from './scene';
 import { CLASS_INFO } from '../game/classes';
 import { Battle, NO_INTENT, heavyChargeOf, COLS, ROWS, type Dir, type Fighter, type Intent, type Side, type StatusKey } from '../game/battle';
 import { drawBattle, drawBattleUi, getArena } from '../game/battleView';
@@ -58,7 +58,7 @@ export class SandboxScene implements Scene {
   private uiT = 0;
   private onKey = (e: KeyboardEvent): void => this.key(e);
 
-  constructor(private back: () => void, opts: SandboxOpts = {}) {
+  constructor(private back: () => void = popScene, opts: SandboxOpts = {}) {
     if (opts.you) saved.you = opts.you;
     if (opts.foe) saved.foe = opts.foe;
     if (opts.brain) saved.brain = opts.brain;
