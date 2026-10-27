@@ -1,6 +1,6 @@
-// Grimoire import and export as a small YAML file:
+// Spell deck import and export as a small YAML file:
 //
-//   # Spell VS Steel grimoire
+//   # Spell VS Steel spell deck
 //   class: mage
 //   name: Pyromancer
 //   spells:
@@ -16,19 +16,19 @@ import { CLASS_INFO, PLAYABLE } from './classes';
 import { DECK_SIZE, MAX_LEGENDARIES, MYTHICS_REQUIRED, countRarity, deckSize, type DeckCounts } from './deck';
 import type { ClassId } from '../art/sprites';
 
-export interface Grimoire { cls: ClassId; name?: string; deck: DeckCounts }
+export interface SpellDeck { cls: ClassId; name?: string; deck: DeckCounts }
 
 const RARITY_RANK = { common: 0, uncommon: 1, legendary: 2, mythic: 3 };
 
 /** A YAML scalar safe to write bare, else double-quoted. */
 const scalar = (s: string): string => (/^[A-Za-z0-9_][A-Za-z0-9_ .'-]*$/.test(s) && !/\s$/.test(s) ? s : JSON.stringify(s));
 
-export function exportYaml(g: Grimoire): string {
+export function exportYaml(g: SpellDeck): string {
   const ids = Object.keys(g.deck).filter(id => g.deck[id] > 0 && CARDS[id])
     .sort((a, b) => RARITY_RANK[CARDS[a].rarity] - RARITY_RANK[CARDS[b].rarity] || CARDS[a].name.localeCompare(CARDS[b].name));
   const w = Math.max(0, ...ids.map(id => id.length));
   return [
-    '# Spell VS Steel grimoire',
+    '# Spell VS Steel spell deck',
     `class: ${g.cls}`,
     ...(g.name ? [`name: ${scalar(g.name)}`] : []),
     'spells:',
@@ -78,10 +78,10 @@ function findCard(key: string): CardDef | undefined {
   return Object.values(CARDS).find(c => norm(c.id) === k || norm(c.name) === k);
 }
 
-/** Reads a grimoire and checks it against the deck rules. Returns the deck, or the first problem found. */
-export function importYaml(text: string): { ok: true; grimoire: Grimoire } | { ok: false; error: string } {
+/** Reads a spell deck and checks it against the deck rules. Returns the deck, or the first problem found. */
+export function importYaml(text: string): { ok: true; spellDeck: SpellDeck } | { ok: false; error: string } {
   const fail = (error: string): { ok: false; error: string } => ({ ok: false, error });
-  if (text.length > 20000) return fail('FILE IS TOO BIG FOR A GRIMOIRE');
+  if (text.length > 20000) return fail('FILE IS TOO BIG FOR A SPELL DECK');
   let cls: string | undefined, name: string | undefined, inSpells = false;
   const entries: Array<[string, number, number]> = [];
   const lines = text.replace(/^﻿/, '').split(/\r?\n/);
@@ -139,5 +139,5 @@ export function importYaml(text: string): { ok: true; grimoire: Grimoire } | { o
   if (deckSize(deck) > DECK_SIZE) return fail(`TOO MANY SPELLS: ${deckSize(deck)} (MAX ${DECK_SIZE})`);
   if (countRarity(deck, 'legendary') > MAX_LEGENDARIES) return fail(`TOO MANY LEGENDARIES: ${countRarity(deck, 'legendary')} (MAX ${MAX_LEGENDARIES})`);
   if (countRarity(deck, 'mythic') > MYTHICS_REQUIRED) return fail(`ONLY ${MYTHICS_REQUIRED} MYTHIC ALLOWED`);
-  return { ok: true, grimoire: { cls: classId, name, deck } };
+  return { ok: true, spellDeck: { cls: classId, name, deck } };
 }

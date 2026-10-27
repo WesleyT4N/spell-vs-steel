@@ -418,7 +418,7 @@ export class Battle {
       const offer = this.offer[f.side];
       const chosen = picks[f.side].filter((i, k, a) => i >= 0 && i < offer.length && a.indexOf(i) === k);
       f.queue = chosen.map(i => offer[i]);
-      // the rest go back into the grimoire, BN style
+      // the rest go back into the spell deck, BN style
       const rest = offer.filter((_, i) => !chosen.includes(i));
       f.deck = shuffle([...f.deck, ...rest], this.rand);
       this.offer[f.side] = [];
