@@ -3,6 +3,7 @@
 // state, so the rules play out exactly the same with it on: online lockstep, the hash and the CPU
 // never see it. Both machines watch the same battle, so online they agree without sending anything.
 import type { Battle, Fighter, HitOpts, Panel, Side } from './battle';
+import type { EffectRec } from '../content/effects';
 import { CARDS } from './cards';
 import type { ClassId } from '../art/sprites';
 
@@ -110,30 +111,22 @@ export function trackStats(b: Battle): BattleStats {
   const tags: Tag[] = [];
   const newTag = (t: Tag): Tag => { tags.push(t); if (tags.length > 64) tags.shift(); return t; };
   Object.defineProperty(out, ROLLBACK, { value: { tags, burnTag, blessTag, curseTag }, enumerable: false });
-  const tagged = new WeakSet<object>();
   /** Traps and companions remember the spell that placed them. */
   const placed = new WeakMap<object, Tag>();
-  // Run `fn` credited to `tag`; projectiles, traps and pets it spawns carry the tag to their hits.
+  // Run `fn` credited to `tag`; effects it schedules, and projectiles, traps and pets it spawns, carry the tag to their hits.
   const under = <R>(tag: Tag | null, fn: () => R): R => {
     const prev = current, n = b.projectiles.length, nTraps = b.traps.length, nPets = b.pets.length;
     current = tag;
     try { return fn(); } finally {
       if (tag) {
-        for (const p of b.projectiles.slice(n)) {
-          if (tagged.has(p)) continue;
-          tagged.add(p);
-          p.onHit = carry(p.onHit, tag);
-        }
+        for (const p of b.projectiles.slice(n)) credit(p.onHit, tag);
         for (const t of [...b.traps.slice(nTraps), ...b.pets.slice(nPets)]) if (!placed.has(t)) placed.set(t, tag);
       }
       current = prev;
     }
   };
-  // run `fn` credited to whatever was current when it was scheduled
-  function carry<A extends unknown[], R>(fn: (...a: A) => R, tag: Tag | null = current): (...a: A) => R {
-    if (!tag) return fn;
-    return (...a: A): R => under(tag, () => fn(...a));
-  }
+  // a scheduled effect is credited to whatever was current when it was scheduled (the note rewinds with the battle)
+  const credit = (fx: EffectRec<unknown>, tag: Tag | null = current): void => { if (tag && !fx.w?.stats) fx.w = { ...fx.w, stats: tag }; };
 
   const update = b.update.bind(b);
   b.update = (dt, intents) => {
@@ -173,7 +166,12 @@ export function trackStats(b: Battle): BattleStats {
   };
 
   const later = b.later.bind(b);
-  b.later = (delay, fn) => later(delay, carry(fn));
+  b.later = (delay, fx) => { credit(fx); later(delay, fx); };
+  const runEffect = b.runEffect.bind(b);
+  b.runEffect = (fx, h) => {
+    const tag = fx.w?.stats as Tag | undefined;
+    if (tag) under(tag, () => runEffect(fx, h)); else runEffect(fx, h);
+  };
 
   const bless = b.bless.bind(b);
   b.bless = (col, row, kind) => {

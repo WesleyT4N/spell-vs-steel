@@ -1,5 +1,6 @@
 // Helpers shared by every class's card list.
 import type { Battle, CastCtx, Fighter, Side } from './battle';
+import { effect, type EffectRec } from '../content/effects';
 
 export const sameRow = (b: Battle, f: Fighter): boolean => b.foe(f).row === f.row;
 export const ahead = (b: Battle, f: Fighter, n: number): boolean => {
@@ -23,13 +24,22 @@ export const lowHp = (f: Fighter, pct: number): boolean => f.hp / f.maxHp < pct;
 /** Move the caster's sprite out and back (dash/leap), purely visual. */
 export function lunge(x: CastCtx, toCol: number, toRow: number, out: number, hold: number, back: number, arc = 0): void {
   const { b, f } = x;
-  const px = (toCol - f.col) * 38, py = (toRow - f.row) * 19;
-  b.anim(out, p => { f.dx = px * p; f.dy = py * p - Math.sin(p * Math.PI) * arc; });
-  b.later(out + hold, () => b.anim(back, p => { f.dx = px * (1 - p); f.dy = py * (1 - p) - Math.sin(p * Math.PI) * arc * 0.5; }));
+  const a = { side: f.side, px: (toCol - f.col) * 38, py: (toRow - f.row) * 19, arc, back };
+  b.anim(out, lungeOut(a));
+  b.later(out + hold, lungeReturn(a));
 }
+interface Lunge { side: Side; px: number; py: number; arc: number; back: number }
+const lungeOut = effect('lunge.out', (b, a: Lunge, p: number) => {
+  const f = b.f[a.side];
+  f.dx = a.px * p; f.dy = a.py * p - Math.sin(p * Math.PI) * a.arc;
+});
+const lungeBack = effect('lunge.back', (b, a: Lunge, p: number) => {
+  const f = b.f[a.side];
+  f.dx = a.px * (1 - p); f.dy = a.py * (1 - p) - Math.sin(p * Math.PI) * a.arc * 0.5;
+});
+const lungeReturn = effect('lunge.return', (b, a: Lunge) => b.anim(a.back, lungeBack(a)));
 
-/** Locks onto the enemy's panel at cast time and runs `fn` there after `delay` (dodgeable when there is a telegraph). */
-export function targeted(x: CastCtx, delay: number, fn: (c: number, r: number) => void): void {
-  const c = x.foe.col, r = x.foe.row;
-  x.b.later(delay, () => fn(c, r));
+/** Locks onto the enemy's panel at cast time and runs the effect made for that panel after `delay` (dodgeable when there is a telegraph). */
+export function targeted(x: CastCtx, delay: number, make: (c: number, r: number) => EffectRec): void {
+  x.b.later(delay, make(x.foe.col, x.foe.row));
 }

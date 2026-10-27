@@ -1,7 +1,8 @@
 // Rollback check: a battle run through the rollback netcode, with the other player's inputs arriving
 // late and in bursts (so it guesses wrong, goes back and replays all the time), must end up exactly
 // like the same battle run straight through. Both machines (side 0 and side 1) are checked, every
-// confirmed checksum is compared, and the post-match stats must agree too.
+// confirmed checksum is compared, and the post-match stats must agree too. The battle's state must also be
+// plain data: a function in it (a closure scheduled for later) would hide state from snapshots and checksums.
 // Usage: npx tsx scripts/rollcheck.ts [matches] [max latency in frames]
 import { Battle, type Side } from '../src/game/battle';
 import { Cpu } from '../src/game/ai';
@@ -21,7 +22,26 @@ const MAX_LAT = Number(process.argv[3] ?? 14);
 const DELAY = 2;
 const dt = 1 / 60;
 let failures = 0, totalRb = 0, worstRb = 0, frames = 0;
+const fnPaths = new Set<string>();
 let snapUs = 0, snaps = 0;
+
+/** Paths in the battle's state that hold a function. Methods (and the wrappers watchers install over them) and the
+ *  seeded RNG (its state is saved explicitly) are fine; anything else should be an effect record. */
+function functionsIn(b: Battle): string[] {
+  const out = new Set<string>(), seen = new Set<object>();
+  const walk = (o: unknown, path: string): void => {
+    if (typeof o === 'function') { out.add(path.replace(/\[\d+\]|\.\d+/g, '[]')); return; }
+    if (!o || typeof o !== 'object' || seen.has(o)) return;
+    seen.add(o);
+    for (const k of Object.keys(o)) walk((o as Record<string, unknown>)[k], `${path}.${k}`);
+  };
+  seen.add(b);
+  for (const k of Object.keys(b)) {
+    if (k === 'rand' || typeof (Battle.prototype as unknown as Record<string, unknown>)[k] === 'function') continue;
+    walk((b as unknown as Record<string, unknown>)[k], `b.${k}`);
+  }
+  return [...out];
+}
 
 for (let m = 0; m < N; m++) {
   const seed = 5000 + m;
@@ -53,6 +73,7 @@ for (let m = 0; m < N; m++) {
     if ((pair[0].draw || pair[1].draw) && x.canOpenCustom()) x.beginCustom();
     else x.update(dt, pair);
     hashes.push(battleHash(x));
+    if (ins.length % 10 === 0) for (const path of functionsIn(x)) if (!fnPaths.has(path)) { fnPaths.add(path); failures++; console.log(`match ${m}: a function in the battle's state at ${path} (schedule an effect record instead)`); }
   }
   frames += ins.length;
   // the battle tells its listeners what happened (audio plays these)
