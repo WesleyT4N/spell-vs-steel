@@ -7,7 +7,7 @@ android {
         applicationId "com.wesleyt4n.spellvssteel"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (System.getenv("SVS_VERSION_CODE") ?: "1") as int
+        versionCode Integer.parseInt(System.getenv("SVS_VERSION_CODE") ?: "1")
         versionName System.getenv("SVS_VERSION") ?: "0.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

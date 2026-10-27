@@ -72,9 +72,10 @@ jobs:
       - name: Build the APK
         working-directory: android
         env:
-          SVS_VERSION: ${{ env.TAG != '' && env.TAG || '0.0.0' }}
           SVS_VERSION_CODE: ${{ github.run_number }}
-        run: ./gradlew assembleDebug --no-daemon
+        run: |
+          v="${TAG#v}"; export SVS_VERSION="${v:-0.0.0}"
+          ./gradlew assembleDebug --no-daemon
       - name: Name the APK
         run: |
           v="${TAG#v}"; v="${v:-dev}"
