@@ -21,10 +21,11 @@ export const BAND: [number, number] = [0.55, 0.65];
  * A knob only ever touches one class's own numbers (no cross-class rules):
  * its HP, its basic attacks, or the power of all its spells.
  */
-export interface Knob { id: string; cls: ClassId; kind: 'hp' | 'light' | 'heavy' | 'power' | 'card'; card?: string }
+export interface Knob { id: string; cls: ClassId; kind: 'hp' | 'light' | 'heavy' | 'power' | 'speed' | 'card'; card?: string }
 
 export function knobsFor(classes: ClassId[], kinds: Knob['kind'][] = ['hp', 'power', 'light', 'heavy']): Knob[] {
-  return classes.flatMap(cls => kinds.filter(k => k !== 'card').map(kind => ({ id: `${cls}.${kind}`, cls, kind })));
+  // the Warrior has no basic projectile, so no speed knob
+  return classes.flatMap(cls => kinds.filter(k => k !== 'card' && !(k === 'speed' && cls === 'warrior')).map(kind => ({ id: `${cls}.${kind}`, cls, kind })));
 }
 
 /** One card's own power (used for the Mythic each ready-made deck is built around). */
@@ -34,6 +35,7 @@ export const cardKnob = (id: string): Knob => ({ id: `${id}.power`, cls: CARDS[i
 export type Patch = Record<string, number>;
 
 export function knobPath(k: Knob): string {
+  if (k.kind === 'speed') return k.cls === 'ranger' ? 'ranger.arrowSpeed' : `${k.cls}.shotSpeed`;
   return k.kind === 'hp' ? `hp.${k.cls}` : k.kind === 'light' ? `${k.cls}.lightDamage` : `${k.cls}.heavyDamage`;
 }
 
@@ -69,7 +71,7 @@ export function describeKnob(k: Knob, x: number): string {
   if (k.kind === 'card') return `${CARDS[k.card!].name} ${x >= 0 ? '+' : ''}${Math.round(x * 100)}%`;
   const base = defaultTuning(knobPath(k));
   const v = Math.round(base * (1 + x) * 10) / 10;
-  const what = k.kind === 'hp' ? 'HP' : k.kind === 'light' ? 'light attack' : 'heavy attack';
+  const what = k.kind === 'hp' ? 'HP' : k.kind === 'light' ? 'light attack' : k.kind === 'speed' ? 'shot speed' : 'heavy attack';
   return `${k.cls} ${what} ${base} -> ${v}`;
 }
 

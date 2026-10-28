@@ -17,9 +17,9 @@ import type { Battle, BlessKind, Fighter, Fx, Warn, Pet, Projectile, Side, Statu
 import { CLASS_INFO } from './classes';
 import { drawOver, drawUnder, lookOf, observe } from './fighterAnim';
 
-import { frozen, holdFrame, kickOffset, noteImpacts } from './hitFeel';
+import { kickOffset, noteImpacts } from './hitFeel';
 import { isHome, setHome, team } from './teamColors';
-import { ARC, FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, useParticles } from './fxView';
+import { FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawArcaneMissile, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, useParticles } from './fxView';
 
 /** Whose hidden things (traps, a stealthed fighter) are visible: one side's, or everything in the dev sandbox. */
 export type Viewer = Side | 'all';
@@ -30,19 +30,19 @@ export const getArena = (): Stage => (arena ??= getStage('colosseum'));
 /** Switch the stage that fights (and menus) are drawn on. */
 export function useStage(id: string): void { arena = getStage(id); }
 
-/** `hitStop` holds the picture for a moment on solid hits (the fight itself never pauses). Off for card previews. */
+/** `hitStop` shudders the picture while the fight stands still in a hit pause. Off for card previews. */
 export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitStop = false): void {
   setHome(me === 'all' ? 0 : me);
-  if (hitStop && frozen(b)) { holdFrame(c, b); return; }
   const a = getArena();
   useParticles(b);
   c.save();
-  const kick = kickOffset(b);
+  const kick = kickOffset(b, hitStop);
   if (b.shake > 0) c.translate(Math.round((Math.random() - 0.5) * 4 * Math.min(1, b.shake * 4)), Math.round((Math.random() - 0.5) * 3 * Math.min(1, b.shake * 4)));
   if (kick.x || kick.y) c.translate(kick.x, kick.y);
   drawStage(c, a, tick, b.cheer);
 
-  // panels
+  // panels (with the rows flying shots are about to cross lit up)
+  const shots = shotPaths(b);
   for (let r = 0; r < 3; r++) for (let col = 0; col < 6; col++) {
     const p = b.panels[col][r];
     const holeAge = since(b, 'hole', col, r, p.hole > 0), crackAge = since(b, 'crack', col, r, p.cracked && p.hole <= 0);
@@ -52,7 +52,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
     const tint: PanelTint | undefined = p.hole > 0 ? undefined : p.burn > 0 ? 'fire' : p.toxic > 0 ? 'poison' : p.curse > 0 ? 'shadow' : p.bless > 0 ? 'holy' : undefined;
     const mark = b.marks.find(m => m.col === col && m.row === r);
     let hl = mark && Math.floor(b.time * 10) % 2 ? mark.color : undefined;
-    const warn = warnFlash(b, col, r);
+    const warn = warnFlash(b, col, r) ?? shotFlash(b, shots, col, r) ?? hitFlash(b, col, r);
     if (warn) hl = warn;
     // an armed Frost Nova blinks the enemy panels it covers
     if (!hl && Math.floor(b.time * 5) % 2 === 0) {
@@ -75,7 +75,9 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
   // toxic, blessed and holy-fire panels
   for (let col = 0; col < 6; col++) for (let r = 0; r < 3; r++) drawPanelEffects(c, b, col, r, tick);
   // warned panels keep a lit rim over flames and toxic clouds, so the danger zone never disappears between flashes
-  for (const w of b.warns) if (w.kind === 'flash') drawWarnEdge(c, w);
+  for (const w of b.warns) if (w.kind === 'flash') drawWarnEdge(c, w.col, w.row, w.side);
+  for (const [key, at] of shots) drawWarnEdge(c, key % 6, Math.floor(key / 6), at.side);
+  for (const e of b.fx) if (e.kind === 'hitPanel') drawWarnEdge(c, e.col, e.row, e.side);
   for (const w of b.warns) if (w.kind === 'shadow') drawLobShadow(c, w);
   for (const t of b.traps) if (me === 'all' || t.side === me) drawTrap(c, t, tick);
 
@@ -90,7 +92,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
   for (const e of b.fx) drawFx(c, b, e);
   drawParticles(c, b);
   c.restore();
-  noteImpacts(c, b, hitStop);
+  noteImpacts(b);
 }
 
 /** When each panel's crack and hole appeared, in battle time: view-only, for the crack-in and crumble animations. */
@@ -123,8 +125,44 @@ function warnFlash(b: Battle, col: number, row: number): string | undefined {
   return Math.floor(gone / period) % 2 === 0 ? fill : undefined;
 }
 
-function drawWarnEdge(c: Ctx, warn: Warn): void {
-  const x = X0 + warn.col * PW + 2, y = Y0 + warn.row * (FACE + LIP) + 1, w = PW - 4, h = FACE - 2, rim = team(warn.side).edge;
+/**
+ * The panels a flying shot covers, keyed col + row * 6, with the seconds until it gets there (9 once it has passed) and the shooter's side.
+ * Straight shots light their whole row until they are gone, homing shots the panel of the fighter they chase (view only).
+ */
+function shotPaths(b: Battle): Map<number, { t: number; side: Side }> {
+  const out = new Map<number, { t: number; side: Side }>();
+  const mark = (col: number, row: number, t: number, side: Side): void => {
+    const k = col + row * 6, cur = out.get(k);
+    if (!cur || t < cur.t) out.set(k, { t, side });
+  };
+  for (const p of b.projectiles) {
+    if (p.dead) continue;
+    if (p.homing) { const t = b.f[p.homing.target]; mark(t.col, t.row, (1 - p.homing.p) * p.homing.dur, p.side); continue; }
+    if (!p.speed) continue;
+    // the whole row stays lit until the shot is gone, solid on the panels it is about to cross
+    for (let col = 0; col < 6; col++) mark(col, p.row, (col - p.x) / p.speed >= 0 ? (col - p.x) / p.speed : 9, p.side);
+  }
+  return out;
+}
+
+/** A shot-path panel's flash in the shooter's team color: the area warning's quick blink, going solid just before the shot arrives. */
+function shotFlash(b: Battle, shots: Map<number, { t: number; side: Side }>, col: number, row: number): string | undefined {
+  const at = shots.get(col + row * 6);
+  if (!at) return undefined;
+  const fill = team(at.side).flash;
+  if (at.t < 0.1) return fill;
+  return Math.floor(b.time / 0.06) % 2 === 0 ? fill : undefined;
+}
+
+/** A panel an instant attack just hit, in the attacker's team color: solid for a moment, then a couple of quick blinks. */
+function hitFlash(b: Battle, col: number, row: number): string | undefined {
+  const e = b.fx.find(x => x.kind === 'hitPanel' && x.col === col && x.row === row);
+  if (!e) return undefined;
+  return e.t < 0.08 || Math.floor(e.t / 0.05) % 2 === 0 ? team(e.side).flash : undefined;
+}
+
+function drawWarnEdge(c: Ctx, col: number, row: number, side: Side): void {
+  const x = X0 + col * PW + 2, y = Y0 + row * (FACE + LIP) + 1, w = PW - 4, h = FACE - 2, rim = team(side).edge;
   P(c, rim, x, y, w, 2); P(c, rim, x, y + h - 2, w, 2);
   P(c, rim, x, y, 2, h); P(c, rim, x + w - 2, y, 2, h);
 }
@@ -577,18 +615,13 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
       drawHawk(c, hx, hy, dd, flap > 0);
       return;
     }
-    if (p.kind === 'arrow') {
-      // a homing Arrow (Hunter's Mark)
+    if (p.kind === 'arrow' || p.kind === 'aimed') {
+      // a homing Arrow or Aimed Shot (Hunter's Mark)
       const dd = e.x - s.x > 0 ? 1 : -1;
       P(c, '#000000', x - dd * 6, y - 1, 9, 3); P(c, '#ac7c00', x - dd * 5, y, 7, 1); P(c, '#fcfcfc', x + dd * 2, y - 1, 2, 3);
       return;
     }
-    const back = e.x - s.x > 0 ? -1 : 1;
-    glow(c, x, y, 7, '248,120,248', 0.5);
-    P(c, '#000000', x - 2, y - 2, 5, 5);
-    P(c, ARC[2], x - 1, y - 1, 3, 3);
-    P(c, ARC[3], x, y, 1, 1);
-    for (let i = 1; i <= 3; i++) P(c, ARC[3 - Math.min(2, i)], x + back * (i * 2 + 1), y + ((i + Math.floor(b.time * 20)) % 3) - 1, 1, 1);
+    drawArcaneMissile(c, b, k => ({ x: s.x + (e.x - s.x) * k, y: s.y - 10 + (e.y - 10 - (s.y - 10)) * k - Math.sin(k * Math.PI) * 18 }), q);
     return;
   }
   const base = panelFoot(0, p.row);

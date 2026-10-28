@@ -6,7 +6,7 @@ import { getDefaultSink, type BattleEvent, type EventSink, type SoundOpts, type 
 import { effect, runEffect, type EffectRec, type ShotHit } from '../content/effects';
 
 /** Sound a shot makes leaving the caster (the light Arrow plays its own). */
-const SHOT_SOUND: Partial<Record<string, string>> = { fireball: 'shot_fireball', hook: 'shot_chain', gust: 'shot_wind', knife: 'shot_knife', arrow: 'shot_arrow', sting: 'shot_arrow', net: 'shot_net', wolf: 'shot_beast', hammer: 'shot_spin', vial: 'shot_net' };
+const SHOT_SOUND: Partial<Record<string, string>> = { orb: 'fx:bolt', spark: 'fx:holySpark', beam: 'fx:boltHeavy', aimed: 'fx:aimed', fireball: 'shot_fireball', hook: 'shot_chain', gust: 'shot_wind', knife: 'shot_knife', arrow: 'shot_arrow', sting: 'shot_arrow', net: 'shot_net', wolf: 'shot_beast', hammer: 'shot_spin', vial: 'shot_net' };
 
 /** Stereo position of a column: -1 left edge to +1 right edge. */
 export const panOf = (col: number): number => (col - 2.5) / 3;
@@ -176,9 +176,11 @@ export interface Projectile {
   row: number;
   /** Column position (float). */
   x: number;
+  /** Where it was fired from (the view draws trails from here). */
+  from?: number;
   /** Panels per second, signed. */
   speed: number;
-  kind: 'fireball' | 'hook' | 'gust' | 'missile' | 'reflected' | 'knife' | 'arrow' | 'net' | 'wolf' | 'hawk' | 'hammer' | 'sting' | 'vial';
+  kind: 'fireball' | 'hook' | 'gust' | 'missile' | 'reflected' | 'knife' | 'arrow' | 'orb' | 'spark' | 'beam' | 'aimed' | 'net' | 'wolf' | 'hawk' | 'hammer' | 'sting' | 'vial';
   /** Piercing shots fly through walls (hitting them) instead of stopping. */
   pierce?: boolean;
   hitWalls?: Wall[];
@@ -257,6 +259,16 @@ export class Battle {
   /** Offered cards on the current custom screen, per side. */
   offer: [string[], string[]] = [[], []];
   shake = 0;
+  /** Hit pause left (seconds): while it runs the whole fight stands still. Part of the rules, so it stays in lockstep. */
+  hitStop = 0;
+  /** Seconds the current hit pause has run (the view shudders on it). */
+  stopT = 0;
+  /** Battle time the last hit pause ended. */
+  stopEnd = -9;
+  /** Slow-mo left (seconds), after a big hit or a K.O. */
+  slowmo = 0;
+  /** Presses made during a hit pause, played on the first frame after it. */
+  private pressBuf: [Intent, Intent] = [{ ...NO_INTENT }, { ...NO_INTENT }];
   cheer = 0;
   /** Damage dealt by each side, split by source (for tuning). */
   stats = [{ basic: 0, spell: 0, other: 0 }, { basic: 0, spell: 0, other: 0 }];
@@ -310,7 +322,8 @@ export class Battle {
     this.walls = []; this.projectiles = []; this.marks = []; this.warns = []; this.traps = []; this.pets = [];
     this.texts = []; this.fx = []; this.timers = []; this.anims = [];
     this.clearPanels();
-    this.shake = 0; this.cheer = 0;
+    this.shake = 0; this.cheer = 0; this.hitStop = 0; this.slowmo = 0; this.stopEnd = -9;
+    this.pressBuf = [{ ...NO_INTENT }, { ...NO_INTENT }];
     this.combo.reset();
   }
 
@@ -361,7 +374,7 @@ export class Battle {
     this.sink?.({ type: 'voice', cls: f.cls, kind, pan: panOf(f.col), side: f.side, element, chance });
   }
   addFx(kind: string, side: Side, col: number, row: number, dur: number, data?: Record<string, number | string>): void {
-    this.fx.push({ t: 0, dur, kind, side, col, row, data });
+    this.fx.push({ t: 0, dur: kind === 'castName' ? dur : dur * TUNING.fxSlow, kind, side, col, row, data });
     this.sink?.({ type: 'fxSound', kind, opts: { pan: panOf(col), dur, data: { ...data, d: side === 0 ? 1 : -1 } } });
   }
   /**
@@ -443,6 +456,25 @@ export class Battle {
 
   // ---------- main update ----------
   update(dt: number, intents: [Intent, Intent]): void {
+    const live = this.phase === 'fight' || this.phase === 'ko';
+    if (live && this.hitStop > 0) {
+      this.hitStop -= dt;
+      this.stopT += dt;
+      if (this.hitStop <= 0) this.stopEnd = this.time;
+      for (const s of [0, 1] as const) {
+        const p = this.pressBuf[s], i = intents[s];
+        p.attackPressed ||= i.attackPressed; p.castPressed ||= i.castPressed; p.move = i.move ?? p.move;
+      }
+      return;
+    }
+    if (this.pressBuf.some(p => p.attackPressed || p.castPressed || p.move)) {
+      intents = intents.map((i, s) => {
+        const p = this.pressBuf[s];
+        return { ...i, attackPressed: i.attackPressed || p.attackPressed, castPressed: i.castPressed || p.castPressed, move: i.move ?? p.move };
+      }) as [Intent, Intent];
+      this.pressBuf = [{ ...NO_INTENT }, { ...NO_INTENT }];
+    }
+    if (live && this.slowmo > 0) { this.slowmo -= dt; dt *= TUNING.slowmo.speed; }
     this.time += dt;
     this.shake = Math.max(0, this.shake - dt);
     this.cheer = Math.max(0, this.cheer - dt);
@@ -873,8 +905,7 @@ export class Battle {
       const T = TUNING.mage;
       const dmg = kind === 'light' ? T.lightDamage : T.heavyDamage;
       f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
-      const end = this.rowShot(f, dmg, { basic: kind, element: 'arcane' });
-      this.addFx(kind === 'light' ? 'bolt' : 'boltHeavy', f.side, f.col, f.row, kind === 'light' ? 0.2 : 0.32, { to: end.col });
+      this.flyingShot(f, kind === 'light' ? 'orb' : 'beam', dmg, { basic: kind, element: 'arcane' });
     } else if (f.cls === 'rogue') {
       const T = TUNING.rogue;
       f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
@@ -886,8 +917,7 @@ export class Battle {
         this.strike(f, cells, T.lightDamage, { basic: kind, element: 'steel' });
       } else {
         // Throwing Knife: a heavy knife down the row
-        const end = this.rowShot(f, T.heavyDamage, { basic: kind, element: 'steel' });
-        this.addFx('knifeHeavy', f.side, f.col, f.row, 0.22, { to: end.col });
+        this.flyingShot(f, 'knife', T.heavyDamage, { basic: kind, element: 'steel' });
       }
     } else if (f.cls === 'ranger') {
       const T = TUNING.ranger;
@@ -915,29 +945,36 @@ export class Battle {
         // Aimed Shot: instant, pierces during Deadeye
         f.lock = T.heavyLock;
         if (homing) {
-          this.addFx('aimed', f.side, f.col, f.row, 0.3, { to: foe.col, toRow: foe.row });
-          this.damage(foe, T.heavyDamage, f, { basic: kind, element: 'steel', targeted: true });
-        } else {
-          const end = this.rowShot(f, T.heavyDamage, { basic: kind, element: 'steel' }, f.st.deadeye > 0);
-          this.addFx('aimed', f.side, f.col, f.row, 0.3, { to: end.col });
-        }
+          this.sound('fx:aimed', { pan: panOf(f.col), data: { dir: d } });
+          this.projectiles.push({
+            side: f.side, row: f.row, x: f.col, speed: 0, kind: 'aimed', reflectable: false,
+            homing: { p: 0, dur: Math.max(0.1, Math.abs(foe.col - f.col) / T.aimedSpeed), sx: f.col, sy: f.row, target: foe.side },
+            onHit: basicShot({ side: f.side, dmg: T.heavyDamage, opts: { basic: kind, element: 'steel', targeted: true } }),
+          });
+        } else this.flyingShot(f, 'aimed', T.heavyDamage, { basic: kind, element: 'steel' }, f.st.deadeye > 0);
       }
     } else {
       const T = TUNING.priest;
       f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
       if (kind === 'light') {
-        const end = this.rowShot(f, T.lightDamage, { basic: kind, element: 'holy' });
-        this.addFx('holySpark', f.side, f.col, f.row, 0.2, { to: end.col });
+        this.flyingShot(f, 'spark', T.lightDamage, { basic: kind, element: 'holy' });
       } else {
-        // Smite: a pillar of light a fixed distance ahead
-        const c = f.col + T.smiteRange * d;
-        this.addFx('holyPillar', f.side, c, f.row, 0.4);
-        const res = this.strike(f, [[c, f.row]], T.heavyDamage, { basic: kind, element: 'holy', knockback: T.smiteKnock > 0 });
-        if (res.fighter && res.dealt > 0) this.heal(f, T.smiteHeal);
+        // Smite: a pillar of light on the enemy, in any row, when they're within smiteRange columns (and not stealthed);
+        // otherwise it lands smiteRange panels ahead in our row and misses. The Priest can stay on its blessings and still hit.
+        const near = !foe.dead && this.targetable(foe) && Math.abs(foe.col - f.col) <= T.smiteRange;
+        const c = near ? foe.col : f.col + T.smiteRange * d, r = near ? foe.row : f.row;
+        this.addFx('holyPillar', f.side, c, r, 0.4);
+        this.strike(f, [[c, r]], T.heavyDamage, { basic: kind, element: 'holy', knockback: T.smiteKnock > 0 });
       }
     }
     this.breakStealth(f);
     void foe;
+  }
+
+  /** A basic shot down the row at a set speed, so the target can step out of its way. */
+  private flyingShot(f: Fighter, kind: 'orb' | 'spark' | 'beam' | 'knife' | 'aimed', dmg: number, opts: HitOpts, pierce = false): void {
+    const speed = kind === 'aimed' ? TUNING.ranger.aimedSpeed : (TUNING[f.cls] as { shotSpeed?: number }).shotSpeed ?? TUNING.maxShotSpeed;
+    this.shoot(f, { speed: speed * this.dir(f), kind, reflectable: false, pierce, onHit: basicShot({ side: f.side, dmg, opts }) });
   }
 
   /** Hit a set of cells for the attacker. Enemy walls in the cells take the hit too. */
@@ -946,6 +983,7 @@ export class Battle {
     const res: HitResult = { fighter: false, wall: false, dealt: 0, broke: false, blocked: false };
     for (const [c, r] of cells) {
       if (!this.inGrid(c, r)) continue;
+      this.addFx('hitPanel', att.side, c, r, 0.2);
       const w = this.wallAt(c, r);
       if (w && w.side !== att.side) {
         res.wall = true;
@@ -978,6 +1016,7 @@ export class Battle {
         break;
       }
     }
+    for (let c = f.col + d; d > 0 ? c <= col : c >= col; c += d) this.addFx('hitPanel', f.side, c, f.row, 0.2);
     return { col, hit };
   }
 
@@ -1265,10 +1304,12 @@ export class Battle {
       target.charging = false;
       target.charge = 0;
     }
-    // impact spark + hit-stop cue for the view (display only: fx are not part of the rules or the net hash)
+    // impact spark for the view, and the hit pause (BN-style: the whole fight stops for a few frames, so it is part of the rules)
     if (!opts.dot) {
       const tier = target.hp <= 0 ? 3 : amt >= 80 ? 2 : opts.basic === 'heavy' || amt >= TUNING.flinchThreshold ? 1 : 0;
       this.addFx('impact', src && src !== target ? src.side : (1 - target.side) as Side, target.col, target.row, 0.3 + tier * 0.06, { el: opts.element ?? 'steel', tier });
+      if (tier >= 3 || this.time - this.stopEnd >= TUNING.hitStopGap) { this.hitStop = Math.max(this.hitStop, TUNING.hitStop[tier]); this.stopT = 0; }
+      if (tier >= 2) this.slowmo = Math.max(this.slowmo, tier >= 3 ? TUNING.slowmo.ko : TUNING.slowmo.big);
     }
     if (amt >= 80) { this.shake = Math.max(this.shake, 0.25); this.cheer = 1.5; }
     if (opts.basic === 'heavy') this.shake = Math.max(this.shake, 0.18);
@@ -1356,7 +1397,9 @@ export class Battle {
   shoot(f: Fighter, p: Omit<Projectile, 'side' | 'row' | 'x'> & { row?: number }): void {
     const reach = Math.max(1, f.side === 0 ? 5 - f.col : f.col);
     this.sound(SHOT_SOUND[p.kind] ?? 'shot_magic', { pan: panOf(f.col), dur: Math.min(1.2, reach / Math.max(1, Math.abs(p.speed))), data: { dir: this.dir(f) } });
-    this.projectiles.push({ side: f.side, row: p.row ?? f.row, x: f.col + this.dir(f) * 0.5, ...p });
+    const cap = p.kind === 'aimed' ? TUNING.ranger.aimedSpeed : TUNING.maxShotSpeed;
+    const x = f.col + this.dir(f) * 0.5, speed = Math.sign(p.speed) * Math.min(Math.abs(p.speed), cap);
+    this.projectiles.push({ side: f.side, row: p.row ?? f.row, x, from: x, ...p, speed });
   }
 
   private updateProjectiles(dt: number): void {
