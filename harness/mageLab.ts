@@ -15,6 +15,10 @@ const LOOKS: Array<[string, string]> = [
 ];
 const SOUNDS: Array<[string, string]> = [
   ['Current', 'Airy whoosh plus high crystal pings. The "glass clinking".'],
+  ['Deep Pulse', 'Round 1. A round, low thrum with a soft push of air. Hits land as a punchy low whomp.'],
+  ['Void Rift', 'Round 1. A dark, detuned drone that closes like a portal. Hits suck in, then thump.'],
+  ['Ethereal Breath', 'Round 1. An airy, voice-like "ooh" over a low body. The softest of round 1.'],
+  ['Arcane Charge', 'Round 1. A low electric buzz with crackle. Hits zap and thud.'],
   ['Arcane Missiles', 'A bright "tsiu" streak trailing fizzing sparkle. Lands as a soft "pff" inside a sparkle cloud.'],
   ['Arcane Blast', 'A breath sucked backwards into a ringing "bwamm", with a singing-glass tail.'],
   ['Arcane Explosion', 'A crackling, glittering burst over a puff of air. The brightest and spikiest.'],
