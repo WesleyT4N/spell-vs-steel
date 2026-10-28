@@ -15,10 +15,10 @@ const LOOKS: Array<[string, string]> = [
 ];
 const SOUNDS: Array<[string, string]> = [
   ['Current', 'Airy whoosh plus high crystal pings. The "glass clinking".'],
-  ['Deep Pulse', 'A round, falling low thrum with a soft push of air. Hits land as a low whomp.'],
-  ['Void Rift', 'A detuned low drone that closes like a portal. Hits suck in, then thump.'],
-  ['Ethereal Breath', 'An airy, voice-like "ooh" carried down the row. Softest of the four.'],
-  ['Arcane Charge', 'A low electric buzz with crackle, like lightning in a bottle. Hits zap and thud.'],
+  ['Missile Swirl', 'A rising, warbling chord riding a phased whoosh. Hits land as a soft "pshh" with a shimmering ring.'],
+  ['Arcane Blast', 'A quick breath in, then a resonant "vwoom" as the tone sweeps down. The closest to WoW\'s Arcane Blast.'],
+  ['Ethereal Shimmer', 'A chorus of soft, trembling tones that bloom and fade. The gentlest of the four.'],
+  ['Warp', 'A wobbling, pitch-bending tone, like a portal or Polymorph. Hits wobble down and fizz out.'],
 ];
 let look = 1, sound = 1, auto = true, slow = false;
 fxLab.mage = look; sfxLab.arcane = sound;
