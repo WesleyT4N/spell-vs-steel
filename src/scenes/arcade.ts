@@ -10,7 +10,7 @@ import { TUNING } from '../game/tuning';
 import { deckLabel } from '../game/match';
 import { setTotals, topSpell, type RoundRecord } from '../game/stats';
 import { CARDS } from '../game/cards';
-import { BOSS_HP, clock, rungMatch, saveClear, loadRecords, type ArcadeRun, type FightRecord } from '../game/arcade';
+import { clock, rungMatch, saveClear, loadRecords, type ArcadeRun, type FightRecord } from '../game/arcade';
 import { UW, vy, screenRect, spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
@@ -86,7 +86,7 @@ export class ArcadeLadderScene implements Scene {
       const hidden = r.boss && !now;
       drawFighterSprite(ui, getSprite(r.cls, r.skin, false), RX + 20, y + RH - 2, true, hidden ? 'ghost' : 'none', 1);
       drawText(ui, r.boss ? (hidden ? 'BOSS  ???' : `BOSS  ${BOSS_NAME}`) : `${i + 1}  ${CLASS_INFO[r.cls].name}`, RX + 38, y + 6, text, 1);
-      drawText(ui, r.boss ? 'HARD  FULL POWER' : `${LEVEL[r.difficulty]}  ${Math.round(r.power * 100)}% POWER`, RX + 38, y + 16, now ? text : INK2, 1);
+      drawText(ui, `${LEVEL[r.difficulty]}  ${Math.round(r.power * 100)}% POWER`, RX + 38, y + 16, now ? text : INK2, 1);
       if (done) drawTextCentered(ui, 'CLEAR', RX + RW - 30, y + 10, RED_INK, 1, false);
     });
 
@@ -97,7 +97,7 @@ export class ArcadeLadderScene implements Scene {
     drawFighterSprite(ui, getSprite(next.cls, next.skin, false), rcx, py + 92 - (Math.floor(tick / 4 + 1) % 2) * 2, true, 'none', 3);
     drawTextCentered(ui, next.boss ? BOSS_NAME : CLASS_INFO[next.cls].name, rcx, py + 100, INK, 2, false);
     const lines = [deckLabel(next.cls, next.deck), `CPU ${LEVEL[next.difficulty]}`, getStage(next.stage).name.toUpperCase()];
-    lines.push(next.boss ? `FULL KIT  HP x${BOSS_HP}` : `${Math.round(next.power * 100)}% POWER`);
+    lines.push(`${Math.round(next.power * 100)}% POWER`);
     lines.forEach((l, i) => drawTextCentered(ui, l, rcx, py + 124 + i * 12, i ? INK2 : TRIM, 1, false));
 
     drawMenu(ui, this.items, this.sel, UW / 2, vy(PY + SIDE_H + 12), tick, { width: 160, gap: 18 });
@@ -126,7 +126,7 @@ export class ArcadeLadderScene implements Scene {
     side(x0, 'YOU', RED_INK, run.m.p1, mine, false, CLASS_INFO[run.m.p1].name,
       [deckLabel(run.m.p1, run.m.p1Deck), `CONTINUES ${run.continues}`, `TIME ${clock(run.time)}`, best ? `BEST ${clock(best.time)} / ${best.continues}C` : ''], 0);
     const rl = [deckLabel(next.cls, next.deck), `CPU ${LEVEL[next.difficulty]}`, getStage(next.stage).name.toUpperCase()];
-    rl.push(next.boss ? `FULL KIT  HP x${BOSS_HP}` : `${Math.round(next.power * 100)}% POWER`);
+    rl.push(`${Math.round(next.power * 100)}% POWER`);
     side(x0 + pw + GAP, next.boss ? 'BOSS' : 'NEXT RIVAL', BLUE_INK, next.cls, next.skin, true, next.boss ? BOSS_NAME : CLASS_INFO[next.cls].name, rl, 1);
     y += ph + GAP;
 
@@ -163,10 +163,10 @@ export class ArcadeBattleScene extends BattleScene {
     this.rivalName = rung.boss ? BOSS_NAME : 'CPU';
     // GIVE UP stands where QUIT TO TITLE does, and does the same
     this.pauseItems = ['RESUME', 'OPTIONS', 'RESTART', 'GIVE UP'];
-    // rivals fight with a weakened kit (less HP, less damage); the boss at full power with extra HP
+    // every rival, the boss too, fights with a weakened kit (less HP, less damage)
     const f = this.b.f[1];
     f.power = rung.power;
-    f.maxHp = f.hp = Math.round(TUNING.hp[f.cls as ClassId] * (rung.boss ? BOSS_HP : rung.power));
+    f.maxHp = f.hp = Math.round(TUNING.hp[f.cls as ClassId] * rung.power);
     if (rung.boss) f.name = BOSS_NAME;
   }
 

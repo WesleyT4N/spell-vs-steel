@@ -16,7 +16,7 @@ export interface Rung {
   deck: string;
   stage: string;
   boss: boolean;
-  /** The rival's HP and damage as a share of the full kit (1 = full power, the boss only). */
+  /** The rival's HP and damage as a share of the full kit. */
   power: number;
 }
 
@@ -53,7 +53,7 @@ export interface ArcadeRun {
 
 /**
  * The rival fights, in order: CPU level, deck, and power (HP and damage as a share of the full kit).
- * Every rival is weaker than a real opponent and each one a step tougher; only the boss fights at full power.
+ * Every rival is weaker than a real opponent and each one a step tougher.
  */
 const CLIMB: Array<{ difficulty: Difficulty; mythic: boolean; power: number }> = [
   { difficulty: 'easy', mythic: false, power: 0.6 },
@@ -61,8 +61,8 @@ const CLIMB: Array<{ difficulty: Difficulty; mythic: boolean; power: number }> =
   { difficulty: 'normal', mythic: true, power: 0.8 },
   { difficulty: 'hard', mythic: true, power: 0.9 },
 ];
-/** The Shadow Self boss: your class and deck in black, on Hard, full damage but this much HP (below 1 so Hard play is beatable). */
-export const BOSS_HP = 0.9;
+/** The Shadow Self boss: your class and deck in black, on Hard, at this power (HP and damage). */
+export const BOSS_POWER = 0.9;
 export const BOSS_SKIN = 'black';
 
 function shuffle<T>(list: T[], rand: () => number): T[] {
@@ -91,7 +91,7 @@ export function buildLadder(m: MatchConfig, rand: () => number = Math.random): R
     power: CLIMB[i].power,
   }));
   // in black, unless you already wear it
-  rungs.push({ cls: m.p1, skin: mirrorSkin(m.p1, skinOf(m.p1, m.p1Skin[m.p1]).id, BOSS_SKIN), difficulty: 'hard', deck: m.p1Deck, stage: stages[rungs.length % stages.length], boss: true, power: 1 });
+  rungs.push({ cls: m.p1, skin: mirrorSkin(m.p1, skinOf(m.p1, m.p1Skin[m.p1]).id, BOSS_SKIN), difficulty: 'hard', deck: m.p1Deck, stage: stages[rungs.length % stages.length], boss: true, power: BOSS_POWER });
   return rungs;
 }
 
