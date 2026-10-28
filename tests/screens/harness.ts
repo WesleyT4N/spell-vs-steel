@@ -144,6 +144,15 @@ const loadMatchDeck = (cls: ClassId = 'warrior'): string[] => toList(presetDeck(
 
 const screens: Record<string, () => void> = {
   'title': title,
+  // the duel mid-flight: one shot of each kind crossing the menu (and the wind-up glow before the mage's)
+  ...Object.fromEntries((['mage', 'warrior', 'rogue', 'ranger'] as const).map((c, i) => [`title-shot-${c}`, () => {
+    const t = new TitleScene();
+    t.intro = 99; t.fighters = [c, c === 'mage' ? 'priest' : 'mage']; t.swapSide = 0; t.swapT = 1.6 + i * 0.05;
+    setScene(t);
+  }])),
+  'title-hit': () => { const t = new TitleScene(); t.intro = 99; t.swapSide = 0; t.swapT = 2.0; setScene(t); run(0.12); },
+  'title-poof': () => { const t = new TitleScene(); t.intro = 99; t.swapSide = 1; t.swapT = 0.15; setScene(t); },
+  'title-windup': () => { const t = new TitleScene(); t.intro = 99; t.swapSide = 0; t.swapT = 1.25; setScene(t); },
   'options': () => setScene(new OptionsScene(title)),
   // the phone layout's second tab: pad size, left-handed and vibration
   'options-touch': () => { const o = new OptionsScene(title); o.tab = 1; setScene(o); },

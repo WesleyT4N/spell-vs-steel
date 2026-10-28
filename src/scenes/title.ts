@@ -50,6 +50,17 @@ const WIND = 1.1, FIRE = 1.35, HIT = 2.05;
 // Mage under SPELL, Warrior under STEEL to start, then the rest of the roster
 const ROSTER: ClassId[] = ['mage', 'warrior', ...PLAYABLE.filter(c => c !== 'mage' && c !== 'warrior')];
 const X = [34, 206], FOOT = 130;
+// the fighters stand at 2x, so their shots, sparks and smoke draw on the same 2x pixel grid (never the stage's 1x)
+const FX = 2;
+
+/** Runs `draw` with the origin at (x, y), snapped to the fighters' pixel grid, and one unit per fighter pixel. */
+function onFighterGrid(c: Ctx, x: number, y: number, draw: () => void): void {
+  c.save();
+  c.translate(Math.round(x / FX) * FX, Math.round(y / FX) * FX);
+  c.scale(FX, FX);
+  draw();
+  c.restore();
+}
 
 /** Each class's shot: its element colors (dark to light) and a shape. */
 const SHOT: Record<ClassId, { ramp: string[]; kind: 'orb' | 'arrow' | 'blade' | 'wave' }> = {
@@ -71,9 +82,9 @@ function nextClass(cur: ClassId, other: ClassId): ClassId {
   return ROSTER[i];
 }
 
-/** A ring of smoke puffs that spreads and shrinks as k goes 0 to 1. */
+/** A ring of smoke puffs that spreads and shrinks as k goes 0 to 1 (in fighter pixels). */
 function poof(c: Ctx, x: number, y: number, k: number): void {
-  const r = 4 + k * 14, s = Math.max(1, Math.round(4 * (1 - k)));
+  const r = 3 + k * 8, s = Math.max(1, Math.round(3 * (1 - k)));
   for (let i = 0; i < 10; i++) {
     const a = (i / 10) * Math.PI * 2;
     P(c, i % 2 ? '#fcfcfc' : '#bcbcbc', x + Math.cos(a) * r - s / 2, y + Math.sin(a) * r * 0.7 - s / 2, s, s);
@@ -105,13 +116,31 @@ function drawShot(c: Ctx, cls: ClassId, x: number, y: number, dir: number, t: nu
     else { P(c, l, x, y - 3, 1, 6); P(c, d, x - 1, y + 2, 3, 1); }
     P(c, m, x - dir * 6, y, 1, 1); P(c, d, x - dir * 9, y, 1, 1);
   } else {
-    // a crescent of steel skimming the ground
-    for (let i = -5; i <= 5; i++) {
-      const bend = Math.round((i * i) / 8) * dir;
-      P(c, Math.abs(i) > 3 ? m : l, x - bend, y + i, 2, 1);
+    // a shockwave tearing along the floor, (x, y) on the floor at its front: arcs of pressure bowing toward the
+    // target, rocks bursting up where it is, a crack and dust left behind
+    const ph = Math.floor(t * 20);
+    // three rings of pressure bowing toward the target, the biggest in front, thick in the middle and tapering
+    for (let n = 2; n >= 0; n--) {
+      const h = [6, 4, 3][n], cx = x - dir * (n * 4 + (ph % 2)), cy = y - h - 1, col = [w, l, m][n];
+      for (let i = -h; i <= h; i++) {
+        const bx = cx + dir * Math.round(3 * (1 - (i / h) ** 2)), thick = Math.abs(i) < h - 2 ? 2 : 1;
+        if (n === 0) P(c, '#000000', Math.min(bx + dir, bx + dir * thick), cy + i, 1, 1);
+        P(c, col, dir > 0 ? bx - thick + 1 : bx, cy + i, thick, 1);
+      }
     }
-    P(c, w, x + dir, y - 1, 1, 3);
-    for (let i = 1; i < 4; i++) P(c, d, x - dir * (3 + i * 3), y - 4 + i * 2, 2, 1);
+    // a white burst on the floor where it is
+    if (ph % 2) { P(c, w, x - 2, y - 2, 5, 1); P(c, l, x - 4, y - 1, 9, 1); }
+    // rocks flung up at the front, each on its own little hop
+    for (let i = 0; i < 4; i++) {
+      const k = ((t * 3 + i * 0.27) % 1), rx = x - dir * (i * 3 + Math.round(k * 4)), ry = y - 2 - Math.round(Math.sin(k * Math.PI) * (4 + i * 2));
+      P(c, i % 2 ? '#7c4c1c' : '#a0703c', rx, ry, i % 2 ? 1 : 2, 1); P(c, '#000000', rx, ry + 1, i % 2 ? 1 : 2, 1);
+    }
+    // the crack it leaves in the floor, and dust curling up off it
+    for (let i = 0; i < 12; i++) P(c, '#3c2410', x - dir * (6 + i), y - 1 + ((i * 5) % 3 === 0 ? -1 : 0), 1, 1);
+    for (let i = 0; i < 3; i++) {
+      const k = (t * 2 + i / 3) % 1, s = k < 0.5 ? 2 : 1;
+      P(c, k < 0.4 ? '#d8c8a8' : '#a89878', x - dir * (10 + i * 5) - s / 2, y - 2 - Math.round(k * 6), s, s);
+    }
   }
 }
 
@@ -247,26 +276,33 @@ export class TitleScene implements Scene {
       // the new fighter flashes in from the smoke
       if (k >= 0.35) drawFighterSprite(c, getFrame(cls, skin, false, this.frameOf(side)), x + kb, FOOT, side === 1, k < 0.6 || hurt ? 'flash' : 'none', 2);
       P(c, '#000000', x - 12, FOOT + 1, 24, 2);
-      if (k < 1) poof(c, x, 112, k);
+      if (k < 1) onFighterGrid(c, x, 106, () => poof(c, 0, 0, k));
     }
     // the shot crossing between them (it passes behind the menu)
     if (intro >= INTRO && this.swapT >= FIRE && this.swapT < HIT) {
       const a = this.swapSide, dir = a ? -1 : 1, f = (this.swapT - FIRE) / (HIT - FIRE), cls = this.fighters[a];
-      const x0 = X[a] + dir * 20, x1 = X[1 - a] - dir * 10, low = SHOT[cls].kind === 'wave';
-      drawShot(c, cls, x0 + (x1 - x0) * f, low ? FOOT - 7 : FOOT - 26 - Math.sin(f * Math.PI) * 6, dir, this.t);
+      const x0 = X[a] + dir * 20, x1 = X[1 - a] - dir * 10;
+      // the warrior's shockwave tears along the floor; the others fly at hand height on a slight arc
+      const y = SHOT[cls].kind === 'wave' ? FOOT : FOOT - 26 - Math.sin(f * Math.PI) * 6;
+      onFighterGrid(c, x0 + (x1 - x0) * f, y, () => drawShot(c, cls, 0, 0, dir, this.t));
     }
     // the attacker gathers its element in its hand before letting fly
     if (intro >= INTRO && this.swapT >= WIND && this.swapT < FIRE) {
       const a = this.swapSide, dir = a ? -1 : 1, r = SHOT[this.fighters[a]].ramp, f = (this.swapT - WIND) / (FIRE - WIND);
-      const hx = X[a] + dir * 16, hy = FOOT - 28, rad = 1 + Math.round(f * 4);
-      for (let i = 0; i < 6; i++) {
-        const an = this.t * 9 + (i / 6) * Math.PI * 2, d = (1 - f) * 10 + 2;
-        P(c, r[1 + (i % 3)], Math.round(hx + Math.cos(an) * d), Math.round(hy + Math.sin(an) * d), 1, 1);
-      }
-      P(c, r[1], hx - rad, hy - rad + 1, rad * 2, rad * 2 - 2); P(c, r[1], hx - rad + 1, hy - rad, rad * 2 - 2, rad * 2);
-      P(c, r[3], hx - 1, hy - 1, 2, 2);
+      const rad = 1 + Math.round(f * 3);
+      onFighterGrid(c, X[a] + dir * 16, FOOT - 28, () => {
+        for (let i = 0; i < 6; i++) {
+          const an = this.t * 9 + (i / 6) * Math.PI * 2, d = (1 - f) * 6 + 2;
+          P(c, r[1 + (i % 3)], Math.cos(an) * d, Math.sin(an) * d, 1, 1);
+        }
+        P(c, r[1], -rad, -rad + 1, rad * 2, rad * 2 - 2); P(c, r[1], -rad + 1, -rad, rad * 2 - 2, rad * 2);
+        P(c, r[3], -1, -1, 2, 2);
+      });
     }
-    for (const p of this.sparks) { const r = p.ramp, i = Math.min(r.length - 1, Math.floor((1 - p.age / p.life) * r.length)); const z = p.age < p.life / 2 ? 2 : 1; P(c, r[i], Math.round(p.x), Math.round(p.y), z, z); }
+    for (const p of this.sparks) {
+      const r = p.ramp, i = Math.min(r.length - 1, Math.floor((1 - p.age / p.life) * r.length)), z = p.age < p.life / 2 ? 2 : 1;
+      onFighterGrid(c, p.x, p.y, () => P(c, r[i], 0, 0, z, z));
+    }
 
     // the logo drops in and lands with a bounce
     const drop = span(intro, LOGO_DROP);
