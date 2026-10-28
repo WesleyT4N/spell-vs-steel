@@ -63,6 +63,15 @@ function arcadeRun(at: number): ArcadeRun {
   return { m, ladder, at: Math.min(at, ladder.length - 1), continues: 1, time: 512, tries: 1, fights };
 }
 
+/** Telegraphs from both sides that stay up for a while: left side hits column 4 and locks on (5, 0); right side hits column 1 and lobs at (0, 2). */
+function warns(): void {
+  const b = battle().b;
+  b.warn(0, [[4, 0], [4, 1], [4, 2]], 3);
+  b.warn(0, [[5, 0]], 3, undefined, 'reticle');
+  b.warn(1, [[1, 0], [1, 1], [1, 2]], 3);
+  b.warn(1, [[0, 2]], 3, undefined, 'shadow');
+}
+
 /** A CPU vs CPU set to watch, so the fight plays itself. */
 function watch(over: Partial<MatchConfig> = {}): BattleScene {
   const s = new BattleScene(match({ p1: 'warrior', cpu: 'mage', bestOf: 3, ...over }), [0, 0], undefined, [], ['cpu', 'cpu']);
@@ -122,7 +131,7 @@ function fakeTournament(state: Bracket['state']): TournamentScene {
  * An online match against a made-up rival over an in-memory link: the rival's side answers every packet at once,
  * so the session stays connected. `matched` false leaves the host alone in the room, waiting.
  */
-function fakeNet(matched = true): NetSession {
+function fakeNet(matched = true, as: 'host' | 'guest' = 'host'): NetSession {
   const hello = (cls: ClassId) => ({ cls, skin: SKINS[cls][0].id, deck: [] as string[] });
   const pipe = (): Transport & { peer?: Transport & { cb?: (p: Packet) => void }; cb?: (p: Packet) => void } => ({
     kind: 'local', cb: undefined, peer: undefined,
@@ -135,6 +144,8 @@ function fakeNet(matched = true): NetSession {
   a.peer = b; b.peer = a;
   const guest = new NetSession('guest', 'KQZ7M', { ...hello('mage'), deck: loadMatchDeck('mage') }, b, 3);
   // the rival answers each packet with its own
+  // (or, playing as the guest, the host answers each of yours)
+  if (as === 'guest') { const onA = a.cb!; a.cb = p => { onA(p); host.tick(); }; guest.tick(); return guest; }
   const onB = b.cb!;
   b.cb = p => { onB(p); guest.tick(); };
   host.tick();
@@ -181,6 +192,8 @@ const screens: Record<string, () => void> = {
   'online-select': () => setScene(new CharSelectScene(fakeNet())),
   'online-stage': () => setScene(new StageSelectScene(fakeNet())),
   // the Draw screen once your picks are locked in and the rival is still choosing
+  // online as the guest, on the right: your side and your telegraphs are still blue
+  'online-battle-guest': () => { const s = new OnlineBattleScene(fakeNet(true, 'guest'), [0, 0], 1); setScene(s); run(0.3); s.b.endCustom([[], []]); run(0.3); warns(); run(0.5); },
   'online-draw-locked': () => { const s = new OnlineBattleScene(fakeNet(), [0, 0], 1); setScene(s); run(0.3); s.picks = [0]; (s as unknown as { confirmCustom(): void }).confirmCustom(); run(0.2); },
   // the end of a ranked round: the results carry the ranked note
   'online-results-ranked': () => {
@@ -200,6 +213,10 @@ const screens: Record<string, () => void> = {
   'battle-fight': () => { watch(); run(8, () => battle().b.phase === 'over'); },
   // mid-fight as the player, so phones show the fight pad
   'battle-player': () => { setScene(new BattleScene(match({ p1: 'priest', cpu: 'ranger' }))); run(0.5); battle().b.endCustom([[0, 1], []]); run(3); },
+  // area-spell telegraphs in team colors: yours blue on their side, theirs red on yours (flash, reticle, lob shadow)
+  'battle-warns': () => { setScene(new BattleScene(match({ p1: 'warrior', cpu: 'mage' }))); run(0.5); battle().b.endCustom([[], []]); run(0.3); warns(); run(0.5); },
+  // the human on the right: the blue team follows you to the right side
+  'battle-warns-right': () => { setScene(new BattleScene(match({ p1: 'rogue', cpu: 'priest' }), [0, 0], undefined, [], ['cpu', 'player'])); run(0.5); battle().b.endCustom([[], []]); run(0.3); warns(); run(0.5); },
   'battle-pause': () => { setScene(new BattleScene(match({ p1: 'mage', cpu: 'rogue' }))); run(0.5); battle().b.endCustom([[], []]); run(2); battle().paused = true; },
   // a whole round played out by two CPUs, ending on the results screen
   'battle-results': () => { watch({ p1: 'ranger', cpu: 'priest' }); run(400, () => battle().b.phase === 'over'); run(3); },

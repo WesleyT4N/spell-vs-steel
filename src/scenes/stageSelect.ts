@@ -17,6 +17,7 @@ import type { NetSession } from '../net/session';
 import { BattleScene } from './battle';
 import { OnlineBattleScene } from './onlineBattle';
 import type { PadMode } from '../engine/touch';
+import { YOU, FOE } from '../game/teamColors';
 import { bigButton, actionBar, barTapped, swipeIn, tallArea, dots, GAP, PAD } from './touchUi';
 
 /** Stage tiles: every stage, then RANDOM. */
@@ -52,7 +53,7 @@ function thumb(id: string, TW = 60, TH = 40): HTMLCanvasElement {
   const fc = full.getContext('2d')!;
   const st = getStage(id);
   st.draw(fc, 0, 0);
-  for (let r = 0; r < 3; r++) for (let col = 0; col < 6; col++) drawPanel(fc, col, r, 'clean', 0, col < 3 ? 0 : 1, undefined, st);
+  for (let r = 0; r < 3; r++) for (let col = 0; col < 6; col++) drawPanel(fc, col, r, 'clean', 0, col < 3, undefined, st);
   t = document.createElement('canvas');
   t.width = TW; t.height = TH;
   const tc = t.getContext('2d')!;
@@ -193,7 +194,7 @@ export class StageSelectScene implements Scene {
     c.fillRect(...screenRect());
     const pc = this.preview.getContext('2d')!;
     st.draw(pc, tick, 0);
-    for (let r = 0; r < 3; r++) for (let col = 0; col < 6; col++) drawPanel(pc, col, r, 'clean', tick, col < 3 ? 0 : 1, undefined, st);
+    for (let r = 0; r < 3; r++) for (let col = 0; col < 6; col++) drawPanel(pc, col, r, 'clean', tick, col < 3, undefined, st);
     const [a, b] = this.fighters(), bob = Math.floor(tick / 4) % 2;
     for (const [f, col, flip] of [[a, 1, false], [b, 4, true]] as const) {
       const foot = panelFoot(col, 1);
@@ -238,9 +239,9 @@ export class StageSelectScene implements Scene {
         drawText(ui, label, tx + 2, tileY + TH + 4, '#fcfcfc');
       };
       if (net) {
-        if (mine && (showSel() || net.lobby.voted)) tag('YOU', '#d82800', false, net.lobby.voted);
-        if (theirs) tag('RIVAL', '#0058f8', true, !!rl?.voted);
-      } else if (mine && showSel()) tag('YOU', '#d82800', false, true);
+        if (mine && (showSel() || net.lobby.voted)) tag('YOU', YOU.mark, false, net.lobby.voted);
+        if (theirs) tag('RIVAL', FOE.mark, true, !!rl?.voted);
+      } else if (mine && showSel()) tag('YOU', YOU.mark, false, true);
     });
 
     // FIGHT! starts on the picked stage (online it casts your vote)
@@ -308,8 +309,8 @@ export class StageSelectScene implements Scene {
         drawText(ui, label, lx + 3, ty + th - 11, '#fcfcfc');
       };
       if (net) {
-        if (mine && (showSel() || net.lobby.voted)) tag('YOU', '#d82800', false);
-        if (theirs) tag('RIVAL', '#0058f8', true);
+        if (mine && (showSel() || net.lobby.voted)) tag('YOU', YOU.mark, false);
+        if (theirs) tag('RIVAL', FOE.mark, true);
       }
     });
 

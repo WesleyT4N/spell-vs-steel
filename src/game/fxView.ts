@@ -5,6 +5,7 @@ import { panelFoot, PW, X0 } from '../art/arena';
 import { drawFighterSprite, type Sprite } from '../art/sprites';
 import { drawTextCentered } from '../engine/font';
 import type { Battle, Fighter, Fx, Projectile } from './battle';
+import { team } from './teamColors';
 
 export const FIRE = ['#f83800', '#fca044', '#f8b800', '#fce0a8'];
 export const ICE = ['#0058f8', '#3cbcfc', '#a4e4fc', '#fcfcfc'];
@@ -423,8 +424,8 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
       for (let r = 0; r < 3; r++) {
         const pc = cellPx(e.col, r), wave = Math.floor(b.time * 6 + r) % 3;
         P(c, '#000000', pc.x - 1, pc.y - 19, 3, 18); P(c, '#503000', pc.x, pc.y - 18, 1, 16); P(c, '#f8b800', pc.x, pc.y - 19, 1, 1);
-        const team = e.side === 0 ? '#d82800' : '#0058f8';
-        for (let i = 0; i < 7; i++) { const off = Math.round(Math.sin((i + wave) * 1.1)); P(c, '#000000', pc.x + 1 + i, pc.y - 19 + off, 1, 7); P(c, team, pc.x + 1 + i, pc.y - 18 + off, 1, 5); }
+        const flag = team(e.side).mark;
+        for (let i = 0; i < 7; i++) { const off = Math.round(Math.sin((i + wave) * 1.1)); P(c, '#000000', pc.x + 1 + i, pc.y - 19 + off, 1, 7); P(c, flag, pc.x + 1 + i, pc.y - 18 + off, 1, 5); }
         P(c, '#fcfcfc', pc.x + 3, pc.y - 16 + Math.round(Math.sin((2 + wave) * 1.1)), 2, 1);
       }
       break;
