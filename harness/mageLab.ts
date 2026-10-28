@@ -25,6 +25,8 @@ const SOUNDS: Array<[string, string]> = [
   ['Arcane Orb', 'A humming singing-glass chord that rolls down the row and rings out on impact.'],
 ];
 const autoBtn = document.getElementById('auto')!;
+const SPELL_LOOP: Array<[number, string]> = [[0.3, 'arcane_missiles'], [2.0, 'arcane_blast'], [3.7, 'arcane_surge'], [5.4, 'repulse'], [7.1, 'arcane_power']];
+const SPELL_LEN = 8.8;
 let look = 1, sound = 1, auto = true, slow = false, spells = 1;
 fxLab.mage = look; sfxLab.arcane = sound; fxLab.spells = spells;
 
@@ -38,7 +40,7 @@ function fresh(withSound: boolean): Battle {
 // light, light, light, heavy, rest
 const SCRIPT: Array<[number, 'light' | 'heavy']> = [[0.3, 'light'], [0.9, 'light'], [1.5, 'light'], [2.3, 'heavy']];
 const LOOP = 3.4;
-interface View { b: Battle; cv: HTMLCanvasElement; look: () => number; t: number; sound: boolean }
+interface View { b: Battle; cv: HTMLCanvasElement; look: () => number; t: number; sound: boolean; spells?: number; demo?: boolean }
 const off = document.createElement('canvas'); off.width = W; off.height = H;
 const oc = off.getContext('2d')!; oc.imageSmoothingEnabled = false;
 const main = document.getElementById('main') as HTMLCanvasElement;
@@ -86,6 +88,14 @@ function pickRow(id: string, items: Array<[string, string]>, get: () => number, 
 pickRow('looks', LOOKS, () => look, i => { look = i; });
 pickRow('sounds', SOUNDS, () => sound, i => { sound = i; sfxLab.arcane = i; });
 
+const previews = document.getElementById('previews')!;
+(['Current spells', 'New spells'] as const).forEach((name, i) => {
+  const wrap = document.createElement('div'); wrap.className = 'thumb';
+  wrap.innerHTML = `<label>${name}</label>`;
+  const st = document.createElement('div'); st.className = 'stage';
+  const cv = document.createElement('canvas'); cv.width = CROP.w * 2; cv.height = CROP.h * 2; st.appendChild(cv); wrap.appendChild(st); previews.appendChild(wrap);
+  views.push({ b: fresh(false), cv, look: () => 1, t: 0, sound: false, spells: i, demo: true });
+});
 const thumbs = document.getElementById('thumbs')!;
 LOOKS.forEach(([name], i) => {
   const wrap = document.createElement('div'); wrap.className = 'thumb';
@@ -110,13 +120,14 @@ function frame(now: number): void {
     acc -= dt;
     for (const v of views) {
       const t0 = v.t; v.t = (v.t + dt) % LOOP;
-      if (auto || !v.sound) for (const [at, kind] of SCRIPT) if (at > t0 && at <= t0 + dt) fire(v, kind);
-      fxLab.mage = v.look(); fxLab.spells = v.sound ? spells : 0;
+      if (v.demo) { v.t = (t0 + dt) % SPELL_LEN; for (const [at, id] of SPELL_LOOP) if (at > t0 && at <= t0 + dt) { fxLab.spells = v.spells ?? 0; cast(v, id); } }
+      else if (auto || !v.sound) for (const [at, kind] of SCRIPT) if (at > t0 && at <= t0 + dt) fire(v, kind);
+      fxLab.mage = v.look(); fxLab.spells = v.sound ? spells : v.spells ?? 0;
       v.b.update(dt, [NO_INTENT, NO_INTENT]);
     }
   }
   for (const v of views) {
-    fxLab.mage = v.look(); fxLab.spells = v.sound ? spells : 0;
+    fxLab.mage = v.look(); fxLab.spells = v.sound ? spells : v.spells ?? 0;
     oc.clearRect(0, 0, W, H); drawBattle(oc, v.b, Math.floor(v.b.time * 30));
     const c = v.cv.getContext('2d')!; c.imageSmoothingEnabled = false;
     c.drawImage(off, CROP.x, CROP.y, CROP.w, CROP.h, 0, 0, v.cv.width, v.cv.height);

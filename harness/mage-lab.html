@@ -35,7 +35,7 @@ button:focus-visible { outline: 3px solid var(--ribbon); outline-offset: 2px; }
 <div class="wrap">
   <header style="display:grid;gap:8px">
     <h1>Mage Attack Lab</h1>
-    <p class="lede">The Mage's light attack (Arcane Bolt) and heavy attack (Arcane Beam), in three new looks and four new sound sets. Pick a look and a sound below and they play together in the arena. Tap anywhere first to turn sound on.</p>
+    <p class="lede">Picked so far: the Arcane Orb look and the Deep Pulse sound. The Mage's light attack (Arcane Bolt) and heavy attack (Arcane Beam), in three new looks and four new sound sets. Pick a look and a sound below and they play together in the arena. Tap anywhere first to turn sound on.</p>
   </header>
   <div class="stage"><canvas id="main" width="912" height="360"></canvas></div>
   <div class="bar">
@@ -44,6 +44,8 @@ button:focus-visible { outline: 3px solid var(--ribbon); outline-offset: 2px; }
   </div>
   <section class="group"><h2>Arcane spells</h2>
     <p>A bolder pass on the arcane spells: Arcane Missiles fly as orbs with ribbon trails, Arcane Blast and Surge open a rune under the target and slam a column of force down on it, Repulse rolls a curved wall of force, and every arcane cast draws a rune at the Mage's feet. Compare against the current versions, then cast each one. They use the sound set picked below.</p>
+    <div class="thumbs" id="previews"></div>
+    <p class="note">The two previews loop every arcane damage spell side by side, silently: Arcane Missiles, Arcane Blast, Arcane Surge, Repulse, Arcane Power. Use the buttons below to cast them yourself in the big arena, with sound.</p>
     <div class="bar" id="spellLook"></div><div class="bar" id="spells"></div></section>
   <section class="group"><h2>Look</h2><div class="picks" id="looks"></div></section>
   <section class="group"><h2>Sound</h2><div class="picks" id="sounds"></div>
