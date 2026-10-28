@@ -61,8 +61,8 @@ const CLIMB: Array<{ difficulty: Difficulty; mythic: boolean; power: number }> =
   { difficulty: 'normal', mythic: true, power: 0.8 },
   { difficulty: 'hard', mythic: true, power: 0.9 },
 ];
-/** The Shadow Self boss: your class and deck in black, on Hard, with this much HP. */
-export const BOSS_HP = 1.25;
+/** The Shadow Self boss: your class and deck in black, on Hard, full damage but this much HP (below 1 so Hard play is beatable). */
+export const BOSS_HP = 0.9;
 export const BOSS_SKIN = 'black';
 
 function shuffle<T>(list: T[], rand: () => number): T[] {
