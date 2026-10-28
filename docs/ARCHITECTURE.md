@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at c1e6e00 (2026-10-27).
+How the game is put together, one section per system. Describes `main` at b89f8df (2026-10-28).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -126,7 +126,7 @@ flowchart LR
 | `net/rollback.ts` | `Rollback`: one confirmed snapshot, guesses up to `MAX_ROLLBACK = 10` frames, rewind and replay, `onConfirmed` feeds the replay `TapeWriter` |
 | `net/snapshot.ts` | Snapshots the Battle object graph and restores it in place; watchers (post-match stats) pass extra roots |
 | `net/session.ts` | `NetSession`: handshake, readiness, input buffers, RTT, status (waiting / connected / reconnecting / lost), desync flag |
-| `net/protocol.ts` | `Packet`, `PROTOCOL = 7`, 10-bit input packing (2 chars per frame), room codes |
+| `net/protocol.ts` | `Packet`, `PROTOCOL = 8`, 10-bit input packing (2 chars per frame), room codes |
 | `net/transport.ts` | `room` (claude.ai artifact presence), `peer` (WebRTC via PeerJS), `local` (BroadcastChannel, fake lag) |
 | `net/hash.ts` | `battleHash(b)`, FNV-1a over everything the rules read |
 | `scenes/online.ts`, `scenes/onlineBattle.ts` | Online menu and the Versus scene driven by `Netplay` |
@@ -238,7 +238,7 @@ flowchart LR
 - Fighters stay 24×24 and are never stretched in menus; spell effects keep a 24×24 footprint and take their element's colour.
 - Visual state never goes into the Battle, so rollback and the hash never see it. Hit feel (#34, `game/hitFeel.ts`): element impact sparks, render-only hit-stop, screen kick and popping damage numbers, deduped so a rollback doesn't replay them.
 - The canvas fits the window between 4:3 and 21:9 (shows more stage, no letterbox); phones in portrait give the bottom half to the touch pad.
-- Screens with a full-height phone layout (`Scene.tall`: title, select, decks, stages, options, online, lobby, ranked, replays, tournament, arcade, training, tutorial, spell encyclopedia) take the whole portrait screen instead and draw big controls from `scenes/touchUi.ts`: the action bar, tabs, scrolling row lists, sheets and swipes.
+- Screens with a full-height phone layout (`Scene.tall`: title, fighter select, spell deck select (#69), decks, stages, options, online, lobby, ranked, replays, tournament, arcade, training, tutorial, spell encyclopedia) take the whole portrait screen instead and draw big controls from `scenes/touchUi.ts`: the action bar, tabs, scrolling row lists, sheets and swipes.
 - UI skin: Parchment (`scenes/skin.ts`). Cards: `scenes/cardView.ts`. Font: `engine/font.ts` (5×7).
 
 ## Audio
@@ -287,17 +287,18 @@ Scenes never import `TitleScene`; `main.ts` registers it with `setHome`. Screens
 ```mermaid
 flowchart LR
   title[Title menu]
-  title -- ARCADE --> cs0[Character select] --> ar["Arcade ladder<br/>4 rivals at 60-90% power<br/>+ Shadow Self boss"] --> bs
-  title -- VERSUS --> cs1[Character select] --> ss1[Stage select] --> bs[BattleScene]
-  title -- ONLINE --> om["Online menu<br/>LOBBY, RANKED MATCH, TOURNAMENT,<br/>MATCH, CREATE/JOIN ROOM"] --> cs2[Character select] --> ss2[Stage vote] --> ob[OnlineBattleScene]
+  title -- ARCADE --> cs0[Fighter select] --> dk0[Spell deck select] --> ar["Arcade ladder<br/>4 rivals at 60-90% power<br/>+ Shadow Self boss"] --> bs
+  title -- VERSUS --> cs1[Fighter select] --> dk1[Spell deck select] --> ss1[Stage select] --> bs[BattleScene]
+  title -- ONLINE --> om["Online menu<br/>LOBBY, RANKED MATCH, TOURNAMENT,<br/>MATCH, CREATE/JOIN ROOM"] --> cs2[Fighter select] --> dk2["Spell deck select<br/>both lock in"] --> ss2[Stage vote] --> ob[OnlineBattleScene]
   title -- REPLAYS --> rp[Replay list] --> bs
-  title -- TRAINING --> cs3[Character select] --> tr[TrainingScene]
-  title -- TUTORIAL --> cs4[Character select] --> tu[TutorialScene]
+  title -- TRAINING --> cs3[Fighter select] --> dk3[Spell deck select] --> tr[TrainingScene]
+  title -- TUTORIAL --> cs4[Fighter select] --> tu[TutorialScene]
   title -- SPELL DECKS --> db[Deck builder]
   title -- OPTIONS --> op[Options + Key Mapping]
   title -. DEV TOOLS, dev builds .-> dev[Encyclopedia, sandbox, lab, voices]
 ```
 
+- Pre-match flow (#69): fighter, then spell deck (`scenes/deckSelect.ts`: both sides' decks side by side, EDIT, CPU level, match length), then stage; a step trail (1 FIGHTER / 2 SPELL DECK / 3 STAGE) runs across the three screens. Tapping a stage only selects it; FIGHT! starts.
 - `OnlineBattleScene` and `TrainingScene` extend `BattleScene`; `TutorialScene` drives one. Card previews run their own tiny muted Battle.
 - Menus are mouse-first: scenes register click zones while drawing (`zone(...)`), the next update reads `hotZone()`. Combat is keyboard, gamepad or the touch pad (`engine/touch.ts`); see Input and platform.
 - Everything kept between sessions goes through the save module (see Saves).
