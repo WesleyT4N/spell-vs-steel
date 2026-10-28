@@ -344,12 +344,12 @@ const ARCANE: ArcaneSet[] = [
 ];
 // round 1 (Wes liked these best: punchy)
 const ARCANE_R1: ArcaneSet[] = [
-  // 1 Deep Pulse: a round, falling sine thrum with a soft air push; hits land as a low "whomp"
-  { bolt: o => { const p = P0(o), j = jit(); synth({ f: 240 * j, f1: 120 * j, dur: 0.16, vol: 0.6, pan: p, lp: 1200 }); synth({ type: 'triangle', f: 480 * j, f1: 240 * j, dur: 0.1, vol: 0.25, pan: p, lp: 1500 });
-      layer({ buf: 'pink', type: 'bandpass', f: 700, f1: 1600, q: 1, env: [[0.03, 0.35], [0.14, 0]], pan: p, panTo: dirTo(o), send: 0.25 }); },
-    beam: o => { const p = P0(o), d = o.dur ?? 0.32; synth({ f: 160, f1: 110, dur: d + 0.1, vol: 0.9, pan: p, lp: 900, atk: 0.02 }); synth({ type: 'triangle', f: 320, f1: 220, dur: d, vol: 0.35, pan: p, lp: 1400, detune: 0.01 });
-      layer({ buf: 'pink', type: 'bandpass', f: 500, f1: 1400, q: 1.5, env: [[0.04, 0.6], [d, 0.3], [d + 0.08, 0]], pan: p, panTo: dirTo(o), send: 0.35, flut: 0.4 }); },
-    hit: (v, p) => { synth({ f: 200, f1: 70, dur: 0.22, vol: 0.9 * v, pan: p, lp: 800 }); layer({ buf: 'brown', type: 'bandpass', f: 450, q: 1, env: [[0.01, 0.6 * v], [0.18, 0]], pan: p, send: 0.35 }); } },
+  // 1 Deep Pulse (Wes's pick): a round, falling low thrum with a soft push of air; hits land as a low "whomp"
+  { bolt: o => { const p = P0(o), j = jit(); synth({ f: 170 * j, f1: 85 * j, dur: 0.17, vol: 0.75, pan: p, lp: 900 }); synth({ type: 'triangle', f: 340 * j, f1: 170 * j, dur: 0.11, vol: 0.25, pan: p, lp: 1000 });
+      layer({ buf: 'pink', type: 'bandpass', f: 450, f1: 1100, q: 1, env: [[0.03, 0.35], [0.14, 0]], pan: p, panTo: dirTo(o), send: 0.25 }); },
+    beam: o => { const p = P0(o), d = o.dur ?? 0.32; synth({ f: 115, f1: 80, dur: d + 0.1, vol: 1, pan: p, lp: 700, atk: 0.02 }); synth({ type: 'triangle', f: 230, f1: 160, dur: d, vol: 0.35, pan: p, lp: 1000, detune: 0.01 });
+      layer({ buf: 'pink', type: 'bandpass', f: 350, f1: 1000, q: 1.5, env: [[0.04, 0.6], [d, 0.3], [d + 0.08, 0]], pan: p, panTo: dirTo(o), send: 0.35, flut: 0.4 }); },
+    hit: (v, p) => { synth({ f: 150, f1: 55, dur: 0.24, vol: 1 * v, pan: p, lp: 600 }); layer({ buf: 'brown', type: 'bandpass', f: 320, q: 1, env: [[0.01, 0.6 * v], [0.18, 0]], pan: p, send: 0.35 }); } },
   // 2 Void Rift: a detuned saw pair closing down like a portal; hits suck in, then thump
   { bolt: o => { const p = P0(o), j = jit(); synth({ type: 'sawtooth', f: 150 * j, f1: 95 * j, dur: 0.18, vol: 0.35, pan: p, lp: 2400, lp1: 350, q: 4, detune: 0.012 });
       layer({ buf: 'brown', type: 'bandpass', f: 900, f1: 400, q: 1.5, env: [[0.02, 0.4], [0.16, 0]], pan: p, panTo: dirTo(o), send: 0.3 }); },
@@ -412,6 +412,7 @@ const REAL: Record<string, Recipe> = {
   cast_frost: o => { const p = P0(o); layer({ buf: 'pink', type: 'bandpass', f: 4500, f1: 1800, q: 1.2, env: [[0.06, 0.7], [0.25, 0]], pan: p, send: 0.3, flut: 0.4 });
     pings({ n: 5, dur: 0.2, vol: 0.18, pan: p, decay: false }); },
   cast_arcane: o => { const p = P0(o);
+    if (arcaneSet() && sfxLab.arcane <= ARCANE_R1.length) { synth({ f: 110, f1: 165, dur: 0.3, vol: 0.6, pan: p, lp: 700, atk: 0.12 }); layer({ buf: 'pink', type: 'bandpass', f: 300, f1: 900, q: 1.2, env: [[0.2, 0.4], [0.3, 0]], pan: p, send: 0.3 }); return; }
     if (arcaneSet()) { revSwell(0.12, 0.3, p, 700, 3000); glassTone(587 * jit(), 0.5, 0.05, p, 0.1, 0.02); grains({ n: 20, dur: 0.3, vol: 0.04, pan: p, delay: 0.1 }); return; }
     hum(700, 0.25, 0.6, p); sparkle(0.8, p, 0.03, 6); },
   cast_holy: o => { const p = P0(o); layer({ buf: 'pink', type: 'bandpass', f: 2000, f1: 4000, q: 1.5, env: [[0.12, 0.35], [0.3, 0]], pan: p, send: 0.45 }); holyChord(0.6, p, 0.02, 880, 0.5); },
@@ -467,7 +468,7 @@ const FX: Record<string, Recipe> = {
     crackles({ dur: d, rate: 30, vol: 0.15, pan: p }); },
   shard: o => { const p = P0(o), d = (o.dur ?? 0.3) * 0.5; whoosh(5000, 1800, d, 0.3, p, 0, 3); iceShatter(0.6, p); },
   arcaneHit: o => { const p = P0(o), a = arcaneSet(), big = (o.dur ?? 0.35) >= 0.45;
-    if (a) { punch(sfxLab.arcane > ARCANE_R1.length ? 0.4 : 0.9, p); a.hit(big ? 1.6 : 1.3, p); revSwell(0.1, 0.25, p, 900, 3500); return; }
+    if (a) { punch(sfxLab.arcane > ARCANE_R1.length ? 0.4 : 0.9, p); a.hit(big ? 1.6 : 1.3, p); if (sfxLab.arcane > ARCANE_R1.length) revSwell(0.1, 0.25, p, 900, 3500); else if (big) synth({ f: 90, f1: 45, dur: 0.4, vol: 0.9, pan: p, lp: 500 }); return; }
     punch(0.9, p); hum(800, 0.3, 0.7, p); sparkle(1, p, 0, 8); },
   blink: o => { const p = P0(o); layer({ buf: 'pink', type: 'bandpass', f: 1500, f1: 6000, q: 2, env: [[0.12, 0.6], [0.14, 0]], pan: p, send: 0.4 }); sparkle(0.7, p, 0.1, 4); },
   nova: o => REAL.cast_frost(o),
