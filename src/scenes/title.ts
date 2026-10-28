@@ -121,7 +121,7 @@ function drawShot(c: Ctx, cls: ClassId, x: number, y: number, dir: number, t: nu
     const ph = Math.floor(t * 20);
     // three rings of pressure bowing toward the target, the biggest in front, thick in the middle and tapering
     for (let n = 2; n >= 0; n--) {
-      const h = 8 - n * 2, cx = x - dir * (n * 4 + (ph % 2)), cy = y - h - 1, col = [w, l, m][n];
+      const h = [6, 4, 3][n], cx = x - dir * (n * 4 + (ph % 2)), cy = y - h - 1, col = [w, l, m][n];
       for (let i = -h; i <= h; i++) {
         const bx = cx + dir * Math.round(3 * (1 - (i / h) ** 2)), thick = Math.abs(i) < h - 2 ? 2 : 1;
         if (n === 0) P(c, '#000000', Math.min(bx + dir, bx + dir * thick), cy + i, 1, 1);
