@@ -29,9 +29,14 @@ The `.exe` is unsigned, so Windows SmartScreen says "Windows protected your PC" 
 **More info > Run anyway**. Signing (and Steam) come later.
 
 The APK installs by opening it on the phone and allowing installs from that app (browser or Files) when
-Android asks. It is signed with the play-test key in `android/app/playtest.keystore` (kept in the repo on
-purpose, never for the Play Store) and each CI run raises the version code, so a newer APK installs over the
-old one and keeps saves.
+Android asks. CI signs it with the play-test key from two repo secrets (never for the Play Store), and each
+CI run raises the version code, so a newer APK installs over the old one and keeps saves:
+
+- `ANDROID_KEYSTORE_B64`: the keystore file, base64 (`base64 -w0 playtest.keystore`), alias `playtest`.
+- `ANDROID_KEYSTORE_PASSWORD`: its store and key password.
+
+Without them the APK still builds, signed with a throwaway debug key, so it won't install over an older one.
+Never commit the keystore (`*.keystore` is ignored).
 
 ## What works in the app
 

@@ -16,19 +16,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // Play-test builds are signed with a key kept in the repo (not a secret, not for the Play Store), so a
-    // newer APK from CI installs over an older one instead of asking friends to uninstall first.
+    // Play-test builds are signed with a key that CI writes from repo secrets (see docs/DESKTOP.md), so a
+    // newer APK installs over an older one instead of asking friends to uninstall first. Without the key
+    // (local builds) the debug build falls back to the default debug key.
+    def playtestKey = file('playtest.keystore')
     signingConfigs {
         playtest {
-            storeFile file('playtest.keystore')
-            storePassword 'android'
+            storeFile playtestKey
+            storePassword System.getenv("SVS_KEYSTORE_PASSWORD")
             keyAlias 'playtest'
-            keyPassword 'android'
+            keyPassword System.getenv("SVS_KEYSTORE_PASSWORD")
         }
     }
     buildTypes {
         debug {
-            signingConfig signingConfigs.playtest
+            if (playtestKey.exists()) signingConfig signingConfigs.playtest
         }
         release {
             minifyEnabled false
