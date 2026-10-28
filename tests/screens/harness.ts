@@ -205,8 +205,9 @@ const screens: Record<string, () => void> = {
   'battle-results': () => { watch({ p1: 'ranger', cpu: 'priest' }); run(400, () => battle().b.phase === 'over'); run(3); },
   'battle-double-ko': () => { watch({ p1: 'warrior', cpu: 'rogue' }); run(0.5); battle().b.endCustom([[], []]); run(1); for (const f of battle().b.f) f.hp = 0; run(1); },
   'battle-draw-result': () => { watch({ p1: 'warrior', cpu: 'rogue' }); run(0.5); battle().b.endCustom([[], []]); run(1); for (const f of battle().b.f) f.hp = 0; run(400, () => battle().b.phase === 'over'); run(3); },
-  // the arcade ladder two fights in, and a cleared run
+  // the arcade ladder two fights in, with the boss up next, and a cleared run
   'arcade-ladder': () => setScene(new ArcadeLadderScene(arcadeRun(2))),
+  'arcade-ladder-boss': () => setScene(new ArcadeLadderScene(arcadeRun(4))),
   'arcade-clear': () => setScene(new ArcadeClearScene(arcadeRun(5))),
   'training': () => { setScene(new TrainingScene(match({ p1: 'rogue', cpu: 'warrior' }))); run(1); },
   // the training settings menu, paused mid-fight
