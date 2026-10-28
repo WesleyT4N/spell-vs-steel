@@ -17,7 +17,7 @@ export interface RealOpts {
   data?: Record<string, number | string>;
 }
 
-interface Rig { c: AudioContext; inp: AudioNode; verb: ConvolverNode; hall: ConvolverNode; white: AudioBuffer; pink: AudioBuffer; brown: AudioBuffer; grit: Float32Array<ArrayBuffer> }
+interface Rig { c: AudioContext; inp: AudioNode; verb: ConvolverNode; white: AudioBuffer; pink: AudioBuffer; brown: AudioBuffer; grit: Float32Array<ArrayBuffer> }
 let R: Rig | null = null;
 
 function rig(c: AudioContext, out: AudioNode): Rig {
@@ -54,14 +54,7 @@ function rig(c: AudioContext, out: AudioNode): Rig {
   comp.connect(hp); hp.connect(shelf); shelf.connect(air); air.connect(gain); gain.connect(lim); lim.connect(sat); sat.connect(fin); fin.connect(out);
   const verb = c.createConvolver(); verb.buffer = ir; const vg = c.createGain(); vg.gain.value = 0.22; verb.connect(vg); vg.connect(comp);
   const grit = new Float32Array(1024); for (let i = 0; i < 1024; i++) grit[i] = Math.tanh((i / 512 - 1) * 3);
-  // a long, soft hall for magic: spells ring out the way they do in an MMO, not in a stone room
-  const hir = c.createBuffer(2, Math.floor(sr * 1.0), sr);
-  for (let ch = 0; ch < 2; ch++) {
-    const d = hir.getChannelData(ch); let lp = 0;
-    for (let i = 0; i < d.length; i++) { const t = i / sr; lp += 0.35 * ((Math.random() * 2 - 1) - lp); d[i] = t < 0.015 ? 0 : lp * Math.exp(-t * 6); }
-  }
-  const hall = c.createConvolver(); hall.buffer = hir; const hg = c.createGain(); hg.gain.value = 0.3; hall.connect(hg); hg.connect(comp);
-  const made: Rig = { c, inp: comp, verb, hall, white, pink, brown, grit };
+  const made: Rig = { c, inp: comp, verb, white, pink, brown, grit };
   R = made;
   return made;
 }
@@ -185,10 +178,6 @@ function iceShatter(vol: number, pan: number): void {
 function sparkle(vol: number, pan: number, delay = 0, n = 6): void {
   pings({ n, dur: 0.25, vol: 0.22 * vol, pan, delay, lo: 3000, hi: 8000, decay: false, partials: [[1, 1], [2, 0.3]] });
 }
-/** A low swell of magic: filtered noise that blooms and fades. */
-function hum(f: number, dur: number, vol: number, pan: number, delay = 0): void {
-  layer({ buf: 'pink', type: 'bandpass', f, f1: f * 1.5, q: 3, env: [[dur * 0.3, vol], [dur, 0]], pan, send: 0.35, delay, flut: 0.3 });
-}
 function holyChord(vol: number, pan: number, delay = 0, root = 880, ring = 0.6): void {
   for (const [m, v] of [[1, 1], [1.25, 0.7], [1.5, 0.6], [2, 0.4]] as Array<[number, number]>) ping(root * m, vol * v * 0.3, pan, delay + rnd(0, 0.02), ring, BELL, 0.5);
 }
@@ -208,9 +197,7 @@ function thud(vol: number, pan: number, delay = 0): void {
   crunch({ dur: 0.12, rate: 80, vol: 0.25 * vol, pan, delay, f: 1600 });
 }
 
-// ---------- arcane (lab: variants under review) ----------
-/** Which arcane sound set plays: 0 = current, 1-4 the punchy first round, 5-8 the WoW-modeled round. */
-export const sfxLab = { arcane: 0 };
+// ---------- arcane: round, low and punchy (Deep Pulse), no crystal pings ----------
 /** An oscillator (or a detuned pair) through a swept lowpass: warm, round synth body for magic. */
 function synth(o: { type?: OscillatorType; f: number; f1?: number; dur: number; vol: number; pan?: number; delay?: number; lp?: number; lp1?: number; q?: number; detune?: number; atk?: number; send?: number; grit?: boolean }): void {
   const r = R!, c = r.c, t = c.currentTime + (o.delay ?? 0), dur = o.dur, ch = chan(o.pan ?? 0, o.send ?? 0.3);
@@ -226,159 +213,23 @@ function synth(o: { type?: OscillatorType; f: number; f1?: number; dur: number; 
   }
   lp.connect(g); tail.connect(ch.in);
 }
-/** Breathy noise through two vowel formants: a soft magical "ooh". */
-function breath(dur: number, vol: number, pan: number, delay = 0, f1 = 450, f2 = 850, panTo?: number): void {
-  layer({ buf: 'pink', type: 'bandpass', f: f1, f1: f1 * 1.3, q: 6, env: [[dur * 0.3, vol], [dur, 0]], pan, panTo, send: 0.4, delay, flut: 0.2 });
-  layer({ buf: 'pink', type: 'bandpass', f: f2, f1: f2 * 1.2, q: 7, env: [[dur * 0.3, vol * 0.7], [dur, 0]], pan, panTo, send: 0.4, delay, flut: 0.2 });
-}
-/** A flanger: a short delay swept by a slow LFO, fed back on itself and mixed with the dry signal. The arcane swirl. */
-function flanger(src: AudioNode, dest: AudioNode, t: number, dur: number, rate = 1.2, fb = 0.2): void {
-  const c = R!.c, dl = c.createDelay(0.02), lfo = c.createOscillator(), depth = c.createGain(), back = c.createGain(), wet = c.createGain();
-  dl.delayTime.value = 0.004; lfo.frequency.value = rate; depth.gain.value = 0.003; back.gain.value = fb; wet.gain.value = 0.6;
-  lfo.connect(depth); depth.connect(dl.delayTime); src.connect(dl); dl.connect(back); back.connect(dl); dl.connect(wet); wet.connect(dest); src.connect(dest);
-  lfo.start(t); lfo.stop(t + dur + 0.1);
-}
-/** Air swirling through the flanger: the "fwsshh" of a spell flying or landing. */
-function swish(o: { f: number; f1: number; dur: number; vol: number; pan?: number; panTo?: number; delay?: number; q?: number; rise?: number; rate?: number }): void {
-  const r = R!, c = r.c, t = c.currentTime + (o.delay ?? 0), dur = o.dur, ch = chan(o.pan ?? 0, 0.45);
-  const n = c.createBufferSource(); n.buffer = r.pink; n.loop = true; n.playbackRate.value = PITCH;
-  const b = filt('bandpass', o.f * PITCH, o.q ?? 2.5); b.frequency.setValueAtTime(o.f * PITCH, t); b.frequency.exponentialRampToValueAtTime(o.f1 * PITCH, t + dur);
-  const g = c.createGain(), pk = dur * (o.rise ?? 0.3);
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(o.vol, t + pk); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  n.connect(b); b.connect(g); flanger(g, ch.in, t, dur, o.rate ?? 2);
-  if (o.panTo !== undefined) ch.pan.linearRampToValueAtTime(clampPan(o.panTo), t + dur);
-  n.start(t, Math.random() * 1.5); n.stop(t + dur + 0.05);
-}
 const jit = (): number => rnd(0.97, 1.03);
 const dirTo = (o: RealOpts, k = 0.8): number => P0(o) + (o.data?.d === -1 || o.data?.dir === -1 ? -k : k);
-interface ArcaneSet { bolt: Recipe; beam: Recipe; hit: (vol: number, pan: number) => void }
-// all four are tonal and airy, after the arcane spells in World of Warcraft: no thumps (those read as drums)
-// ---- WoW-style arcane: smeared sparkle, singing glass, reversed swells and a long hall ----
-/** A panned channel that also sends into the long magic hall. */
-function hallChan(pan: number, hall: number): { in: GainNode; pan: AudioParam } {
-  const r = R!, ch = chan(pan, 0.1), h = r.c.createGain(); h.gain.value = hall; ch.in.gain.value = 1.8; ch.in.connect(h); h.connect(r.hall);
-  return ch;
-}
-const HANN = new Float32Array(16).map((_, i) => Math.max(0.0001, Math.sin((i / 15) * Math.PI) ** 2));
-/** A dense cloud of tiny, soft-edged tones: the fizzing sparkle of arcane magic (soft grains, never struck pings). */
-function grains(o: { n: number; dur: number; vol: number; pan?: number; spread?: number; delay?: number; lo?: number; hi?: number; len?: number; hall?: number; fade?: boolean }): void {
-  const c = R!.c, t0 = c.currentTime + (o.delay ?? 0), ch = hallChan(o.pan ?? 0, o.hall ?? 0.35);
-  for (let i = 0; i < o.n; i++) {
-    const u = Math.random(), t = t0 + u * o.dur, len = (o.len ?? 0.03) * rnd(0.6, 1.4), v = o.vol * rnd(0.4, 1) * (o.fade === false ? 1 : 1 - u * 0.7);
-    const os = c.createOscillator(), g = c.createGain(); os.frequency.value = rnd(o.lo ?? 2500, o.hi ?? 6500) * PITCH;
-    g.gain.value = 0; g.gain.setValueCurveAtTime(HANN.map(x => x * v), t, len);
-    os.connect(g); g.connect(ch.in); os.start(t); os.stop(t + len + 0.01);
-  }
-}
-/** Singing glass (a wet finger on a glass rim): two close sines beating, a soft attack and a long ring. */
-function glassTone(f: number, dur: number, vol: number, pan: number, delay = 0, atk = 0.04, bend = 1, hall = 0.4): void {
-  dur = Math.min(dur, 0.22); vol *= 0.6;
-  const c = R!.c, t = c.currentTime + delay, ch = hallChan(pan, hall);
-  for (const [m, k, v] of [[1, 1, 1], [1, 1.007, 0.8], [2.01, 1, 0.25], [3.02, 1, 0.08]] as Array<[number, number, number]>) {
-    const os = c.createOscillator(), g = c.createGain(), f0 = f * m * k * PITCH;
-    os.frequency.setValueAtTime(f0, t); if (bend !== 1) os.frequency.exponentialRampToValueAtTime(f0 * bend, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol * v, t + atk); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    os.connect(g); g.connect(ch.in); os.start(t); os.stop(t + dur + 0.02);
-  }
-}
-/** Air sucked backwards into the spell: noise that swells up and stops dead, like a reversed reverb. */
-function revSwell(dur: number, vol: number, pan: number, f0 = 800, f1 = 3500, delay = 0): void {
-  const r = R!, c = r.c, t = c.currentTime + delay, ch = hallChan(pan, 0.4);
-  const n = c.createBufferSource(); n.buffer = r.pink; n.loop = true; n.playbackRate.value = PITCH;
-  const b = filt('bandpass', f0 * PITCH, 1.4); b.frequency.setValueAtTime(f0 * PITCH, t); b.frequency.exponentialRampToValueAtTime(f1 * PITCH, t + dur);
-  const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.015);
-  n.connect(b); b.connect(g); g.connect(ch.in); n.start(t, Math.random() * 1.5); n.stop(t + dur + 0.05);
-}
-/** A soft, airy "pff": the puff of an arcane impact, made of noise (no drum-like pitched thump). */
-function puff(dur: number, vol: number, pan: number, f0 = 2400, f1 = 500, delay = 0): void {
-  const r = R!, c = r.c, t = c.currentTime + delay, ch = hallChan(pan, 0.5);
-  const n = c.createBufferSource(); n.buffer = r.pink; n.loop = true; n.playbackRate.value = PITCH;
-  const b = filt('bandpass', f0 * PITCH, 0.9); b.frequency.setValueAtTime(f0 * PITCH, t); b.frequency.exponentialRampToValueAtTime(f1 * PITCH, t + dur);
-  const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  n.connect(b); b.connect(g); g.connect(ch.in); n.start(t, Math.random() * 1.5); n.stop(t + dur + 0.05);
-}
-/** The "tsiu" of a missile: a pure tone streaking down in pitch, with a soft front. */
-function zip(f0: number, f1: number, dur: number, vol: number, pan: number, panTo?: number, delay = 0): void {
-  const c = R!.c, t = c.currentTime + delay, ch = hallChan(pan, 0.6);
-  for (const [m, v] of [[1, 1], [1.5, 0.35]]) {
-    const os = c.createOscillator(), g = c.createGain(); os.type = 'sine';
-    os.frequency.setValueAtTime(f0 * m * PITCH, t); os.frequency.exponentialRampToValueAtTime(f1 * m * PITCH, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol * v, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    os.connect(g); g.connect(ch.in); os.start(t); os.stop(t + dur + 0.02);
-  }
-  if (panTo !== undefined) ch.pan.linearRampToValueAtTime(clampPan(panTo), t + dur);
-}
-// each after one of WoW's arcane spells
-const ARCANE: ArcaneSet[] = [
-  // 1 Arcane Missiles: a bright "tsiu" streak trailing fizzing sparkle; lands as a soft "pff" in a sparkle cloud
-  { bolt: o => { const p = P0(o), j = jit(), to = dirTo(o);
-      zip(2600 * j, 1100 * j, 0.13, 0.14, p, to); swish({ f: 3500, f1: 1500, dur: 0.14, vol: 0.18, pan: p, panTo: to, rise: 0.15, rate: 3 });
-      grains({ n: 14, dur: 0.16, vol: 0.05, pan: p, lo: 3500, hi: 7500, len: 0.02 }); },
-    beam: o => { const p = P0(o), d = (o.dur ?? 0.32) + 0.1, to = dirTo(o, 0.5);
-      for (let i = 0; i < 3; i++) zip(2800 * jit(), 1000, 0.14, 0.08, p, to, i * 0.09);
-      glassTone(880, d + 0.3, 0.063, p, 0, 0.05); grains({ n: 40, dur: d, vol: 0.05, pan: p, spread: 0.5, lo: 3000, hi: 8000, fade: false }); },
-    hit: (v, p) => { puff(0.14, 0.45 * v, p, 2600, 700); grains({ n: 36, dur: 0.35, vol: 0.06 * v, pan: p, lo: 3000, hi: 8000 }); glassTone(1320, 0.6, 0.045 * v, p, 0.01, 0.01); } },
-  // 2 Arcane Blast: a breath sucked backwards, then a heavy airy "fwoom"
-  { bolt: o => { const p = P0(o), j = jit();
-      revSwell(0.07, 0.3, p, 900, 3200); puff(0.16, 0.4, dirTo(o, 0.3), 2200, 500, 0.07); glassTone(660 * j, 0.2, 0.05, p, 0.07, 0.01); },
-    beam: o => { const p = P0(o), d = (o.dur ?? 0.32), j = jit();
-      glassTone(440 * j, 0.16, 0.063, p, 0, 0.12, 1.5); revSwell(0.14, 0.4, p, 600, 3500);
-      puff(d, 0.55, p, 1800, 400, 0.14); swish({ f: 2500, f1: 700, dur: d, vol: 0.3, pan: p, panTo: dirTo(o, 0.5), delay: 0.14, rise: 0.1 });
-      grains({ n: 30, dur: d, vol: 0.05, pan: p, delay: 0.14, lo: 2500, hi: 7000 }); },
-    hit: (v, p) => { puff(0.16, 0.35 * v, p, 3000, 600); grains({ n: 24, dur: 0.3, vol: 0.05 * v, pan: p }); } },
-  // 3 Arcane Explosion: a crackling, glittering burst over a puff of air (brighter and spikier than the others)
-  { bolt: o => { const p = P0(o), to = dirTo(o);
-      swish({ f: 2200, f1: 4500, dur: 0.14, vol: 0.35, pan: p, panTo: to, rate: 4 }); grains({ n: 26, dur: 0.14, vol: 0.06, pan: p, lo: 2200, hi: 6000, len: 0.012 }); },
-    beam: o => { const p = P0(o), d = (o.dur ?? 0.32) + 0.15, to = dirTo(o, 0.5);
-      swish({ f: 1200, f1: 4200, dur: d, vol: 0.4, pan: p, panTo: to, rise: 0.6, rate: 2.5 });
-      grains({ n: 90, dur: d, vol: 0.06, pan: p, spread: 0.6, lo: 2000, hi: 7000, len: 0.012, fade: false }); glassTone(523, d + 0.4, 0.054, p, 0.05, 0.08); },
-    hit: (v, p) => { puff(0.22, 0.55 * v, p, 1800, 400); grains({ n: 70, dur: 0.3, vol: 0.07 * v, pan: p, lo: 2000, hi: 7000, len: 0.012 }); glassTone(1047, 0.5, 0.036 * v, p, 0, 0.01); } },
-  // 4 Arcane Orb: a short humming glass chord riding a soft whoosh
-  { bolt: o => { const p = P0(o), j = jit(), to = dirTo(o);
-      glassTone(880 * j, 0.3, 0.072, p, 0, 0.03, 1.06); glassTone(1320 * j, 0.25, 0.036, p, 0.01, 0.03, 1.06);
-      swish({ f: 900, f1: 2000, dur: 0.18, vol: 0.2, pan: p, panTo: to, rate: 1.5 }); },
-    beam: o => { const p = P0(o), d = (o.dur ?? 0.32) + 0.3, j = jit(), to = dirTo(o, 0.5);
-      for (const [f, v] of [[440, 0.04], [660, 0.03], [990, 0.02]]) glassTone(f * j, d, v, p, 0, 0.08);
-      swish({ f: 700, f1: 2200, dur: d, vol: 0.3, pan: p, panTo: to, rise: 0.4, rate: 0.9 }); grains({ n: 24, dur: d, vol: 0.04, pan: p, fade: false }); },
-    hit: (v, p) => { glassTone(1760, 0.7, 0.063 * v, p, 0, 0.005); glassTone(1175, 0.6, 0.045 * v, p, 0.01, 0.005); puff(0.12, 0.3 * v, p, 2200, 700); grains({ n: 20, dur: 0.3, vol: 0.04 * v, pan: p }); } },
-];
-// round 1 (Wes liked these best: punchy)
-const ARCANE_R1: ArcaneSet[] = [
-  // 1 Deep Pulse (Wes's pick): a round, falling low thrum with a soft push of air; hits land as a low "whomp"
-  { bolt: o => { const p = P0(o), j = jit(); synth({ f: 170 * j, f1: 85 * j, dur: 0.17, vol: 0.75, pan: p, lp: 900 }); synth({ type: 'triangle', f: 340 * j, f1: 170 * j, dur: 0.11, vol: 0.25, pan: p, lp: 1000 });
-      layer({ buf: 'pink', type: 'bandpass', f: 450, f1: 1100, q: 1, env: [[0.03, 0.35], [0.14, 0]], pan: p, panTo: dirTo(o), send: 0.25 }); },
-    beam: o => { const p = P0(o), d = o.dur ?? 0.32; synth({ f: 115, f1: 80, dur: d + 0.1, vol: 1, pan: p, lp: 700, atk: 0.02 }); synth({ type: 'triangle', f: 230, f1: 160, dur: d, vol: 0.35, pan: p, lp: 1000, detune: 0.01 });
-      layer({ buf: 'pink', type: 'bandpass', f: 350, f1: 1000, q: 1.5, env: [[0.04, 0.6], [d, 0.3], [d + 0.08, 0]], pan: p, panTo: dirTo(o), send: 0.35, flut: 0.4 }); },
-    hit: (v, p) => { synth({ f: 150, f1: 55, dur: 0.24, vol: 1 * v, pan: p, lp: 600 }); layer({ buf: 'brown', type: 'bandpass', f: 320, q: 1, env: [[0.01, 0.6 * v], [0.18, 0]], pan: p, send: 0.35 }); } },
-  // 2 Void Rift: a detuned saw pair closing down like a portal; hits suck in, then thump
-  { bolt: o => { const p = P0(o), j = jit(); synth({ type: 'sawtooth', f: 150 * j, f1: 95 * j, dur: 0.18, vol: 0.35, pan: p, lp: 2400, lp1: 350, q: 4, detune: 0.012 });
-      layer({ buf: 'brown', type: 'bandpass', f: 900, f1: 400, q: 1.5, env: [[0.02, 0.4], [0.16, 0]], pan: p, panTo: dirTo(o), send: 0.3 }); },
-    beam: o => { const p = P0(o), d = o.dur ?? 0.32; synth({ type: 'sawtooth', f: 110, f1: 80, dur: d + 0.12, vol: 0.5, pan: p, lp: 600, lp1: 2200, q: 6, detune: 0.015, atk: 0.03 });
-      synth({ type: 'sawtooth', f: 55, dur: d + 0.1, vol: 0.3, pan: p, lp: 400, atk: 0.03 });
-      layer({ buf: 'brown', type: 'bandpass', f: 400, f1: 1200, q: 1.2, env: [[d * 0.8, 0.6], [d + 0.1, 0]], pan: p, panTo: dirTo(o), send: 0.3, flut: 0.6 }); },
-    hit: (v, p) => { layer({ buf: 'brown', type: 'bandpass', f: 300, f1: 1200, q: 2, env: [[0.07, 0.5 * v], [0.08, 0]], pan: p, send: 0.2 });
-      synth({ f: 150, f1: 55, dur: 0.2, vol: 1 * v, pan: p, lp: 700, delay: 0.06 }); synth({ type: 'sawtooth', f: 90, f1: 60, dur: 0.15, vol: 0.25 * v, pan: p, lp: 500, delay: 0.06 }); } },
-  // 3 Ethereal Breath: an airy, voice-like "ooh" carried down the row; hits are a soft burst with a low body
-  { bolt: o => { const p = P0(o), j = jit(); breath(0.2, 0.7, p, 0, 420 * j, 820 * j, dirTo(o)); synth({ f: 290 * j, f1: 260 * j, dur: 0.18, vol: 0.35, pan: p, lp: 1000, atk: 0.03 }); },
-    beam: o => { const p = P0(o), d = o.dur ?? 0.32; breath(d + 0.15, 0.9, p, 0, 380, 700, dirTo(o)); breath(d + 0.1, 0.5, p, 0.02, 560, 1100);
-      synth({ f: 196, dur: d + 0.15, vol: 0.4, pan: p, lp: 900, atk: 0.04, detune: 0.006 }); synth({ f: 294, dur: d + 0.1, vol: 0.2, pan: p, lp: 1200, atk: 0.05 }); },
-    hit: (v, p) => { breath(0.22, 0.6 * v, p, 0, 350, 700); synth({ f: 180, f1: 80, dur: 0.18, vol: 0.7 * v, pan: p, lp: 800 }); } },
-  // 4 Arcane Charge: a low electric buzz and a crackle, like lightning held in a bottle; hits zap and thud
-  { bolt: o => { const p = P0(o), j = jit(); synth({ type: 'sawtooth', f: 95 * j, f1: 70 * j, dur: 0.14, vol: 0.3, pan: p, lp: 1600, lp1: 500, q: 3, grit: true });
-      crackles({ dur: 0.12, rate: 70, vol: 0.18, pan: p, spread: 0.3, lo: 700, hi: 2200 }); whoosh(800, 1800, 0.12, 0.3, p, 0, 1.2, dirTo(o)); },
-    beam: o => { const p = P0(o), d = o.dur ?? 0.32; synth({ type: 'sawtooth', f: 70, dur: d + 0.08, vol: 0.45, pan: p, lp: 1400, q: 4, detune: 0.02, grit: true, atk: 0.02 });
-      crackles({ dur: d, rate: 90, vol: 0.2, pan: p, spread: 0.5, lo: 600, hi: 2400 }); layer({ buf: 'pink', type: 'bandpass', f: 900, q: 2, env: [[0.03, 0.4], [d, 0.3], [d + 0.06, 0]], pan: p, panTo: dirTo(o), send: 0.3, flut: 1.2 }); },
-    hit: (v, p) => { synth({ type: 'sawtooth', f: 120, f1: 50, dur: 0.14, vol: 0.5 * v, pan: p, lp: 1000, grit: true }); crackles({ dur: 0.15, rate: 80, vol: 0.25 * v, pan: p, lo: 600, hi: 2000, decay: true }); synth({ f: 170, f1: 70, dur: 0.16, vol: 0.6 * v, pan: p, lp: 700 }); } },
-];
-const ARCANE_ALL = [...ARCANE_R1, ...ARCANE];
-const arcaneSet = (): ArcaneSet | undefined => ARCANE_ALL[sfxLab.arcane - 1];
+/** Arcane Bolt (and each Arcane Missile) leaving the hand: a falling low thrum with a soft push of air. */
+const arcaneBolt: Recipe = o => { const p = P0(o), j = jit(); synth({ f: 170 * j, f1: 85 * j, dur: 0.17, vol: 0.75, pan: p, lp: 900 }); synth({ type: 'triangle', f: 340 * j, f1: 170 * j, dur: 0.11, vol: 0.25, pan: p, lp: 1000 });
+      layer({ buf: 'pink', type: 'bandpass', f: 450, f1: 1100, q: 1, env: [[0.03, 0.35], [0.14, 0]], pan: p, panTo: dirTo(o), send: 0.25 }); };
+/** Arcane Beam: a longer, lower thrum that carries for the length of the beam. */
+const arcaneBeam: Recipe = o => { const p = P0(o), d = o.dur ?? 0.32; synth({ f: 115, f1: 80, dur: d + 0.1, vol: 1, pan: p, lp: 700, atk: 0.02 }); synth({ type: 'triangle', f: 230, f1: 160, dur: d, vol: 0.35, pan: p, lp: 1000, detune: 0.01 });
+      layer({ buf: 'pink', type: 'bandpass', f: 350, f1: 1000, q: 1.5, env: [[0.04, 0.6], [d, 0.3], [d + 0.08, 0]], pan: p, panTo: dirTo(o), send: 0.35, flut: 0.4 }); };
+/** The arcane tail on a hit: a low whomp under the punch. */
+const arcaneTail = (v: number, p: number): void => { synth({ f: 150, f1: 55, dur: 0.24, vol: 1 * v, pan: p, lp: 600 }); layer({ buf: 'brown', type: 'bandpass', f: 320, q: 1, env: [[0.01, 0.6 * v], [0.18, 0]], pan: p, send: 0.35 }); };
 
 /** Element tail layered on top of a hit's punch. */
 function elementHit(el: string, vol: number, pan: number): void {
   switch (el) {
     case 'fire': fireBurst(0.55 * vol, pan, 0.6); break;
     case 'frost': crunch({ dur: 0.12, rate: 140, vol: 0.4 * vol, pan }); ping(3100, 0.25 * vol, pan, 0.01, 0.3); break;
-    case 'arcane': { const a = arcaneSet(); if (a) a.hit(vol, pan); else { sparkle(vol, pan, 0, 5); hum(900, 0.18, 0.5 * vol, pan); } break; }
+    case 'arcane': arcaneTail(vol, pan); break;
     case 'holy': holyChord(0.7 * vol, pan, 0, 1100, 0.35); break;
     case 'shadow': darkSwell(0.18, 0.6 * vol, pan); break;
     case 'poison': gasHiss(0.2, 0.5 * vol, pan); break;
@@ -392,7 +243,7 @@ type Recipe = (o: RealOpts) => void;
 const P0 = (o: RealOpts): number => o.pan ?? 0;
 const REAL: Record<string, Recipe> = {
   // combat
-  hit: o => { const p = P0(o), big = (o.amt ?? 20) >= 60, soft = o.element === 'arcane' && sfxLab.arcane > ARCANE_R1.length ? 0.35 : 1; punch((big ? 1.15 : 0.85) * soft, p); elementHit(o.element ?? 'steel', big ? 1.1 : 0.8, p); },
+  hit: o => { const p = P0(o), big = (o.amt ?? 20) >= 60; punch(big ? 1.15 : 0.85, p); elementHit(o.element ?? 'steel', big ? 1.1 : 0.8, p); },
   heavyImpact: o => { const p = P0(o); punch(1.3, p); thud(0.8, p); elementHit(o.element ?? 'steel', 1.1, p); },
   block: o => metalClang(0.8, P0(o), 0, 1700),
   break: o => { const p = P0(o); punch(1, p); crunch({ dur: 0.2, rate: 160, vol: 0.5, pan: p, f: 2200 }); crackles({ dur: 0.6, rate: 40, vol: 0.3, pan: p, decay: true, lo: 1500, hi: 5000 }); },
@@ -411,10 +262,7 @@ const REAL: Record<string, Recipe> = {
     layer({ buf: 'brown', type: 'bandpass', f: 500, q: 0.8, env: [[0.015, 0.5], [0.15, 0]], pan: p, send: 0.1 }); crackles({ dur: 0.25, rate: 50, vol: 0.3, pan: p }); },
   cast_frost: o => { const p = P0(o); layer({ buf: 'pink', type: 'bandpass', f: 4500, f1: 1800, q: 1.2, env: [[0.06, 0.7], [0.25, 0]], pan: p, send: 0.3, flut: 0.4 });
     pings({ n: 5, dur: 0.2, vol: 0.18, pan: p, decay: false }); },
-  cast_arcane: o => { const p = P0(o);
-    if (arcaneSet() && sfxLab.arcane <= ARCANE_R1.length) { synth({ f: 110, f1: 165, dur: 0.3, vol: 0.6, pan: p, lp: 700, atk: 0.12 }); layer({ buf: 'pink', type: 'bandpass', f: 300, f1: 900, q: 1.2, env: [[0.2, 0.4], [0.3, 0]], pan: p, send: 0.3 }); return; }
-    if (arcaneSet()) { revSwell(0.12, 0.3, p, 700, 3000); glassTone(587 * jit(), 0.5, 0.05, p, 0.1, 0.02); grains({ n: 20, dur: 0.3, vol: 0.04, pan: p, delay: 0.1 }); return; }
-    hum(700, 0.25, 0.6, p); sparkle(0.8, p, 0.03, 6); },
+  cast_arcane: o => { const p = P0(o); synth({ f: 110, f1: 165, dur: 0.3, vol: 0.6, pan: p, lp: 700, atk: 0.12 }); layer({ buf: 'pink', type: 'bandpass', f: 300, f1: 900, q: 1.2, env: [[0.2, 0.4], [0.3, 0]], pan: p, send: 0.3 }); },
   cast_holy: o => { const p = P0(o); layer({ buf: 'pink', type: 'bandpass', f: 2000, f1: 4000, q: 1.5, env: [[0.12, 0.35], [0.3, 0]], pan: p, send: 0.45 }); holyChord(0.6, p, 0.02, 880, 0.5); },
   cast_shadow: o => { const p = P0(o); darkSwell(0.25, 0.7, p); whoosh(600, 2500, 0.2, 0.35, p, 0.05); },
   cast_poison: o => gasHiss(0.25, 0.6, P0(o)),
@@ -442,10 +290,8 @@ const FX: Record<string, Recipe> = {
   cleaveHeavy: o => { const p = P0(o); whoosh(700, 2600, 0.2, 0.9, p, 0, 1); thud(0.9, p, 0.15); },
   dagger: o => { const p = P0(o); whoosh(3000, 6000, 0.09, 0.6, p, 0, 1.8); ping(3200, 0.12, p, 0.03, 0.15, METAL); },
   knifeHeavy: REAL.shot_knife, knife: REAL.shot_knife,
-  bolt: o => { const a = arcaneSet(); if (a) return a.bolt(o); const p = P0(o); whoosh(2500, 5500, 0.12, 0.55, p, 0, 2); sparkle(0.6, p, 0.02, 3); },
-  boltHeavy: o => { const a = arcaneSet(); if (a) return a.beam(o); const p = P0(o), d = o.dur ?? 0.32;
-    layer({ buf: 'white', type: 'bandpass', f: 1600, f1: 900, q: 4, env: [[0.01, 0.8], [d * 0.7, 0.6], [d, 0]], pan: p, send: 0.3, flut: 1.5, grit: true });
-    hum(500, d, 0.6, p); crackles({ dur: d, rate: 60, vol: 0.25, pan: p, lo: 2500, hi: 8000 }); },
+  bolt: arcaneBolt,
+  boltHeavy: arcaneBeam,
   arrow: REAL.shot_arrow,
   aimed: o => { const p = P0(o); tone(150, 110, 0.18, 0.7, p, 0, 'triangle', 0.15); layer({ buf: 'white', type: 'highpass', f: 2000, env: [[0.001, 1.1], [0.04, 0]], pan: p, send: 0.3 }); whoosh(4500, 1500, 0.12, 0.6, p, 0.01, 2.5); },
   holySpark: o => { const p = P0(o); whoosh(2500, 5000, 0.12, 0.45, p, 0, 2); ping(1980, 0.2, p, 0, 0.3, BELL); },
@@ -467,9 +313,7 @@ const FX: Record<string, Recipe> = {
     layer({ buf: 'brown', type: 'bandpass', f: 800, f1: 1400, q: 0.8, env: [[d, 0.5]], pan: p, send: 0.15, flut: 0.6 });
     crackles({ dur: d, rate: 30, vol: 0.15, pan: p }); },
   shard: o => { const p = P0(o), d = (o.dur ?? 0.3) * 0.5; whoosh(5000, 1800, d, 0.3, p, 0, 3); iceShatter(0.6, p); },
-  arcaneHit: o => { const p = P0(o), a = arcaneSet(), big = (o.dur ?? 0.35) >= 0.45;
-    if (a) { punch(sfxLab.arcane > ARCANE_R1.length ? 0.4 : 0.9, p); a.hit(big ? 1.6 : 1.3, p); if (sfxLab.arcane > ARCANE_R1.length) revSwell(0.1, 0.25, p, 900, 3500); else if (big) synth({ f: 90, f1: 45, dur: 0.4, vol: 0.9, pan: p, lp: 500 }); return; }
-    punch(0.9, p); hum(800, 0.3, 0.7, p); sparkle(1, p, 0, 8); },
+  arcaneHit: o => { const p = P0(o), big = (o.dur ?? 0.35) >= 0.45; punch(0.9, p); arcaneTail(big ? 1.6 : 1.3, p); if (big) synth({ f: 90, f1: 45, dur: 0.4, vol: 0.9, pan: p, lp: 500 }); },
   blink: o => { const p = P0(o); layer({ buf: 'pink', type: 'bandpass', f: 1500, f1: 6000, q: 2, env: [[0.12, 0.6], [0.14, 0]], pan: p, send: 0.4 }); sparkle(0.7, p, 0.1, 4); },
   nova: o => REAL.cast_frost(o),
   novaZone: o => { const p = P0(o);
@@ -502,7 +346,7 @@ const FX: Record<string, Recipe> = {
 
 // older names still used around the game
 Object.assign(REAL, {
-  missile: (o: RealOpts) => { const a = arcaneSet(); if (a) a.bolt(o); else REAL.shot_magic(o); }, explode: FX.explode, slash: FX.cleave, slashHeavy: FX.cleaveHeavy, bolt: FX.bolt, boltHeavy: FX.boltHeavy,
+  missile: arcaneBolt, explode: FX.explode, slash: FX.cleave, slashHeavy: FX.cleaveHeavy, bolt: FX.bolt, boltHeavy: FX.boltHeavy,
   hitBig: (o: RealOpts) => REAL.hit({ ...o, amt: 80 }), fire: REAL.cast_fire, frost: REAL.cast_frost, arcane: REAL.cast_arcane, cast: REAL.cast_arcane,
   shot_hawk: FX.hawkDive,
 });

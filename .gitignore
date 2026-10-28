@@ -9,4 +9,3 @@ dist-test
 test-results
 release
 *.keystore
-harness/out/

@@ -18,7 +18,7 @@ import { CLASS_INFO } from './classes';
 import { drawOver, drawUnder, lookOf, observe } from './fighterAnim';
 
 import { frozen, holdFrame, kickOffset, noteImpacts } from './hitFeel';
-import { ARC, FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawArcaneMissile, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, fxLab, useParticles } from './fxView';
+import { FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawArcaneMissile, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, useParticles } from './fxView';
 
 /** Whose hidden things (traps, a stealthed fighter) are visible: one side's, or everything in the dev sandbox. */
 export type Viewer = Side | 'all';
@@ -577,13 +577,7 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
       P(c, '#000000', x - dd * 6, y - 1, 9, 3); P(c, '#ac7c00', x - dd * 5, y, 7, 1); P(c, '#fcfcfc', x + dd * 2, y - 1, 2, 3);
       return;
     }
-    if (fxLab.spells) { drawArcaneMissile(c, b, k => ({ x: s.x + (e.x - s.x) * k, y: s.y - 10 + (e.y - 10 - (s.y - 10)) * k - Math.sin(k * Math.PI) * 18 }), q); return; }
-    const back = e.x - s.x > 0 ? -1 : 1;
-    glow(c, x, y, 7, '248,120,248', 0.5);
-    P(c, '#000000', x - 2, y - 2, 5, 5);
-    P(c, ARC[2], x - 1, y - 1, 3, 3);
-    P(c, ARC[3], x, y, 1, 1);
-    for (let i = 1; i <= 3; i++) P(c, ARC[3 - Math.min(2, i)], x + back * (i * 2 + 1), y + ((i + Math.floor(b.time * 20)) % 3) - 1, 1, 1);
+    drawArcaneMissile(c, b, k => ({ x: s.x + (e.x - s.x) * k, y: s.y - 10 + (e.y - 10 - (s.y - 10)) * k - Math.sin(k * Math.PI) * 18 }), q);
     return;
   }
   const base = panelFoot(0, p.row);
