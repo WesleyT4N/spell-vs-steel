@@ -131,7 +131,7 @@ function fakeTournament(state: Bracket['state']): TournamentScene {
  * An online match against a made-up rival over an in-memory link: the rival's side answers every packet at once,
  * so the session stays connected. `matched` false leaves the host alone in the room, waiting.
  */
-function fakeNet(matched = true): NetSession {
+function fakeNet(matched = true, as: 'host' | 'guest' = 'host'): NetSession {
   const hello = (cls: ClassId) => ({ cls, skin: SKINS[cls][0].id, deck: [] as string[] });
   const pipe = (): Transport & { peer?: Transport & { cb?: (p: Packet) => void }; cb?: (p: Packet) => void } => ({
     kind: 'local', cb: undefined, peer: undefined,
@@ -144,6 +144,8 @@ function fakeNet(matched = true): NetSession {
   a.peer = b; b.peer = a;
   const guest = new NetSession('guest', 'KQZ7M', { ...hello('mage'), deck: loadMatchDeck('mage') }, b, 3);
   // the rival answers each packet with its own
+  // (or, playing as the guest, the host answers each of yours)
+  if (as === 'guest') { const onA = a.cb!; a.cb = p => { onA(p); host.tick(); }; guest.tick(); return guest; }
   const onB = b.cb!;
   b.cb = p => { onB(p); guest.tick(); };
   host.tick();
@@ -190,6 +192,8 @@ const screens: Record<string, () => void> = {
   'online-select': () => setScene(new CharSelectScene(fakeNet())),
   'online-stage': () => setScene(new StageSelectScene(fakeNet())),
   // the Draw screen once your picks are locked in and the rival is still choosing
+  // online as the guest, on the right: your side and your telegraphs are still blue
+  'online-battle-guest': () => { const s = new OnlineBattleScene(fakeNet(true, 'guest'), [0, 0], 1); setScene(s); run(0.3); s.b.endCustom([[], []]); run(0.3); warns(); run(0.5); },
   'online-draw-locked': () => { const s = new OnlineBattleScene(fakeNet(), [0, 0], 1); setScene(s); run(0.3); s.picks = [0]; (s as unknown as { confirmCustom(): void }).confirmCustom(); run(0.2); },
   // the end of a ranked round: the results carry the ranked note
   'online-results-ranked': () => {
