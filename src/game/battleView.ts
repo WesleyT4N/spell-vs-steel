@@ -18,6 +18,7 @@ import { CLASS_INFO } from './classes';
 import { drawOver, drawUnder, lookOf, observe } from './fighterAnim';
 
 import { frozen, holdFrame, kickOffset, noteImpacts } from './hitFeel';
+import { isHome, setHome, team } from './teamColors';
 import { ARC, FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, useParticles } from './fxView';
 
 /** Whose hidden things (traps, a stealthed fighter) are visible: one side's, or everything in the dev sandbox. */
@@ -31,6 +32,7 @@ export function useStage(id: string): void { arena = getStage(id); }
 
 /** `hitStop` holds the picture for a moment on solid hits (the fight itself never pauses). Off for card previews. */
 export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitStop = false): void {
+  setHome(me === 'all' ? 0 : me);
   if (hitStop && frozen(b)) { holdFrame(c, b); return; }
   const a = getArena();
   useParticles(b);
@@ -45,7 +47,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
     const p = b.panels[col][r];
     const holeAge = since(b, 'hole', col, r, p.hole > 0), crackAge = since(b, 'crack', col, r, p.cracked && p.hole <= 0);
     // a broken panel blinks back in over its last 0.8s, like BN
-    if (p.hole > 0 && !(p.hole < 0.8 && Math.floor(p.hole * 10) % 2 === 0)) { drawHole(c, col, r, p.owner, a, holeAge); continue; }
+    if (p.hole > 0 && !(p.hole < 0.8 && Math.floor(p.hole * 10) % 2 === 0)) { drawHole(c, col, r, isHome(p.owner), a, holeAge); continue; }
     const state: PanelState = p.hole > 0 ? 'clean' : p.burn > 0 ? 'burning' : p.cracked ? 'cracked' : 'clean';
     const tint: PanelTint | undefined = p.hole > 0 ? undefined : p.burn > 0 ? 'fire' : p.toxic > 0 ? 'poison' : p.curse > 0 ? 'shadow' : p.bless > 0 ? 'holy' : undefined;
     const mark = b.marks.find(m => m.col === col && m.row === r);
@@ -58,7 +60,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
         if (f.st.frostNova > 0 && !f.frostNovaUsed && p.owner !== f.side && Math.abs(col - f.col) <= TUNING.frostNovaRange) hl = '#a4e4fc';
       }
     }
-    drawPanel(c, col, r, state, tick, p.owner, hl, a, { crackAge, tint, time: b.time });
+    drawPanel(c, col, r, state, tick, isHome(p.owner), hl, a, { crackAge, tint, time: b.time });
   }
   // Frost Nova / Glacial zones get a frosty tint on the trigger columns
   for (const f of b.f) {
@@ -73,7 +75,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
   // toxic, blessed and holy-fire panels
   for (let col = 0; col < 6; col++) for (let r = 0; r < 3; r++) drawPanelEffects(c, b, col, r, tick);
   // warned panels keep a lit rim over flames and toxic clouds, so the danger zone never disappears between flashes
-  for (const w of b.warns) if (w.kind === 'flash') drawWarnEdge(c, w.col, w.row);
+  for (const w of b.warns) if (w.kind === 'flash') drawWarnEdge(c, w);
   for (const w of b.warns) if (w.kind === 'shadow') drawLobShadow(c, w);
   for (const t of b.traps) if (me === 'all' || t.side === me) drawTrap(c, t, tick);
 
@@ -104,37 +106,35 @@ function since(b: Battle, kind: 'crack' | 'hole', col: number, row: number, on: 
   return b.time - t0;
 }
 
-/** Area-spell telegraph colors: the whole panel flashes, and a rim stays lit between flashes. */
-const WARN_FILL = '#f8e000', WARN_RIM = '#f8b800';
 
 /**
  * The standard BN-style warning flash for a panel an area spell is about to hit, or undefined.
  * It blinks steadily, speeds up over the last half and goes solid just before impact, so how close the hit is reads at a glance.
+ * It flashes in the caster's team color (yours blue, the opponent's red), and a rim stays lit between flashes.
  */
 function warnFlash(b: Battle, col: number, row: number): string | undefined {
   let w: Battle['warns'][number] | undefined;
   for (const x of b.warns) if (x.kind === 'flash' && x.col === col && x.row === row && (!w || x.t < w.t)) w = x;
   if (!w) return undefined;
   const left = w.t, gone = w.dur - w.t;
-  if (left < 0.1) return WARN_FILL;
+  const fill = team(w.side).flash;
+  if (left < 0.1) return fill;
   const period = left / w.dur > 0.5 ? 0.12 : 0.06;
-  return Math.floor(gone / period) % 2 === 0 ? WARN_FILL : undefined;
+  return Math.floor(gone / period) % 2 === 0 ? fill : undefined;
 }
 
-function drawWarnEdge(c: Ctx, col: number, row: number): void {
-  const x = X0 + col * PW + 2, y = Y0 + row * (FACE + LIP) + 1, w = PW - 4, h = FACE - 2;
-  P(c, WARN_RIM, x, y, w, 2); P(c, WARN_RIM, x, y + h - 2, w, 2);
-  P(c, WARN_RIM, x, y, 2, h); P(c, WARN_RIM, x + w - 2, y, 2, h);
+function drawWarnEdge(c: Ctx, warn: Warn): void {
+  const x = X0 + warn.col * PW + 2, y = Y0 + warn.row * (FACE + LIP) + 1, w = PW - 4, h = FACE - 2, rim = team(warn.side).edge;
+  P(c, rim, x, y, w, 2); P(c, rim, x, y + h - 2, w, 2);
+  P(c, rim, x, y, 2, h); P(c, rim, x + w - 2, y, 2, h);
 }
-
-const RETICLE = '#f83800';
 
 /** BN lock-on crosshair: corner brackets close in on the target panel as the shot nears, around a blinking center cross. */
 function drawReticle(c: Ctx, w: Warn, time: number): void {
   const p = 1 - w.t / w.dur;
   const at = panelCenter(w.col, w.row);
   const cx = Math.round(at.x), cy = Math.round(at.y);
-  const rx = Math.round(18 - 8 * p), ry = Math.round(12 - 5 * p), arm = 4;
+  const rx = Math.round(18 - 8 * p), ry = Math.round(12 - 5 * p), arm = 4, RETICLE = team(w.side).edge;
   for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
     const x = cx + sx * rx, y = cy + sy * ry;
     P(c, '#000000', Math.min(x, x - sx * arm) - 1, y - 1, arm + 3, 3);
@@ -148,7 +148,7 @@ function drawReticle(c: Ctx, w: Warn, time: number): void {
   }
 }
 
-/** BN bomb shadow: a dark oval on the landing panel that grows as the lob comes down. */
+/** BN bomb shadow: a dark oval on the landing panel that grows as the lob comes down, edged in the thrower's color. */
 function drawLobShadow(c: Ctx, w: Warn): void {
   const p = 1 - w.t / w.dur;
   const pc = panelCenter(w.col, w.row);
@@ -158,6 +158,13 @@ function drawLobShadow(c: Ctx, w: Warn): void {
   for (let dy = -hh; dy <= hh; dy++) {
     const half = Math.round(hw * Math.sqrt(1 - (dy / (hh + 0.5)) ** 2));
     P(c, '#000000', Math.round(pc.x) - half, Math.round(pc.y) + dy, half * 2, 1);
+  }
+  c.globalAlpha = 0.5 + 0.4 * p;
+  const rim = team(w.side).edge;
+  for (let dy = -hh; dy <= hh; dy++) {
+    const half = Math.round(hw * Math.sqrt(1 - (dy / (hh + 0.5)) ** 2));
+    if (Math.abs(dy) === hh) P(c, rim, Math.round(pc.x) - half, Math.round(pc.y) + dy, half * 2, 1);
+    else { P(c, rim, Math.round(pc.x) - half - 1, Math.round(pc.y) + dy, 1, 1); P(c, rim, Math.round(pc.x) + half, Math.round(pc.y) + dy, 1, 1); }
   }
   c.restore();
 }
@@ -316,7 +323,7 @@ function drawWall(c: Ctx, w: Wall, time: number): void {
 /** Shield Wall: a planted steel tower shield with rivets and a stripe in the owner's color. Dents as it takes damage. */
 function drawTowerShield(c: Ctx, w: Wall, cx: number, base: number, pct: number): number {
   const h = 18, top = base - h, x = cx - 8;
-  const stripe = w.side === 0 ? '#d82800' : '#0058f8';
+  const { mark: stripe, dark } = team(w.side);
   P(c, '#000000', x - 1, top - 1, 18, h + 1);
   P(c, '#000000', x, base, 16, 1);
   for (let r = 0; r < h; r++) {
@@ -327,14 +334,13 @@ function drawTowerShield(c: Ctx, w: Wall, cx: number, base: number, pct: number)
   P(c, '#fcfcfc', x + 1, top, 14, 1);
   P(c, '#fcfcfc', x + 1, top + 1, 1, h - 6);
   P(c, stripe, x + 6, top + 1, 4, h - 4);
-  P(c, mixDark(stripe), x + 9, top + 1, 1, h - 4);
+  P(c, dark, x + 9, top + 1, 1, h - 4);
   for (const [rx, ry] of [[2, 2], [13, 2], [2, 11], [13, 11]]) { P(c, '#3c3c3c', x + rx, top + ry, 1, 1); P(c, '#fcfcfc', x + rx, top + ry - 1, 1, 1); }
   // dents and cracks appear as it loses HP
   if (pct < 0.7) { P(c, '#3c3c3c', x + 3, top + 6, 2, 1); P(c, '#3c3c3c', x + 4, top + 7, 1, 2); }
   if (pct < 0.4) { P(c, '#000000', x + 11, top + 4, 1, 3); P(c, '#000000', x + 12, top + 7, 1, 3); P(c, '#000000', x + 10, top + 10, 1, 2); }
   return top;
 }
-const mixDark = (col: string): string => (col === '#d82800' ? '#881400' : '#0000a8');
 
 /** Ice Wall: a cluster of jagged frost crystals with a shimmer that sweeps up them. Cracks as it weakens. */
 /** Holy Wall: a shimmering pane of gold light. */

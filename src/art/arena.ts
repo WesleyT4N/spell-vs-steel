@@ -2,11 +2,9 @@
 // outlined pieces, flat cel shading, no dithering (toolkit in ink.ts). Each stage is a module in src/content/stages/.
 import { P, view, rng, mix, plain, piece, type Ctx } from '../engine/gfx';
 import { MX, MY, LIFT, BW, BH, XL, YT } from './ink';
+import { YOU, FOE } from '../game/teamColors';
 
 export const COLS = 6, ROWS = 3, PW = 38, FACE = 15, LIP = 4, X0 = 6, Y0 = 98;
-/** Panel rims per side, [light, dark], from the fighters' red and blue. */
-export const TEAM_RIM: [string, string][] = [['#dd3443', '#8d1a30'], ['#486cdb', '#212f84']];
-export const LEFT_EDGE = TEAM_RIM[0][0], RIGHT_EDGE = TEAM_RIM[1][0];
 
 /** Center-bottom (feet) position of a panel. */
 export function panelFoot(col: number, row: number): { x: number; y: number } {
@@ -97,18 +95,18 @@ const TINT: Record<PanelTint, { face: string; hi: string; lo: string; ink: [stri
 };
 
 /** A panel: black outline, two-tone team rim, an outlined bevelled face, and a darker front lip. */
-export function drawPanel(c: Ctx, col: number, row: number, state: PanelState, _t: number, owner: 0 | 1, highlight: string | undefined, stage: Stage, art: PanelArt = {}): void {
+export function drawPanel(c: Ctx, col: number, row: number, state: PanelState, _t: number, mine: boolean, highlight: string | undefined, stage: Stage, art: PanelArt = {}): void {
   const x = X0 + col * PW, y = Y0 + row * (FACE + LIP);
   // a clean, untinted panel's look only depends on these, so it is painted once and stamped every frame; its
   // first fill is an opaque box over the whole piece, so anything blended inside it blends the same either way.
   // Tinted and cracked panels animate, so they paint fresh.
-  if (!plain(c) || state !== 'clean' || art.tint) { paintPanel(c, x, y, col, row, state, owner, highlight, stage, art); return; }
-  const key = `panel|${stage.id}|${col}|${row}|${owner}|${highlight ?? ''}`;
-  c.drawImage(piece(key, PW, FACE + LIP + 1, p => paintPanel(p, 0, 1, col, row, state, owner, highlight, stage, art)), x, y - 1);
+  if (!plain(c) || state !== 'clean' || art.tint) { paintPanel(c, x, y, col, row, state, mine, highlight, stage, art); return; }
+  const key = `panel|${stage.id}|${col}|${row}|${mine ? 1 : 0}|${highlight ?? ''}`;
+  c.drawImage(piece(key, PW, FACE + LIP + 1, p => paintPanel(p, 0, 1, col, row, state, mine, highlight, stage, art)), x, y - 1);
 }
 
-function paintPanel(c: Ctx, x: number, y: number, col: number, row: number, state: PanelState, owner: 0 | 1, highlight: string | undefined, stage: Stage, art: PanelArt): void {
-  const [tl, td] = TEAM_RIM[owner];
+function paintPanel(c: Ctx, x: number, y: number, col: number, row: number, state: PanelState, mine: boolean, highlight: string | undefined, stage: Stage, art: PanelArt): void {
+  const [tl, td] = (mine ? YOU : FOE).rim;
   const fx = x + 2, fy = y + 1, fw = PW - 4, fh = FACE - 2;
   const look = stage.panel;
   const tint = art.tint ?? (state === 'burning' ? 'fire' : undefined), time = art.time ?? 0;
@@ -205,9 +203,9 @@ function panelGlyph(c: Ctx, tint: PanelTint, fx: number, fy: number, fw: number,
  * A broken panel: the team rim stays, the face is gone and the pit shows its stone walls, with jagged shards left
  * at the edges and rubble at the bottom. `age` is seconds since it broke (the face crumbles in for the first 0.35s).
  */
-export function drawHole(c: Ctx, col: number, row: number, owner: 0 | 1, stage: Stage, age = 9): void {
+export function drawHole(c: Ctx, col: number, row: number, mine: boolean, stage: Stage, age = 9): void {
   const x = X0 + col * PW, y = Y0 + row * (FACE + LIP);
-  const [tl, td] = TEAM_RIM[owner];
+  const [tl, td] = (mine ? YOU : FOE).rim;
   const look = stage.panel;
   const fx = x + 2, fy = y + 1, fw = PW - 4, fh = FACE - 2;
   const wall = look.lip, wallDk = mix(look.lip, '#000000', 0.45), pit = '#0a0610';

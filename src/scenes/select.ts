@@ -20,6 +20,7 @@ import { DeckSelectScene } from './deckSelect';
 import { TutorialScene, type TutorialClass } from './tutorial';
 import { loadRecords, clock } from '../game/arcade';
 import type { PadMode } from '../engine/touch';
+import { YOU, FOE } from '../game/teamColors';
 import { bigButton, actionBar, barTapped, swipeIn, tallArea, GAP, PAD } from './touchUi';
 
 /** Roster tiles: every playable class, then RANDOM. */
@@ -312,11 +313,12 @@ export class CharSelectScene implements Scene {
         P(ui, color, tx, ty - 10, tw, 10);
         drawText(ui, label, tx + 2, ty - 8, '#fcfcfc');
       };
-      if (mine && (this.slot === 0 || tick % 8 < 6)) tag(this.who(this.slot), this.slot === 0 ? '#d82800' : '#0058f8', this.slot === 1);
-      else if (picked0) tag(this.who(0), '#881400', false);
-      if (theirs) tag('RIVAL', '#0058f8', true);
-      else if (net && rl && rl.step > 0 && rival && n === PLAYABLE.indexOf(rival.cls)) tag('RIVAL', '#0000a8', true);
-      else if (picked1) tag(this.who(1), '#0000a8', true);
+      // you (and P1) blue, the rival (and P2) red, like the battle grid
+      if (mine && (this.slot === 0 || tick % 8 < 6)) tag(this.who(this.slot), this.slot === 0 ? YOU.mark : FOE.mark, this.slot === 1);
+      else if (picked0) tag(this.who(0), YOU.dark, false);
+      if (theirs) tag('RIVAL', FOE.mark, true);
+      else if (net && rl && rl.step > 0 && rival && n === PLAYABLE.indexOf(rival.cls)) tag('RIVAL', FOE.dark, true);
+      else if (picked1) tag(this.who(1), FOE.dark, true);
     }
 
     // on to the spell decks: the last OK gets there too
