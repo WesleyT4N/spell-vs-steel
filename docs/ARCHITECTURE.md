@@ -126,7 +126,7 @@ flowchart LR
 | `net/rollback.ts` | `Rollback`: one confirmed snapshot, guesses up to `MAX_ROLLBACK = 10` frames, rewind and replay, `onConfirmed` feeds the replay `TapeWriter` |
 | `net/snapshot.ts` | Snapshots the Battle object graph and restores it in place; watchers (post-match stats) pass extra roots |
 | `net/session.ts` | `NetSession`: handshake, readiness, input buffers, RTT, status (waiting / connected / reconnecting / lost), desync flag |
-| `net/protocol.ts` | `Packet`, `PROTOCOL = 7`, 10-bit input packing (2 chars per frame), room codes |
+| `net/protocol.ts` | `Packet`, `PROTOCOL = 8`, 10-bit input packing (2 chars per frame), room codes |
 | `net/transport.ts` | `room` (claude.ai artifact presence), `peer` (WebRTC via PeerJS), `local` (BroadcastChannel, fake lag) |
 | `net/hash.ts` | `battleHash(b)`, FNV-1a over everything the rules read |
 | `scenes/online.ts`, `scenes/onlineBattle.ts` | Online menu and the Versus scene driven by `Netplay` |
