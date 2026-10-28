@@ -3,7 +3,7 @@ import { k } from '../engine/input';
 import { drawPanel, drawHole, drawStage, panelFoot, panelCenter, X0, Y0, PW, FACE, LIP, type PanelState, type PanelTint } from '../art/arena';
 import { getStage } from '../content/stages';
 import type { Stage } from '../art/arena';
-import { getSprite, getFrame, drawFighterSprite, drawFighterPosed, teamColor, type Tint } from '../art/sprites';
+import { getSprite, getFrame, drawFighterSprite, drawFighterPosed, type Tint } from '../art/sprites';
 import type { FrameId } from '../art/fighterFrames';
 import { P, UW, UH, blob, frame, glow, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '../engine/font';
@@ -654,8 +654,8 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0, sha
 function drawFighterHud(ui: Ctx, b: Battle, f: Fighter, tick: number): void {
   const right = f.side === 1, w = 132;
   const x = right ? UW - w - 8 : 8;
-  // a parchment nameplate with a ribbon in the fighter's color, and an HP bar
-  win(ui, x, 4, w, 34, { accent: teamColor(f.cls, f.skin, f.alt), burn: 3 });
+  // a parchment nameplate with a ribbon in the team color (yours blue, theirs red), and an HP bar
+  win(ui, x, 4, w, 34, { accent: team(f.side).mark, burn: 3 });
   drawText(ui, f.name, x + 7, 11, INK);
   drawText(ui, CLASS_INFO[f.cls].name, x + 7, 20, INK2);
   const hp = String(Math.max(0, Math.ceil(f.hp)));
@@ -675,7 +675,7 @@ function drawCombo(ui: Ctx, b: Battle, f: Fighter): void {
   // a finished combo slides back out toward the edge
   const out = c.live ? 0 : Math.max(0, (c.ago - (COMBO_HOLD - 0.25)) / 0.25);
   const x = Math.round(right ? UW - w - 8 + out * (w + 10) : 8 - out * (w + 10)), y = 96;
-  win(ui, x, y, w, h, { accent: teamColor(f.cls, f.skin, f.alt), burn: 3 });
+  win(ui, x, y, w, h, { accent: team(f.side).mark, burn: 3 });
   const hits = `${c.hits} HITS`;
   drawText(ui, hits, x + Math.round((w - textWidth(hits, 2)) / 2), y + 9, c.live ? RED_INK : INK2, 2);
   const dmg = `${Math.round(c.dmg)} DMG`;

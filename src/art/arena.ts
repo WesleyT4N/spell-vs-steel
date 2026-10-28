@@ -6,6 +6,9 @@ import { YOU, FOE } from '../game/teamColors';
 
 export const COLS = 6, ROWS = 3, PW = 38, FACE = 15, LIP = 4, X0 = 6, Y0 = 98;
 
+/** How strongly a clean panel face is washed with its team's rim color. */
+const TEAM_WASH = 0.3;
+
 /** Center-bottom (feet) position of a panel. */
 export function panelFoot(col: number, row: number): { x: number; y: number } {
   return { x: X0 + col * PW + PW / 2, y: Y0 + row * (FACE + LIP) + FACE - 3 };
@@ -114,6 +117,8 @@ function paintPanel(c: Ctx, x: number, y: number, col: number, row: number, stat
   P(c, tl, x + 1, y, PW - 2, FACE); P(c, td, x + 1, y + FACE - 1, PW - 2, 1); P(c, td, x + PW - 2, y, 1, FACE);
   let face = look.face, hi = look.hi, lo = look.lo;
   if (tint) ({ face, hi, lo } = TINT[tint]);
+  // BN-style team panels: every stage's face takes on a wash of its side's color
+  else { const wash = tl; face = mix(face, wash, TEAM_WASH); hi = mix(hi, wash, TEAM_WASH * 0.6); lo = mix(lo, td, TEAM_WASH); }
   // a cracked face sits a little lower and darker
   if (state === 'cracked') { face = mix(face, lo, 0.2); hi = mix(hi, face, 0.4); }
   if (highlight) { face = mix(face, highlight, 0.55); hi = mix(hi, highlight, 0.4); lo = mix(lo, highlight, 0.4); }
