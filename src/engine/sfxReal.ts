@@ -178,9 +178,6 @@ function iceShatter(vol: number, pan: number): void {
 function sparkle(vol: number, pan: number, delay = 0, n = 6): void {
   pings({ n, dur: 0.25, vol: 0.22 * vol, pan, delay, lo: 3000, hi: 8000, decay: false, partials: [[1, 1], [2, 0.3]] });
 }
-function holyChord(vol: number, pan: number, delay = 0, root = 880, ring = 0.6): void {
-  for (const [m, v] of [[1, 1], [1.25, 0.7], [1.5, 0.6], [2, 0.4]] as Array<[number, number]>) ping(root * m, vol * v * 0.3, pan, delay + rnd(0, 0.02), ring, BELL, 0.5);
-}
 function darkSwell(dur: number, vol: number, pan: number, delay = 0): void {
   layer({ buf: 'brown', type: 'bandpass', f: 500, f1: 1400, q: 1.5, env: [[dur * 0.8, vol], [dur, 0]], pan, send: 0.3, delay, flut: 0.4 });
 }
@@ -224,13 +221,16 @@ const arcaneBeam: Recipe = o => { const p = P0(o), d = o.dur ?? 0.32; synth({ f:
 /** The arcane tail on a hit: a low whomp under the punch. */
 const arcaneTail = (v: number, p: number): void => { synth({ f: 150, f1: 55, dur: 0.24, vol: 1 * v, pan: p, lp: 600 }); layer({ buf: 'brown', type: 'bandpass', f: 320, q: 1, env: [[0.01, 0.6 * v], [0.18, 0]], pan: p, send: 0.35 }); };
 
+/** The holy tail on a hit: a low thump, no bell ringing. */
+const holyTail = (v: number, p: number): void => { thud(0.6 * v, p); synth({ f: 160, f1: 70, dur: 0.18, vol: 0.7 * v, pan: p, lp: 600 }); };
+
 /** Element tail layered on top of a hit's punch. */
 function elementHit(el: string, vol: number, pan: number): void {
   switch (el) {
     case 'fire': fireBurst(0.55 * vol, pan, 0.6); break;
     case 'frost': crunch({ dur: 0.12, rate: 140, vol: 0.4 * vol, pan }); ping(3100, 0.25 * vol, pan, 0.01, 0.3); break;
     case 'arcane': arcaneTail(vol, pan); break;
-    case 'holy': holyChord(0.7 * vol, pan, 0, 1100, 0.35); break;
+    case 'holy': holyTail(vol, pan); break;
     case 'shadow': darkSwell(0.18, 0.6 * vol, pan); break;
     case 'poison': gasHiss(0.2, 0.5 * vol, pan); break;
     case 'nature': thud(0.6 * vol, pan); break;
@@ -263,7 +263,7 @@ const REAL: Record<string, Recipe> = {
   cast_frost: o => { const p = P0(o); layer({ buf: 'pink', type: 'bandpass', f: 4500, f1: 1800, q: 1.2, env: [[0.06, 0.7], [0.25, 0]], pan: p, send: 0.3, flut: 0.4 });
     pings({ n: 5, dur: 0.2, vol: 0.18, pan: p, decay: false }); },
   cast_arcane: o => { const p = P0(o); synth({ f: 110, f1: 165, dur: 0.3, vol: 0.6, pan: p, lp: 700, atk: 0.12 }); layer({ buf: 'pink', type: 'bandpass', f: 300, f1: 900, q: 1.2, env: [[0.2, 0.4], [0.3, 0]], pan: p, send: 0.3 }); },
-  cast_holy: o => { const p = P0(o); layer({ buf: 'pink', type: 'bandpass', f: 2000, f1: 4000, q: 1.5, env: [[0.12, 0.35], [0.3, 0]], pan: p, send: 0.45 }); holyChord(0.6, p, 0.02, 880, 0.5); },
+  cast_holy: o => layer({ buf: 'pink', type: 'lowpass', f: 600, f1: 2200, env: [[0.15, 0.5], [0.25, 0]], pan: P0(o), send: 0.3, flut: 0.3 }),
   cast_shadow: o => { const p = P0(o); darkSwell(0.25, 0.7, p); whoosh(600, 2500, 0.2, 0.35, p, 0.05); },
   cast_poison: o => gasHiss(0.25, 0.6, P0(o)),
   cast_nature: o => { const p = P0(o); layer({ buf: 'pink', type: 'bandpass', f: 1200, f1: 700, q: 1, env: [[0.05, 0.5], [0.25, 0]], pan: p, send: 0.3, flut: 0.8 }); crackles({ dur: 0.2, rate: 30, vol: 0.18, pan: p, lo: 1500, hi: 4000 }); },
@@ -294,9 +294,9 @@ const FX: Record<string, Recipe> = {
   boltHeavy: arcaneBeam,
   arrow: REAL.shot_arrow,
   aimed: o => { const p = P0(o); tone(150, 110, 0.18, 0.7, p, 0, 'triangle', 0.15); layer({ buf: 'white', type: 'highpass', f: 2000, env: [[0.001, 1.1], [0.04, 0]], pan: p, send: 0.3 }); whoosh(4500, 1500, 0.12, 0.6, p, 0.01, 2.5); },
-  holySpark: o => { const p = P0(o); whoosh(2500, 5000, 0.12, 0.45, p, 0, 2); ping(1980, 0.2, p, 0, 0.3, BELL); },
-  holyPillar: o => { const p = P0(o); layer({ buf: 'pink', type: 'bandpass', f: 4000, f1: 1500, q: 1.2, env: [[0.06, 0.6], [0.35, 0]], pan: p, send: 0.45 }); punch(0.9, p, 0.04); holyChord(0.8, p, 0.04, 660, 0.7); },
-  holyNova: o => { const p = P0(o); punch(0.7, p); layer({ buf: 'pink', type: 'bandpass', f: 1500, f1: 4500, q: 1, env: [[0.03, 0.8], [0.4, 0]], pan: p, send: 0.45 }); holyChord(0.9, p, 0.02, 990, 0.8); },
+  holySpark: o => { const p = P0(o); layer({ buf: 'pink', type: 'lowpass', f: 2600, f1: 700, env: [[0.01, 0.6], [0.14, 0]], pan: p, panTo: dirTo(o), send: 0.2, flut: 0.3 }); synth({ f: 300 * jit(), f1: 190, dur: 0.1, vol: 0.35, pan: p, lp: 900 }); },
+  holyPillar: o => { const p = P0(o); layer({ buf: 'pink', type: 'bandpass', f: 3000, f1: 600, q: 0.8, env: [[0.03, 0.7], [0.28, 0]], pan: p, send: 0.3, flut: 0.4 }); punch(1, p, 0.03); thud(0.8, p, 0.03); synth({ f: 110, f1: 55, dur: 0.25, vol: 0.8, pan: p, lp: 600, delay: 0.03 }); },
+  holyNova: o => { const p = P0(o); punch(0.9, p); thud(0.9, p); layer({ buf: 'pink', type: 'lowpass', f: 3000, f1: 500, env: [[0.02, 0.8], [0.4, 0]], pan: p, send: 0.4, flut: 0.4 }); },
   healBurst: () => { /* heal() plays the heal sound */ },
   thrust: o => { const p = P0(o); whoosh(1500, 5000, 0.12, 0.8, p, 0, 1.6, p + 0.4 * Math.sign(Number(o.data?.d ?? 1))); ping(1500, 0.18, p, 0.02, 0.25, METAL); },
   smash: o => { const p = P0(o); punch(1, p); thud(1, p); },
