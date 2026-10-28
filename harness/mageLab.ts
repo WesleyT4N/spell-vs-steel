@@ -15,13 +15,14 @@ const LOOKS: Array<[string, string]> = [
 ];
 const SOUNDS: Array<[string, string]> = [
   ['Current', 'Airy whoosh plus high crystal pings. The "glass clinking".'],
-  ['Missile Swirl', 'A rising, warbling chord riding a phased whoosh. Hits land as a soft "pshh" with a shimmering ring.'],
-  ['Arcane Blast', 'A quick breath in, then a resonant "vwoom" as the tone sweeps down. The closest to WoW\'s Arcane Blast.'],
-  ['Ethereal Shimmer', 'A chorus of soft, trembling tones that bloom and fade. The gentlest of the four.'],
-  ['Warp', 'A wobbling, pitch-bending tone, like a portal or Polymorph. Hits wobble down and fizz out.'],
+  ['Arcane Missiles', 'A bright "tsiu" streak trailing fizzing sparkle. Lands as a soft "pff" inside a sparkle cloud.'],
+  ['Arcane Blast', 'A breath sucked backwards into a ringing "bwamm", with a singing-glass tail.'],
+  ['Arcane Explosion', 'A crackling, glittering burst over a puff of air. The brightest and spikiest.'],
+  ['Arcane Orb', 'A humming singing-glass chord that rolls down the row and rings out on impact.'],
 ];
-let look = 1, sound = 1, auto = true, slow = false;
-fxLab.mage = look; sfxLab.arcane = sound;
+const autoBtn = document.getElementById('auto')!;
+let look = 1, sound = 1, auto = true, slow = false, spells = 1;
+fxLab.mage = look; sfxLab.arcane = sound; fxLab.spells = spells;
 
 const CROP = { x: 0, y: 72, w: W, h: 90 };
 function fresh(withSound: boolean): Battle {
@@ -46,6 +47,27 @@ function fire(v: View, kind: 'light' | 'heavy'): void {
   fxLab.mage = v.look(); v.b.basicAttack(f, kind);
 }
 
+function cast(v: View, id: string): void {
+  const b = v.b, f = b.f[0], foe = b.f[1];
+  foe.hp = foe.maxHp; foe.col = 4; foe.row = f.row; foe.st.stunned = 0;
+  f.queue = [id]; f.res = 5; f.castCd = 0; f.lock = 0; f.st.silenced = 0;
+  b.castTop(f, null);
+}
+const SPELLS: Array<[string, string]> = [['arcane_missiles', 'Arcane Missiles'], ['arcane_blast', 'Arcane Blast'], ['arcane_surge', 'Arcane Surge'], ['repulse', 'Repulse'], ['arcane_power', 'Arcane Power']];
+const spellBar = document.getElementById('spells')!;
+for (const [id, name] of SPELLS) {
+  const bt = document.createElement('button'); bt.id = 'cast-' + id; bt.textContent = name.toUpperCase();
+  bt.onclick = () => { unlockAudio(); if (auto) autoBtn.click(); cast(views[0], id); };
+  spellBar.appendChild(bt);
+}
+const spellPick = document.getElementById('spellLook')!;
+const syncSpell = (): void => { for (const [i, el] of [...spellPick.children].entries()) el.setAttribute('aria-pressed', String(i === spells)); };
+['CURRENT SPELLS', 'NEW SPELLS'].forEach((label, i) => {
+  const bt = document.createElement('button'); bt.id = 'spells-' + i; bt.textContent = label;
+  bt.onclick = () => { spells = i; syncSpell(); }; spellPick.appendChild(bt);
+});
+syncSpell();
+
 function pickRow(id: string, items: Array<[string, string]>, get: () => number, set: (i: number) => void): void {
   const root = document.getElementById(id)!;
   const btns = items.map(([name, desc], i) => {
@@ -69,7 +91,7 @@ LOOKS.forEach(([name], i) => {
   views.push({ b: fresh(false), cv, look: () => i, t: 0, sound: false });
 });
 
-const autoBtn = document.getElementById('auto')!, slowBtn = document.getElementById('slow')!;
+const slowBtn = document.getElementById('slow')!;
 autoBtn.onclick = () => { unlockAudio(); auto = !auto; autoBtn.setAttribute('aria-pressed', String(auto)); autoBtn.textContent = auto ? 'AUTOPLAY ON' : 'AUTOPLAY OFF'; };
 slowBtn.onclick = () => { slow = !slow; slowBtn.setAttribute('aria-pressed', String(slow)); slowBtn.textContent = slow ? 'SLOW-MO ON' : 'SLOW-MO OFF'; };
 document.getElementById('light')!.onclick = () => { unlockAudio(); fire(views[0], 'light'); };
@@ -85,12 +107,12 @@ function frame(now: number): void {
     for (const v of views) {
       const t0 = v.t; v.t = (v.t + dt) % LOOP;
       if (auto || !v.sound) for (const [at, kind] of SCRIPT) if (at > t0 && at <= t0 + dt) fire(v, kind);
-      fxLab.mage = v.look();
+      fxLab.mage = v.look(); fxLab.spells = v.sound ? spells : 0;
       v.b.update(dt, [NO_INTENT, NO_INTENT]);
     }
   }
   for (const v of views) {
-    fxLab.mage = v.look();
+    fxLab.mage = v.look(); fxLab.spells = v.sound ? spells : 0;
     oc.clearRect(0, 0, W, H); drawBattle(oc, v.b, Math.floor(v.b.time * 30));
     const c = v.cv.getContext('2d')!; c.imageSmoothingEnabled = false;
     c.drawImage(off, CROP.x, CROP.y, CROP.w, CROP.h, 0, 0, v.cv.width, v.cv.height);

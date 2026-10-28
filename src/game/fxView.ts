@@ -363,6 +363,7 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
       break;
     }
     case 'arcaneHit': {
+      if (fxLab.spells) { arcaneBlast(c, e, x, y, p); break; }
       // a rune circle snaps around the target, then bursts outward in sparks
       const cy = y - 11, r = Math.min(11, 4 + p * 9);
       for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2 + p * 4; P(c, ARC[1 + (i % 3)], x + Math.cos(a) * r, cy + Math.sin(a) * r, i % 4 ? 1 : 2, i % 4 ? 1 : 2); }
@@ -551,6 +552,7 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
     case 'cast': {
       // every spell: the element gathers at the caster's hand and flares (buff spells get feedback too)
       const ramp = ELEMENT_RAMP[String(e.data?.el ?? 'arcane')] ?? ARC, hx = x + d * 8, hy = y - 14;
+      if (fxLab.spells && String(e.data?.el ?? 'arcane') === 'arcane') floorRune(c, x, y - 1, Math.min(11, 3 + p * 20), p * 6, ARC[1], ARC[3]);
       if (p < 0.6) for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + p * 5, r = 10 * (1 - p / 0.6) + 1; P(c, ramp[1 + (i % 3)], hx + Math.cos(a) * r, hy + Math.sin(a) * r, 1, 1); }
       if (p > 0.45 && p < 0.8) { blob(c, ramp[2], hx, hy, 2); P(c, ramp[3], hx - 3, hy, 7, 1); P(c, ramp[3], hx, hy - 3, 1, 7); }
       if (once(e, 'fl', p > 0.5)) emit(6, () => spark(hx, hy, [ramp[3], ramp[2], ramp[1]], boxC(hx, hy), 40, { g: 20 }));
@@ -621,6 +623,7 @@ export function drawShot(c: Ctx, b: Battle, p: Projectile, x: number, y: number,
     return true;
   }
   if (p.kind === 'gust') {
+    if (fxLab.spells) { repulseWave(c, b, x, y, dir); return true; }
     for (let i = 0; i < 3; i++) { const o = (Math.floor(b.time * 30) + i * 3) % 6; P(c, '#fcfcfc', x - dir * (i * 4 + o), y - 4 + i * 3, 6, 1); P(c, '#f878f8', x - dir * (i * 4 + o) - dir * 2, y - 3 + i * 3, 3, 1); }
     return true;
   }
@@ -667,7 +670,7 @@ export const xOfShot = (p: Projectile): number => X0 + p.x * PW + PW / 2;
 
 // ---------- Mage basic attacks (lab: variants under review) ----------
 /** Which look the Mage's basic attacks use: 0 = current, 1 = Orb, 2 = Rune, 3 = Lance. Set by the preview lab. */
-export const fxLab = { mage: 0 };
+export const fxLab = { mage: 0, spells: 0 };
 /** A four-point flare: long arms that shrink with k (1 = full). */
 function flare(c: Ctx, x: number, y: number, s: number, col: string, out = true): void {
   x = Math.round(x); y = Math.round(y); s = Math.max(1, Math.round(s));
@@ -768,4 +771,65 @@ function mageBeam(c: Ctx, _b: Battle, e: Fx, v: number, x0: number, x1: number, 
   }
   glow(c, x1, by, 11, '248,120,248', 0.5 * w);
   if (once(e, 'hit', grow >= 1)) emit(10, () => spark(x1, by, [ARC[3], ARC[2], ARC[1]], boxC(x1, by), 60, { g: 20 }));
+}
+
+// ---------- arcane spells (lab: the bolder pass under review) ----------
+/** A flat rune circle on the floor: a ring, ticks turning around it and a few glyph marks. */
+function floorRune(c: Ctx, x: number, y: number, r: number, spin: number, col: string, hot: string): void {
+  ring(c, '#000000', x, y + 1, r + 1, r * 0.35 + 1);
+  ring(c, col, x, y, r, r * 0.35);
+  for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + spin, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r * 0.35; P(c, hot, px - 1, py, 2, 1); }
+  if (r > 5) ring(c, col, x, y, r * 0.55, r * 0.2, 2);
+}
+/** Arcane Missiles in flight: an orb with a glowing core and a ribbon trail along its arc. */
+export function drawArcaneMissile(c: Ctx, b: Battle, at: (q: number) => { x: number; y: number }, q: number): void {
+  const box = boxC(at(q).x, at(q).y);
+  for (let i = 6; i >= 1; i--) {
+    const k = q - i * 0.035; if (k <= 0) continue;
+    const t = at(k);
+    if (i > 3) dblob(c, ARC[0], t.x, t.y, 1, i); else blob(c, i > 1 ? ARC[1] : ARC[2], t.x, t.y, i > 2 ? 1 : 2);
+  }
+  const { x, y } = at(q);
+  glow(c, x, y, 9, '248,120,248', 0.6);
+  blob(c, '#000000', x, y, 4); blob(c, ARC[1], x, y, 3); blob(c, ARC[2], x, y, 2); P(c, ARC[3], x - 1, y - 1, 2, 2);
+  const a = b.time * 30; P(c, ARC[3], x + Math.cos(a) * 5, y + Math.sin(a) * 2, 1, 1);
+  if (Math.random() < 0.5) part(x, y, { vx: rnd(-10, 10), vy: rnd(-6, 12), g: 20, life: rnd(0.15, 0.3), ramp: [ARC[3], ARC[2], ARC[1]], box });
+}
+/** Arcane Blast / Arcane Surge: a rune opens under the target, a column of force slams down, the orb bursts. */
+function arcaneBlast(c: Ctx, e: Fx, x: number, y: number, p: number): void {
+  const big = e.dur >= 0.45, cy = y - 11, box = boxF(x, y), spin = p * 8;
+  // the rune opens on the floor first
+  floorRune(c, x, y - 1, Math.min(11, 4 + p * 14), spin, ARC[1], ARC[3]);
+  // the column drops from the top of the box and slams into the panel
+  if (p > 0.12 && p < 0.6) {
+    const k = (p - 0.12) / 0.48, w = Math.max(1, Math.round((big ? 7 : 5) * (1 - k))), top = y - 24, h = Math.round(24 * Math.min(1, k * 4));
+    P(c, '#000000', x - w - 1, top, w * 2 + 3, h); P(c, ARC[1], x - w, top, w * 2 + 1, h); P(c, ARC[2], x - Math.ceil(w / 2), top, Math.ceil(w / 2) * 2 + 1, h); P(c, '#fcfcfc', x, top, 1, h);
+  }
+  // the burst: an orb that swells and pops, a flare, a shock ring rolling out along the floor
+  if (p > 0.25) {
+    const k = (p - 0.25) / 0.75;
+    if (k < 0.35) { const r = Math.round((big ? 8 : 6) * (k / 0.35)) + 1; blob(c, '#000000', x, cy, r + 1); blob(c, ARC[1], x, cy, r); blob(c, ARC[2], x, cy, r - 2); blob(c, '#fcfcfc', x, cy, Math.max(0, r - 4)); }
+    else if (k < 0.7) flare(c, x, cy, (big ? 11 : 8) * (1 - (k - 0.35) / 0.35) + 1, ARC[2]);
+    ring(c, k < 0.4 ? ARC[3] : ARC[1], x, y - 1, Math.min(11, 3 + k * 12), Math.min(4, 1 + k * 4), k > 0.5 ? 2 : 0);
+    if (big && k < 0.6) ring(c, ARC[2], x, cy, Math.min(11, 2 + k * 14), Math.min(11, 2 + k * 14), 2);
+    if (k < 0.3) glow(c, x, cy, 12, '248,120,248', 0.8);
+  }
+  if (once(e, 'pop', p > 0.25)) {
+    emit(big ? 18 : 12, () => spark(x, cy, [ARC[3], ARC[2], ARC[1]], box, big ? 75 : 60, { g: 40 }));
+    emit(big ? 10 : 6, () => mote(x + rnd(-8, 8), y - rnd(0, 6), [ARC[3], ARC[2], ARC[1]], box, { vy: rnd(-40, -18) }));
+  }
+}
+/** Repulse: a curved wall of force rolling down the row, shedding motes. */
+function repulseWave(c: Ctx, b: Battle, x: number, y: number, dir: number): void {
+  const pulse = Math.floor(b.time * 24) % 2;
+  for (let k = 0; k < 3; k++) {
+    const cx = x - dir * k * 4, r = 9 - k * 2;
+    for (let i = -r; i <= r; i++) {
+      const bend = Math.round((i * i) / (r * 1.6));
+      const px = cx - dir * bend, py = y + i;
+      P(c, '#000000', px - 1, py, 3, 1);
+      P(c, k === 0 ? (pulse ? '#fcfcfc' : ARC[3]) : k === 1 ? ARC[2] : ARC[1], px, py, k === 0 ? 2 : 1, 1);
+    }
+  }
+  if (Math.random() < 0.6) part(x - dir * 6, y + rnd(-8, 8), { vx: -dir * rnd(10, 30), vy: rnd(-8, 8), drag: 0.9, life: rnd(0.15, 0.3), ramp: [ARC[3], ARC[2], ARC[1]], box: boxC(x - dir * 6, y) });
 }

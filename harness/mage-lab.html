@@ -42,9 +42,12 @@ button:focus-visible { outline: 3px solid var(--ribbon); outline-offset: 2px; }
     <button id="light">LIGHT</button><button id="heavy">HEAVY</button>
     <button id="auto" aria-pressed="true">AUTOPLAY ON</button><button id="slow" aria-pressed="false">SLOW-MO OFF</button>
   </div>
+  <section class="group"><h2>Arcane spells</h2>
+    <p>A bolder pass on the arcane spells: Arcane Missiles fly as orbs with ribbon trails, Arcane Blast and Surge open a rune under the target and slam a column of force down on it, Repulse rolls a curved wall of force, and every arcane cast draws a rune at the Mage's feet. Compare against the current versions, then cast each one. They use the sound set picked below.</p>
+    <div class="bar" id="spellLook"></div><div class="bar" id="spells"></div></section>
   <section class="group"><h2>Look</h2><div class="picks" id="looks"></div></section>
   <section class="group"><h2>Sound</h2><div class="picks" id="sounds"></div>
-    <p class="note">The sound set also replaces the arcane hit tail, so Arcane Missiles, Blast and Surge hits change with it. Current is the glassy sparkle set. All four new sets are tonal and airy, after the arcane spells in World of Warcraft, with no low thumps.</p></section>
+    <p class="note">The sound set also replaces the arcane hit tail, so Arcane Missiles, Blast and Surge hits change with it. Current is the glassy sparkle set. Each new set is modeled on one of the arcane spells in World of Warcraft: a long magic hall reverb, soft fizzing sparkle, reversed swells and singing glass, with no low thumps. The set also drives the arcane spell sounds above.</p></section>
   <section class="group"><h2>All looks at once</h2><div class="thumbs" id="thumbs"></div><p class="note">These loop silently, at the same time, for comparing. Each effect stays inside the 24-pixel box the fighters use.</p></section>
 </div>
 <script type="module" src="./mageLab.ts"></script>
