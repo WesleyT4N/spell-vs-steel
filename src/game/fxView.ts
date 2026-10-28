@@ -252,6 +252,7 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
         } else if (once(e, 'hit')) emit(6, () => spark(x1, by, STEEL.slice(1).reverse(), boxC(x1, by), 50));
         break;
       }
+      if ((e.kind === 'bolt' || heavy) && fxLab.mage) { (heavy ? mageBeam : mageBolt)(c, b, e, fxLab.mage, x0, x1, by, p, d, ph); break; }
       // cast flash at the hand
       if (p < 0.4) { glow(c, x0, by, heavy ? 11 : 7, heavy ? '248,120,248' : e.kind === 'holySpark' ? '248,216,120' : '60,188,252', 0.7 * (1 - p / 0.4)); blob(c, ramp[3], x0, by, heavy ? 3 : 2); }
       if (!heavy) {
@@ -663,3 +664,108 @@ export function drawBurn(c: Ctx, b: Battle, col: number, row: number): void {
 }
 
 export const xOfShot = (p: Projectile): number => X0 + p.x * PW + PW / 2;
+
+// ---------- Mage basic attacks (lab: variants under review) ----------
+/** Which look the Mage's basic attacks use: 0 = current, 1 = Orb, 2 = Rune, 3 = Lance. Set by the preview lab. */
+export const fxLab = { mage: 0 };
+/** A four-point flare: long arms that shrink with k (1 = full). */
+function flare(c: Ctx, x: number, y: number, s: number, col: string, out = true): void {
+  x = Math.round(x); y = Math.round(y); s = Math.max(1, Math.round(s));
+  if (out) { P(c, '#000000', x - s - 1, y - 1, s * 2 + 3, 3); P(c, '#000000', x - 1, y - s - 1, 3, s * 2 + 3); }
+  P(c, col, x - s, y, s * 2 + 1, 1); P(c, col, x, y - s, 1, s * 2 + 1);
+  P(c, '#fcfcfc', x - (s >> 1), y, s + 1, 1); P(c, '#fcfcfc', x, y - (s >> 1), 1, s + 1);
+}
+/** A pixel diamond of radius r. */
+function diamond(c: Ctx, col: string, x: number, y: number, r: number): void {
+  x = Math.round(x); y = Math.round(y);
+  for (let dy = -r; dy <= r; dy++) { const hw = r - Math.abs(dy); P(c, col, x - hw, y + dy, hw * 2 + 1, 1); }
+}
+/** A crescent facing `d`: a disc with a bite out of its back. */
+function crescent(c: Ctx, x: number, y: number, r: number, d: number, edge: string, body: string): void {
+  x = Math.round(x); y = Math.round(y);
+  for (let dy = -r - 1; dy <= r + 1; dy++) for (let dx = -r - 1; dx <= r + 1; dx++) {
+    const inO = dx * dx + dy * dy <= (r + 0.5) ** 2, bx = dx + d * (r * 0.7), inB = bx * bx + dy * dy <= (r * 0.85) ** 2;
+    const nearO = dx * dx + dy * dy <= (r + 1.5) ** 2, nearB = bx * bx + dy * dy <= (r * 0.85 - 1) ** 2;
+    if (inO && !inB) P(c, d * dx > 0 ? edge : body, x + dx, y + dy);
+    else if (nearO && !nearB && !(inO && inB)) P(c, '#000000', x + dx, y + dy);
+  }
+}
+
+function mageBolt(c: Ctx, b: Battle, e: Fx, v: number, x0: number, x1: number, by: number, p: number, d: number, ph: number): void {
+  const q = Math.min(1, p * 2.2), head = x0 + (x1 - x0) * q;
+  if (p < 0.3) { glow(c, x0, by, 7, '248,120,248', 0.7 * (1 - p / 0.3)); flare(c, x0, by, 3 * (1 - p / 0.3) + 1, ARC[2], false); }
+  if (v === 1) {
+    // Arcane Orb: a glowing orb with two motes circling it and a dithered comet trail
+    if (q < 1) {
+      for (let i = 3; i >= 1; i--) { const tx = head - d * i * 5; if ((tx - x0) * d < 0) continue; dblob(c, i > 1 ? ARC[0] : ARC[1], tx, by, 4 - i, ph + i); }
+      blob(c, '#000000', head, by, 4); blob(c, ARC[1], head, by, 3); blob(c, ARC[2], head, by, 2); P(c, ARC[3], head - d, by - 1, 2, 2);
+      for (let i = 0; i < 2; i++) { const a = b.time * 28 + i * Math.PI; P(c, i ? ARC[2] : ARC[3], head + Math.cos(a) * 6 - 1, by + Math.sin(a) * 3 - 1, 2, 2); }
+    }
+  } else if (v === 2) {
+    // Rune Missile: a diamond glyph stepping down the row with afterimages
+    const hx = x0 + Math.round((head - x0) / 4) * 4;
+    if (q < 1) {
+      for (let i = 2; i >= 1; i--) { const tx = hx - d * i * 7; if ((tx - x0) * d < 0) continue; diamond(c, '#000000', tx, by, 3 - i + 1); diamond(c, i > 1 ? ARC[0] : ARC[1], tx, by, 3 - i); }
+      diamond(c, '#000000', hx, by, 4); diamond(c, ARC[1], hx, by, 3); diamond(c, ARC[2], hx, by, 2); P(c, ARC[3], hx, by, 1, 1);
+      P(c, ARC[3], hx - 1, by - 1, 1, 1);
+    }
+  } else {
+    // Arcane Crescent: a moon blade spinning down the row, shedding star glints
+    if (q < 1) {
+      for (let i = 1; i <= 3; i++) { const tx = head - d * (i * 6 + 2), ty = by + ((i * 5 + ph) % 5) - 2; if ((tx - x0) * d < 0) continue; if ((ph + i) & 1) flare(c, tx, ty, 1, i === 1 ? ARC[2] : ARC[1], false); else P(c, ARC[2], tx, ty, 1, 1); }
+      crescent(c, head, by, 4, d, ARC[3], ARC[2]);
+    }
+  }
+  // the landing, shared shape per variant
+  if (q >= 1) {
+    const k = (p - 1 / 2.2) / (1 - 1 / 2.2);
+    if (v === 1) {
+      if (k < 0.4) { blob(c, ARC[1], x1, by, Math.round(4 * (1 - k / 0.4)) + 1); blob(c, ARC[3], x1, by, Math.round(2 * (1 - k / 0.4))); }
+      if (k < 0.8) ring(c, ARC[2], x1, by, 3 + k * 9, 2 + k * 7, 2);
+    } else if (v === 2) {
+      // four corner brackets snap shut around the target
+      const r = Math.round(10 - Math.min(1, k * 2.5) * 5);
+      if (k < 0.85) for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { P(c, ARC[2], x1 + sx * r - (sx < 0 ? 0 : 2), by + sy * r, 3, 1); P(c, ARC[2], x1 + sx * r, by + sy * r - (sy < 0 ? 0 : 2), 1, 3); }
+      if (k > 0.35 && k < 0.7) { diamond(c, ARC[1], x1, by, 3); P(c, ARC[3], x1, by, 1, 1); }
+    } else if (k < 0.6) flare(c, x1, by, 5 * (1 - k / 0.6) + 1, ARC[2]);
+    if (once(e, 'hit')) emit(8, () => spark(x1, by, [ARC[3], ARC[2], ARC[1]], boxC(x1, by), 55, { g: 30 }));
+  }
+}
+
+function mageBeam(c: Ctx, _b: Battle, e: Fx, v: number, x0: number, x1: number, by: number, p: number, d: number, ph: number): void {
+  const w = p < 0.7 ? 1 : 1 - (p - 0.7) / 0.3;
+  const grow = Math.min(1, p * 4), xe = x0 + (x1 - x0) * grow, ya = Math.min(x0, xe), yb = Math.max(x0, xe);
+  if (v === 1) {
+    // Orb Helix: a rune disc at the hand, two strands twisting round a bright core, an orb bursting at the end
+    if (p < 0.5) { const s = 1 - p / 0.5; ring(c, ARC[2], x0 + d * 2, by, 3 * s + 1, 10 * s + 1, 2); P(c, ARC[3], x0 + d * 2, by - Math.round(10 * s) - 1, 1, 1); }
+    const hh = Math.max(1, Math.round(4 * w));
+    P(c, '#000000', ya, by - 2, yb - ya, 5); P(c, ARC[0], ya, by - 1, yb - ya, 3); P(c, ARC[3], ya, by, yb - ya, 1);
+    for (let xx = ya; xx < yb; xx++) {
+      const a = (xx - x0) * d * 0.32 - p * 40, s = Math.sin(a) * hh, front = Math.cos(a) > 0;
+      P(c, front ? ARC[3] : ARC[1], xx, by + s, 1, 1); P(c, front ? ARC[1] : ARC[2], xx, by - s, 1, 1);
+    }
+    if (grow >= 1) { blob(c, '#000000', x1, by, Math.round(5 * w) + 1); blob(c, ARC[1], x1, by, Math.round(5 * w)); blob(c, ARC[2], x1, by, Math.round(3 * w)); ring(c, ARC[3], x1, by, Math.min(11, 4 + p * 8), Math.min(10, 3 + p * 7), 2); }
+  } else if (v === 2) {
+    // Rune Lance: a sigil plate at the hand, a thick banded beam with runes running down it, a starburst
+    const plate = x0 + d * 3;
+    if (p < 0.85) { ring(c, '#000000', plate, by, 4, 11, 0); ring(c, ARC[2], plate, by, 3, 10, 0); for (let i = -1; i <= 1; i++) P(c, ARC[3], plate - 1, by + i * 5, 2, 1); }
+    const hh = Math.max(1, Math.round(3 * w));
+    P(c, '#000000', ya, by - hh - 1, yb - ya, hh * 2 + 3);
+    for (let xx = ya; xx < yb; xx += 2) { const band = Math.floor(((xx - x0) * d - p * 260) / 6); P(c, ARC[1 + ((band % 2) + 2) % 2], xx, by - hh, 2, hh * 2 + 1); }
+    P(c, ARC[3], ya, by, yb - ya, 1);
+    for (let i = 0; i < 6; i++) { const rx = x0 + d * (((i * 13 + Math.floor(p * 220)) % Math.max(1, Math.abs(xe - x0)))); P(c, '#fcfcfc', rx, by - hh, 1, hh * 2 + 1); }
+    if (grow >= 1) { const s = Math.round(9 * w) + 1; flare(c, x1, by, s, ARC[2]); for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) for (let i = 2; i < s * 0.7; i++) P(c, ARC[2], x1 + sx * i, by + sy * i); }
+  } else {
+    // Crescent Lance: a white-hot core wrapped in crackling arcane edges, flares at both ends
+    const hh = Math.max(1, Math.round(2 * w));
+    P(c, '#000000', ya, by - hh - 1, yb - ya, hh * 2 + 3); P(c, ARC[2], ya, by - hh, yb - ya, hh * 2 + 1); P(c, ARC[3], ya, by, yb - ya, 1);
+    for (const side of [-1, 1]) {
+      let yy = 0;
+      for (let xx = ya; xx < yb; xx += 3) { yy = ((xx * 7 + ph * 13 + side * 5) % 4); P(c, ARC[1], xx, by + side * (hh + 1 + yy), 3, 1); if (yy > 2) P(c, ARC[2], xx + 1, by + side * (hh + 2 + yy), 1, 1); }
+    }
+    flare(c, x0, by, (p < 0.6 ? 6 : 6 * w) + 1, ARC[2]);
+    if (grow >= 1) flare(c, x1, by, 8 * w + 2, ARC[2]);
+  }
+  glow(c, x1, by, 11, '248,120,248', 0.5 * w);
+  if (once(e, 'hit', grow >= 1)) emit(10, () => spark(x1, by, [ARC[3], ARC[2], ARC[1]], boxC(x1, by), 60, { g: 20 }));
+}

@@ -201,12 +201,67 @@ function thud(vol: number, pan: number, delay = 0): void {
   crunch({ dur: 0.12, rate: 80, vol: 0.25 * vol, pan, delay, f: 1600 });
 }
 
+// ---------- arcane (lab: variants under review) ----------
+/** Which arcane sound set plays: 0 = current, 1 = Deep Pulse, 2 = Void Rift, 3 = Ethereal Breath, 4 = Arcane Charge. */
+export const sfxLab = { arcane: 0 };
+/** An oscillator (or a detuned pair) through a swept lowpass: warm, round synth body for magic. */
+function synth(o: { type?: OscillatorType; f: number; f1?: number; dur: number; vol: number; pan?: number; delay?: number; lp?: number; lp1?: number; q?: number; detune?: number; atk?: number; send?: number; grit?: boolean }): void {
+  const r = R!, c = r.c, t = c.currentTime + (o.delay ?? 0), dur = o.dur, ch = chan(o.pan ?? 0, o.send ?? 0.3);
+  const lp = filt('lowpass', (o.lp ?? 2000) * PITCH, o.q ?? 1);
+  if (o.lp1) { lp.frequency.setValueAtTime((o.lp ?? 2000) * PITCH, t); lp.frequency.exponentialRampToValueAtTime(o.lp1 * PITCH, t + dur); }
+  const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(o.vol, t + (o.atk ?? 0.01)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  let tail: AudioNode = g;
+  if (o.grit) { const sh = c.createWaveShaper(); sh.curve = r.grit; g.connect(sh); tail = sh; }
+  for (const k of o.detune ? [1 - o.detune, 1 + o.detune] : [1]) {
+    const os = c.createOscillator(); os.type = o.type ?? 'sine';
+    os.frequency.setValueAtTime(o.f * k * PITCH, t); if (o.f1) os.frequency.exponentialRampToValueAtTime(Math.max(20, o.f1 * k * PITCH), t + dur);
+    os.connect(lp); os.start(t); os.stop(t + dur + 0.02);
+  }
+  lp.connect(g); tail.connect(ch.in);
+}
+/** Breathy noise through two vowel formants: a soft magical "ooh". */
+function breath(dur: number, vol: number, pan: number, delay = 0, f1 = 450, f2 = 850, panTo?: number): void {
+  layer({ buf: 'pink', type: 'bandpass', f: f1, f1: f1 * 1.3, q: 6, env: [[dur * 0.3, vol], [dur, 0]], pan, panTo, send: 0.4, delay, flut: 0.2 });
+  layer({ buf: 'pink', type: 'bandpass', f: f2, f1: f2 * 1.2, q: 7, env: [[dur * 0.3, vol * 0.7], [dur, 0]], pan, panTo, send: 0.4, delay, flut: 0.2 });
+}
+const jit = (): number => rnd(0.96, 1.04);
+const dirTo = (o: RealOpts, k = 0.8): number => P0(o) + (o.data?.d === -1 || o.data?.dir === -1 ? -k : k);
+interface ArcaneSet { bolt: Recipe; beam: Recipe; hit: (vol: number, pan: number) => void }
+const ARCANE: ArcaneSet[] = [
+  // 1 Deep Pulse: a round, falling sine thrum with a soft air push; hits land as a low "whomp"
+  { bolt: o => { const p = P0(o), j = jit(); synth({ f: 240 * j, f1: 120 * j, dur: 0.16, vol: 0.6, pan: p, lp: 1200 }); synth({ type: 'triangle', f: 480 * j, f1: 240 * j, dur: 0.1, vol: 0.25, pan: p, lp: 1500 });
+      layer({ buf: 'pink', type: 'bandpass', f: 700, f1: 1600, q: 1, env: [[0.03, 0.35], [0.14, 0]], pan: p, panTo: dirTo(o), send: 0.25 }); },
+    beam: o => { const p = P0(o), d = o.dur ?? 0.32; synth({ f: 160, f1: 110, dur: d + 0.1, vol: 0.9, pan: p, lp: 900, atk: 0.02 }); synth({ type: 'triangle', f: 320, f1: 220, dur: d, vol: 0.35, pan: p, lp: 1400, detune: 0.01 });
+      layer({ buf: 'pink', type: 'bandpass', f: 500, f1: 1400, q: 1.5, env: [[0.04, 0.6], [d, 0.3], [d + 0.08, 0]], pan: p, panTo: dirTo(o), send: 0.35, flut: 0.4 }); },
+    hit: (v, p) => { synth({ f: 200, f1: 70, dur: 0.22, vol: 0.9 * v, pan: p, lp: 800 }); layer({ buf: 'brown', type: 'bandpass', f: 450, q: 1, env: [[0.01, 0.6 * v], [0.18, 0]], pan: p, send: 0.35 }); } },
+  // 2 Void Rift: a detuned saw pair closing down like a portal; hits suck in, then thump
+  { bolt: o => { const p = P0(o), j = jit(); synth({ type: 'sawtooth', f: 150 * j, f1: 95 * j, dur: 0.18, vol: 0.35, pan: p, lp: 2400, lp1: 350, q: 4, detune: 0.012 });
+      layer({ buf: 'brown', type: 'bandpass', f: 900, f1: 400, q: 1.5, env: [[0.02, 0.4], [0.16, 0]], pan: p, panTo: dirTo(o), send: 0.3 }); },
+    beam: o => { const p = P0(o), d = o.dur ?? 0.32; synth({ type: 'sawtooth', f: 110, f1: 80, dur: d + 0.12, vol: 0.5, pan: p, lp: 600, lp1: 2200, q: 6, detune: 0.015, atk: 0.03 });
+      synth({ type: 'sawtooth', f: 55, dur: d + 0.1, vol: 0.3, pan: p, lp: 400, atk: 0.03 });
+      layer({ buf: 'brown', type: 'bandpass', f: 400, f1: 1200, q: 1.2, env: [[d * 0.8, 0.6], [d + 0.1, 0]], pan: p, panTo: dirTo(o), send: 0.3, flut: 0.6 }); },
+    hit: (v, p) => { layer({ buf: 'brown', type: 'bandpass', f: 300, f1: 1200, q: 2, env: [[0.07, 0.5 * v], [0.08, 0]], pan: p, send: 0.2 });
+      synth({ f: 150, f1: 55, dur: 0.2, vol: 1 * v, pan: p, lp: 700, delay: 0.06 }); synth({ type: 'sawtooth', f: 90, f1: 60, dur: 0.15, vol: 0.25 * v, pan: p, lp: 500, delay: 0.06 }); } },
+  // 3 Ethereal Breath: an airy, voice-like "ooh" carried down the row; hits are a soft burst with a low body
+  { bolt: o => { const p = P0(o), j = jit(); breath(0.2, 0.7, p, 0, 420 * j, 820 * j, dirTo(o)); synth({ f: 290 * j, f1: 260 * j, dur: 0.18, vol: 0.35, pan: p, lp: 1000, atk: 0.03 }); },
+    beam: o => { const p = P0(o), d = o.dur ?? 0.32; breath(d + 0.15, 0.9, p, 0, 380, 700, dirTo(o)); breath(d + 0.1, 0.5, p, 0.02, 560, 1100);
+      synth({ f: 196, dur: d + 0.15, vol: 0.4, pan: p, lp: 900, atk: 0.04, detune: 0.006 }); synth({ f: 294, dur: d + 0.1, vol: 0.2, pan: p, lp: 1200, atk: 0.05 }); },
+    hit: (v, p) => { breath(0.22, 0.6 * v, p, 0, 350, 700); synth({ f: 180, f1: 80, dur: 0.18, vol: 0.7 * v, pan: p, lp: 800 }); } },
+  // 4 Arcane Charge: a low electric buzz and a crackle, like lightning held in a bottle; hits zap and thud
+  { bolt: o => { const p = P0(o), j = jit(); synth({ type: 'sawtooth', f: 95 * j, f1: 70 * j, dur: 0.14, vol: 0.3, pan: p, lp: 1600, lp1: 500, q: 3, grit: true });
+      crackles({ dur: 0.12, rate: 70, vol: 0.18, pan: p, spread: 0.3, lo: 700, hi: 2200 }); whoosh(800, 1800, 0.12, 0.3, p, 0, 1.2, dirTo(o)); },
+    beam: o => { const p = P0(o), d = o.dur ?? 0.32; synth({ type: 'sawtooth', f: 70, dur: d + 0.08, vol: 0.45, pan: p, lp: 1400, q: 4, detune: 0.02, grit: true, atk: 0.02 });
+      crackles({ dur: d, rate: 90, vol: 0.2, pan: p, spread: 0.5, lo: 600, hi: 2400 }); layer({ buf: 'pink', type: 'bandpass', f: 900, q: 2, env: [[0.03, 0.4], [d, 0.3], [d + 0.06, 0]], pan: p, panTo: dirTo(o), send: 0.3, flut: 1.2 }); },
+    hit: (v, p) => { synth({ type: 'sawtooth', f: 120, f1: 50, dur: 0.14, vol: 0.5 * v, pan: p, lp: 1000, grit: true }); crackles({ dur: 0.15, rate: 80, vol: 0.25 * v, pan: p, lo: 600, hi: 2000, decay: true }); synth({ f: 170, f1: 70, dur: 0.16, vol: 0.6 * v, pan: p, lp: 700 }); } },
+];
+const arcaneSet = (): ArcaneSet | undefined => ARCANE[sfxLab.arcane - 1];
+
 /** Element tail layered on top of a hit's punch. */
 function elementHit(el: string, vol: number, pan: number): void {
   switch (el) {
     case 'fire': fireBurst(0.55 * vol, pan, 0.6); break;
     case 'frost': crunch({ dur: 0.12, rate: 140, vol: 0.4 * vol, pan }); ping(3100, 0.25 * vol, pan, 0.01, 0.3); break;
-    case 'arcane': sparkle(vol, pan, 0, 5); hum(900, 0.18, 0.5 * vol, pan); break;
+    case 'arcane': { const a = arcaneSet(); if (a) a.hit(vol, pan); else { sparkle(vol, pan, 0, 5); hum(900, 0.18, 0.5 * vol, pan); } break; }
     case 'holy': holyChord(0.7 * vol, pan, 0, 1100, 0.35); break;
     case 'shadow': darkSwell(0.18, 0.6 * vol, pan); break;
     case 'poison': gasHiss(0.2, 0.5 * vol, pan); break;
@@ -267,8 +322,8 @@ const FX: Record<string, Recipe> = {
   cleaveHeavy: o => { const p = P0(o); whoosh(700, 2600, 0.2, 0.9, p, 0, 1); thud(0.9, p, 0.15); },
   dagger: o => { const p = P0(o); whoosh(3000, 6000, 0.09, 0.6, p, 0, 1.8); ping(3200, 0.12, p, 0.03, 0.15, METAL); },
   knifeHeavy: REAL.shot_knife, knife: REAL.shot_knife,
-  bolt: o => { const p = P0(o); whoosh(2500, 5500, 0.12, 0.55, p, 0, 2); sparkle(0.6, p, 0.02, 3); },
-  boltHeavy: o => { const p = P0(o), d = o.dur ?? 0.32;
+  bolt: o => { const a = arcaneSet(); if (a) return a.bolt(o); const p = P0(o); whoosh(2500, 5500, 0.12, 0.55, p, 0, 2); sparkle(0.6, p, 0.02, 3); },
+  boltHeavy: o => { const a = arcaneSet(); if (a) return a.beam(o); const p = P0(o), d = o.dur ?? 0.32;
     layer({ buf: 'white', type: 'bandpass', f: 1600, f1: 900, q: 4, env: [[0.01, 0.8], [d * 0.7, 0.6], [d, 0]], pan: p, send: 0.3, flut: 1.5, grit: true });
     hum(500, d, 0.6, p); crackles({ dur: d, rate: 60, vol: 0.25, pan: p, lo: 2500, hi: 8000 }); },
   arrow: REAL.shot_arrow,
