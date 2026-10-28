@@ -6,17 +6,17 @@ type Cells = Array<[number, number]>;
 // Spells' later steps (see spellStep): what lands after a delay, a telegraph or a flight.
 const stepSlashHit = spellStep('step_slash.hit', x => {
   x.b.addFx('cleaveHeavy', x.f.side, x.f.col + 2 * x.dir, x.f.row, 0.2);
-  x.b.strike(x.f, cellsAhead(x, 2, 3), 80 * x.mult, { spell: true, element: 'steel' });
+  x.b.strike(x.f, cellsAhead(x, 2, 3), 70 * x.mult, { spell: true, element: 'steel' });
 });
-const lungeHit = spellStep('lunge.hit', x => { x.b.strike(x.f, cellsAhead(x, 1, 3), 100 * x.mult, { spell: true, element: 'steel' }); });
+const lungeHit = spellStep('lunge.hit', x => { x.b.strike(x.f, cellsAhead(x, 1, 3), 90 * x.mult, { spell: true, element: 'steel' }); });
 const leapStrikeHit = spellStep('leap_strike.hit', (x, { tc, tr, cells }: { tc: number; tr: number; cells: Cells }) => {
   x.b.addFx('smash', x.f.side, tc, tr, 0.3);
   x.b.shake = 0.2;
-  x.b.strike(x.f, cells, 120 * x.mult, { spell: true, element: 'steel' });
+  x.b.strike(x.f, cells, 105 * x.mult, { spell: true, element: 'steel' });
 });
 const executeHit = spellStep('execute.hit', x => {
   x.b.addFx('smash', x.f.side, x.f.col + x.dir, x.f.row, 0.25);
-  const dmg = (lowHp(x.foe, 0.3) ? 200 : 100) * x.mult;
+  const dmg = (lowHp(x.foe, 0.3) ? 180 : 90) * x.mult;
   x.b.strike(x.f, cellsAhead(x, 1, 2), dmg, { spell: true, element: 'steel' });
 });
 const chainHookHit = spellStep('chain_hook.hit', (x, _a, h: ShotHit) => {
@@ -24,7 +24,7 @@ const chainHookHit = spellStep('chain_hook.hit', (x, _a, h: ShotHit) => {
   if (h.w) { b.hitWall(h.w, 20, x.f, {}); return; }
   if (!t) return;
   const src = b.f[h.p.side];
-  const res = b.damage(t, 20 * x.mult, src, { spell: true, element: 'steel' });
+  const res = b.damage(t, 18 * x.mult, src, { spell: true, element: 'steel' });
   if (res.blocked && !res.dealt) return;
   const front = b.frontCol(t.side);
   if (t.st.noKnock <= 0 && b.canStand(t, front, t.row)) { t.col = front; }
@@ -33,36 +33,36 @@ const chainHookHit = spellStep('chain_hook.hit', (x, _a, h: ShotHit) => {
 });
 const shieldbreakerHit = spellStep('shieldbreaker.hit', x => {
   x.b.addFx('smash', x.f.side, x.f.col + x.dir, x.f.row, 0.3);
-  x.b.strike(x.f, cellsAhead(x, 1, 2), 60 * x.mult, { spell: true, breaks: true, element: 'steel' });
+  x.b.strike(x.f, cellsAhead(x, 1, 2), 55 * x.mult, { spell: true, breaks: true, element: 'steel' });
 });
 const groundSlamHit = spellStep('ground_slam.hit', (x, { col, cells }: { col: number; cells: Cells }) => {
   x.b.addFx('shockwave', x.f.side, col, 1, 0.4);
   x.b.shake = 0.2;
-  x.b.strike(x.f, cells, 60 * x.mult, { spell: true, element: 'steel' });
+  x.b.strike(x.f, cells, 55 * x.mult, { spell: true, element: 'steel' });
   for (let r = 0; r < 3; r++) x.b.panels[col][r].cracked = true;
 });
 const seismicHit = spellStep('seismic_wave.hit', (x, { cells }: { cells: Cells }) => {
   const { b, f } = x;
   for (const [c, rr] of cells) if (b.inGrid(c, rr)) b.addFx('quake', f.side, c, rr, 0.3);
-  b.strike(f, cells, 60 * x.mult, { spell: true, element: 'steel' });
+  b.strike(f, cells, 55 * x.mult, { spell: true, element: 'steel' });
 });
 const rampageHit = spellStep('rampage.hit', x => {
   const { b, f, foe } = x;
   b.addFx('cleaveHeavy', f.side, foe.col, foe.row, 0.18);
-  b.damage(foe, 50 * x.mult, f, { spell: true, element: 'steel', targeted: true });
+  b.damage(foe, 44 * x.mult, f, { spell: true, element: 'steel', targeted: true });
 });
 const shatterHit = spellStep('ground_shatter.hit', (x, { col, cells }: { col: number; cells: Cells }) => {
   const { b, f, foe } = x;
   b.shake = 0.3;
   b.addFx('shockwave', f.side, col, 1, 0.4);
-  b.strike(f, cells, 110 * x.mult, { spell: true, element: 'steel' });
+  b.strike(f, cells, 100 * x.mult, { spell: true, element: 'steel' });
   b.walls = b.walls.filter(w => w.col !== col);
   for (let r = 0; r < 3; r++) b.panels[col][r].hole = 4;
   if (foe.col === col) { if (!b.knockback(foe, 1)) b.relocate(foe); }
 });
 const mortalStrikeHit = spellStep('mortal_strike.hit', x => {
   x.b.addFx('smash', x.f.side, x.f.col + x.dir, x.f.row, 0.25);
-  const res = x.b.strike(x.f, cellsAhead(x, 1, 2), 145 * x.mult, { spell: true, element: 'steel' });
+  const res = x.b.strike(x.f, cellsAhead(x, 1, 2), 130 * x.mult, { spell: true, element: 'steel' });
   if (res.fighter) x.foe.st.mortal = 10;
 });
 const titansFallHit = spellStep('titans_fall.hit', (x, { cells }: { cells: Cells }) => {
@@ -70,13 +70,13 @@ const titansFallHit = spellStep('titans_fall.hit', (x, { cells }: { cells: Cells
   b.shake = 0.5;
   b.cheer = 2;
   for (const [c, r] of cells) { b.addFx('quake', f.side, c, r, 0.4); b.panels[c][r].cracked = true; }
-  b.strike(f, cells, 140 * x.mult, { spell: true, element: 'steel' });
+  b.strike(f, cells, 125 * x.mult, { spell: true, element: 'steel' });
 });
 
 export const warrior: CardDef[] = [
   {
     id: 'step_slash', name: 'Step Slash', cls: 'warrior', cost: 1, rarity: 'common', element: 'steel', damaging: true, lock: 0.55,
-    dmg: '80', short: 'Dash 2 panels forward, slash the panel ahead, snap back.',
+    dmg: '70', short: 'Dash 2 panels forward, slash the panel ahead, snap back.',
     cast: x => {
       lunge(x, x.f.col + 2 * x.dir, x.f.row, 0.12, 0.2, 0.15);
       x.b.later(0.12, stepSlashHit(x));
@@ -91,7 +91,7 @@ export const warrior: CardDef[] = [
   },
   {
     id: 'lunge', name: 'Lunge', cls: 'warrior', cost: 2, rarity: 'common', element: 'steel', damaging: true, lock: 0.45,
-    dmg: '100', short: 'Piercing thrust hits 3 panels in a line ahead. You stay put.',
+    dmg: '90', short: 'Piercing thrust hits 3 panels in a line ahead. You stay put.',
     cast: x => {
       x.b.addFx('thrust', x.f.side, x.f.col, x.f.row, 0.25, { len: 3 });
       x.b.later(0.1, lungeHit(x));
@@ -100,7 +100,7 @@ export const warrior: CardDef[] = [
   },
   {
     id: 'leap_strike', name: 'Leap Strike', cls: 'warrior', cost: 3, rarity: 'uncommon', element: 'steel', damaging: true, lock: 0.8,
-    dmg: '120', short: 'Leap in front of the enemy and smash their panel plus above and below.',
+    dmg: '105', short: 'Leap in front of the enemy and smash their panel plus above and below.',
     cast: x => {
       const tc = x.foe.col, tr = x.foe.row, w = TUNING.warnTime;
       const cells: Array<[number, number]> = [[tc, tr - 1], [tc, tr], [tc, tr + 1]];
@@ -121,7 +121,7 @@ export const warrior: CardDef[] = [
   },
   {
     id: 'execute', name: 'Execute', cls: 'warrior', cost: 3, rarity: 'common', element: 'steel', damaging: true, lock: 0.5,
-    dmg: '100/200', short: 'Heavy strike on the 2 panels ahead. Double damage below 30% HP.',
+    dmg: '90/180', short: 'Heavy strike on the 2 panels ahead. Double damage below 30% HP.',
     cast: x => {
       x.b.later(0.18, executeHit(x));
     },
@@ -129,21 +129,21 @@ export const warrior: CardDef[] = [
   },
   {
     id: 'chain_hook', name: 'Chain Hook', cls: 'warrior', cost: 1, rarity: 'common', element: 'steel', damaging: true, lock: 0.35,
-    dmg: '20', short: 'Chain down your row. On hit: pull them to their front column, stun 2s, gain 1 Rage.',
+    dmg: '18', short: 'Chain down your row. On hit: pull them to their front column, stun 2s, gain 1 Rage.',
     cast: x => {
-      x.b.shoot(x.f, { speed: 14 * x.dir, kind: 'hook', reflectable: true, onHit: chainHookHit(x) });
+      x.b.shoot(x.f, { speed: 12 * x.dir, kind: 'hook', reflectable: true, onHit: chainHookHit(x) });
     },
     ai: (b, f) => sameRow(b, f) && b.foe(f).col !== b.frontCol(b.foe(f).side),
   },
   {
     id: 'war_banner', name: 'War Banner', cls: 'warrior', cost: 2, rarity: 'uncommon', element: 'steel', damaging: true, lock: 0.4,
-    dmg: '10', short: 'Steal the enemy front column for 5s. Anyone there is knocked back.',
+    dmg: '9', short: 'Steal the enemy front column for 5s. Anyone there is knocked back.',
     cast: x => {
       const { b, f, foe } = x;
       const col = b.frontCol(foe.side);
       if (col === b.backCol(foe.side)) { b.text(f, 'NO ROOM', '#bcbcbc'); return; }
       if (foe.col === col) {
-        b.damage(foe, 10 * x.mult, f, { spell: true });
+        b.damage(foe, 9 * x.mult, f, { spell: true });
         if (!b.knockback(foe, 1)) b.relocate(foe);
       }
       for (let r = 0; r < 3; r++) {
@@ -158,7 +158,7 @@ export const warrior: CardDef[] = [
   },
   {
     id: 'shieldbreaker', name: 'Shieldbreaker', cls: 'warrior', cost: 2, rarity: 'common', element: 'steel', damaging: true, lock: 0.7,
-    dmg: '60/120', short: 'Slow hammer on 2 panels ahead. Shatters shields and walls, double dmg on a break.',
+    dmg: '55/110', short: 'Slow hammer on 2 panels ahead. Shatters shields and walls, double dmg on a break.',
     cast: x => {
       x.b.later(0.4, shieldbreakerHit(x));
     },
@@ -176,19 +176,19 @@ export const warrior: CardDef[] = [
   },
   {
     id: 'wide_cleave', name: 'Wide Cleave', cls: 'warrior', cost: 2, rarity: 'uncommon', element: 'steel', damaging: true, lock: 0.45,
-    dmg: '90', short: 'Sweeping slash hits all 3 panels of the enemy front column.',
+    dmg: '80', short: 'Sweeping slash hits all 3 panels of the enemy front column.',
     cast: x => {
       const col = x.b.frontCol(x.foe.side);
       const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
       // BN WideSword: a sword swing lands instantly, no warning
       x.b.addFx('wide', x.f.side, col, 1, 0.3);
-      x.b.strike(x.f, cells, 90 * x.mult, { spell: true, element: 'steel' });
+      x.b.strike(x.f, cells, 80 * x.mult, { spell: true, element: 'steel' });
     },
     ai: (b, f) => b.foe(f).col === b.frontCol(b.foe(f).side),
   },
   {
     id: 'ground_slam', name: 'Ground Slam', cls: 'warrior', cost: 2, rarity: 'uncommon', element: 'steel', damaging: true, lock: 0.45,
-    dmg: '60', short: 'Shockwave hits the enemy front column and cracks those panels.',
+    dmg: '55', short: 'Shockwave hits the enemy front column and cracks those panels.',
     cast: x => {
       const col = x.b.frontCol(x.foe.side);
       const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
@@ -197,7 +197,7 @@ export const warrior: CardDef[] = [
   },
   {
     id: 'seismic_wave', name: 'Seismic Wave', cls: 'warrior', cost: 3, rarity: 'uncommon', element: 'steel', damaging: true, lock: 0.5,
-    dmg: '60 each', short: 'Quake rolls down your row and spreads into a cone of 6 enemy panels.',
+    dmg: '55 each', short: 'Quake rolls down your row and spreads into a cone of 6 enemy panels.',
     cast: x => {
       const { b, f, foe } = x;
       const r = f.row, front = b.frontCol(foe.side), d = x.dir;
@@ -208,7 +208,7 @@ export const warrior: CardDef[] = [
   },
   {
     id: 'rampage', name: 'Rampage', cls: 'warrior', cost: 5, rarity: 'legendary', element: 'steel', damaging: true, lock: 1.3,
-    dmg: '50x3', short: 'Charge the enemy wherever they are: 3 heavy slashes. Cannot be interrupted.',
+    dmg: '44x3', short: 'Charge the enemy wherever they are: 3 heavy slashes. Cannot be interrupted.',
     cast: x => {
       const { b, f, foe } = x;
       f.st.noKnock = 1.4;
@@ -228,7 +228,7 @@ export const warrior: CardDef[] = [
   },
   {
     id: 'ground_shatter', name: 'Ground Shatter', cls: 'warrior', cost: 3, rarity: 'legendary', element: 'steel', damaging: true, lock: 0.5,
-    dmg: '110', short: 'Turn the enemy front column into holes for 4s. 110 to anyone caught.',
+    dmg: '100', short: 'Turn the enemy front column into holes for 4s. 100 to anyone caught.',
     cast: x => {
       const { b, f, foe } = x;
       const col = b.frontCol(foe.side);
@@ -239,10 +239,10 @@ export const warrior: CardDef[] = [
   },
   {
     id: 'shield_slam', name: 'Shield Slam', cls: 'warrior', cost: 0, rarity: 'legendary', element: 'steel', damaging: true, lock: 0.45,
-    dmg: '80', short: 'Bash 2 panels ahead: break shields, stun 2s. Gain 2 Rage on hit.',
+    dmg: '70', short: 'Bash 2 panels ahead: break shields, stun 2s. Gain 2 Rage on hit.',
     cast: x => {
       x.b.addFx('smash', x.f.side, x.f.col + x.dir, x.f.row, 0.25);
-      const res = x.b.strike(x.f, cellsAhead(x, 1, 2), 80 * x.mult, { spell: true, breaks: true, stun: 2, element: 'steel' });
+      const res = x.b.strike(x.f, cellsAhead(x, 1, 2), 70 * x.mult, { spell: true, breaks: true, stun: 2, element: 'steel' });
       if (res.fighter) x.b.gainRage(x.f, 2, true);
     },
     ai: (b, f) => ahead(b, f, 2),
@@ -255,7 +255,7 @@ export const warrior: CardDef[] = [
   },
   {
     id: 'mortal_strike', name: 'Mortal Strike', cls: 'warrior', cost: 3, rarity: 'legendary', element: 'steel', damaging: true, lock: 0.5,
-    dmg: '145', short: 'Heavy hit on 2 panels ahead. Halves enemy healing for 10s.',
+    dmg: '130', short: 'Heavy hit on 2 panels ahead. Halves enemy healing for 10s.',
     cast: x => {
       x.b.later(0.15, mortalStrikeHit(x));
     },
@@ -281,7 +281,7 @@ export const warrior: CardDef[] = [
   },
   {
     id: 'titans_fall', name: "Titan's Fall", cls: 'warrior', cost: 5, rarity: 'mythic', element: 'steel', damaging: true, lock: 1.1,
-    dmg: '140', short: 'Leap into the enemy area and smash all their panels, cracking them. Only blockable.',
+    dmg: '125', short: 'Leap into the enemy area and smash all their panels, cracking them. Only blockable.',
     cast: x => {
       const { b, f, foe } = x;
       const mid = b.frontCol(foe.side) + x.dir;

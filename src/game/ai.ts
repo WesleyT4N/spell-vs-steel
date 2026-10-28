@@ -95,9 +95,11 @@ export class Cpu {
       : f.cls === 'rogue' ? aligned && dist >= 1 && dist <= TUNING.rogue.stabReach
       // Hunter's Mark: the Ranger's shots home in from any row
       : aligned || (f.cls === 'ranger' && foe.st.hunted > 0));
-    // Smite lands a fixed distance ahead, so the Priest only releases its heavy at that range;
+    // Smite finds the enemy in any row within its reach, so the Priest releases its heavy whenever they're that close;
     // the Rogue's Throwing Knife flies down the whole row
-    const heavyReach = f.cls === 'rogue' ? seen && aligned : inReach && (f.cls !== 'priest' || dist === TUNING.priest.smiteRange);
+    const heavyReach = f.cls === 'rogue' ? seen && aligned
+      : f.cls === 'priest' ? b.targetable(foe) && dist >= 1 && dist <= TUNING.priest.smiteRange
+      : inReach;
     const need = heavyChargeOf(f);
     // the press that started the hold never landed (we were flinching or locked): let go, or we'd hold forever
     if (this.holding && !f.charging && f.lock <= 0) this.holding = false;
@@ -149,7 +151,7 @@ export class Cpu {
       // go stand on the most useful blessing we have
       const spot = this.bestBlessing(b, f);
       if (spot) return spot;
-      // otherwise stand where Smite reaches the enemy, inside our own area
+      // otherwise stand where Smite can reach the enemy, inside our own area
       const want = foe.col - TUNING.priest.smiteRange * b.dir(f);
       const lo = Math.min(b.backCol(f.side), b.frontCol(f.side)), hi = Math.max(b.backCol(f.side), b.frontCol(f.side));
       return [Math.max(lo, Math.min(hi, want)), row];

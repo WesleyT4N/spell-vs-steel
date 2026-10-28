@@ -2,7 +2,7 @@
 
 export const TUNING = {
   // re-searched after the CPU stopped freezing up when stunned mid-charge (#45): the HP-only patch closest to the 55-65 wheel at Normal, at Hard and with the starters (scripts/tune.ts)
-  hp: { warrior: 890, mage: 665, rogue: 650, ranger: 695, priest: 630 },
+  hp: { warrior: 965, mage: 690, rogue: 650, ranger: 765, priest: 660 },
 
   /** Seconds for the shared custom gauge to fill. */
   gaugeSeconds: 10,
@@ -27,8 +27,8 @@ export const TUNING = {
   heavyCharge: 1.0,
 
   warrior: {
-    lightDamage: 7,
-    heavyDamage: 32,
+    lightDamage: 10,
+    heavyDamage: 28,
     lightLock: 0.45,
     heavyLock: 0.4,
     rageMax: 5,
@@ -40,6 +40,8 @@ export const TUNING = {
   },
 
   mage: {
+    /** Arcane Orb and Beam flight speed (panels per second, capped by maxShotSpeed). */
+    shotSpeed: 14,
     lightDamage: 6,
     heavyDamage: 28,
     lightLock: 0.4,
@@ -52,9 +54,11 @@ export const TUNING = {
 
   // Draft classes (Rogue, Ranger, Priest): basics follow the same x0.7 scale as Warrior and Mage.
   rogue: {
+    /** Throwing Knife flight speed (panels per second, capped by maxShotSpeed). */
+    shotSpeed: 12,
     /** Light: a dagger stab that hits every panel up to `stabReach` ahead. Heavy: a throwing knife down the row. */
     // light 12 / 650 HP: sims put the Rogue near 60% vs Mage and 40% vs Warrior (2026-10-25)
-    lightDamage: 12,
+    lightDamage: 10,
     heavyDamage: 22,
     stabReach: 1,
     lightLock: 0.35,
@@ -70,11 +74,13 @@ export const TUNING = {
   },
 
   ranger: {
-    /** Light: a travel-time Arrow (panels per second). Heavy: an instant Aimed Shot on the normal charge. */
+    /** Light: a travel-time Arrow (panels per second). Heavy: an Aimed Shot on the normal charge, flying at aimedSpeed. */
     // heavy 20 / 740 HP: sims put the Ranger at ~39% vs Warrior, ~63% vs Mage, ~60% vs Rogue (2026-10-25)
-    lightDamage: 8,
+    lightDamage: 10,
     heavyDamage: 20,
-    arrowSpeed: 14,
+    arrowSpeed: 12,
+    /** Aimed Shot, the sniper shot: the one projectile allowed past maxShotSpeed (Wes). */
+    aimedSpeed: 15,
     lightLock: 0.4,
     heavyLock: 0.4,
     /** Steady Focus: damage multiplier while rooted. */
@@ -87,16 +93,17 @@ export const TUNING = {
   },
 
   priest: {
+    /** Holy Spark flight speed (panels per second, capped by maxShotSpeed). */
+    shotSpeed: 12,
     lightDamage: 6,
-    // Smite at 28 flinches like the Mage heavy; sims at 700 HP (1000 matches each): ~66% vs Warrior, ~53% vs Mage, ~45% vs Rogue, ~42% vs Ranger (2026-10-25)
+    // Smite at 28 flinches (threshold 20 since 2026-10-28); it finds the enemy within smiteRange columns
     heavyDamage: 28,
     lightLock: 0.4,
     heavyLock: 0.5,
-    /** Smite lands this many panels ahead and heals the Priest on a hit. */
+    /** Smite finds the enemy within this many columns (any row); farther away it lands this many panels ahead and misses. */
     smiteRange: 3,
     holyWallHp: 100,
     holyWallTime: 6,
-    smiteHeal: 10,
     smiteKnock: 0,
     manaStart: 3,
     manaPerDraw: 3,
@@ -120,7 +127,7 @@ export const TUNING = {
   poisonSeconds: 6,
   poisonMaxStacks: 3,
   /** Healing blessed panels (Sanctuary, Sacred Ground) heal their owner this much per second. */
-  blessHps: 12,
+  blessHps: 16,
 
   /** Frost Nova hits an enemy within this many columns of the caster. */
   frostNovaRange: 3,
@@ -129,8 +136,18 @@ export const TUNING = {
   /** Frozen or stunned targets take this multiplier from all sources. */
   frozenBonus: 1.5,
   /** Hits this big make the target flinch (cancels charging, brief lockout). */
-  flinchThreshold: 28,
+  flinchThreshold: 20,
   flinchTime: 0.3,
+  /** No projectile flies faster than this (panels per second), so every shot can be read and dodged. */
+  maxShotSpeed: 15,
+  /** Hit pause: the whole fight stops this long on a hit, by tier (light, solid, big, K.O.). BN-style weight. */
+  hitStop: [0.045, 0.105, 0.165, 0.375],
+  /** Hits this soon after a pause don't pause again (unless they K.O.), so a flurry doesn't stutter. */
+  hitStopGap: 0.18,
+  /** Big hits (and K.O.s) slow the fight to this speed for a moment. */
+  slowmo: { speed: 0.3, big: 0.525, ko: 1.35 },
+  /** Effect animations play this much longer than they're timed (looks only, the rules keep their timing). */
+  fxSlow: 1.25,
   /** Burning panels tick this often (seconds). */
   burnTick: 0.5,
 

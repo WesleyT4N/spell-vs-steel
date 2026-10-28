@@ -143,7 +143,7 @@ export const ranger: CardDef[] = [
   {
     id: 'multi_shot', name: 'Multi-Shot', cls: 'ranger', cost: 2, rarity: 'common', element: 'steel', damaging: true, lock: 0.35,
     dmg: '50', short: 'Three arrows, one down each row.',
-    cast: x => { for (let r = 0; r < 3; r++) arrow(x, 'arrow', 14, multiShotHit(x), 50, r); },
+    cast: x => { for (let r = 0; r < 3; r++) arrow(x, 'arrow', 12, multiShotHit(x), 50, r); },
   },
   {
     id: 'call_wolf', name: 'Call Wolf', cls: 'ranger', cost: 2, rarity: 'common', element: 'nature', damaging: true, lock: 0.3,
@@ -224,7 +224,7 @@ export const ranger: CardDef[] = [
   {
     id: 'explosive_shot', name: 'Explosive Shot', cls: 'ranger', cost: 3, rarity: 'legendary', element: 'fire', damaging: true, lock: 0.35,
     dmg: '40+120', short: 'Arrow down your row sticks to the enemy and explodes 2s later on them and around them.',
-    cast: x => arrow(x, 'arrow', 16, explosiveHit(x)),
+    cast: x => arrow(x, 'arrow', 12, explosiveHit(x)),
     ai: (b, f) => sameRow(b, f),
   },
   {
@@ -241,7 +241,7 @@ export const ranger: CardDef[] = [
   {
     id: 'wyvern_sting', name: 'Wyvern Sting', cls: 'ranger', cost: 2, rarity: 'legendary', element: 'poison', damaging: false, lock: 0.3,
     dmg: '-', short: 'Arrow down your row puts the enemy to sleep for 3s. Any damage wakes them (+50%).',
-    cast: x => arrow(x, 'sting', 16, stingHit(x)),
+    cast: x => arrow(x, 'sting', 12, stingHit(x)),
     ai: (b, f) => sameRow(b, f),
   },
   {

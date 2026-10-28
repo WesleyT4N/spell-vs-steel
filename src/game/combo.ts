@@ -1,5 +1,5 @@
 // True combos: a run of hits where every hit after the first lands while the target can't act.
-// "Can't act" means frozen, stunned, asleep, or in hitstun (the flinch after a hit of 28+ damage).
+// "Can't act" means frozen, stunned, asleep, or in hitstun (the flinch after a hit of flinchThreshold (20)+ damage).
 // Knockback only counts through the flinch that comes with it; roots, silences and slows don't count,
 // since a rooted or silenced fighter can still fight back.
 // Display only: the battle reports its hits here, and nothing in the rules reads it back,

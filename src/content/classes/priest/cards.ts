@@ -44,38 +44,38 @@ const column = (f: Fighter): Array<[number, number]> => [[f.col, 0], [f.col, 1],
 const row = (f: Fighter): Array<[number, number]> => [[0, f.row], [1, f.row], [2, f.row], [3, f.row], [4, f.row], [5, f.row]];
 
 // Spells' later steps (see spellStep): what lands after a delay or a telegraph.
-const penanceBolt = spellStep('penance.bolt', (x, { noFlinch }: { noFlinch: boolean }) => { zap(x, 25, 'holy', noFlinch); });
-const hymnTick = spellStep('divine_hymn.tick', x => { x.b.heal(x.f, 50); x.b.addFx('healBurst', x.f.side, x.f.col, x.f.row, 0.4); });
-const haloBolt = spellStep('halo.bolt', x => { if (!x.f.dead) zap(x, 15, 'holy', true); });
+const penanceBolt = spellStep('penance.bolt', (x, { noFlinch }: { noFlinch: boolean }) => { zap(x, 27, 'holy', noFlinch); });
+const hymnTick = spellStep('divine_hymn.tick', x => { x.b.heal(x.f, 60); x.b.addFx('healBurst', x.f.side, x.f.col, x.f.row, 0.4); });
+const haloBolt = spellStep('halo.bolt', x => { if (!x.f.dead) zap(x, 16, 'holy', true); });
 const wrathHit = spellStep('wrath_of_heaven.hit', (x, { cells }: { cells: Array<[number, number]> }) => {
   const { b, f } = x;
   b.shake = 0.4; b.cheer = 2;
   for (const [c, r] of cells) b.addFx('holyPillar', f.side, c, r, 0.45);
-  b.strike(f, cells, 80 * x.mult, { spell: true, element: 'holy' });
+  b.strike(f, cells, 85 * x.mult, { spell: true, element: 'holy' });
 });
 
 export const priest: CardDef[] = [
   // Commons
   {
     id: 'prayer', name: 'Prayer', cls: 'priest', cost: 0, rarity: 'common', element: 'holy', damaging: false, lock: 0.2,
-    dmg: '-', short: 'Gain 1 Mana now and heal 20.', gain: { res: 1 },
-    cast: x => { x.b.gainRes(x.f, 1); x.b.heal(x.f, 20); },
+    dmg: '-', short: 'Gain 1 Mana now and heal 30.', gain: { res: 1 },
+    cast: x => { x.b.gainRes(x.f, 1); x.b.heal(x.f, 30); },
   },
   {
     id: 'flash_heal', name: 'Flash Heal', cls: 'priest', cost: 1, rarity: 'common', element: 'holy', damaging: false, lock: 0.25,
-    dmg: '-', short: 'Heal 40 instantly.',
-    cast: x => { x.b.addFx('healBurst', x.f.side, x.f.col, x.f.row, 0.4); x.b.heal(x.f, 40); },
-    ai: (_b, f) => hurt(f, 40),
+    dmg: '-', short: 'Heal 60 instantly.',
+    cast: x => { x.b.addFx('healBurst', x.f.side, x.f.col, x.f.row, 0.4); x.b.heal(x.f, 60); },
+    ai: (_b, f) => hurt(f, 60),
   },
   {
     id: 'holy_fire', name: 'Holy Fire', cls: 'priest', cost: 2, rarity: 'common', element: 'holy', damaging: true, lock: 0.3,
-    dmg: '50', short: 'Instant holy flame on the enemy wherever they are.',
-    cast: x => { zap(x, 50, 'holy'); },
+    dmg: '55', short: 'Instant holy flame on the enemy wherever they are.',
+    cast: x => { zap(x, 55, 'holy'); },
     ai: canPick,
   },
   {
     id: 'penance', name: 'Penance', cls: 'priest', cost: 2, rarity: 'common', element: 'holy', damaging: true, lock: 0.45,
-    dmg: '25x3', short: 'Three holy bolts that hit the enemy wherever they are.',
+    dmg: '27x3', short: 'Three holy bolts that hit the enemy wherever they are.',
     cast: x => { for (let i = 0; i < 3; i++) x.b.later(i * 0.15, penanceBolt(x, { noFlinch: i < 2 })); },
     ai: canPick,
   },
@@ -91,7 +91,7 @@ export const priest: CardDef[] = [
   },
   {
     id: 'sanctuary', name: 'Sanctuary', cls: 'priest', cost: 2, rarity: 'common', element: 'holy', damaging: false, lock: 0.3,
-    dmg: '12 HP/s', short: 'Bless your column until the Draw. Heal 12 per second while on it.',
+    dmg: '16 HP/s', short: 'Bless your column until the Draw. Heal 16 per second while on it.',
     cast: x => blessCells(x, column(x.f), 'heal'),
   },
   {
@@ -124,13 +124,13 @@ export const priest: CardDef[] = [
   },
   {
     id: 'holy_nova', name: 'Holy Nova', cls: 'priest', cost: 2, rarity: 'uncommon', element: 'holy', damaging: true, lock: 0.35,
-    dmg: '40', short: 'Light bursts on every panel around you, enemy panel in front included. Knockback.',
+    dmg: '44', short: 'Light bursts on every panel around you, enemy panel in front included. Knockback.',
     cast: x => {
       const { b, f } = x;
       const cells: Array<[number, number]> = [];
       for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) if ((dc || dr) && b.inGrid(f.col + dc, f.row + dr)) cells.push([f.col + dc, f.row + dr]);
       b.addFx('holyNova', f.side, f.col, f.row, 0.45);
-      b.strike(f, cells, 40 * x.mult, { spell: true, element: 'holy', knockback: true });
+      b.strike(f, cells, 44 * x.mult, { spell: true, element: 'holy', knockback: true });
     },
     ai: (b, f) => Math.abs(b.foe(f).col - f.col) <= 1 && Math.abs(b.foe(f).row - f.row) <= 1,
   },
@@ -142,8 +142,8 @@ export const priest: CardDef[] = [
   },
   {
     id: 'hex', name: 'Hex', cls: 'priest', cost: 2, rarity: 'uncommon', element: 'shadow', damaging: true, lock: 0.3,
-    dmg: '20', short: 'Hits the enemy wherever they are and Weakens them (-25% damage) for 6s.',
-    cast: x => { if (zap(x, 20, 'shadow')) { x.foe.st.weakened = Math.max(x.foe.st.weakened, 6); x.b.text(x.foe, 'WEAKENED', '#9878f8'); } },
+    dmg: '22', short: 'Hits the enemy wherever they are and Weakens them (-25% damage) for 6s.',
+    cast: x => { if (zap(x, 22, 'shadow')) { x.foe.st.weakened = Math.max(x.foe.st.weakened, 6); x.b.text(x.foe, 'WEAKENED', '#9878f8'); } },
     ai: canPick,
   },
   {
@@ -154,7 +154,7 @@ export const priest: CardDef[] = [
   // Legendaries
   {
     id: 'divine_hymn', name: 'Divine Hymn', cls: 'priest', cost: 5, rarity: 'legendary', element: 'holy', damaging: false, lock: 0.2,
-    dmg: '300 heal', short: 'Channel for 3s (no moving or attacking, cannot be knocked back). Heal 100 per second.',
+    dmg: '360 heal', short: 'Channel for 3s (no moving or attacking, cannot be knocked back). Heal 120 per second.',
     cast: x => {
       x.f.st.channel = 3; x.f.st.noKnock = 3;
       overTime(x.b, 3, 0.5, hymnTick(x));
@@ -178,36 +178,36 @@ export const priest: CardDef[] = [
   },
   {
     id: 'sacred_ground', name: 'Sacred Ground', cls: 'priest', cost: 3, rarity: 'legendary', element: 'holy', damaging: false, lock: 0.3,
-    dmg: '12 HP/s', short: 'Bless every panel of your area until the Draw. Heal 12 per second on them.',
+    dmg: '16 HP/s', short: 'Bless every panel of your area until the Draw. Heal 16 per second on them.',
     cast: x => blessCells(x, ownPanels(x.b, x.f), 'heal'),
   },
   {
     id: 'psychic_scream', name: 'Psychic Scream', cls: 'priest', cost: 3, rarity: 'legendary', element: 'shadow', damaging: true, lock: 0.3,
-    dmg: '20', short: 'Knock the enemy to their back column and stun them for 2s.',
+    dmg: '22', short: 'Knock the enemy to their back column and stun them for 2s.',
     cast: x => {
       const { b, f, foe } = x;
       if (!b.targetable(foe)) { b.text(foe, 'MISS', '#bcbcbc'); return; }
       b.addFx('shout', f.side, f.col, f.row, 0.5);
       b.knockback(foe, 3);
-      b.damage(foe, 20 * x.mult, f, { spell: true, element: 'shadow', stun: 2 });
+      b.damage(foe, 22 * x.mult, f, { spell: true, element: 'shadow', stun: 2 });
     },
     ai: (b, f) => canPick(b, f) && Math.abs(b.foe(f).col - f.col) <= 2,
   },
   {
     id: 'shadow_word_death', name: 'Shadow Word: Death', cls: 'priest', cost: 4, rarity: 'legendary', element: 'shadow', damaging: true, lock: 0.3,
-    dmg: '60/180', short: 'Shadow damage wherever the enemy is: 60, or 180 if they are under 25% HP.',
-    cast: x => { zap(x, lowHp(x.foe, 0.25) ? 180 : 60, 'shadow'); },
+    dmg: '65/195', short: 'Shadow damage wherever the enemy is: 65, or 195 if they are under 25% HP.',
+    cast: x => { zap(x, lowHp(x.foe, 0.25) ? 195 : 65, 'shadow'); },
     ai: (b, f) => canPick(b, f) && lowHp(b.foe(f), 0.25),
   },
   {
     id: 'halo', name: 'Halo', cls: 'priest', cost: 4, rarity: 'legendary', element: 'holy', damaging: true, lock: 0.25,
-    dmg: '15x8', short: 'A ring of light circles you for 8s, firing a bolt at the enemy every second.',
+    dmg: '16x8', short: 'A ring of light circles you for 8s, firing a bolt at the enemy every second.',
     cast: x => { x.f.st.halo = 8; overTime(x.b, 8, 1, haloBolt(x)); },
   },
   // Mythics
   {
     id: 'wrath_of_heaven', name: 'Wrath of Heaven', cls: 'priest', cost: 5, rarity: 'mythic', element: 'holy', damaging: true, lock: 0.4,
-    dmg: '80 each', short: 'After 1.5s, pillars of light hit all 9 enemy panels.',
+    dmg: '85 each', short: 'After 1.5s, pillars of light hit all 9 enemy panels.',
     cast: x => {
       const { b, f } = x;
       const cells = allEnemyPanels(b, f.side);
