@@ -68,13 +68,17 @@ jobs:
         run: npm run build:prod
       - name: Copy the game into the Android project
         run: npx cap sync android
-      # the runner image has the Android SDK; the APK is signed with the play-test key in android/app
+      # the runner image has the Android SDK; the APK is signed with the play-test key from the repo secrets
       - name: Build the APK
         working-directory: android
         env:
           SVS_VERSION_CODE: ${{ github.run_number }}
+          SVS_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          SVS_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           v="${TAG#v}"; export SVS_VERSION="${v:-0.0.0}"
+          if [ -n "$SVS_KEYSTORE_B64" ]; then echo "$SVS_KEYSTORE_B64" | base64 -d > app/playtest.keystore
+          else echo "::warning::ANDROID_KEYSTORE_B64 is not set; the APK gets a throwaway debug key and won't install over older ones"; fi
           ./gradlew assembleDebug --no-daemon
       - name: Name the APK
         run: |
