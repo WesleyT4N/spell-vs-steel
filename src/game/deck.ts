@@ -286,11 +286,17 @@ export function renameCustom(cls: ClassId, id: string, name: string): string | n
   return free;
 }
 
-/** A copy of a saved deck, just after it in the list ("NAME COPY"). Null when the class is full. */
-export function cloneCustom(cls: ClassId, id: string): SavedDeck | null {
+/** The name a copy of a deck gets unless the player picks one: "NAME COPY". */
+export function copyName(cls: ClassId, name: string): string {
+  const tail = ' COPY';
+  return freeDeckName(cls, name.slice(0, DECK_NAME_MAX - tail.length).trimEnd() + tail);
+}
+
+/** A copy of a saved deck, just after it in the list (named `name`, or "NAME COPY"). Null when the class is full. */
+export function cloneCustom(cls: ClassId, id: string, name?: string): SavedDeck | null {
   const src = getCustom(cls, id);
   if (!src) return null;
-  const tail = ' COPY', made = createCustom(cls, src.name.slice(0, DECK_NAME_MAX - tail.length).trimEnd() + tail, src.cards);
+  const made = createCustom(cls, name ?? copyName(cls, src.name), src.cards);
   if (!made) return null;
   // sit next to the original
   writeDecks(cls, l => { const rest = l.filter(d => d.id !== made.id); rest.splice(rest.findIndex(d => d.id === id) + 1, 0, made); return rest; });
