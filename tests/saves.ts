@@ -7,6 +7,8 @@ import {
 import { customDecks, createCustom, saveCustom, renameCustom, cloneCustom, deleteCustom, MAX_CUSTOM_DECKS, DECK_NAME_MAX } from '../src/game/deck';
 import { loadMatch, sideDeck, deckLabel } from '../src/game/match';
 import { loadRecords } from '../src/game/arcade';
+import { loadProfile, recordSet, total, favoriteClass, favoriteDeck } from '../src/game/profile';
+import type { Replay } from '../src/game/replay';
 
 let failed = 0;
 function check(name: string, ok: boolean, detail = ''): void {
@@ -97,11 +99,12 @@ async function main(): Promise<void> {
   check('bad deck entries dropped', same(getSave('decks').mage.map(d => d.name), ['A']) && !('rogue' in getSave('decks')));
 
   // ---- version 1 -> 2: the one custom deck per class becomes the first of a list, and the match setup follows ----
-  const v1 = { decks: { warrior: { step_slash: 4, guard: 2 }, mage: {} }, match: { p1: 'warrior', p1Deck: 'custom', cpu: 'mage', cpuDeck: 'custom' } };
+  const v1 = { decks: { warrior: { step_slash: 4, guard: 2 }, mage: {} }, match: { p1: 'warrior', p1Deck: 'custom', cpu: 'mage', cpuDeck: 'custom' }, profile: { decks: { 'warrior|custom': 3, 'mage|custom': 1, 'mage|starter': 2 } } };
   resetSaveForTests({ 'save.json': JSON.stringify({ game: 'spell-vs-steel', v: 1, data: v1 }) });
   check('v1 deck migrated', same(getSave('decks').warrior, [{ id: 'd1', name: 'MY SPELL DECK', cards: { step_slash: 4, guard: 2 } }]) && !('mage' in getSave('decks')));
   check('v1 match deck migrated', loadMatch().p1Deck === 'custom:d1' && loadMatch().cpuDeck === 'starter');
   check('migrated deck label', deckLabel('warrior', 'custom:d1') === 'MY SPELL DECK');
+  check('v1 profile deck counts migrated', same(getSave('profile')?.decks, { 'warrior|custom:d1': 3, 'mage|starter': 3 }));
 
   // ---- many decks per class: create, rename, clone, delete ----
   resetSaveForTests();
@@ -141,6 +144,28 @@ async function main(): Promise<void> {
   const big = Array.from({ length: 10 }, (_, i) => ({ ...rep(i), pad: 'x'.repeat(1000) }));
   const fit = capReplays(big, 5000);
   check('size budget drops the oldest unkept', fit.length === 4 && fit[fit.length - 1].id === 'r6', fit.map(r => r.id).join());
+
+  // ---- player profile: finished sets only, from the recording player's side; old saves start from their replays ----
+  resetSaveForTests();
+  const set = (id: string, mode: Replay['mode'], me: 0 | 1 | null, mine: string, wins: Array<0 | 1 | null>, bestOf = 3): Replay => {
+    const specs = me === 1 ? [{ cls: 'mage' }, { cls: mine }] : [{ cls: mine }, { cls: 'mage' }];
+    return { id, v: 0, at: 5000, mode, me, bestOf, stage: 'plains', rounds: wins.map(w => ({ specs, winner: w })) } as unknown as Replay;
+  };
+  setReplays([set('o1', 'cpu', 0, 'warrior', [0, 0]), set('o2', 'online', 1, 'rogue', [0, 1, 0]), set('o3', 'cpu', 0, 'warrior', [0]), set('o4', 'versus', null, 'priest', [0, 0])]);
+  const seeded = loadProfile();
+  check('profile seeded from replays', same(seeded.classes, { warrior: { w: 1, l: 0 }, rogue: { w: 0, l: 1 } }) && same(seeded.modes, { cpu: { w: 1, l: 0 }, online: { w: 0, l: 1 } }), JSON.stringify(seeded));
+  const now = set('n1', 'ranked', 1, 'priest', [1, null, 1]);
+  setReplays([...getReplays(), now]);
+  recordSet(now, 'starter');
+  recordSet(set('n2', 'arcade', 0, 'warrior', [1, 0], 3), 'custom');
+  recordSet(set('n3', 'cpu', 0, 'warrior', [1, 1]), 'custom');
+  recordSet(set('n4', 'watch', null, 'mage', [0, 0]), 'starter');
+  const pr = loadProfile();
+  check('set results counted once', same(pr.classes, { warrior: { w: 1, l: 1 }, rogue: { w: 0, l: 1 }, priest: { w: 1, l: 0 } }) && same(total(pr), { w: 2, l: 2 }), JSON.stringify(pr.classes));
+  check('profile modes', same(pr.modes.ranked, { w: 1, l: 0 }) && same(pr.modes.cpu, { w: 1, l: 1 }) && pr.modes.arcade === undefined);
+  check('favorites', favoriteClass(pr) === 'warrior' && same(favoriteDeck(pr), { cls: 'warrior', deck: 'custom', n: 1 }), JSON.stringify(pr.decks));
+  resetSaveForTests({ 'save.json': '{"game":"spell-vs-steel","v":1,"data":{"profile":{"classes":{"mage":{"w":-1,"l":2},"rogue":{"w":3,"l":4}},"decks":{"mage|starter":"lots"}}}}' });
+  check('hand-edited profile checked', same(loadProfile(), { classes: { rogue: { w: 3, l: 4 } }, modes: {}, decks: {} }));
 
   console.log(failed ? `\n${failed} save check(s) failed` : '\nall save checks passed');
   process.exit(failed ? 1 : 0);

@@ -50,5 +50,5 @@ flowchart TD
 - Replays: 20 most recent + up to 20 starred, and the oldest unstarred go first if the file passes ~3 MB. Enforced in `setReplays`.
 - Old keys imported once: `svs:keys`, `svs:p2keys`, `svs:pads`, `svs:audio`, `svs:muted`, `svs:deck:<class>`, `svs:match`, `svs:training`, `svs:tutorial`, `svs:arcade`, `svs:replays`, `svs:rating`, `svs:ranked-pending`, `svs:lab:script`, `svs:touch`.
 - `svs:touch` (touch controls) was its own key for a short while after `save.json` existed, so it is also taken in when a save has no `touch` section yet, then removed.
-- Versions so far: 1 is the first save.json; 2 (#77) turned the one custom deck per class into a list of named decks (`{ id, name, cards }`) and moved a match setup's `'custom'` deck to `'custom:<id>'`.
+- Versions so far: 1 is the first save.json; 2 (#78) turned the one custom deck per class into a list of named decks (`{ id, name, cards }`) and moved a match setup's `'custom'` deck to `'custom:<id>'`.
 - A new section that defaults to empty (like `touch`) needs no version bump: older saves just get the default, and older builds ignore it.

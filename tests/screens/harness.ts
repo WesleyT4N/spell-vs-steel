@@ -27,7 +27,11 @@ import { PLAYABLE } from '../../src/game/classes';
 import { SKINS, type ClassId } from '../../src/art/sprites';
 import { LobbyScene } from '../../src/scenes/lobby';
 import { RankedScene } from '../../src/scenes/ranked';
-import { ReplaysScene } from '../../src/scenes/replays';
+import { ReplaysScene, ReplayScene } from '../../src/scenes/replays';
+import { ProfileScene } from '../../src/scenes/profile';
+import { Battle, type Intent } from '../../src/game/battle';
+import { Cpu } from '../../src/game/ai';
+import { TapeWriter } from '../../src/game/replay';
 import { TournamentScene } from '../../src/scenes/tournament';
 import { tournaments, type Bracket } from '../../src/net/tournament';
 import { lobbyId, type Lobby, type Here } from '../../src/net/lobby';
@@ -112,6 +116,40 @@ function fakeReplay(id: string, mode: Replay['mode'], a: ClassId, b: ClassId, wi
   const rounds = wins.map((w, i) => ({ seed: i, specs, frames: [], events: [], n: 3600 + i * 1700, hash: 0, winner: w }));
   return { id, v: 0, at: AT - ago * 3600_000, mode, me: 0, bestOf: wins.length > 1 ? 3 : 1, stage: 'plains', rounds, keep } as unknown as Replay;
 }
+/** A real recorded round (CPU vs CPU, warrior against mage), `secs` of fighting long, to play back. */
+function recordedReplay(secs = 40): Replay {
+  const deck = (c: ClassId): string[] => toList(presetDeck(c, 'starter'));
+  const b = new Battle({ cls: 'warrior', deck: deck('warrior'), name: 'YOU' }, { cls: 'mage', deck: deck('mage'), name: 'RIVAL' }, 1234);
+  const w = new TapeWriter(b), cpus = [new Cpu('hard'), new Cpu('hard')];
+  for (let f = 0; f < secs * 60 && b.phase !== 'over'; f++) {
+    if (b.phase === 'custom') { const picks: [number[], number[]] = [cpus[0].pick(b, b.f[0]), cpus[1].pick(b, b.f[1])]; w.endCustom(picks); b.endCustom(picks); }
+    if (b.canOpenCustom() && f % 900 === 899) { w.beginCustom(); b.beginCustom(); continue; }
+    const ins: [Intent, Intent] = [cpus[0].intent(b, b.f[0], STEP), cpus[1].intent(b, b.f[1], STEP)];
+    w.update(ins);
+    b.update(STEP, ins);
+  }
+  return { id: 'rw', v: 0, at: AT, mode: 'cpu', me: 0, bestOf: 3, stage: 'plains', rounds: [w.finish()] } as unknown as Replay;
+}
+function fakeProfile(empty: boolean): ProfileScene {
+  const s = new ProfileScene();
+  s.enter = () => {};
+  if (empty) {
+    s.profile = { classes: {}, modes: {}, decks: {} };
+    s.rating = { rating: 1000, games: 0, wins: 0, losses: 0 };
+    s.arcade = {};
+    s.replays = 0;
+    return s;
+  }
+  s.profile = {
+    classes: { warrior: { w: 21, l: 9 }, mage: { w: 7, l: 8 }, rogue: { w: 2, l: 4 }, priest: { w: 5, l: 1 } },
+    modes: { cpu: { w: 14, l: 6 }, arcade: { w: 9, l: 3 }, online: { w: 4, l: 6 }, ranked: { w: 8, l: 7 } },
+    decks: { 'warrior|starter': 18, 'warrior|custom': 9, 'mage|starter': 15 },
+  };
+  s.rating = { rating: 1284, games: 15, wins: 8, losses: 7 };
+  s.arcade = { warrior: { time: 754, continues: 0 }, mage: { time: 1022, continues: 2 } };
+  s.replays = 9;
+  return s;
+}
 function fakeTournament(state: Bracket['state']): TournamentScene {
   const me = lobbyId();
   const b: Bracket = state === 'open'
@@ -149,7 +187,21 @@ function fakeNet(matched = true, as: 'host' | 'guest' = 'host'): NetSession {
   const onB = b.cb!;
   b.cb = p => { onB(p); guest.tick(); };
   host.tick();
+  RIVAL_NET.set(host, guest);
   return host;
+}
+/** The rival's own session behind a fakeNet(), to answer for them. */
+const RIVAL_NET = new WeakMap<NetSession, NetSession>();
+/** An online best of 3 you just won 2-0, on its results screen; `rival` is what the rival picked there first. */
+function onlineSetOver(rival: 'rematch' | 'change' | null = null): OnlineBattleScene {
+  const net = fakeNet(), them = RIVAL_NET.get(net)!;
+  const s = new OnlineBattleScene(net, [1, 0], 2);
+  setScene(s);
+  run(0.2);
+  s.b.phase = 'over'; s.b.winner = 0; s.ended = true; s.score[0]++; s.rounds.push(roundRecord(s.b, s.stats));
+  if (rival) { them.myReady = 3; if (rival === 'change') them.myRepick = 3; them.tick(); }
+  run(0.5);
+  return s;
 }
 const loadMatchDeck = (cls: ClassId = 'warrior'): string[] => toList(presetDeck(cls, 'starter'));
 
@@ -228,6 +280,11 @@ const screens: Record<string, () => void> = {
     s.b.phase = 'over'; s.b.winner = 0; s.ended = true; s.score[0]++; s.rounds.push(roundRecord(s.b, s.stats));
     run(0.5);
   },
+  // a set decided: the rival asked for a rematch first; you asked to change fighters and wait on the rival;
+  // and both agreed to change fighters, so it's back to the character select in the same room
+  'online-rematch': () => onlineSetOver('rematch'),
+  'online-rematch-waiting': () => { const s = onlineSetOver(); s.waitingNext = true; s.net.myRepick = s.net.myReady = 3; s.resultSel = 1; run(0.2); },
+  'online-rematch-repick': () => { const s = onlineSetOver('change'); s.waitingNext = true; s.net.myReady = 3; run(0.3); },
   // a ready-made deck's spells open over the start-from picker (on phones in portrait; wider screens list it on hover)
   'deck-builder-peek': () => { const d = new DeckBuilderScene('ranger', title); (d as unknown as { peek: number; pickSel: number }).peek = 1; (d as unknown as { pickSel: number }).pickSel = 1; setScene(d); },
   ...Object.fromEntries(PLAYABLE.map(c => [`deck-builder-${c}`, () => setScene(new DeckBuilderScene(c, title))])),
@@ -314,6 +371,16 @@ const screens: Record<string, () => void> = {
     setScene(s);
   },
   'replays-empty': () => { const s = new ReplaysScene(); s.list = []; setScene(s); },
+  'profile': () => setScene(fakeProfile(false)),
+  'profile-empty': () => setScene(fakeProfile(true)),
+  // watching a replay, and paused in slow motion
+  'replay-watch': () => { setScene(new ReplayScene(recordedReplay())); run(8); },
+  'replay-paused': () => {
+    const s = new ReplayScene(recordedReplay());
+    setScene(s);
+    run(8);
+    Object.assign(s, { speed: 0, halt: true });
+  },
   // open tournaments to join, and an 8-player bracket a round in
   'tournament-browse': () => setScene(fakeTournament('open')),
   'tournament-bracket': () => setScene(fakeTournament('live')),

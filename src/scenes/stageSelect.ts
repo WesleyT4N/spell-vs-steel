@@ -115,7 +115,7 @@ export class StageSelectScene implements Scene {
   private start(): void {
     useStage(this.final!);
     // the fight takes this screen's place: leaving it goes back to the character select
-    if (this.net) { replaceScene(new OnlineBattleScene(this.net, [0, 0], 1)); return; }
+    if (this.net) { replaceScene(new OnlineBattleScene(this.net, [0, 0], this.net.setStart)); return; }
     replaceScene(new BattleScene(this.m, [0, 0], undefined, [], this.m.sides));
   }
 
@@ -132,7 +132,8 @@ export class StageSelectScene implements Scene {
       // both votes in: settle it, the same way on both machines
       if (!this.final && net.lobby.voted && rl?.voted) {
         const host = net.side === 0 ? net.lobby.stage : rl.stage, guest = net.side === 0 ? rl.stage : net.lobby.stage;
-        const res = resolveStage(net.start!.seed, host, guest);
+        // a rematch with new picks rolls a fresh roulette (the first set keeps the match seed)
+        const res = resolveStage((net.start!.seed ^ Math.imul(net.setStart - 1, 0x9e3779b9)) >>> 0, host, guest);
         this.final = res.stage;
         preloadMusic(stageTrack(this.final));
         this.swing = res.votes[0] !== res.votes[1] ? res.votes : null;
@@ -155,8 +156,8 @@ export class StageSelectScene implements Scene {
       }
       if (this.t >= ROULETTE + REVEAL) {
         if (!net) { this.start(); return; }
-        if (net.myReady === 0) net.myReady = 1;
-        if (net.remoteReady >= 1) { this.start(); return; }
+        if (net.myReady < net.setStart) net.myReady = net.setStart;
+        if (net.remoteReady >= net.setStart) { this.start(); return; }
       }
       return;
     }

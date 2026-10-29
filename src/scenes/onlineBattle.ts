@@ -1,5 +1,6 @@
 // An online round: the Versus scene, driven by rollback netcode (src/net/netplay.ts) instead of a CPU.
-import { replaceScene, goHome, dim, hint, resetSel } from './scene';
+import { replaceScene, popTo, goHome, dim, hint, resetSel } from './scene';
+import { CharSelectScene } from './select';
 import { BattleScene } from './battle';
 import { Battle, heavyChargeOf, type Side } from '../game/battle';
 import { loadMatch } from '../game/match';
@@ -11,7 +12,7 @@ import type { NetSession } from '../net/session';
 import { roundRecord, type RoundRecord } from '../game/stats';
 import { replayScore, type Replay, type ReplayMode } from '../game/replay';
 import { rankedOf, rankedRound, rankedNote } from '../net/rating';
-import { tournamentRound, tournamentNote } from './tournament';
+import { tournamentRound, tournamentNote, tournamentOf } from './tournament';
 import { UW, spread, type Ctx } from '../engine/gfx';
 import { drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, navPressed, mouse, k } from '../engine/input';
@@ -57,6 +58,8 @@ export class OnlineBattleScene extends BattleScene {
   }
 
   protected get replayMode(): ReplayMode { return rankedOf(this.net) ? 'ranked' : 'online'; }
+  /** This machine's own pick is always player 1's in its match setup, whichever side it plays. */
+  protected get myDeck(): string { return this.decks[0]; }
   /** Recorded from the agreed frames instead (see the constructor). */
   protected get keepsReplays(): boolean { return false; }
   protected afterRound(r: Replay): void {
@@ -125,26 +128,52 @@ export class OnlineBattleScene extends BattleScene {
     }
   }
 
-  protected get resultItems(): string[] { return [this.setOver ? 'REMATCH' : 'NEXT ROUND', 'LEAVE']; }
+  /**
+   * Once the set is decided: run it back as it was, or both go back to pick fighters, spell decks and
+   * the stage again (in the same room, no new code). A tournament set goes back to its bracket instead.
+   */
+  protected get resultItems(): string[] {
+    if (!this.setOver) return ['NEXT ROUND', 'LEAVE'];
+    return tournamentOf(this.net) ? ['LEAVE'] : ['REMATCH', 'CHANGE FIGHTER', 'LEAVE'];
+  }
+
+  /** What the rival asked for on this results screen, if they chose first. */
+  protected resultAlert(): string {
+    const net = this.net, next = this.roundNo + 1;
+    if (this.waitingNext || !this.setOver || net.remoteReady < next) return '';
+    return net.remoteRepick >= next ? 'RIVAL WANTS TO CHANGE FIGHTER' : 'RIVAL WANTS A REMATCH';
+  }
+  /** Once you have answered, only LEAVE is left to pick. */
+  protected resultDisabled(): boolean[] { return this.waitingNext ? this.resultItems.map(it => it !== 'LEAVE') : []; }
 
   protected updateResult(dt: number): void {
     this.statsPanel.update(this.statsData());
     const net = this.net, next = this.roundNo + 1;
     if (this.waitingNext && net.remoteReady >= next) {
       stopMusic();
+      // either side asking for new picks sends both back to the character select (keeping your fighter is one tap)
+      if (this.setOver && (net.myRepick >= next || net.remoteRepick >= next)) {
+        net.beginRepick(next);
+        popTo(s => s instanceof CharSelectScene, () => new CharSelectScene(net));
+        replaceScene(new CharSelectScene(net));
+        return;
+      }
       replaceScene(new OnlineBattleScene(net, this.setOver ? [0, 0] : this.score, next, this.setOver ? [] : this.rounds));
       return;
     }
-    if (this.waitingNext) return;
-    const items = this.resultItems.length;
+    const items = this.resultItems;
     const clicked = listMouse('menu', this.resultSel, i => { this.resultSel = i; sfx('move'); });
     if (clicked >= 0) this.resultSel = clicked;
-    if (navPressed('up', dt)) { this.resultSel = (this.resultSel + items - 1) % items; sfx('move'); }
-    if (navPressed('down', dt)) { this.resultSel = (this.resultSel + 1) % items; sfx('move'); }
+    if (navPressed('up', dt)) { this.resultSel = (this.resultSel + items.length - 1) % items.length; sfx('move'); }
+    if (navPressed('down', dt)) { this.resultSel = (this.resultSel + 1) % items.length; sfx('move'); }
     if (wasPressed('confirm') || wasPressed('custom') || clicked >= 0) {
+      const choice = items[this.resultSel];
+      if (choice === 'LEAVE') { sfx('select'); this.quit(); return; }
+      // an answer is final once given (the rival may already be on their way): only LEAVE is left
+      if (this.waitingNext) { sfx('deny'); return; }
       sfx('select');
-      if (this.resultSel === 1) { this.quit(); return; }
       this.waitingNext = true;
+      if (choice === 'CHANGE FIGHTER') net.myRepick = next;
       net.myReady = next;
     }
   }

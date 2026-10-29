@@ -475,7 +475,7 @@ export class DeckBuilderScene implements Scene {
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
     this.drawScreen(c, tick, ui);
-    this.naming?.entry.draw(ui, tick);
+    this.naming?.entry.draw(ui);
   }
 
   private drawScreen(c: Ctx, tick: number, ui: Ctx): void {
