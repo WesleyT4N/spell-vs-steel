@@ -176,9 +176,12 @@ export const mage: CardDef[] = [
   },
   {
     id: 'arcane_blast', name: 'Arcane Blast', cls: 'mage', cost: 2, rarity: 'uncommon', element: 'arcane', damaging: true, lock: 0.35,
-    dmg: '1300', short: 'Arcane hit on the enemy wherever they are.',
+    dmg: '1300', short: 'Arcane hit on the enemy wherever they are. Your next damaging spell gets +25%.',
     cast: x => {
       x.b.later(0.15, arcaneBlastHit(x));
+      // set after this cast's own multiplier was taken, so it carries to the next damaging spell
+      x.f.empowered = TUNING.mage.blastEmpower;
+      x.b.text(x.f, 'EMPOWERED', '#f878f8');
     },
   },
   {
@@ -212,13 +215,13 @@ export const mage: CardDef[] = [
     ai: (b, f) => b.foe(f).queue.length > 0,
   },
   {
-    id: 'meteor', name: 'Meteor', cls: 'mage', cost: 5, rarity: 'legendary', element: 'fire', damaging: true, lock: 0.4,
+    id: 'meteor', name: 'Meteor', cls: 'mage', cost: 3, rarity: 'legendary', element: 'fire', damaging: true, lock: 0.4,
     dmg: '2650', short: 'After 1.5s, crashes on their panel in a plus shape and leaves it burning.',
     cast: x => {
-      const c0 = x.foe.col, r0 = x.foe.row;
+      const c0 = x.foe.col, r0 = x.foe.row, fall = TUNING.mage.meteorFall;
       const cells: Array<[number, number]> = [[c0, r0], [c0 - 1, r0], [c0 + 1, r0], [c0, r0 - 1], [c0, r0 + 1]];
-      x.b.addFx('meteorFall', x.f.side, c0, r0, 1.5);
-      x.b.warn(x.f, cells, 1.5, meteorHit(x, { cells }));
+      x.b.addFx('meteorFall', x.f.side, c0, r0, fall);
+      x.b.warn(x.f, cells, fall, meteorHit(x, { cells }));
     },
   },
   {
@@ -265,7 +268,7 @@ export const mage: CardDef[] = [
     },
   },
   {
-    id: 'deep_freeze', name: 'Deep Freeze', cls: 'mage', cost: 3, rarity: 'legendary', element: 'frost', damaging: false, lock: 0.3,
+    id: 'deep_freeze', name: 'Deep Freeze', cls: 'mage', cost: 2, rarity: 'legendary', element: 'frost', damaging: false, lock: 0.3,
     dmg: '-', short: 'Freeze the enemy for 3s. They cannot move or act.',
     cast: x => {
       if (!x.b.targetable(x.foe)) { x.b.text(x.foe, 'MISS', '#bcbcbc'); return; }

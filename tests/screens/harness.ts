@@ -354,6 +354,8 @@ const screens: Record<string, () => void> = {
   'battle-warns': () => { setScene(new BattleScene(match({ p1: 'warrior', cpu: 'mage' }))); run(0.5); battle().b.endCustom([[], []]); run(0.3); warns(); run(0.5); },
   // the human on the right: the blue team follows you to the right side
   'battle-warns-right': () => { setScene(new BattleScene(match({ p1: 'rogue', cpu: 'priest' }), [0, 0], undefined, [], ['cpu', 'player'])); run(0.5); battle().b.endCustom([[], []]); run(0.3); warns(); run(0.5); },
+  // Mage buffs in the status tags: Arcane Blast's EMPOWER next to Arcane Power's discount
+  'battle-empowered': () => { setScene(new BattleScene(match({ p1: 'mage', cpu: 'priest' }))); run(0.5); battle().b.endCustom([[], []]); run(0.5); const f = battle().b.f[0]; f.empowered = 1.25; f.powerLeft = 2; run(0.5); },
   'battle-pause': () => { setScene(new BattleScene(match({ p1: 'mage', cpu: 'rogue' }))); run(0.5); battle().b.endCustom([[], []]); run(2); battle().paused = true; },
   // a whole round played out by two CPUs, ending on the results screen
   'battle-results': () => { watch({ p1: 'ranger', cpu: 'priest' }); run(400, () => battle().b.phase === 'over'); run(3); },

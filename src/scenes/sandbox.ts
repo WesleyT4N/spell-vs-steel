@@ -275,7 +275,7 @@ export class SandboxScene implements Scene {
   private clearStatus(f: Fighter): void {
     for (const k of Object.keys(f.st) as StatusKey[]) f.st[k] = 0;
     f.shields = [];
-    f.shout = 0; f.rallyLeft = 0; f.powerLeft = 0;
+    f.shout = 0; f.rallyLeft = 0; f.powerLeft = 0; f.empowered = 0;
   }
 
   private maxRes(): void {
@@ -322,7 +322,7 @@ export class SandboxScene implements Scene {
     const fmt = (f: Fighter): string => {
       const st = (Object.entries(f.st) as Array<[StatusKey, number]>).filter(([, v]) => v > 0).map(([k, v]) => `${k} ${v.toFixed(1)}`);
       const sh = f.shields.filter(s => s.hp > 0).map(s => `${s.kind} ${Math.ceil(s.hp)}`);
-      const mods = [f.shout ? `shout ×${f.shout}` : '', f.rallyLeft ? `rally ×${f.rallyLeft}` : '', f.powerLeft ? `power ×${f.powerLeft}` : '', f.bonusManaNext ? `+${f.bonusManaNext} mana next` : ''].filter(Boolean);
+      const mods = [f.shout ? `shout ×${f.shout}` : '', f.rallyLeft ? `rally ×${f.rallyLeft}` : '', f.powerLeft ? `power ×${f.powerLeft}` : '', f.empowered ? `empower ×${f.empowered}` : '', f.bonusManaNext ? `+${f.bonusManaNext} mana next` : ''].filter(Boolean);
       const res = f.cls === 'warrior' ? `rage ${f.res.toFixed(1)}/${TUNING.warrior.rageMax}` : `${CLASS_INFO[f.cls].res.toLowerCase()} ${f.res}/${f.resMax}${f.poison ? `  poison ×${f.poison}` : ''}`;
       return [
         `${f.side ? 'ENEMY' : 'YOU'} ${f.cls}  hp ${Math.ceil(f.hp)}/${f.maxHp}  ${res}`,

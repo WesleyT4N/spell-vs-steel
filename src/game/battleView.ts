@@ -775,6 +775,7 @@ function drawStatuses(ui: Ctx, b: Battle, f: Fighter, edge: number, y: number, r
   if (f.poison > 0) tags.push([`POISON ×${f.poison} ${Math.max(0, f.poisonT).toFixed(1)}`, '#b8f818']);
   if (f.st.evasion > 0 && f.dodges > 0) tags.push([`DODGE ×${f.dodges}`, '#fcfcfc']);
   if (f.coldBlood) tags.push(['COLD BLOOD', '#9878f8']);
+  if (f.empowered > 0) tags.push([`EMPOWER +${Math.round((f.empowered - 1) * 100)}%`, '#f878f8']);
   const p = b.panels[f.col][f.row];
   if (p.burn > 0) tags.push(['ON FIRE', '#fca044']);
   let cx = edge, cy = y;

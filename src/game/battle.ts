@@ -99,6 +99,8 @@ export interface Fighter {
   castStun: number;
   /** Cold Blood: the next attack spell deals double. */
   coldBlood: boolean;
+  /** Arcane Blast: damage multiplier on the next damaging spell (0 = none). */
+  empowered: number;
   /** Shadow Clone: where the decoy stands. */
   decoyCol: number;
   decoyRow: number;
@@ -1394,6 +1396,7 @@ export class Battle {
       if (f.shout > 0) { mult *= f.shout; f.shout = 0; }
       if (f.rallyLeft > 0) { mult *= 1.3; f.rallyLeft--; }
       if (f.coldBlood) { mult *= 2; f.coldBlood = false; }
+      if (f.empowered > 0) { mult *= f.empowered; f.empowered = 0; }
       if (f.st.vanishStun > 0) { f.st.vanishStun = 0; f.castStun = TUNING.rogue.vanishStun; }
     }
     this.sound('cast_' + card.element, { pan: panOf(f.col) });
@@ -1573,7 +1576,7 @@ function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => nu
     deck: shuffle(deck, rand), discard: [], queue: [], shields: [], st,
     shout: 0, rallyLeft: 0, powerLeft: 0, frostNovaUsed: false, lastStandAbsorbed: 0, glacialCd: 0,
     poison: 0, poisonT: 0, poisonAcc: 0, dodges: 0,
-    homeCol: -1, homeRow: -1, castTimes: [], castSeq: 0, dpSeq: 0, castStun: 0, coldBlood: false, decoyCol: 0, decoyRow: 0,
+    homeCol: -1, homeRow: -1, castTimes: [], castSeq: 0, dpSeq: 0, castStun: 0, coldBlood: false, empowered: 0, decoyCol: 0, decoyRow: 0,
     stillT: 0, lastCol: -1, lastRow: -1, dots: [], deathMarkAcc: 0,
     flash: 0, pose: 'idle', poseT: 0, dead: false,
   };
