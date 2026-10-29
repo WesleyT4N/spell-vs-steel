@@ -149,7 +149,21 @@ function fakeNet(matched = true, as: 'host' | 'guest' = 'host'): NetSession {
   const onB = b.cb!;
   b.cb = p => { onB(p); guest.tick(); };
   host.tick();
+  RIVAL_NET.set(host, guest);
   return host;
+}
+/** The rival's own session behind a fakeNet(), to answer for them. */
+const RIVAL_NET = new WeakMap<NetSession, NetSession>();
+/** An online best of 3 you just won 2-0, on its results screen; `rival` is what the rival picked there first. */
+function onlineSetOver(rival: 'rematch' | 'change' | null = null): OnlineBattleScene {
+  const net = fakeNet(), them = RIVAL_NET.get(net)!;
+  const s = new OnlineBattleScene(net, [1, 0], 2);
+  setScene(s);
+  run(0.2);
+  s.b.phase = 'over'; s.b.winner = 0; s.ended = true; s.score[0]++; s.rounds.push(roundRecord(s.b, s.stats));
+  if (rival) { them.myReady = 3; if (rival === 'change') them.myRepick = 3; them.tick(); }
+  run(0.5);
+  return s;
 }
 const loadMatchDeck = (cls: ClassId = 'warrior'): string[] => toList(presetDeck(cls, 'starter'));
 
@@ -205,6 +219,11 @@ const screens: Record<string, () => void> = {
     s.b.phase = 'over'; s.b.winner = 0; s.ended = true; s.score[0]++; s.rounds.push(roundRecord(s.b, s.stats));
     run(0.5);
   },
+  // a set decided: the rival asked for a rematch first; you asked to change fighters and wait on the rival;
+  // and both agreed to change fighters, so it's back to the character select in the same room
+  'online-rematch': () => onlineSetOver('rematch'),
+  'online-rematch-waiting': () => { const s = onlineSetOver(); s.waitingNext = true; s.net.myRepick = s.net.myReady = 3; s.resultSel = 1; run(0.2); },
+  'online-rematch-repick': () => { const s = onlineSetOver('change'); s.waitingNext = true; s.net.myReady = 3; run(0.3); },
   // a ready-made deck's spells open over the start-from picker (on phones in portrait; wider screens list it on hover)
   'deck-builder-peek': () => { const d = new DeckBuilderScene('ranger', title); (d as unknown as { peek: number; pickSel: number }).peek = 1; (d as unknown as { pickSel: number }).pickSel = 1; setScene(d); },
   ...Object.fromEntries(PLAYABLE.map(c => [`deck-builder-${c}`, () => setScene(new DeckBuilderScene(c, title))])),

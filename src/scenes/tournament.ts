@@ -29,6 +29,9 @@ const DONE = new WeakSet<object>();
 /** A line for the results screen of a tournament set. */
 export const tournamentNote = (net: object): string => (DONE.has(net) ? 'TOURNAMENT SET: BACK TO THE BRACKET IN A MOMENT' : SETS.has(net) ? 'TOURNAMENT SET' : '');
 
+/** The session is playing (or just played) a tournament set. */
+export const tournamentOf = (net: object): boolean => SETS.has(net) || DONE.has(net);
+
 /** A round of a tournament set ended: once the set is decided, report it and head back to the bracket. */
 export function tournamentRound(net: NetSession, score: [number, number], need: number): void {
   const t = SETS.get(net);

@@ -361,6 +361,10 @@ export class BattleScene implements Scene {
   protected afterRound(_r: Replay): void { /* online play scores ranked sets here */ }
   /** An extra line on the results screen, under the score. */
   protected resultNote(): string { return ''; }
+  /** A call-out over the results menu (online: what the rival asked for). */
+  protected resultAlert(): string { return ''; }
+  /** Results menu items that can't be picked right now. */
+  protected resultDisabled(): boolean[] { return []; }
 
   /** Hooks the online scene overrides. */
   protected rivalName = 'CPU';
@@ -484,7 +488,14 @@ export class BattleScene implements Scene {
     const data = this.statsData();
     this.statsPanel.draw(ui, data, 8, 46, 344, 254);
     const items = this.resultItems;
-    drawMenu(ui, items, this.resultSel, 416, 62, tick, { width: 112, gap: 22 });
+    drawMenu(ui, items, this.resultSel, 416, 62, tick, { width: 112, gap: 22, disabled: this.resultDisabled() });
+    const alert = this.resultAlert();
+    if (alert) {
+      // over the menu, kept on screen at its right edge
+      const aw = Math.max(112, textWidth(alert) + 16), ax = Math.min(360, UW - 6 - aw);
+      win(ui, ax, 34, aw, 20, { burn: 3, accent: '#f8b800' });
+      drawTextCentered(ui, tick % 16 < 12 ? alert : '', ax + aw / 2, 41, RED_INK, 1, false);
+    }
     // your best spell of the round (or set), as a card
     const best = topSpell(data.shown[this.me]);
     if (best) {
@@ -689,12 +700,19 @@ export class BattleScene implements Scene {
     // online ranked: the rating change; a tournament set: where it goes next
     const note = this.resultNote();
     if (note) { drawTextCentered(ui, note, UW / 2, y, '#f8b800', textWidth(note, 2) <= w ? 2 : 1); y += 26; }
-    const items = this.resultItems, bh = TAP + 8;
+    const items = this.resultItems, bh = TAP + 8, alert = this.resultAlert();
     const btnY = a.y + a.h - PAD - items.length * (bh + GAP) + GAP;
+    // the rival's ask sits right over the buttons that answer it
+    if (alert) {
+      const ay = btnY - GAP - 32;
+      win(ui, x0, ay, w, 32, { burn: 3, accent: '#f8b800' });
+      drawTextCentered(ui, tick % 16 < 12 ? alert : '', UW / 2, ay + 11, RED_INK, 2, false);
+    }
+    const alertH = alert ? 32 + GAP : 0;
     const data = this.statsData();
     const best = topSpell(data.shown[this.me]);
     const bestH = best ? 64 : 0;
-    const ph = btnY - 16 - bestH - y;
+    const ph = btnY - 16 - bestH - alertH - y;
     this.statsRect = [x0, y, w, ph];
     this.statsPanel.draw(ui, data, x0, y, w, ph);
     if (best) {
@@ -705,9 +723,10 @@ export class BattleScene implements Scene {
       const done = best[1].heal > best[1].dmg ? `+${Math.round(best[1].heal)} HEALED` : `${Math.round(best[1].dmg)} DAMAGE`;
       drawText(ui, done, x0 + w - 12 - textWidth(done, 2), by + 24, INK2, 2);
     }
+    const off = this.resultDisabled();
     items.forEach((it, i) => {
       const wait = i === 0 && this.waitingOn;
-      bigButton(ui, `menu:${i}`, wait ? (tick % 16 < 12 ? wait : '') : it, x0, btnY + i * (bh + GAP), w, bh, { primary: i === 0, disabled: !!wait, on: i === this.resultSel && showSel() && i > 0 });
+      bigButton(ui, `menu:${i}`, wait ? (tick % 16 < 12 ? wait : '') : it, x0, btnY + i * (bh + GAP), w, bh, { primary: i === 0, disabled: !!wait || !!off[i], on: i === this.resultSel && showSel() && i > 0 });
     });
   }
 
