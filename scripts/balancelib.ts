@@ -51,7 +51,7 @@ export function patchOverrides(p: Patch, knobs: Knob[]): Overrides {
   return ov;
 }
 
-/** A patch in shipped units, rounded the way a designer would write it (HP to 5, damage to whole points, spell power to 1%). */
+/** A patch in shipped units, rounded the way a designer would write it (HP to 50, damage to 10s, spell power to 1%). */
 export function roundPatch(p: Patch, knobs: Knob[]): Patch {
   const out: Patch = {};
   for (const k of knobs) {
@@ -59,7 +59,7 @@ export function roundPatch(p: Patch, knobs: Knob[]): Patch {
     if (!x) continue;
     if (k.kind === 'power' || k.kind === 'card') { const r = Math.round(x * 100) / 100; if (r) out[k.id] = r; continue; }
     const base = defaultTuning(knobPath(k));
-    const step = k.kind === 'hp' ? 5 : 1;
+    const step = k.kind === 'hp' ? 50 : k.kind === 'speed' ? 1 : 10;
     const v = Math.round(base * (1 + x) / step) * step;
     if (v !== base) out[k.id] = v / base - 1;
   }

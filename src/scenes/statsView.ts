@@ -211,11 +211,16 @@ export class StatsPanel {
     P(ui, INK2, x, base, w, 1);
     for (let i = 0; i < n; i++) {
       const gx = x + i * gw + Math.floor((gw - bw * 2 - 1) / 2);
-      for (const [v, col, bx] of [[ta[i] ?? 0, colA, gx], [tb[i] ?? 0, colB, gx + bw + 1]] as Array<[number, string, number]>) {
+      const bars = [[ta[i] ?? 0, colA, gx], [tb[i] ?? 0, colB, gx + bw + 1]] as Array<[number, string, number]>;
+      const labels: Array<{ text: string; cx: number; y: number; w: number }> = [];
+      for (const [v, col, bx] of bars) {
         const bh = Math.round(ch * v / max);
         if (bh > 0) { P(ui, '#000000', bx - 1, base - bh - 1, bw + 2, bh + 1); P(ui, col, bx, base - bh, bw, bh); P(ui, mix(col, '#fcfcfc', 0.45), bx, base - bh, bw, 1); }
-        if (v > 0 && bw >= 18) drawTextCentered(ui, String(Math.round(v)), bx + bw / 2, base - bh - 9, INK2, 1, false);
+        if (v > 0 && bw >= 18) { const text = String(Math.round(v)); labels.push({ text, cx: bx + bw / 2, y: base - bh - 9, w: textWidth(text) }); }
       }
+      // a 4-digit label is wider than its bar: the pair's labels lean apart by the overhang, off each other and the other bar
+      for (const l of labels) { const hang = Math.max(0, Math.ceil((l.w - bw) / 2) + 1); l.cx += l.cx < gx + bw ? -hang : hang; }
+      for (const l of labels) drawTextCentered(ui, l.text, l.cx, l.y, INK2, 1, false);
       if (gw >= 14 || i % 2 === 0) drawTextCentered(ui, String(i + 1), x + i * gw + gw / 2, base + 4, TRIM, 1, false);
     }
     if (!ta.length && !tb.length) drawTextCentered(ui, 'NO DAMAGE YET', x + w / 2, top + ch / 2 - 4, INK2, 1, false);

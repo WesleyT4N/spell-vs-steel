@@ -13,14 +13,14 @@ const missile = spellStep('arcane_missiles.fire', x => {
   x.b.sound('missile');
 });
 const missileHit = spellStep('arcane_missiles.hit', (x, _a, h: ShotHit) => {
-  if (h.t) x.b.damage(h.t, 30 * x.mult, x.b.f[1 - h.t.side], { spell: true, element: 'arcane', noFlinch: true });
+  if (h.t) x.b.damage(h.t, 300 * x.mult, x.b.f[1 - h.t.side], { spell: true, element: 'arcane', noFlinch: true });
 });
 const repulseHit = spellStep('repulse.hit', (x, _a, h: ShotHit) => {
   const { b } = x;
-  if (h.w) { b.hitWall(h.w, 25, x.f, {}); return; }
+  if (h.w) { b.hitWall(h.w, 250, x.f, {}); return; }
   if (!h.t) return;
   b.knockback(h.t, 3);
-  b.damage(h.t, 30 * x.mult, b.f[h.p.side], { spell: true, element: 'arcane', stun: 1 });
+  b.damage(h.t, 300 * x.mult, b.f[h.p.side], { spell: true, element: 'arcane', stun: 1 });
 });
 const fireballHit = spellStep('fireball.hit', (x, _a, { col, p }: ShotHit) => {
   const { b } = x;
@@ -30,22 +30,22 @@ const fireballHit = spellStep('fireball.hit', (x, _a, { col, p }: ShotHit) => {
   const r2 = row === 2 ? 1 : row + 1;
   const cells: Cells = [[col, row], [col + d, row], [col, r2], [col + d, r2]];
   b.shake = 0.2;
-  for (const [c, rr] of cells) { b.addFx('explode', src.side, c, rr, 0.35); b.burn(c, rr, 5, 18); }
-  b.strike(src, cells, 145 * x.mult, { spell: true, element: 'fire' });
+  for (const [c, rr] of cells) { b.addFx('explode', src.side, c, rr, 0.35); b.burn(c, rr, 5, 180); }
+  b.strike(src, cells, 1450 * x.mult, { spell: true, element: 'fire' });
 });
 const scorchHit = spellStep('scorch.hit', (x, { cells }: { cells: Cells }) => {
   for (const [c, r] of cells) x.b.addFx('explode', x.f.side, c, r, 0.35);
-  x.b.strike(x.f, cells, 90 * x.mult, { spell: true, element: 'fire' });
+  x.b.strike(x.f, cells, 900 * x.mult, { spell: true, element: 'fire' });
 });
 const arcaneBlastHit = spellStep('arcane_blast.hit', x => {
   x.b.addFx('arcaneHit', x.f.side, x.foe.col, x.foe.row, 0.35);
-  x.b.damage(x.foe, 130 * x.mult, x.f, { spell: true, element: 'arcane', targeted: true });
+  x.b.damage(x.foe, 1300 * x.mult, x.f, { spell: true, element: 'arcane', targeted: true });
 });
 const flamestrikeHit = spellStep('flamestrike.hit', (x, { c, r }: { c: number; r: number }) => {
   x.b.addFx('pillar', x.f.side, c, r, 0.45);
   x.b.sound('explode');
-  x.b.strike(x.f, [[c, r]], 185 * x.mult, { spell: true, element: 'fire' });
-  for (let rr = 0; rr < 3; rr++) x.b.burn(c, rr, 5, 18);
+  x.b.strike(x.f, [[c, r]], 1850 * x.mult, { spell: true, element: 'fire' });
+  for (let rr = 0; rr < 3; rr++) x.b.burn(c, rr, 5, 180);
 });
 /** Shards landed on the enemy so far, shared by one Blizzard's shards. */
 interface Hits { hits: number }
@@ -59,14 +59,14 @@ const blizzardShard = spellStep('blizzard.shard', (x, { n }: { n: Hits }) => {
 const blizzardHit = spellStep('blizzard.hit', (x, { c, r, n }: { c: number; r: number; n: Hits }) => {
   const { b, f, foe } = x;
   b.addFx('shard', f.side, c, r, 0.3);
-  const res = b.strike(f, [[c, r]], 36 * x.mult, { spell: true, element: 'frost', noFlinch: true });
+  const res = b.strike(f, [[c, r]], 360 * x.mult, { spell: true, element: 'frost', noFlinch: true });
   if (res.fighter && ++n.hits === 2) b.freeze(foe, 2);
 });
 const meteorHit = spellStep('meteor.hit', (x, { cells }: { cells: Cells }) => {
   x.b.shake = 0.5;
   x.b.cheer = 2;
-  for (const [c, r] of cells) { x.b.addFx('explode', x.f.side, c, r, 0.5); x.b.burn(c, r, 5, 18); }
-  x.b.strike(x.f, cells, 265 * x.mult, { spell: true, element: 'fire' });
+  for (const [c, r] of cells) { x.b.addFx('explode', x.f.side, c, r, 0.5); x.b.burn(c, r, 5, 180); }
+  x.b.strike(x.f, cells, 2650 * x.mult, { spell: true, element: 'fire' });
 });
 const surgeHit = spellStep('arcane_surge.hit', (x, { dmg }: { dmg: number }) => {
   x.b.addFx('arcaneHit', x.f.side, x.foe.col, x.foe.row, 0.5);
@@ -77,14 +77,14 @@ const cometWarn = spellStep('comet_storm.warn', (x, { c, r }: { c: number; r: nu
 const cometHit = spellStep('comet_storm.hit', (x, { c, r }: { c: number; r: number }) => {
   const { b, f } = x;
   b.addFx('explode', f.side, c, r, 0.35);
-  b.burn(c, r, 5, 18);
-  b.strike(f, [[c, r]], 70 * x.mult, { spell: true, element: 'fire', noFlinch: true });
+  b.burn(c, r, 5, 180);
+  b.strike(f, [[c, r]], 700 * x.mult, { spell: true, element: 'fire', noFlinch: true });
 });
 
 export const mage: CardDef[] = [
   {
     id: 'arcane_missiles', name: 'Arcane Missiles', cls: 'mage', cost: 1, rarity: 'common', element: 'arcane', damaging: true, lock: 0.45,
-    dmg: '30x3', short: '3 homing missiles strike the enemy wherever they are.',
+    dmg: '300x3', short: '3 homing missiles strike the enemy wherever they are.',
     cast: x => {
       for (let i = 0; i < 3; i++) x.b.later(i * 0.12, missile(x));
     },
@@ -96,8 +96,8 @@ export const mage: CardDef[] = [
   },
   {
     id: 'arcane_barrier', name: 'Arcane Barrier', cls: 'mage', cost: 1, rarity: 'common', element: 'arcane', damaging: false, lock: 0.2,
-    dmg: '-', short: 'Absorb 60 damage for 5s. If it breaks, +1 Mana next turn.',
-    cast: x => x.b.addShield(x.f, 'barrier', 60, 5),
+    dmg: '-', short: 'Absorb 600 damage for 5s. If it breaks, +1 Mana next turn.',
+    cast: x => x.b.addShield(x.f, 'barrier', 600, 5),
     ai: (b, f) => b.foe(f).cls === 'warrior' ? Math.abs(b.foe(f).col - f.col) <= 2 : sameRow(b, f),
   },
   {
@@ -128,7 +128,7 @@ export const mage: CardDef[] = [
   },
   {
     id: 'repulse', name: 'Repulse', cls: 'mage', cost: 1, rarity: 'common', element: 'arcane', damaging: true, lock: 0.3,
-    dmg: '30', short: 'Gust down your row knocks the enemy to their back column and stuns them 1s.',
+    dmg: '300', short: 'Gust down your row knocks the enemy to their back column and stuns them 1s.',
     cast: x => {
       x.b.shoot(x.f, { speed: 12 * x.dir, kind: 'gust', reflectable: true, onHit: repulseHit(x) });
     },
@@ -136,12 +136,12 @@ export const mage: CardDef[] = [
   },
   {
     id: 'ignite', name: 'Ignite', cls: 'mage', cost: 1, rarity: 'common', element: 'fire', damaging: true, lock: 0.3,
-    dmg: '22/s', short: 'The column the enemy stands in burns for 5s.',
-    cast: x => { for (let r = 0; r < 3; r++) x.b.burn(x.foe.col, r, 5, 22 * x.mult); },
+    dmg: '220/s', short: 'The column the enemy stands in burns for 5s.',
+    cast: x => { for (let r = 0; r < 3; r++) x.b.burn(x.foe.col, r, 5, 220 * x.mult); },
   },
   {
     id: 'fireball', name: 'Fireball', cls: 'mage', cost: 3, rarity: 'common', element: 'fire', damaging: true, lock: 0.4,
-    dmg: '145', short: 'Fireball down your row. Explodes on a 2x2 square and leaves it burning.',
+    dmg: '1450', short: 'Fireball down your row. Explodes on a 2x2 square and leaves it burning.',
     cast: x => {
       x.b.shoot(x.f, { speed: 9 * x.dir, kind: 'fireball', reflectable: true, onHit: fireballHit(x) });
     },
@@ -149,7 +149,7 @@ export const mage: CardDef[] = [
   },
   {
     id: 'scorch', name: 'Scorch', cls: 'mage', cost: 2, rarity: 'common', element: 'fire', damaging: true, lock: 0.3,
-    dmg: '90', short: 'Every burning panel erupts. 90 to anyone on one.',
+    dmg: '900', short: 'Every burning panel erupts. 900 to anyone on one.',
     cast: x => {
       const cells: Array<[number, number]> = [];
       for (let c = 0; c < 6; c++) for (let r = 0; r < 3; r++) if (x.b.panels[c][r].burn > 0 && x.b.panels[c][r].owner !== x.f.side) cells.push([c, r]);
@@ -159,13 +159,13 @@ export const mage: CardDef[] = [
   },
   {
     id: 'ice_wall', name: 'Ice Wall', cls: 'mage', cost: 1, rarity: 'common', element: 'frost', damaging: false, lock: 0.3,
-    dmg: '-', short: 'Ice block (60 HP) on the panel in front of you blocks shots in your row.',
-    cast: x => { if (!x.b.placeWall(x.f, x.f.col + x.dir, x.f.row, 60, 'ice', 12)) x.b.text(x.f, 'BLOCKED', '#bcbcbc'); },
+    dmg: '-', short: 'Ice block (600 HP) on the panel in front of you blocks shots in your row.',
+    cast: x => { if (!x.b.placeWall(x.f, x.f.col + x.dir, x.f.row, 600, 'ice', 12)) x.b.text(x.f, 'BLOCKED', '#bcbcbc'); },
     ai: (b, f) => sameRow(b, f),
   },
   {
     id: 'frost_nova', name: 'Frost Nova', cls: 'mage', cost: 2, rarity: 'common', element: 'frost', damaging: true, lock: 0.3,
-    dmg: '30', short: 'Hits an enemy within 3 columns of you for 30 and freezes them 2s. If none, lingers 6s until one comes close.',
+    dmg: '300', short: 'Hits an enemy within 3 columns of you for 300 and freezes them 2s. If none, lingers 6s until one comes close.',
     cast: x => { x.f.st.frostNova = 6; x.f.frostNovaUsed = false; x.b.addFx('novaZone', x.f.side, x.f.col, x.f.row, 0.6); },
     ai: (b, f) => b.foe(f).cls === 'warrior' || Math.abs(b.foe(f).col - f.col) <= 3,
   },
@@ -176,14 +176,14 @@ export const mage: CardDef[] = [
   },
   {
     id: 'arcane_blast', name: 'Arcane Blast', cls: 'mage', cost: 2, rarity: 'uncommon', element: 'arcane', damaging: true, lock: 0.35,
-    dmg: '130', short: 'Arcane hit on the enemy wherever they are.',
+    dmg: '1300', short: 'Arcane hit on the enemy wherever they are.',
     cast: x => {
       x.b.later(0.15, arcaneBlastHit(x));
     },
   },
   {
     id: 'flamestrike', name: 'Flamestrike', cls: 'mage', cost: 3, rarity: 'uncommon', element: 'fire', damaging: true, lock: 0.35,
-    dmg: '185', short: 'After 1s, a fire pillar hits their panel and sets that whole column burning.',
+    dmg: '1850', short: 'After 1s, a fire pillar hits their panel and sets that whole column burning.',
     cast: x => {
       // BN Canodumb style: a crosshair locks onto their panel, then the pillar comes down
       x.b.warn(x.f, [[x.foe.col, x.foe.row]], 1, undefined, 'reticle');
@@ -192,7 +192,7 @@ export const mage: CardDef[] = [
   },
   {
     id: 'blizzard', name: 'Blizzard', cls: 'mage', cost: 4, rarity: 'uncommon', element: 'frost', damaging: true, lock: 0.4,
-    dmg: '36 each', short: '4s of ice shards on random enemy panels. Hit 2 times = frozen 2s.',
+    dmg: '360 each', short: '4s of ice shards on random enemy panels. Hit 2 times = frozen 2s.',
     cast: x => {
       // ~2 shards/s; each telegraphs 0.5s. Prototype: 40% of shards aim at the enemy's panel.
       const n: Hits = { hits: 0 };
@@ -213,7 +213,7 @@ export const mage: CardDef[] = [
   },
   {
     id: 'meteor', name: 'Meteor', cls: 'mage', cost: 5, rarity: 'legendary', element: 'fire', damaging: true, lock: 0.4,
-    dmg: '265', short: 'After 1.5s, crashes on their panel in a plus shape and leaves it burning.',
+    dmg: '2650', short: 'After 1.5s, crashes on their panel in a plus shape and leaves it burning.',
     cast: x => {
       const c0 = x.foe.col, r0 = x.foe.row;
       const cells: Array<[number, number]> = [[c0, r0], [c0 - 1, r0], [c0 + 1, r0], [c0, r0 - 1], [c0, r0 + 1]];
@@ -223,9 +223,9 @@ export const mage: CardDef[] = [
   },
   {
     id: 'arcane_surge', name: 'Arcane Surge', cls: 'mage', cost: 'all', rarity: 'legendary', element: 'arcane', damaging: true, lock: 0.45,
-    dmg: '70/Mana', short: 'Spend ALL Mana: arcane blast on the enemy, 70 damage per Mana spent.',
+    dmg: '700/Mana', short: 'Spend ALL Mana: arcane blast on the enemy, 700 damage per Mana spent.',
     cast: x => {
-      const dmg = 70 * x.spent * x.mult;
+      const dmg = 700 * x.spent * x.mult;
       x.b.later(0.2, surgeHit(x, { dmg }));
     },
     ai: (_b, f) => f.res >= 4,
@@ -243,21 +243,21 @@ export const mage: CardDef[] = [
   },
   {
     id: 'dragons_breath', name: "Dragon's Breath", cls: 'mage', cost: 3, rarity: 'legendary', element: 'fire', damaging: true, lock: 0.5,
-    dmg: '145 each', short: 'Cone of flame hits the enemy front two columns and leaves them burning.',
+    dmg: '1450 each', short: 'Cone of flame hits the enemy front two columns and leaves them burning.',
     cast: x => {
       const { b, f, foe } = x;
       const c1 = b.frontCol(foe.side), c2 = c1 + x.dir;
       const cells: Array<[number, number]> = [];
       for (const c of [c1, c2]) for (let r = 0; r < 3; r++) cells.push([c, r]);
       // like BN's fire arms, the breath is instant; the burning panels it leaves are the warning
-      for (const [c, r] of cells) { b.addFx('explode', f.side, c, r, 0.4); b.burn(c, r, 5, 18); }
-      b.strike(f, cells, 145 * x.mult, { spell: true, element: 'fire' });
+      for (const [c, r] of cells) { b.addFx('explode', f.side, c, r, 0.4); b.burn(c, r, 5, 180); }
+      b.strike(f, cells, 1450 * x.mult, { spell: true, element: 'fire' });
     },
     ai: (b, f) => { const foe = b.foe(f); return Math.abs(foe.col - b.frontCol(foe.side)) <= 1; },
   },
   {
     id: 'comet_storm', name: 'Comet Storm', cls: 'mage', cost: 5, rarity: 'legendary', element: 'fire', damaging: true, lock: 0.4,
-    dmg: '70 each', short: '6 comets fall on random enemy panels, leaving them burning.',
+    dmg: '700 each', short: '6 comets fall on random enemy panels, leaving them burning.',
     cast: x => {
       const { b, f } = x;
       const cells = shuffle(allEnemyPanels(b, f.side), b.rand).slice(0, 6);
@@ -281,10 +281,10 @@ export const mage: CardDef[] = [
   },
   {
     id: 'inferno', name: 'Inferno', cls: 'mage', cost: 5, rarity: 'mythic', element: 'fire', damaging: true, lock: 0.5,
-    dmg: '29/s', short: 'All enemy panels burn for 10s. Outlasts the next custom screen.',
+    dmg: '290/s', short: 'All enemy panels burn for 10s. Outlasts the next custom screen.',
     cast: x => {
       x.b.cheer = 2;
-      for (const [c, r] of allEnemyPanels(x.b, x.f.side)) { x.b.burn(c, r, 10, 29 * x.mult); x.b.addFx('explode', x.f.side, c, r, 0.3); }
+      for (const [c, r] of allEnemyPanels(x.b, x.f.side)) { x.b.burn(c, r, 10, 290 * x.mult); x.b.addFx('explode', x.f.side, c, r, 0.3); }
     },
   },
   {

@@ -167,7 +167,7 @@ export class Cpu {
     const shield = f.shields.find(s => s.kind === 'holy')?.hp ?? 0;
     const worth: Record<BlessKind, number> = {
       all: 5,
-      heal: f.maxHp - f.hp >= 30 ? 3 : 0.5,
+      heal: f.maxHp - f.hp >= 300 ? 3 : 0.5,
       shield: shield < TUNING.priest.shieldCap ? 2.5 : 0.5,
       power: 2,
       mana: f.res < TUNING.priest.manaCap ? 2 : 0.2,

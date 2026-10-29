@@ -58,7 +58,7 @@ function arcadeRun(at: number): ArcadeRun {
   const ladder = buildLadder(m, () => (seed = (seed * 16807) % 2147483647) / 2147483647);
   const fights = ladder.slice(0, at).map((r, i) => ({
     cls: r.cls, skin: r.skin, difficulty: r.difficulty, boss: r.boss, rounds: [2, i % 2] as [number, number],
-    secs: 70 + i * 23, dealt: 900 + i * 110, taken: 300 + i * 90, tries: i === 3 ? 2 : 1, best: null,
+    secs: 70 + i * 23, dealt: 9000 + i * 1100, taken: 3000 + i * 900, tries: i === 3 ? 2 : 1, best: null,
   }));
   return { m, ladder, at: Math.min(at, ladder.length - 1), continues: 1, time: 512, tries: 1, fights };
 }
@@ -220,6 +220,16 @@ const screens: Record<string, () => void> = {
   'battle-pause': () => { setScene(new BattleScene(match({ p1: 'mage', cpu: 'rogue' }))); run(0.5); battle().b.endCustom([[], []]); run(2); battle().paused = true; },
   // a whole round played out by two CPUs, ending on the results screen
   'battle-results': () => { watch({ p1: 'ranger', cpu: 'priest' }); run(400, () => battle().b.phase === 'over'); run(3); },
+  // the stats screen's last tab: the per-round table and the damage-per-turn chart with its bar labels
+  'battle-results-rounds': () => { watch({ p1: 'ranger', cpu: 'priest' }); run(400, () => battle().b.phase === 'over'); run(3); battle().statsPanel.tab = 2; run(0.1); },
+  // big damage numbers and a live combo tag (frozen target, so the hits combo)
+  'battle-hits': () => {
+    watch({ p1: 'warrior', cpu: 'mage' }); run(0.5); battle().b.endCustom([[], []]); run(0.5);
+    const b = battle().b, [w, m] = b.f;
+    b.damage(m, 1000, w, { spell: true, freeze: 2, element: 'frost' }); run(0.5);
+    b.damage(m, 280, w, { basic: 'heavy', element: 'steel' }); run(0.5);
+    b.damage(m, 1767, w, { spell: true, element: 'fire' }); run(0.2);
+  },
   'battle-double-ko': () => { watch({ p1: 'warrior', cpu: 'rogue' }); run(0.5); battle().b.endCustom([[], []]); run(1); for (const f of battle().b.f) f.hp = 0; run(1); },
   'battle-draw-result': () => { watch({ p1: 'warrior', cpu: 'rogue' }); run(0.5); battle().b.endCustom([[], []]); run(1); for (const f of battle().b.f) f.hp = 0; run(400, () => battle().b.phase === 'over'); run(3); },
   // the arcade ladder two fights in, with the boss up next, and a cleared run

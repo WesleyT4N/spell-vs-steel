@@ -1,7 +1,7 @@
 // The full balance sweep: every class against every class at every CPU level, over the shipped decks
 // (starter + Mythic decks) played in every CPU playstyle, the starters alone, and random legal decks.
 // Usage: npx tsx scripts/sweep.ts --out dir [--cpu easy,normal,hard] [--n 200] [--starter-n 4000] [--random-k 12 --random-n 40]
-//        [--script file] [--set "hp.mage = 700"]   (balance script applied to every match, see src/dev/script.ts)
+//        [--script file] [--set "hp.mage = 7000"]   (balance script applied to every match, see src/dev/script.ts)
 // Writes dir/sweep.json (raw results per deck pair, card casts included) and prints the class grids.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
