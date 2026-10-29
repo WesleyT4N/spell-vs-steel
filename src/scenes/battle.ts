@@ -489,15 +489,19 @@ export class BattleScene implements Scene {
     this.statsPanel.draw(ui, data, 8, 46, 344, 254);
     const items = this.resultItems;
     drawMenu(ui, items, this.resultSel, 416, 62, tick, { width: 112, gap: 22, disabled: this.resultDisabled() });
-    const alert = this.resultAlert();
+    // under the menu, the rival's ask on two lines ("RIVAL WANTS" / "A REMATCH")
+    const alert = this.resultAlert(), alertY = 62 + items.length * 22 + 6;
     if (alert) {
-      // over the menu, kept on screen at its right edge
-      const aw = Math.max(112, textWidth(alert) + 16), ax = Math.min(360, UW - 6 - aw);
-      win(ui, ax, 34, aw, 20, { burn: 3, accent: '#f8b800' });
-      drawTextCentered(ui, tick % 16 < 12 ? alert : '', ax + aw / 2, 41, RED_INK, 1, false);
+      const [l1, l2] = alert.startsWith('RIVAL WANTS ') ? ['RIVAL WANTS', alert.slice(12)] : [alert, ''];
+      win(ui, 360, alertY, 112, 34, { burn: 3, accent: '#f8b800' });
+      if (tick % 16 < 12) {
+        drawTextCentered(ui, l1, 416, alertY + 10, RED_INK, 1, false);
+        drawTextCentered(ui, l2, 416, alertY + 21, RED_INK, 1, false);
+      }
     }
     // your best spell of the round (or set), as a card
-    const best = topSpell(data.shown[this.me]);
+    // (it gives way to the rival's ask while that is up: there is no room for both)
+    const best = alert ? null : topSpell(data.shown[this.me]);
     if (best) {
       const y = 62 + items.length * 22 + 14;
       win(ui, 368, y, 96, 152, { burn: 3 });
