@@ -270,7 +270,7 @@ export const warrior: CardDef[] = [
   // Mythics
   {
     id: 'avatar_of_war', name: 'Avatar of War', cls: 'warrior', cost: 5, rarity: 'mythic', element: 'steel', damaging: false, lock: 0.5,
-    dmg: '-', short: 'Transform for 12s: spells cost no Rage, no knockback, Cleave hits twice.',
+    dmg: '-', short: 'Transform for 12s: spells cost no Rage, no knockback, Cleave hits twice.', costMod: { free: true },
     cast: x => { x.f.st.avatar = 12; x.b.cheer = 2; x.b.addFx('transform', x.f.side, x.f.col, x.f.row, 0.8); },
   },
   {

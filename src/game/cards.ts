@@ -21,6 +21,12 @@ export interface CardDef {
   dmg: string;
   /** Resource the spell gives its caster when cast, previewed on the Draw screen. */
   gain?: { max?: number; res?: number; refill?: boolean };
+  /**
+   * How the spell changes the cost of spells cast after it, previewed on the Draw screen and in the hand:
+   * `next` = that many spells cost 1 less (Arcane Power), `less` = every spell costs 1 less (Power Infusion),
+   * `free` = every spell costs nothing (Avatar, Ascendance). Display only; `cast` applies the real effect.
+   */
+  costMod?: { next?: number; less?: boolean; free?: boolean };
   /** Only castable while the caster is in Stealth (Ambush); otherwise it waits at the top of the queue. */
   needsStealth?: boolean;
   /** One-line rules text (keep under ~90 chars, it has to fit a 240px screen). */

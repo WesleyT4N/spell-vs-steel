@@ -168,7 +168,7 @@ export const priest: CardDef[] = [
   },
   {
     id: 'power_infusion', name: 'Power Infusion', cls: 'priest', cost: 3, rarity: 'legendary', element: 'holy', damaging: false, lock: 0.2,
-    dmg: '-', short: 'For 8s, every spell costs 1 less Mana.',
+    dmg: '-', short: 'For 8s, every spell costs 1 less Mana.', costMod: { less: true },
     cast: x => { x.f.st.powerInfusion = 8; x.b.addFx('transform', x.f.side, x.f.col, x.f.row, 0.6); },
   },
   {

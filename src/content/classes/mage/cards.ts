@@ -232,7 +232,7 @@ export const mage: CardDef[] = [
   },
   {
     id: 'arcane_power', name: 'Arcane Power', cls: 'mage', cost: 2, rarity: 'legendary', element: 'arcane', damaging: false, lock: 0.3,
-    dmg: '-', short: 'Your next 3 spells cost 1 less Mana.',
+    dmg: '-', short: 'Your next 3 spells cost 1 less Mana.', costMod: { next: 3 },
     cast: x => { x.f.powerLeft = 3; },
   },
   {
@@ -276,7 +276,7 @@ export const mage: CardDef[] = [
   // Mythics
   {
     id: 'ascendance', name: 'Ascendance', cls: 'mage', cost: 5, rarity: 'mythic', element: 'arcane', damaging: false, lock: 0.5,
-    dmg: '-', short: 'Transform for 8s: your spells cost 0 Mana and every spell fires twice.',
+    dmg: '-', short: 'Transform for 8s: your spells cost 0 Mana and every spell fires twice.', costMod: { free: true },
     cast: x => { x.f.st.ascendance = 8; x.b.cheer = 2; x.b.addFx('transform', x.f.side, x.f.col, x.f.row, 0.8); },
   },
   {
