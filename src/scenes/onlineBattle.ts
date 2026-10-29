@@ -57,6 +57,8 @@ export class OnlineBattleScene extends BattleScene {
   }
 
   protected get replayMode(): ReplayMode { return rankedOf(this.net) ? 'ranked' : 'online'; }
+  /** This machine's own pick is always player 1's in its match setup, whichever side it plays. */
+  protected get myDeck(): string { return this.decks[0]; }
   /** Recorded from the agreed frames instead (see the constructor). */
   protected get keepsReplays(): boolean { return false; }
   protected afterRound(r: Replay): void {
