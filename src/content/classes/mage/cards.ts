@@ -66,7 +66,7 @@ const meteorHit = spellStep('meteor.hit', (x, { cells }: { cells: Cells }) => {
   x.b.shake = 0.5;
   x.b.cheer = 2;
   for (const [c, r] of cells) { x.b.addFx('explode', x.f.side, c, r, 0.5); x.b.burn(c, r, 5, 180); }
-  x.b.strike(x.f, cells, 2650 * x.mult, { spell: true, element: 'fire' });
+  x.b.strike(x.f, cells, 2100 * x.mult, { spell: true, element: 'fire' });
 });
 const surgeHit = spellStep('arcane_surge.hit', (x, { dmg }: { dmg: number }) => {
   x.b.addFx('arcaneHit', x.f.side, x.foe.col, x.foe.row, 0.5);
@@ -216,7 +216,7 @@ export const mage: CardDef[] = [
   },
   {
     id: 'meteor', name: 'Meteor', cls: 'mage', cost: 3, rarity: 'legendary', element: 'fire', damaging: true, lock: 0.4,
-    dmg: '2650', short: 'After 1.5s, crashes on their panel in a plus shape and leaves it burning.',
+    dmg: '2100', short: 'After 1.5s, crashes on their panel in a plus shape and leaves it burning.',
     cast: x => {
       const c0 = x.foe.col, r0 = x.foe.row, fall = TUNING.mage.meteorFall;
       const cells: Array<[number, number]> = [[c0, r0], [c0 - 1, r0], [c0 + 1, r0], [c0, r0 - 1], [c0, r0 + 1]];
