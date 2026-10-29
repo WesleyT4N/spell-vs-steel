@@ -7,7 +7,8 @@ import { getSprite, getFrame, drawFighterSprite, drawFighterPosed, type Tint } f
 import type { FrameId } from '../art/fighterFrames';
 import { P, UW, UH, blob, frame, glow, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '../engine/font';
-import { drawCardIcon, RES_INK } from '../scenes/cardView';
+import { drawCardIcon, costSign, costDeltaText, RES_INK } from '../scenes/cardView';
+import { drawModValue } from '../scenes/modValue';
 import { win, bar, pip as skinPip, toInk, PAPER, PAPER2, INK, INK2, TRIM, WAX_HI, RED_INK } from '../scenes/skin';
 import { COMBO_HOLD } from './combo';
 import { CARDS, ELEMENT_COLOR } from './cards';
@@ -594,7 +595,7 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
     const ok = i > 0 || b.canAfford(f, card);
     P(c, '#000000', cx - 1, cy - 1, 10, 9);
     P(c, ok ? ELEMENT_COLOR[card.element] : '#7c7c7c', cx, cy, 8, 7);
-    if (i === 0) drawText(c, card.cost === 'all' ? 'A' : String(card.cost), cx + 1, cy, '#000000');
+    if (i === 0) drawText(c, card.cost === 'all' && !costSign(card, b.costOf(f, card)) ? 'A' : String(b.costOf(f, card)), cx + 1, cy, '#000000');
     // global cooldown: a shade over the top chip that drains away as it recharges
     if (i === 0 && f.castCd > 0) {
       const sh = Math.ceil(7 * f.castCd / TUNING.castCooldown);
@@ -821,13 +822,17 @@ function drawNextSpell(ui: Ctx, b: Battle, f: Fighter, key: string | null = k('c
   const card = CARDS[f.queue[0]], ok = b.canAfford(f, card);
   const more = f.queue.length - 1;
   const s = `${key ?? 'NEXT'}: ${card.name.toUpperCase()}`;
-  const tw = textWidth(s) + (more ? textWidth(`  +${more}`) : 0);
+  // a cost something has changed (Arcane Power, Power Infusion, a transform) shows in the modifier look
+  const cost = b.costOf(f, card), sign = costSign(card, cost), delta = sign ? costDeltaText(card, cost) : '';
+  const modW = sign ? 8 + textWidth(String(cost)) + 4 + textWidth(delta) + 4 : 0;
+  const tw = textWidth(s) + modW + (more ? textWidth(`  +${more}`) : 0);
   const x = right ? UW - 16 - (tw + 28) : 0;
   win(ui, x + 8, UH - 23, tw + 28, 18, { burn: 3 });
   P(ui, '#000000', x + 11, UH - 19, 10, 10);
   P(ui, ok ? ELEMENT_COLOR[card.element] : '#7c7c7c', x + 12, UH - 18, 8, 8);
   drawText(ui, s, x + 25, UH - 18, ok ? INK : TRIM);
-  if (more) drawText(ui, `+${more}`, x + 25 + textWidth(s) + 12, UH - 18, INK2);
+  if (sign) drawModValue(ui, String(cost), delta, sign, x + 25 + textWidth(s) + 8, UH - 18, INK);
+  if (more) drawText(ui, `+${more}`, x + 25 + textWidth(s) + modW + 12, UH - 18, INK2);
   if (!ok) {
     const need = f.st.silenced > 0 ? 'SILENCED' : `NEED ${CLASS_INFO[card.cls].res}`;
     drawTextOutlined(ui, need, right ? x - textWidth(need) : tw + 44, UH - 18, '#f83800');

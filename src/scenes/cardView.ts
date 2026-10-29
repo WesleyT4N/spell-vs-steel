@@ -5,6 +5,7 @@ import { drawText, drawTextCentered, textWidth, wrap } from '../engine/font';
 import { ELEMENT_COLOR, RARITY_COLOR, type CardDef, type Element } from '../game/cards';
 import { CLASS_INFO } from '../game/classes';
 import { cardIconCanvas, ICON_SIZE } from '../art/cardIcons';
+import { modSign, modInk, drawDelta, deltaText, BUFF_WAX, NERF_WAX } from './modValue';
 
 const EMBLEM: Record<Element | 'shield', string[]> = {
   shield: ['#########', '####.####', '####.####', '#.......#', '####.####', '.###.###.', '.###.###.', '..##.##..', '...#.#...'],
@@ -24,6 +25,14 @@ export const resColor = (card: CardDef): string => CLASS_INFO[card.cls].resColor
 export const resInk = (card: CardDef): string => RES_INK[CLASS_INFO[card.cls].res];
 export const RES_INK: Record<string, string> = { RAGE: RED_INK, MANA: BLUE_INK, ENERGY: '#7c5800' };
 const costText = (card: CardDef): string => (card.cost === 'all' ? 'A' : String(card.cost));
+/** -1/0/+1 for a card whose cost is now `cost` (see modSign); 'All' costs only change when they become free. */
+export function costSign(card: CardDef, cost: number | undefined): number {
+  if (cost === undefined) return 0;
+  if (card.cost === 'all') return cost === 0 ? 1 : 0;
+  return modSign(card.cost, cost, true);
+}
+/** The change to a card's cost as tag text: -1, +1, or FREE for an All cost that costs nothing. */
+export const costDeltaText = (card: CardDef, cost: number): string => (card.cost === 'all' ? 'FREE' : deltaText(cost - card.cost));
 
 export function drawEmblem(c: Ctx, el: Element | 'shield', cx: number, cy: number, s: number, col: string): void {
   const rows = EMBLEM[el], x0 = Math.round(cx - (9 * s) / 2), y0 = Math.round(cy - (9 * s) / 2);
@@ -50,7 +59,8 @@ function artBox(el: Element, w: number, h: number): HTMLCanvasElement {
 }
 
 /** Name, rarity, cost, damage and rules text in a column `w` pixels wide, in ink for a parchment window. Returns the y below it. */
-export function drawCardDetail(c: Ctx, card: CardDef, x: number, y: number, w: number, z = 1): number {
+/** `cost` is what the card costs right now, when something has changed it (shown in the modifier look). */
+export function drawCardDetail(c: Ctx, card: CardDef, x: number, y: number, w: number, z = 1, cost?: number): number {
   const chars = Math.floor(w / (6 * z));
   let yy = y;
   const big = textWidth(card.name.toUpperCase(), 2 * z) <= w;
@@ -58,7 +68,14 @@ export function drawCardDetail(c: Ctx, card: CardDef, x: number, y: number, w: n
   else for (const line of wrap(card.name.toUpperCase(), chars)) { drawText(c, line, x, yy, INK, z); yy += 10 * z; }
   drawText(c, card.rarity.toUpperCase(), x, yy, ink(RARITY_COLOR[card.rarity]), z);
   drawText(c, card.element.toUpperCase(), x + textWidth(card.rarity.toUpperCase(), z) + 12 * z, yy, ink(ELEMENT_COLOR[card.element]), z); yy += 14 * z;
-  drawText(c, `COST ${card.cost === 'all' ? 'ALL' : card.cost} ${resName(card)}`, x, yy, resInk(card), z); yy += 11 * z;
+  // COST 2 MANA [-1]: a cost something has changed, in the modifier look
+  const sign = costSign(card, cost), now = sign ? String(cost) : card.cost === 'all' ? 'ALL' : String(card.cost);
+  let cx = x;
+  drawText(c, 'COST ', cx, yy, resInk(card), z); cx += textWidth('COST ', z);
+  drawText(c, now, cx, yy, modInk(sign, resInk(card)), z); cx += textWidth(now, z);
+  drawText(c, ` ${resName(card)}`, cx, yy, resInk(card), z); cx += textWidth(` ${resName(card)}`, z);
+  if (sign) drawDelta(c, costDeltaText(card, cost!), sign, cx + 6, yy + (z - 1) * 3);
+  yy += 11 * z;
   if (card.dmg !== '-') { drawText(c, `DAMAGE ${card.dmg.toUpperCase()}`, x, yy, RED_INK, z); yy += 11 * z; }
   yy += 6 * z;
   for (const line of wrap(card.short.toUpperCase(), chars)) { drawText(c, line, x, yy, INK, z); yy += 11 * z; }
@@ -75,9 +92,11 @@ export const CARD_H = 104;
  * A parchment card face as it sits in the hand. `order` is its cast position when picked, else -1.
  * `short` marks affordability: 0 = payable (gold ring on the seal), above 0 = that much resource missing
  * (grey seal, dimmed, NEED tag), unset = not shown. `builds` is for resources earned mid-fight (Rage):
- * a short card stays bright and gets a soft +N tag instead, since it will be castable later.
+ * a short card stays bright and gets a soft +N tag instead, since it will be castable later. `cost` is what
+ * it costs right now: when that differs from the print, the seal turns green (cheaper) or grey (dearer)
+ * and the printed cost sits struck through beside it.
  */
-export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: { order?: number; lit?: boolean; faded?: boolean; short?: number; builds?: boolean } = {}): void {
+export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: { order?: number; lit?: boolean; faded?: boolean; short?: number; builds?: boolean; cost?: number } = {}): void {
   const w = CARD_W, h = CARD_H, order = opts.order ?? -1;
   const edge = order >= 0 ? WAX : opts.lit ? GOLD : FRAME;
   P(c, 'rgba(40,20,0,0.5)', x + 3, y + 3, w, h); // drop shadow
@@ -86,10 +105,12 @@ export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: 
   paper(c, x + 2, y + 2, w - 4, h - 4, 4);
   // wax seal cost
   const short = opts.short ?? -1, hard = short > 0 && !opts.builds;
-  const gem = hard ? '#7c7c7c' : CLASS_INFO[card.cls].gem;
+  const sign = costSign(card, opts.cost);
+  const gem = hard ? '#7c7c7c' : sign > 0 ? BUFF_WAX : sign < 0 ? NERF_WAX : CLASS_INFO[card.cls].gem;
   if (short === 0) disc(c, x + 12, y + 12, 10, GOLD);
   seal(c, x + 12, y + 12, 8, gem);
-  drawTextCentered(c, costText(card), x + 12, y + 9, '#fcfcfc', 1, false);
+  drawTextCentered(c, sign ? String(opts.cost) : costText(card), x + 12, y + 9, '#fcfcfc', 1, false);
+  if (sign) drawDelta(c, costDeltaText(card, opts.cost!), sign, x + 23, y + 9);
   // rarity ribbon hanging from the top edge
   P(c, RARITY_COLOR[card.rarity], x + w - 12, y + 2, 6, 11);
   P(c, mix(RARITY_COLOR[card.rarity], '#000000', 0.35), x + w - 7, y + 2, 1, 11);

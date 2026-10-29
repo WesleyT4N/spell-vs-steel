@@ -323,6 +323,30 @@ const screens: Record<string, () => void> = {
   'deck-builder-edit': () => { const [id] = myDecks('mage'); setScene(new DeckBuilderScene('mage', title, id)); },
   // the opening Draw screen, with you on the left against the CPU
   'battle-draw': () => { setScene(new BattleScene(match({ p1: 'warrior', cpu: 'mage' }))); run(0.5); },
+  // Arcane Power picked first: the rest of the hand shows its lowered costs in the modifier look
+  'battle-draw-modified': () => {
+    setScene(new BattleScene(match({ p1: 'mage', cpu: 'warrior' }))); run(0.2);
+    const s = battle(), b = s.b;
+    b.offer[0] = ['arcane_power', 'fireball', 'flamestrike', 'arcane_missiles', 'deep_freeze'];
+    b.f[0].resMax = 4; b.f[0].res = 4;
+    (s as unknown as { picks: number[] }).picks = [0, 1];
+    s.cursor = 2; run(0.5);
+  },
+  // the same picks with the cursor on FIGHT: the cast order lists the lowered costs
+  'battle-draw-modified-order': () => {
+    setScene(new BattleScene(match({ p1: 'mage', cpu: 'warrior' }))); run(0.2);
+    const s = battle(), b = s.b;
+    b.offer[0] = ['arcane_power', 'fireball', 'flamestrike', 'arcane_missiles', 'deep_freeze'];
+    b.f[0].resMax = 5; b.f[0].res = 5;
+    (s as unknown as { picks: number[] }).picks = [0, 3, 1];
+    s.cursor = 5; run(0.5);
+  },
+  // mid-fight with Arcane Power up: the next-spell plate and the chip over your head show the lowered cost
+  'battle-player-modified': () => {
+    setScene(new BattleScene(match({ p1: 'mage', cpu: 'warrior' }))); run(0.5);
+    const b = battle().b; b.endCustom([[], []]); run(1);
+    const f = b.f[0]; f.powerLeft = 2; f.queue = ['flamestrike', 'fireball']; f.resMax = 4; f.res = 4; run(0.2);
+  },
   'battle-fight': () => { watch(); run(8, () => battle().b.phase === 'over'); },
   // mid-fight as the player, so phones show the fight pad
   'battle-player': () => { setScene(new BattleScene(match({ p1: 'priest', cpu: 'ranger' }))); run(0.5); battle().b.endCustom([[0, 1], []]); run(3); },
