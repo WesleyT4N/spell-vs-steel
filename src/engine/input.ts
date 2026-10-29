@@ -132,6 +132,8 @@ export function keyName(code: string): string {
 }
 /** Whether the last button pressed was on a pad, so hints name pad buttons instead of keys. */
 let onPad = false;
+/** True when the last button pressed was on a gamepad. */
+export const usingPad = (): boolean => onPad;
 /** Name of the key (or pad button, when playing on a pad) bound to an action, for hints. */
 export const k = (a: Bindable): string => (onPad ? padName(pads.p1[a]) : keyName(keys[a]));
 

@@ -7,7 +7,7 @@
 import { webStorage, memoryStorage, type PlatformStorage } from '../platform/storage';
 
 /** Bump when SaveData changes shape, and add a MIGRATIONS entry that turns the previous version into this one. */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 type Obj = Record<string, unknown>;
 
@@ -22,8 +22,8 @@ export interface SaveData {
   /** Volume settings (see AudioSettings). */
   audio: Obj;
   muted: boolean;
-  /** Custom spell deck per class: card id -> copies. */
-  decks: Record<string, Record<string, number>>;
+  /** The player's own spell decks per class, in the order they were made. */
+  decks: Record<string, SavedDeck[]>;
   /** Last match setup (see MatchConfig). */
   match: Obj | null;
   /** Training mode dummy settings. */
@@ -39,6 +39,9 @@ export interface SaveData {
   /** Touch controls: pad size, left-handed, vibration (see TouchSettings in touch.ts). */
   touch: Obj | null;
 }
+
+/** One of the player's own spell decks: an id unique within its class, a name, and card id -> copies. */
+export interface SavedDeck { id: string; name: string; cards: Record<string, number> }
 
 /** A saved replay, as far as the save module cares: newest-first order and the kept flag. */
 export interface StoredReplay { id: string; at: number; keep?: boolean }
@@ -64,6 +67,23 @@ const defaults = (): SaveData => ({
 const MIGRATIONS: Record<number, (d: Obj) => Obj> = {
   // 1: the first versioned save. Nothing before it but the legacy keys, which importLegacy handles.
   1: d => d,
+  // 2: many spell decks per class. The one custom deck of each class (card id -> copies) becomes the first
+  // of a list, and a match setup that picked 'custom' now names that deck.
+  2: d => {
+    const decks: Obj = {};
+    for (const [cls, cards] of Object.entries(clean(d.decks))) {
+      if (isObj(cards) && Object.keys(clean(cards)).length) decks[cls] = [{ id: 'd1', name: 'MY SPELL DECK', cards }];
+    }
+    const out: Obj = { ...d, decks };
+    if (isObj(d.match)) {
+      const m: Obj = { ...clean(d.match) };
+      for (const [side, deck] of [['p1', 'p1Deck'], ['cpu', 'cpuDeck']] as const) {
+        if (m[deck] === 'custom') m[deck] = typeof m[side] === 'string' && decks[m[side] as string] ? 'custom:d1' : 'starter';
+      }
+      out.match = m;
+    }
+    return out;
+  },
 };
 
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -85,8 +105,11 @@ function normalize(raw: Obj): SaveData {
     pads: objOr(r.pads, d.pads),
     audio: objOr(r.audio, d.audio),
     muted: r.muted === true,
-    decks: Object.fromEntries(Object.entries(clean(r.decks)).filter(([, x]) => isObj(x)).map(([c, x]) =>
-      [c, Object.fromEntries(Object.entries(clean(x)).filter(([, n]) => Number.isInteger(n) && (n as number) > 0))])) as SaveData['decks'],
+    decks: Object.fromEntries(Object.entries(clean(r.decks)).filter(([, x]) => Array.isArray(x)).map(([c, x]) =>
+      [c, (x as unknown[]).map(clean).filter(e => typeof e.id === 'string' && e.id && typeof e.name === 'string').map(e => ({
+        id: e.id as string, name: e.name as string,
+        cards: Object.fromEntries(Object.entries(clean(e.cards)).filter(([, n]) => Number.isInteger(n) && (n as number) > 0)) as Record<string, number>,
+      })).filter((e, i, all) => all.findIndex(o => o.id === e.id) === i)])),
     match: objOr(r.match, d.match),
     training: objOr(r.training, d.training),
     tutorialDone: r.tutorialDone === true,
@@ -156,7 +179,8 @@ export function importLegacy(l: Legacy): { data: SaveData; found: string[] } | n
   for (const k of l.keys()) if (k.startsWith(LEGACY_DECK)) decks[k.slice(LEGACY_DECK.length)] = json(k);
   raw.decks = decks;
   if (!found.length) return null;
-  return { data: normalize(raw), found };
+  // the old keys hold what a version 1 save would
+  return { data: normalize(migrateFrom(1, raw)), found };
 }
 
 // ---------- the live save ----------
@@ -182,11 +206,13 @@ function parse(text: string | null, file: string): Envelope | 'bad' | null {
   }
 }
 
-function migrate(e: Envelope): Obj {
-  let d = clean(e.data);
-  for (let v = e.v + 1; v <= SAVE_VERSION; v++) d = MIGRATIONS[v](d);
+/** Bring a version `from` save up to SAVE_VERSION. */
+function migrateFrom(from: number, raw: unknown): Obj {
+  let d = clean(raw);
+  for (let v = from + 1; v <= SAVE_VERSION; v++) d = MIGRATIONS[v](d);
   return d;
 }
+const migrate = (e: Envelope): Obj => migrateFrom(e.v, e.data);
 
 function adopt(saveText: string | null, replayText: string | null, legacy: Legacy | null): void {
   readOnly = false;

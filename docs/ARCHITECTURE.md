@@ -191,7 +191,7 @@ flowchart LR
 | Ranger | 7650 | 100 / 200 | Energy | Starts 2, +1 per Draw, grows standing still | `content/classes/ranger/cards.ts` |
 | Priest | 6600 | 60 / 280 | Mana | Starts 3, +3 per Draw (cap 5) | `content/classes/priest/cards.ts` |
 
-`tuning.ts` is the source of truth for numbers. Each class has 26 cards, a starter deck and 3 Mythic decks (`game/deck.ts`). Deck rules: exactly 30, 4 / 2 / 1 copies by rarity, max 5 Legendaries, exactly 1 Mythic. Custom decks save per class in `save.json`; `game/deckYaml.ts` imports and exports YAML.
+`tuning.ts` is the source of truth for numbers. Each class has 26 cards, a starter deck and 3 Mythic decks (`game/deck.ts`). Deck rules: exactly 30, 4 / 2 / 1 copies by rarity, max 5 Legendaries, exactly 1 Mythic. Players keep up to 10 named spell decks per class in `save.json` (`createCustom` / `renameCustom` / `cloneCustom` / `deleteCustom` in `deck.ts`); a match setup names one as `custom:<id>`. The deck builder opens on that list (edit, rename, clone, delete, or start a new one from a ready-made deck, an empty one or YAML), and `scenes/nameEntry.ts` is the name box (typing, a phone's keyboard, or a letter grid for pads). `game/deckYaml.ts` imports and exports YAML; an import becomes a new deck.
 
 Adding a class today touches: `art/sprites.ts` (+ generated sprites and frames), `game/classes.ts`, a `tuning.ts` block, `content/classes/<id>/cards.ts` (listed in `game/cards.ts`), resource rules in `battle.ts`, decks in `deck.ts`, `game/fighterAnim.ts`, voice lines, and tutorial lessons (every new character gets tutorial support). Only the spells live in the class folder so far (#62); the rest moves there next.
 
@@ -407,7 +407,7 @@ flowchart LR
 
 | File | Holds |
 | --- | --- |
-| `save.json` | keys, P2 keys, pads, audio, mute, decks, last match, training, tutorial done, arcade, rating, pending ranked result, lab script, touch controls |
+| `save.json` | keys, P2 keys, pads, audio, mute, spell decks (a list per class), last match, training, tutorial done, arcade, rating, pending ranked result, lab script, touch controls |
 | `replays.json` | 20 recent + up to 20 starred replays, about 3 MB budget |
 
 - Each file is `{game, v, data}`. Changing the shape means bumping `SAVE_VERSION` and adding `MIGRATIONS[n]`; never edit a shipped one.

@@ -1,6 +1,6 @@
 // Spell deck select: the second step before a fight (fighter, spell deck, stage). Each side's spell decks sit
-// in a list: the starter, one per Mythic, your own deck and RANDOM, each with its Mythic and Legendaries as
-// icons. Versus and training pick both sides here, with the CPU level and match length; arcade picks only yours.
+// in a list: the starter, one per Mythic, every deck of your own and RANDOM, each with its Mythic and
+// Legendaries as icons; the list scrolls when it is longer than the panel. Versus and training pick both sides here, with the CPU level and match length; arcade picks only yours.
 // Online you pick yours and lock in, and the stage vote opens once both players have.
 import { pushScene, popScene, goHome, hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
 import type { SelectMode } from './select';
@@ -11,11 +11,11 @@ import { getPortrait, teamColor, skinOf, mirrorSkin, type ClassId } from '../art
 import { cardIconCanvas, ICON_SIZE } from '../art/cardIcons';
 import { P, UW, screenRect, fillScreen, vy, vspan, spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
-import { win, banner, stepTrail, plaque, GOLD, FRAME, INK, INK2, TRIM, PAPER, PAPER2, RED_INK, BLUE_INK } from './skin';
+import { win, banner, stepTrail, plaque, GOLD, FRAME, INK, INK2, TRIM, PAPER, PAPER2, RED_INK, BLUE_INK, BURN } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { loadMatch, saveMatch, playerDeck, sideName, type MatchConfig } from '../game/match';
-import { presetsFor, loadCustom, validate, deckSize } from '../game/deck';
+import { presetsFor, customDecks, customChoice, customIdOf, validate, deckSize } from '../game/deck';
 import { CARDS } from '../game/cards';
 import { STAGE_IDS } from '../content/stages';
 import type { NetSession } from '../net/session';
@@ -25,9 +25,9 @@ import { TrainingScene } from './training';
 import { ArcadeLadderScene } from './arcade';
 import { newRun } from '../game/arcade';
 import type { PadMode } from '../engine/touch';
-import { bigButton, actionBar, barTapped, swipeIn, tallArea, TAP, GAP, PAD } from './touchUi';
+import { bigButton, actionBar, barTapped, swipeIn, tallArea, Scroller, TAP, GAP, PAD } from './touchUi';
 
-/** One line of a side's list: a ready-made deck, the player's own deck, or RANDOM. */
+/** One line of a side's list: a ready-made deck, one of the player's own, or RANDOM. */
 interface Choice { id: string; name: string; sub: string; mythic: string | null; legends: string[]; ok: boolean }
 
 const byRarity = (ids: string[], r: string): string[] => ids.filter(id => CARDS[id]?.rarity === r);
@@ -38,8 +38,10 @@ export function deckChoices(cls: ClassId): Choice[] {
     id: p.id, name: p.name.toUpperCase(), sub: p.id === 'starter' ? 'STARTER' : (CARDS[p.mythic]?.name ?? '').toUpperCase(),
     mythic: p.mythic || null, legends: byRarity(Object.keys(p.cards), 'legendary'), ok: true,
   }));
-  const own = loadCustom(cls), ids = own ? Object.keys(own) : [], ok = !!own && validate(own).length === 0;
-  list.push({ id: 'custom', name: 'MY SPELL DECK', sub: ok ? 'CUSTOM' : own && deckSize(own) ? 'NOT READY' : 'NOT BUILT YET', mythic: byRarity(ids, 'mythic')[0] ?? null, legends: byRarity(ids, 'legendary'), ok });
+  for (const own of customDecks(cls)) {
+    const ids = Object.keys(own.cards), ok = validate(own.cards).length === 0;
+    list.push({ id: customChoice(own.id), name: own.name, sub: ok ? 'YOUR SPELL DECK' : `NOT READY (${deckSize(own.cards)}/30)`, mythic: byRarity(ids, 'mythic')[0] ?? null, legends: byRarity(ids, 'legendary'), ok });
+  }
   list.push({ id: 'random', name: 'RANDOM', sub: 'NEW EACH ROUND', mythic: null, legends: [], ok: true });
   return list;
 }
@@ -65,6 +67,14 @@ export class DeckSelectScene implements Scene {
   t = 0;
   /** Phone layout: where the list was drawn, for swipes between the sides. */
   private listRect: [number, number, number, number] = [0, 0, 0, 0];
+  /** Wider screens: each side's first visible row when its list is longer than the panel. */
+  private top: [number, number] = [0, 0];
+  /** Wider screens: each panel's list window [x, y, w, h] and how many rows fit, for the wheel. */
+  private listWin: Array<[number, number, number, number, number]> = [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0]];
+  /** Phone layout: the list's scroll. */
+  private scroller = new Scroller();
+  /** A side's list should scroll its cursor's row into view when next drawn. */
+  private follow: [boolean, boolean] = [true, true];
 
   constructor(private mode: SelectMode = 'versus', private net?: NetSession) {
     this.findRows();
@@ -101,6 +111,7 @@ export class DeckSelectScene implements Scene {
   /** Put each side's cursor on its current deck. */
   private findRows(): void {
     for (const s of [0, 1] as const) this.row[s] = Math.max(0, deckChoices(this.clsOf(s)).findIndex(c => c.id === this.deckOf(s)));
+    this.follow = [true, true];
   }
 
   /** Online: tell the rival our fighter and deck, and whether we're locked in. */
@@ -128,10 +139,11 @@ export class DeckSelectScene implements Scene {
     else sfx('move');
   }
 
+  /** Open the deck builder: on the picked deck when it is one of yours, else on the list of your decks. */
   private editDeck(s: 0 | 1): void {
     sfx('select');
     saveMatch(this.m);
-    pushScene(new DeckBuilderScene(this.clsOf(s)));
+    pushScene(new DeckBuilderScene(this.clsOf(s), popScene, customIdOf(this.deckOf(s)) ?? undefined));
   }
 
   private activateChip(c: Chip): void {
@@ -151,8 +163,9 @@ export class DeckSelectScene implements Scene {
   /** On to the stage select (arcade: the ladder; training: the fight; online: lock in and wait for the rival). */
   private next(): void {
     for (const s of this.sides) {
-      if (this.deckOf(s) === 'custom' && !deckChoices(this.clsOf(s))[presetsFor(this.clsOf(s)).length].ok) {
-        this.msg = this.sides.length > 1 ? `${this.who(s)}'S CUSTOM ${CLASS_INFO[this.clsOf(s)].name} SPELL DECK IS NOT READY` : 'YOUR CUSTOM SPELL DECK IS NOT READY';
+      const ch = deckChoices(this.clsOf(s)).find(c => c.id === this.deckOf(s));
+      if (ch && !ch.ok) {
+        this.msg = this.sides.length > 1 ? `${this.who(s)}'S SPELL DECK ${ch.name} IS NOT READY` : `YOUR SPELL DECK ${ch.name} IS NOT READY`;
         this.msgT = 2; sfx('deny');
         this.side = s; this.low = false;
         return;
@@ -196,9 +209,15 @@ export class DeckSelectScene implements Scene {
       if (barTapped('back')) { this.back(); return; }
       if (barTapped('primary')) { this.next(); return; }
       const tab = hot('dside');
-      if (mouse.click && tab >= 0 && this.sides.includes(tab as 0 | 1)) { if (this.side !== tab) sfx('move'); this.side = tab as 0 | 1; return; }
+      if (mouse.click && tab >= 0 && this.sides.includes(tab as 0 | 1)) { if (this.side !== tab) sfx('move'); this.side = tab as 0 | 1; this.reveal(this.side); return; }
       const sw = this.sides.length > 1 ? swipeIn(...this.listRect) : 0;
-      if (sw) { this.side = this.side === 0 ? 1 : 0; sfx('move'); return; }
+      if (sw) { this.side = this.side === 0 ? 1 : 0; this.reveal(this.side); sfx('move'); return; }
+      this.scroller.update(...this.listRect);
+    } else if (mouse.wheel) {
+      for (const s of this.sides) {
+        const [wx, wy, ww, wh, vis] = this.listWin[s], n = deckChoices(this.clsOf(s)).length;
+        if (mouse.x >= wx && mouse.x < wx + ww && mouse.y >= wy && mouse.y < wy + wh) this.top[s] = Math.max(0, Math.min(n - vis, this.top[s] + Math.sign(mouse.wheel)));
+      }
     }
 
     if (mouse.click) {
@@ -226,9 +245,9 @@ export class DeckSelectScene implements Scene {
       if (ok) this.activateChip(this.chips[this.chip]);
       return;
     }
-    if (up && this.row[s] > 0) this.moveTo(s, this.row[s] - 1);
+    if (up && this.row[s] > 0) { this.moveTo(s, this.row[s] - 1); this.reveal(s); }
     if (down) {
-      if (this.row[s] < rows - 1) this.moveTo(s, this.row[s] + 1);
+      if (this.row[s] < rows - 1) { this.moveTo(s, this.row[s] + 1); this.reveal(s); }
       else { this.low = true; this.chip = n - 1; sfx('move'); }
     }
     // left/right hops between the two sides' lists
@@ -240,6 +259,8 @@ export class DeckSelectScene implements Scene {
       else { this.low = true; this.chip = n - 1; sfx('select'); }
     }
   }
+
+  private reveal(s: 0 | 1): void { this.follow[s] = true; }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
     drawStage(c, getArena(), tick);
@@ -300,14 +321,26 @@ export class DeckSelectScene implements Scene {
       drawTextCentered(ui, tick % 16 < 12 ? 'WAITING FOR RIVAL...' : '', x + w / 2, y + h / 2 + 4, INK2, 1, false);
       return;
     }
-    const list = deckChoices(cls), pick = this.deckOf(s);
-    for (let i = 0; i <= list.length; i++) {
-      const ry = y + vspan(PY, ROW_Y) + i * (ROW_H + ROW_GAP), rx = x + 8, rw = w - 16, id = `d${s}:${i}`;
+    const list = deckChoices(cls), pick = this.deckOf(s), step = ROW_H + ROW_GAP;
+    // the rows that fit above the EDIT row, which stays at the bottom of the panel
+    const ly = y + vspan(PY, ROW_Y), editY = y + h - 4 - ROW_H, vis = Math.max(1, Math.floor((editY - ROW_GAP - ly + ROW_GAP) / step));
+    this.listWin[s] = [x, ly, w, vis * step, vis];
+    // keep the cursor's row in view after it moves (the EDIT row is always in view)
+    const r = this.row[s];
+    if (this.follow[s] && r < list.length) this.top[s] = Math.max(Math.min(this.top[s], r), r - vis + 1);
+    this.follow[s] = false;
+    this.top[s] = Math.max(0, Math.min(Math.max(0, list.length - vis), this.top[s]));
+    const first = this.top[s], last = Math.min(list.length, first + vis);
+    if (first > 0) drawTextCentered(ui, '↑', x + w - 5, ly - 9, INK2, 1, false);
+    if (last < list.length) drawTextCentered(ui, '↓', x + w - 5, ly + vis * step - 1, INK2, 1, false);
+    for (let i = first; i <= list.length; i++) {
+      if (i >= last && i < list.length) continue;
+      const ry = i === list.length ? editY : ly + (i - first) * step, rx = x + 8, rw = w - 16, id = `d${s}:${i}`;
       const cursor = focused && this.row[s] === i && showSel();
       zone(id, rx, ry, rw, ROW_H);
       if (i === list.length) {
         const text = plaque(ui, rx, ry, rw, ROW_H, false, cursor ? GOLD : isHot(id) ? PAPER : FRAME);
-        drawTextCentered(ui, 'EDIT SPELL DECK...', rx + rw / 2, ry + 8, text, 1, false);
+        drawTextCentered(ui, customIdOf(pick) ? 'EDIT THIS SPELL DECK...' : 'EDIT YOUR SPELL DECKS...', rx + rw / 2, ry + 8, text, 1, false);
         continue;
       }
       const ch = list[i], on = ch.id === pick;
@@ -378,14 +411,28 @@ export class DeckSelectScene implements Scene {
       drawTextCentered(ui, 'LOCKED IN', UW / 2, y + 40, '#007800', 3, false);
       drawTextCentered(ui, tick % 16 < 12 ? 'WAITING FOR RIVAL...' : '', UW / 2, y + 80, INK2, 2, false);
     } else {
-      const rh = Math.max(TAP, Math.min(TAP + 18, Math.floor((stripY - GAP - y + GAP) / list.length) - GAP));
+      // rows grow to fill the space; past that the list scrolls (drag it)
+      const lh = stripY - GAP - y, rh = Math.max(TAP, Math.min(TAP + 18, Math.floor((lh + GAP) / list.length) - GAP));
+      const sc = this.scroller;
+      sc.max = Math.max(0, list.length * (rh + GAP) - GAP - lh);
+      if (this.follow[s] && this.row[s] < list.length) sc.reveal(this.row[s] * (rh + GAP), rh, lh);
+      this.follow[s] = false;
+      ui.save();
+      ui.beginPath(); ui.rect(a.x, y - 2, a.w, lh + 4); ui.clip();
       list.forEach((ch, i) => {
-        const ry = y + i * (rh + GAP), on = ch.id === pick;
-        bigButton(ui, `d${s}:${i}`, ' ', x0, ry, w, rh, { primary: on, on: !on && this.row[s] === i && !this.low && showSel() });
+        const ry = y + i * (rh + GAP) - Math.round(sc.pos), on = ch.id === pick;
+        if (ry + rh < y - 2 || ry > y + lh + 2) return;
+        bigButton(ui, `d${s}:${i}`, ' ', x0, ry, w, rh, { primary: on, on: !on && this.row[s] === i && !this.low && showSel(), clip: [y, lh] });
         this.icon(ui, ch, x0 + 10, ry + (rh - 40) / 2, 2, on);
         drawText(ui, ch.name, x0 + 62, ry + rh / 2 - 12, on ? PAPER : INK, 2);
         drawText(ui, ch.sub, x0 + 62, ry + rh / 2 + 6, on ? PAPER2 : ch.ok ? INK2 : RED_INK, 1);
       });
+      ui.restore();
+      if (sc.max > 0) {
+        const sh = Math.max(24, Math.round(lh * lh / (lh + sc.max)));
+        P(ui, BURN, a.x + a.w - 6, y, 4, lh);
+        P(ui, INK2, a.x + a.w - 6, y + Math.round((sc.pos / sc.max) * (lh - sh)), 4, sh);
+      }
     }
 
     // the picked deck at a glance, and EDIT

@@ -4,8 +4,8 @@ import {
   resetSaveForTests, getSave, setSave, flushSave, getReplays, setReplays, saveIsReadOnly, capReplays,
   SAVE_VERSION, RECENT_REPLAYS, MAX_KEPT_REPLAYS, type Legacy, type StoredReplay,
 } from '../src/engine/save';
-import { loadCustom, saveCustom } from '../src/game/deck';
-import { loadMatch } from '../src/game/match';
+import { customDecks, createCustom, saveCustom, renameCustom, cloneCustom, deleteCustom, MAX_CUSTOM_DECKS, DECK_NAME_MAX } from '../src/game/deck';
+import { loadMatch, sideDeck, deckLabel } from '../src/game/match';
 import { loadRecords } from '../src/game/arcade';
 
 let failed = 0;
@@ -57,8 +57,8 @@ async function main(): Promise<void> {
   check('arcade best carried over', loadRecords().mage?.time === 321);
   check('touch settings carried over', getSave('touch')?.size === 'L' && getSave('touch')?.left === true);
   check('match carried over', loadMatch().p1 === 'rogue' && loadMatch().bestOf === 5);
-  const deck = loadCustom('warrior');
-  check('deck carried over, unknown cards dropped', deck?.step_slash === 4 && !('not-a-card' in deck) && Object.keys(getSave('decks').warrior).length === 2);
+  const deck = customDecks('warrior')[0];
+  check('deck carried over, unknown cards dropped', deck?.cards.step_slash === 4 && !('not-a-card' in deck.cards) && deck.name === 'MY SPELL DECK' && Object.keys(getSave('decks').warrior[0].cards).length === 2);
   const reps = getReplays();
   check('replays carried over within the cap', reps.length === RECENT_REPLAYS + 1 && reps.some(r => r.id === 'r90') && reps[0].at >= reps[1].at);
   await settle();
@@ -68,10 +68,10 @@ async function main(): Promise<void> {
 
   // ---- round trip: a fresh boot on the same files sees the same save ----
   setSave('tutorialDone', false);
-  saveCustom('mage', { 'm-fireball': 2 });
+  createCustom('mage', 'BURN', { 'm-fireball': 2 });
   await settle();
   resetSaveForTests({ ...files }, legacyStore({ 'svs:tutorial': '1' }));
-  check('round trip', getSave('tutorialDone') === false && getSave('decks').mage['m-fireball'] === 2 && getSave('keys').up === 'KeyI');
+  check('round trip', getSave('tutorialDone') === false && getSave('decks').mage[0].cards['m-fireball'] === 2 && getSave('keys').up === 'KeyI');
   check('legacy keys ignored once a save exists', getSave('tutorialDone') === false);
 
   // ---- touch settings saved under their own key after save.json existed: taken in late, then dropped ----
@@ -92,7 +92,37 @@ async function main(): Promise<void> {
   // ---- hand-edited save can't reach Object.prototype or break types ----
   resetSaveForTests({ 'save.json': '{"game":"spell-vs-steel","v":1,"data":{"__proto__":{"polluted":1},"keys":{"up":5,"down":"KeyS"},"decks":{"__proto__":{"x":1},"rogue":{"r-stab":-1,"r-gouge":2}},"muted":"yes"}}' });
   check('no prototype pollution', ({} as Record<string, unknown>).polluted === undefined && Object.getPrototypeOf(getSave('decks')) === Object.prototype);
-  check('wrong types dropped', same(getSave('keys'), { down: 'KeyS' }) && same(getSave('decks').rogue, { 'r-gouge': 2 }) && getSave('muted') === false);
+  check('wrong types dropped', same(getSave('keys'), { down: 'KeyS' }) && same(getSave('decks').rogue[0].cards, { 'r-gouge': 2 }) && getSave('muted') === false);
+  resetSaveForTests({ 'save.json': '{"game":"spell-vs-steel","v":2,"data":{"decks":{"mage":[{"id":"d1","name":"A","cards":{}},{"id":"d1","name":"B","cards":{}},{"name":"C"},5],"rogue":{"r-stab":2}}}}' });
+  check('bad deck entries dropped', same(getSave('decks').mage.map(d => d.name), ['A']) && !('rogue' in getSave('decks')));
+
+  // ---- version 1 -> 2: the one custom deck per class becomes the first of a list, and the match setup follows ----
+  const v1 = { decks: { warrior: { step_slash: 4, guard: 2 }, mage: {} }, match: { p1: 'warrior', p1Deck: 'custom', cpu: 'mage', cpuDeck: 'custom' } };
+  resetSaveForTests({ 'save.json': JSON.stringify({ game: 'spell-vs-steel', v: 1, data: v1 }) });
+  check('v1 deck migrated', same(getSave('decks').warrior, [{ id: 'd1', name: 'MY SPELL DECK', cards: { step_slash: 4, guard: 2 } }]) && !('mage' in getSave('decks')));
+  check('v1 match deck migrated', loadMatch().p1Deck === 'custom:d1' && loadMatch().cpuDeck === 'starter');
+  check('migrated deck label', deckLabel('warrior', 'custom:d1') === 'MY SPELL DECK');
+
+  // ---- many decks per class: create, rename, clone, delete ----
+  resetSaveForTests();
+  const a = createCustom('rogue', 'my phantom', {})!, b = createCustom('rogue', 'MY PHANTOM', { shiv: 2 })!;
+  check('names cleaned and kept apart', a.name === 'MY PHANTOM' && b.name === 'MY PHANTOM 2' && a.id !== b.id);
+  saveCustom('rogue', b.id, { shiv: 3 });
+  check('save one deck', customDecks('rogue')[1].cards.shiv === 3 && same(customDecks('rogue')[0].cards, {}));
+  check('rename', renameCustom('rogue', a.id, 'night~ blade!') === 'NIGHT BLADE!' && customDecks('rogue')[0].name === 'NIGHT BLADE!');
+  check('blank rename refused', renameCustom('rogue', a.id, '  ~ ') === null && customDecks('rogue')[0].name === 'NIGHT BLADE!');
+  check('long names cut', renameCustom('rogue', a.id, 'X'.repeat(40))!.length === DECK_NAME_MAX);
+  const c = cloneCustom('rogue', a.id)!;
+  check('clone sits after its original', same(customDecks('rogue').map(d => d.id), [a.id, c.id, b.id]) && c.name.endsWith(' COPY') && c.name.length <= DECK_NAME_MAX);
+  deleteCustom('rogue', a.id);
+  check('delete', same(customDecks('rogue').map(d => d.id), [c.id, b.id]));
+  const fresh = createCustom('rogue', 'X', {})!;
+  check('ids never reused', ![a.id, b.id, c.id].includes(fresh.id));
+  while (customDecks('rogue').length < MAX_CUSTOM_DECKS) createCustom('rogue', 'FILL', {});
+  check('deck limit', createCustom('rogue', 'ONE MORE', {}) === null && cloneCustom('rogue', b.id) === null);
+  const m = { ...loadMatch(), p1: 'rogue' as const, p1Deck: `custom:${b.id}` };
+  check('unready deck fights as the starter', sideDeck(m, 0).length === 30);
+  check('gone deck fights as the starter', sideDeck({ ...m, p1Deck: 'custom:nope' }, 0).length === 30);
 
   // ---- a save from a newer build is read but never overwritten ----
   const newer = '{"game":"spell-vs-steel","v":999,"data":{"tutorialDone":true}}';
