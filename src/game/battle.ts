@@ -857,14 +857,19 @@ export class Battle {
    * paying pick i (negative = short by that much), `cost[i]` is what pick i costs once earlier picks'
    * cost changes (Arcane Power, Power Infusion, transforms) apply, `rest` is what the queue leaves for one
    * more spell. Resource gained mid-fight (Rage from hits) isn't counted, so it reads "affordable now".
-   * Mirrors costOf + cast's bookkeeping; timed effects are assumed to still be up.
+   * Mirrors costOf + cast's bookkeeping; timed effects are assumed to still be up. `dmg[i]` is the damage
+   * multiplier Arcane Blast's empower gives pick i (1 = none).
    */
-  planCosts(f: Fighter, cards: CardDef[]): { left: number[]; cost: number[]; rest: number } {
+  planCosts(f: Fighter, cards: CardDef[]): { left: number[]; cost: number[]; dmg: number[]; rest: number } {
     let free = f.st.avatar > 0 || f.st.ascendance > 0, less = f.st.powerInfusion > 0;
     const cap = f.cls === 'mage' ? TUNING.mage.manaCap : TUNING.warrior.rageMax;
     let max = f.cls === 'mage' ? f.resMax : cap, res = Math.floor(f.res), power = f.powerLeft;
-    const cost: number[] = [];
+    const cost: number[] = [], dmg: number[] = [];
+    let emp = f.empowered;
     const left = cards.map(card => {
+      dmg.push(card.damaging && emp > 0 ? emp : 1);
+      if (card.damaging) emp = 0;
+      if (card.empowers) emp = TUNING.mage.blastEmpower;
       let c = 0;
       if (!free) {
         c = card.cost === 'all' ? Math.max(1, res) : Math.max(0, card.cost - (power > 0 ? 1 : 0) - (less ? 1 : 0));
@@ -888,7 +893,7 @@ export class Battle {
       }
       return short;
     });
-    return { left, cost, rest: res };
+    return { left, cost, dmg, rest: res };
   }
 
   // ---------- attacks ----------

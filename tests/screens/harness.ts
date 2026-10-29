@@ -347,6 +347,21 @@ const screens: Record<string, () => void> = {
     const b = battle().b; b.endCustom([[], []]); run(1);
     const f = b.f[0]; f.powerLeft = 2; f.queue = ['flamestrike', 'fireball']; f.resMax = 4; f.res = 4; run(0.2);
   },
+  // Arcane Blast picked: the next damaging card in the hand shows +25% damage, with the cursor on it
+  'battle-draw-empowered': () => {
+    setScene(new BattleScene(match({ p1: 'mage', cpu: 'warrior' }))); run(0.2);
+    const s = battle(), b = s.b;
+    b.offer[0] = ['arcane_blast', 'ice_wall', 'meteor', 'deep_freeze', 'arcane_missiles'];
+    b.f[0].resMax = 5; b.f[0].res = 5;
+    (s as unknown as { picks: number[] }).picks = [0, 1];
+    s.cursor = 2; run(0.5);
+  },
+  // mid-fight, empowered with a damaging spell next: the next-spell plate shows +25%
+  'battle-player-empowered': () => {
+    setScene(new BattleScene(match({ p1: 'mage', cpu: 'warrior' }))); run(0.5);
+    const b = battle().b; b.endCustom([[], []]); run(1);
+    const f = b.f[0]; f.empowered = 1.25; f.queue = ['meteor', 'fireball']; f.resMax = 5; f.res = 5; run(0.2);
+  },
   'battle-fight': () => { watch(); run(8, () => battle().b.phase === 'over'); },
   // mid-fight as the player, so phones show the fight pad
   'battle-player': () => { setScene(new BattleScene(match({ p1: 'priest', cpu: 'ranger' }))); run(0.5); battle().b.endCustom([[0, 1], []]); run(3); },

@@ -8,7 +8,7 @@ import type { FrameId } from '../art/fighterFrames';
 import { P, UW, UH, blob, frame, glow, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '../engine/font';
 import { drawCardIcon, costSign, costDeltaText, RES_INK } from '../scenes/cardView';
-import { drawModValue } from '../scenes/modValue';
+import { drawModValue, drawDelta, pctText } from '../scenes/modValue';
 import { win, bar, pip as skinPip, toInk, PAPER, PAPER2, INK, INK2, TRIM, WAX_HI, RED_INK } from '../scenes/skin';
 import { COMBO_HOLD } from './combo';
 import { CARDS, ELEMENT_COLOR } from './cards';
@@ -826,14 +826,17 @@ function drawNextSpell(ui: Ctx, b: Battle, f: Fighter, key: string | null = k('c
   // a cost something has changed (Arcane Power, Power Infusion, a transform) shows in the modifier look
   const cost = b.costOf(f, card), sign = costSign(card, cost), delta = sign ? costDeltaText(card, cost) : '';
   const modW = sign ? 8 + textWidth(String(cost)) + 4 + textWidth(delta) + 4 : 0;
-  const tw = textWidth(s) + modW + (more ? textWidth(`  +${more}`) : 0);
+  // Arcane Blast's empower waiting on a damaging spell: its +25% tag
+  const emp = card.damaging && f.empowered > 0 ? pctText(f.empowered) : '', empW = emp ? 8 + textWidth(emp) + 4 : 0;
+  const tw = textWidth(s) + modW + empW + (more ? textWidth(`  +${more}`) : 0);
   const x = right ? UW - 16 - (tw + 28) : 0;
   win(ui, x + 8, UH - 23, tw + 28, 18, { burn: 3 });
   P(ui, '#000000', x + 11, UH - 19, 10, 10);
   P(ui, ok ? ELEMENT_COLOR[card.element] : '#7c7c7c', x + 12, UH - 18, 8, 8);
   drawText(ui, s, x + 25, UH - 18, ok ? INK : TRIM);
   if (sign) drawModValue(ui, String(cost), delta, sign, x + 25 + textWidth(s) + 8, UH - 18, INK);
-  if (more) drawText(ui, `+${more}`, x + 25 + textWidth(s) + modW + 12, UH - 18, INK2);
+  if (emp) drawDelta(ui, emp, 1, x + 25 + textWidth(s) + modW + 8, UH - 18);
+  if (more) drawText(ui, `+${more}`, x + 25 + textWidth(s) + modW + empW + 12, UH - 18, INK2);
   if (!ok) {
     const need = f.st.silenced > 0 ? 'SILENCED' : `NEED ${CLASS_INFO[card.cls].res}`;
     drawTextOutlined(ui, need, right ? x - textWidth(need) : tw + 44, UH - 18, '#f83800');

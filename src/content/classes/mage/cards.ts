@@ -176,7 +176,7 @@ export const mage: CardDef[] = [
   },
   {
     id: 'arcane_blast', name: 'Arcane Blast', cls: 'mage', cost: 2, rarity: 'uncommon', element: 'arcane', damaging: true, lock: 0.35,
-    dmg: '1300', short: 'Arcane hit on the enemy wherever they are. Your next damaging spell gets +25%.',
+    dmg: '1300', short: 'Arcane hit on the enemy wherever they are. Your next damaging spell gets +25%.', empowers: true,
     cast: x => {
       x.b.later(0.15, arcaneBlastHit(x));
       // set after this cast's own multiplier was taken, so it carries to the next damaging spell
