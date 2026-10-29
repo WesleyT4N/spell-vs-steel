@@ -3,7 +3,7 @@ import { getSave, setSave } from '../engine/save';
 import { defaultSkin, type ClassId } from '../art/sprites';
 import { CLASS_IDS } from './classes';
 import type { Difficulty } from './tuning';
-import { loadCustom, presetDeck, presetName, presetsFor, toList, validate } from './deck';
+import { customChoice, customDecks, customIdOf, getCustom, presetDeck, presetName, presetsFor, toList, validate } from './deck';
 
 /** Who plays a side in local Versus: someone at this keyboard, or the CPU. */
 export type Ctl = 'player' | 'cpu';
@@ -11,7 +11,7 @@ export type Ctl = 'player' | 'cpu';
 export interface MatchConfig {
   /** Left side's fighter and deck. (Named from when the left side was always you.) */
   p1: ClassId;
-  /** A side's deck: a ready-made deck id ('starter' or a Mythic deck), 'custom', or 'random' (a ready-made deck rolled each round). */
+  /** A side's deck: a ready-made deck id ('starter' or a Mythic deck), one of the player's own ('custom:<id>'), or 'random' (a ready-made deck rolled each round). */
   p1Deck: string;
   /** Right side's fighter and deck. */
   cpu: ClassId;
@@ -40,34 +40,38 @@ export function saveMatch(m: MatchConfig): void {
   setSave('match', JSON.parse(JSON.stringify(m)) as Record<string, unknown>);
 }
 
-/** The card list the player will fight with (falls back to the starter if the custom deck is invalid). */
+/** The card list the player will fight with (falls back to the starter if their own deck is gone or not ready). */
 export function playerDeck(m: MatchConfig): string[] { return sideDeck(m, 0); }
 
 /** A side's deck for one round: 'random' rolls a ready-made deck, and an id the class doesn't have becomes the starter. */
 export function rollDeck(m: MatchConfig, s: 0 | 1): string {
   const cls = s === 0 ? m.p1 : m.cpu, pick = s === 0 ? m.p1Deck : m.cpuDeck, list = presetsFor(cls);
-  if (pick === 'custom') return pick;
+  const own = customIdOf(pick);
+  if (own !== null) return getCustom(cls, own) ? pick : 'starter';
   if (pick === 'random') return list[Math.floor(Math.random() * list.length)].id;
   return list.some(p => p.id === pick) ? pick : 'starter';
 }
 
-/** The card list a side fights with: its class's custom deck if picked and valid (else the starter), or a ready-made deck. */
+/** The card list a side fights with: one of the player's own decks if picked and ready (else the starter), or a ready-made deck. */
 export function sideDeck(m: MatchConfig, s: 0 | 1, deck: string = rollDeck(m, s)): string[] {
-  const cls = s === 0 ? m.p1 : m.cpu;
-  if (deck === 'custom') {
-    const d = loadCustom(cls);
+  const cls = s === 0 ? m.p1 : m.cpu, own = customIdOf(deck);
+  if (own !== null) {
+    const d = getCustom(cls, own)?.cards;
     return toList(d && validate(d).length === 0 ? d : presetDeck(cls, 'starter'));
   }
   return toList(presetDeck(cls, deck));
 }
 
 /** How a deck choice reads in menus and the HUD. */
-export const deckLabel = (cls: ClassId, deck: string): string =>
-  deck === 'custom' ? 'CUSTOM' : deck === 'random' ? 'RANDOM' : presetName(cls, deck).toUpperCase();
+export function deckLabel(cls: ClassId, deck: string): string {
+  const own = customIdOf(deck);
+  if (own !== null) return getCustom(cls, own)?.name ?? 'CUSTOM';
+  return deck === 'random' ? 'RANDOM' : presetName(cls, deck).toUpperCase();
+}
 
-/** Steps through a class's deck choices: the ready-made decks, then custom, then random. */
+/** Steps through a class's deck choices: the ready-made decks, then the player's own, then random. */
 export function cycleDeck(cls: ClassId, cur: string, d: 1 | -1): string {
-  const ids = [...presetsFor(cls).map(p => p.id), 'custom', 'random'];
+  const ids = [...presetsFor(cls).map(p => p.id), ...customDecks(cls).map(c => customChoice(c.id)), 'random'];
   const i = ids.indexOf(cur);
   return ids[((i < 0 ? 0 : i) + d + ids.length) % ids.length];
 }

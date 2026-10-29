@@ -22,7 +22,7 @@ import { EncyclopediaScene } from '../../src/scenes/encyclopedia';
 import { LabScene } from '../../src/scenes/lab';
 import { ArcadeLadderScene, ArcadeClearScene } from '../../src/scenes/arcade';
 import { buildLadder, type ArcadeRun } from '../../src/game/arcade';
-import { loadMatch, type MatchConfig } from '../../src/game/match';
+import { loadMatch, saveMatch, type MatchConfig } from '../../src/game/match';
 import { PLAYABLE } from '../../src/game/classes';
 import { SKINS, type ClassId } from '../../src/art/sprites';
 import { LobbyScene } from '../../src/scenes/lobby';
@@ -44,7 +44,7 @@ import type { Packet } from '../../src/net/protocol';
 import { OnlineBattleScene } from '../../src/scenes/onlineBattle';
 import { startRanked } from '../../src/net/rating';
 import { roundRecord } from '../../src/game/stats';
-import { presetDeck, toList } from '../../src/game/deck';
+import { presetDeck, presetsFor, toList, createCustom, customChoice } from '../../src/game/deck';
 
 const STEP = 1 / 60;
 /** Run the current screen's update for `seconds` of game time without drawing (much faster than real frames). */
@@ -205,6 +205,20 @@ function onlineSetOver(rival: 'rematch' | 'change' | null = null): OnlineBattleS
 }
 const loadMatchDeck = (cls: ClassId = 'warrior'): string[] => toList(presetDeck(cls, 'starter'));
 
+/** `n` spell decks of your own for a class (the second one half built), the first picked for your next fight. */
+function myDecks(cls: ClassId = 'warrior', n = 3): string[] {
+  const p = presetsFor(cls);
+  const ids = Array.from({ length: n }, (_, i) => {
+    const src = p[i % p.length];
+    const cards = i === 1 ? Object.fromEntries(Object.entries(src.cards).slice(0, 6)) : src.cards;
+    return createCustom(cls, i === 1 ? 'WORK IN PROGRESS' : `MY ${src.name}`, cards)!.id;
+  });
+  saveMatch(match({ p1: cls, p1Deck: customChoice(ids[0]) }));
+  return ids;
+}
+type Builder = { listSel: number; onActs: boolean; actSel: number; act(a: string): void; naming: { entry: { text: string } } | null };
+const builder = (): Builder => getScene() as unknown as Builder;
+
 const screens: Record<string, () => void> = {
   'title': title,
   // the duel mid-flight: one shot of each kind crossing the menu (and the wind-up glow before the mage's)
@@ -232,6 +246,15 @@ const screens: Record<string, () => void> = {
   'deck-select-options': () => { const d = new DeckSelectScene(); d.low = true; d.chip = 1; setScene(d); },
   'deck-select-arcade': () => setScene(new DeckSelectScene('arcade')),
   'deck-select-training': () => setScene(new DeckSelectScene('training')),
+  // three decks of your own in the list, one of them picked; then eight, so the list scrolls to the cursor near the end
+  'deck-select-mine': () => { myDecks(); setScene(new DeckSelectScene()); },
+  'deck-select-many': () => {
+    myDecks('warrior', 8);
+    const d = new DeckSelectScene();
+    d.row[0] = 10;
+    (d as unknown as { follow: boolean[] }).follow[0] = true;
+    setScene(d);
+  },
   'select-training': () => setScene(new CharSelectScene(undefined, 0, 'training')),
   'select-tutorial': () => setScene(new CharSelectScene(undefined, 0, 'tutorial')),
   'stage-select': () => setScene(new StageSelectScene()),
@@ -265,6 +288,15 @@ const screens: Record<string, () => void> = {
   // a ready-made deck's spells open over the start-from picker (on phones in portrait; wider screens list it on hover)
   'deck-builder-peek': () => { const d = new DeckBuilderScene('ranger', title); (d as unknown as { peek: number; pickSel: number }).peek = 1; (d as unknown as { pickSel: number }).pickSel = 1; setScene(d); },
   ...Object.fromEntries(PLAYABLE.map(c => [`deck-builder-${c}`, () => setScene(new DeckBuilderScene(c, title))])),
+  // your decks: the list; one opened (its actions on wider screens, its sheet on phones); DELETE pressed once
+  'deck-builder-list': () => { myDecks(); setScene(new DeckBuilderScene('warrior', title)); },
+  'deck-builder-actions': () => { myDecks(); setScene(new DeckBuilderScene('warrior', title)); Object.assign(builder(), { listSel: 1, onActs: true, actSel: 2 }); },
+  'deck-builder-delete': () => { myDecks(); setScene(new DeckBuilderScene('warrior', title)); Object.assign(builder(), { onActs: true, actSel: 3 }); builder().act('DELETE'); },
+  // renaming: typing on a keyboard, and picking letters on a pad
+  'deck-builder-rename': () => { myDecks(); setScene(new DeckBuilderScene('warrior', title)); builder().act('RENAME'); builder().naming!.entry.text = 'EARTHQUAKE'; },
+  'deck-builder-rename-pad': () => { fakePad(); myDecks(); setScene(new DeckBuilderScene('warrior', title)); builder().act('RENAME'); run(0.1); },
+  // editing one of your decks (opened from the deck select's EDIT)
+  'deck-builder-edit': () => { const [id] = myDecks('mage'); setScene(new DeckBuilderScene('mage', title, id)); },
   // the opening Draw screen, with you on the left against the CPU
   'battle-draw': () => { setScene(new BattleScene(match({ p1: 'warrior', cpu: 'mage' }))); run(0.5); },
   'battle-fight': () => { watch(); run(8, () => battle().b.phase === 'over'); },
