@@ -23,6 +23,7 @@ import { LabScene } from '../../src/scenes/lab';
 import { ArcadeLadderScene, ArcadeClearScene } from '../../src/scenes/arcade';
 import { buildLadder, type ArcadeRun } from '../../src/game/arcade';
 import { loadMatch, saveMatch, type MatchConfig } from '../../src/game/match';
+import { encodeDeckCode } from '../../src/game/deckCode';
 import { PLAYABLE } from '../../src/game/classes';
 import { SKINS, type ClassId } from '../../src/art/sprites';
 import { LobbyScene } from '../../src/scenes/lobby';
@@ -295,6 +296,10 @@ const screens: Record<string, () => void> = {
   // renaming: typing on a keyboard, and picking letters on a pad
   'deck-builder-rename': () => { myDecks(); setScene(new DeckBuilderScene('warrior', title)); builder().act('RENAME'); builder().naming!.entry.text = 'EARTHQUAKE'; },
   'deck-builder-rename-pad': () => { fakePad(); myDecks(); setScene(new DeckBuilderScene('warrior', title)); builder().act('RENAME'); run(0.1); },
+  // a new deck asks for its name first (a ready-made start, on a keyboard and on a pad), and so does CLONE
+  'deck-builder-new-name': () => { setScene(new DeckBuilderScene('priest', title)); builder().choosePick('starter'); },
+  'deck-builder-new-name-pad': () => { fakePad(); setScene(new DeckBuilderScene('priest', title)); run(0.1); builder().choosePick('empty'); run(0.1); },
+  'deck-builder-clone-name': () => { myDecks(); setScene(new DeckBuilderScene('warrior', title)); builder().act('CLONE'); },
   // SHARE on one of your decks: the code to copy and the import box (a pad gets its button hints); the import-only
   // panel from the start-from picker, with a refused code's reason showing
   'deck-builder-share': () => { myDecks(); setScene(new DeckBuilderScene('warrior', title)); builder().act('SHARE'); },
@@ -304,6 +309,14 @@ const screens: Record<string, () => void> = {
     const d = builder(); d.choosePick('import');
     const box = document.querySelector<HTMLTextAreaElement>('.svs-share textarea')!;
     box.value = 'SVS1-MAGE-4ZZZZ12';
+    document.querySelectorAll<HTMLButtonElement>('.svs-share button').forEach(b => { if (b.textContent === 'Import') b.click(); });
+  },
+  // a good code asks for the new deck's name (its own name filled in) before it is saved
+  'deck-builder-import-name': () => {
+    setScene(new DeckBuilderScene('mage', title));
+    builder().choosePick('import');
+    const box = document.querySelector<HTMLTextAreaElement>('.svs-share textarea')!;
+    box.value = encodeDeckCode({ cls: 'rogue', name: 'KNIFE PARTY', deck: presetsFor('rogue')[0].cards });
     document.querySelectorAll<HTMLButtonElement>('.svs-share button').forEach(b => { if (b.textContent === 'Import') b.click(); });
   },
   // editing one of your decks (opened from the deck select's EDIT)

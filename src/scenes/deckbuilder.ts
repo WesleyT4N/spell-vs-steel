@@ -12,7 +12,7 @@ import { touchActive, type PadMode } from '../engine/touch';
 import { sfx } from '../engine/audio';
 import { cardsFor, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef } from '../game/cards';
 import {
-  canAdd, countRarity, deckSize, customDecks, getCustom, createCustom, saveCustom, renameCustom, cloneCustom, deleteCustom, cleanDeckName,
+  canAdd, countRarity, deckSize, customDecks, getCustom, createCustom, saveCustom, renameCustom, cloneCustom, deleteCustom, cleanDeckName, copyName, freeDeckName,
   customChoice, customIdOf, presetsFor, validate, DECK_SIZE, MAX_LEGENDARIES, MAX_CUSTOM_DECKS, DECK_NAME_MAX, type DeckCounts, type DeckPreset,
 } from '../game/deck';
 import type { SavedDeck } from '../engine/save';
@@ -65,8 +65,8 @@ export class DeckBuilderScene implements Scene {
   private armed: string | null = null;
   /** The deck being edited. */
   private editing: string | null = null;
-  /** Renaming a deck: the name box, and which deck. */
-  private naming: { entry: NameEntry; id: string } | null = null;
+  /** Naming a deck (renaming one, or a new deck before it is made): the name box, and what OK does with the name. */
+  private naming: { entry: NameEntry; done: (name: string) => void } | null = null;
   /** Phone layout: the list's scroll. */
   private lscroller = new Scroller();
   private lrect: [number, number, number, number] = [0, 0, 0, 0];
@@ -126,12 +126,21 @@ export class DeckBuilderScene implements Scene {
     if (a !== 'DELETE') this.armed = null;
     if (a === 'EDIT') { this.edit(d.id); return; }
     if (a === 'SHARE') { this.openShare(); return; }
-    if (a === 'RENAME') { this.naming = { entry: new NameEntry(d.name, 'NAME THIS SPELL DECK', cleanDeckName, DECK_NAME_MAX), id: d.id }; sfx('select'); return; }
+    if (a === 'RENAME') {
+      this.askName(d.name, 'NAME THIS SPELL DECK', name => {
+        const got = renameCustom(this.cls, d.id, name);
+        if (got) { this.flash(`RENAMED TO ${got}`); sfx('confirm'); }
+      });
+      return;
+    }
     if (a === 'CLONE') {
-      const c = cloneCustom(this.cls, d.id);
-      if (!c) { this.flash(`${MAX_CUSTOM_DECKS} SPELL DECKS IS THE MOST: DELETE ONE FIRST`); sfx('deny'); return; }
-      this.listSel = this.decks.findIndex(x => x.id === c.id);
-      this.flash(`COPIED AS ${c.name}`); sfx('confirm');
+      if (this.full()) return;
+      this.askName(copyName(this.cls, d.name), 'NAME THE COPY', name => {
+        const c = cloneCustom(this.cls, d.id, name);
+        if (!c) { this.full(); return; }
+        this.listSel = this.decks.findIndex(x => x.id === c.id);
+        this.flash(`COPIED AS ${c.name}`); sfx('confirm');
+      });
       return;
     }
     // DELETE asks twice
@@ -148,15 +157,24 @@ export class DeckBuilderScene implements Scene {
     this.flash(`DELETED ${d.name}`); sfx('back');
   }
 
-  /** The rename box takes the input while it is open. */
+  /** Open the name box on `name`; OK hands the typed name to `done`, CANCEL leaves everything as it was. */
+  private askName(name: string, title: string, done: (name: string) => void): void {
+    this.naming = { entry: new NameEntry(name, title, cleanDeckName, DECK_NAME_MAX), done };
+    sfx('select');
+  }
+
+  /** The name box takes the input while it is open. */
   private updateNaming(dt: number): void {
     const n = this.naming!, r = n.entry.update(dt);
     if (r === 'cancel') this.naming = null;
-    if (r === 'ok') {
-      const name = renameCustom(this.cls, n.id, n.entry.text);
-      this.naming = null;
-      if (name) { this.flash(`RENAMED TO ${name}`); sfx('confirm'); }
-    }
+    if (r === 'ok') { this.naming = null; n.done(n.entry.text); }
+  }
+
+  /** True (and says so) when the class already has the most decks it can. */
+  private full(): boolean {
+    if (this.decks.length < MAX_CUSTOM_DECKS) return false;
+    this.flash(`${MAX_CUSTOM_DECKS} SPELL DECKS IS THE MOST: DELETE ONE FIRST`); sfx('deny');
+    return true;
   }
 
   /** The list of your decks takes the input while it shows (wider screens; phones use updateTall). */
@@ -193,7 +211,7 @@ export class DeckBuilderScene implements Scene {
 
   /** On to the start-from picker, if there is room for another deck. */
   private newDeck(): void {
-    if (this.decks.length >= MAX_CUSTOM_DECKS) { this.flash(`${MAX_CUSTOM_DECKS} SPELL DECKS IS THE MOST: DELETE ONE FIRST`); sfx('deny'); return; }
+    if (this.full()) return;
     this.listing = false;
     this.openPicker();
     sfx('select');
@@ -221,14 +239,17 @@ export class DeckBuilderScene implements Scene {
     });
   }
 
-  /** A legal imported spell deck becomes a new deck of its class (switching to that class if needed). */
+  /** A legal imported spell deck becomes a new deck of its class (switching to that class if needed), once it is named. */
   private applyImport(g: SpellDeck): void {
-    if (g.cls !== this.cls) { this.cls = g.cls; this.loadCards(); }
-    const made = createCustom(this.cls, g.name ?? 'IMPORTED', g.deck);
-    if (!made) { this.openList(); this.flash(`${MAX_CUSTOM_DECKS} SPELL DECKS IS THE MOST: DELETE ONE FIRST`); sfx('deny'); return; }
-    this.edit(made.id, false);
-    this.flash(`IMPORTED AS ${made.name}`);
-    sfx('confirm');
+    if (g.cls !== this.cls) { this.cls = g.cls; this.loadCards(); if (this.picks) this.openPicker(); }
+    if (this.full()) { this.openList(); return; }
+    this.askName(freeDeckName(this.cls, g.name ?? 'IMPORTED'), 'NAME THE IMPORTED DECK', name => {
+      const made = createCustom(this.cls, name, g.deck);
+      if (!made) { this.full(); return; }
+      this.edit(made.id, false);
+      this.flash(`IMPORTED AS ${made.name}`);
+      sfx('confirm');
+    });
   }
 
   /** Show the start-from picker for a new deck, on the ready-made deck picked for the fight. */
@@ -248,11 +269,15 @@ export class DeckBuilderScene implements Scene {
   private choosePick(id: string): void {
     if (id === 'import') { this.openShare(); return; }
     const p = this.presets.find(x => x.id === id);
-    const made = createCustom(this.cls, p ? `MY ${p.name}` : 'SPELL DECK', p ? p.cards : {});
-    if (!made) { this.flash(`${MAX_CUSTOM_DECKS} SPELL DECKS IS THE MOST: DELETE ONE FIRST`); sfx('deny'); return; }
-    this.edit(made.id, false);
-    this.flash(p ? `NEW DECK FROM ${p.name.toUpperCase()}` : 'NEW EMPTY SPELL DECK');
-    sfx('select');
+    if (this.full()) return;
+    // name it first; CANCEL goes back to the picker
+    this.askName(freeDeckName(this.cls, p ? `MY ${p.name}` : 'SPELL DECK'), 'NAME YOUR NEW SPELL DECK', name => {
+      const made = createCustom(this.cls, name, p ? p.cards : {});
+      if (!made) { this.full(); return; }
+      this.edit(made.id, false);
+      this.flash(`NEW SPELL DECK: ${made.name}`);
+      sfx('confirm');
+    });
   }
 
   /** The one row above the cards reopens the start-from picker. */
