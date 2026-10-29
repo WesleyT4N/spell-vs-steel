@@ -534,7 +534,7 @@ export class BattleScene implements Scene {
     if (this.timed) drawTextCentered(ui, String(secs).padStart(2, '0'), UW / 2, 8, secs <= 5 && tick % 4 < 2 ? WAX_HI : RED_INK, 2, false);
     else drawTextCentered(ui, 'NO TIME LIMIT', UW / 2, 11, INK2, 1, false);
     this.drawResourcePreview(ui, tick);
-    const { short, cost } = this.handPlan();
+    const { short, cost, dmg } = this.handPlan();
     const total = this.picks.reduce((a, i) => a + cost[i], 0);
     // Rage is earned in the fight and paid on cast, so a short Warrior card is "later", not "can't"
     const builds = f.cls === 'warrior';
@@ -543,7 +543,7 @@ export class BattleScene implements Scene {
     const card = showSel() && offer[this.cursor] ? CARDS[offer[this.cursor]] : null;
     win(ui, 8, 34, 228, 130, { accent: card ? ELEMENT_COLOR[card.element] : undefined });
     if (card) {
-      drawCardDetail(ui, card, 18, 44, 208, 1, cost[this.cursor]);
+      drawCardDetail(ui, card, 18, 44, 208, 1, cost[this.cursor], dmg[this.cursor]);
       const need = short[this.cursor];
       if (need > 0) {
         if (builds) drawText(ui, `BUILD ${need} MORE ${resName(card)} IN THE FIGHT`, 18, 150, resInk(card));
@@ -581,7 +581,7 @@ export class BattleScene implements Scene {
       // the hit box covers every raise level, so a rising card never slips out from under the pointer
       zone(`card:${i}`, x, HAND_Y - 2 * LIFT, CARD_W, CARD_H + 2 * LIFT);
       const y = HAND_Y - Math.round(this.lift[i] ?? 0);
-      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1 || (lvl === 2 && this.cursor === i && showSel()), short: short[i], builds, cost: cost[i] });
+      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1 || (lvl === 2 && this.cursor === i && showSel()), short: short[i], builds, cost: cost[i], dmg: dmg[i] });
       if (!this.mouseMode && this.cursor === i && showSel() && tick % 8 < 6) drawTextCentered(ui, '↓', x + CARD_W / 2, y - 10, GOLD, 1, true);
     });
     const s = this.me, done = this.twoPlayer && s === 0 ? 'DONE' : 'FIGHT';
@@ -624,7 +624,7 @@ export class BattleScene implements Scene {
     const clipH = Math.min(150, Math.floor(h * 0.42));
     this.preview.draw(ui, x + 10, y + 10, w - 20, clipH);
     const plan = this.handPlan();
-    drawCardDetail(ui, card, x + 14, y + clipH + 20, w - 28, h - clipH > 200 ? 2 : 1, plan.cost[i]);
+    drawCardDetail(ui, card, x + 14, y + clipH + 20, w - 28, h - clipH > 200 ? 2 : 1, plan.cost[i], plan.dmg[i]);
     const need = plan.short[i];
     if (need > 0) drawText(ui, this.b.f[this.me].cls === 'warrior' ? `BUILD ${need} MORE ${resName(card)} IN THE FIGHT` : `NEED ${need} MORE ${resName(card)}`, x + 14, y + h - 20, this.b.f[this.me].cls === 'warrior' ? resInk(card) : RED_INK);
   }
@@ -633,7 +633,7 @@ export class BattleScene implements Scene {
   private drawCustomBelow(ui: Ctx, tick: number, top: number, a: { x: number; w: number }): void {
     const b = this.b, f = b.f[this.me], offer = b.offer[this.me];
     const x0 = a.x + PAD, w = a.w - PAD * 2;
-    const { short, cost } = this.handPlan(), builds = f.cls === 'warrior';
+    const { short, cost, dmg } = this.handPlan(), builds = f.cls === 'warrior';
     // header: turn, a big timer, the resource
     win(ui, x0 - 8, top + 12, w + 16, 40, { burn: 3 });
     drawText(ui, `TURN ${b.turn}`, x0 + 4, top + 26, this.twoPlayer ? (this.me === 0 ? RED_INK : BLUE_INK) : INK, 2);
@@ -655,7 +655,7 @@ export class BattleScene implements Scene {
       const order = this.picks.indexOf(i), lvl = this.level(i);
       zone(`card:${i}`, x - 4, handY - 2 * LIFT, CARD_W + 8, CARD_H + 2 * LIFT + 10);
       const y = handY - Math.round(this.lift[i] ?? 0);
-      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1, short: short[i], builds, cost: cost[i] });
+      drawCardFace(ui, CARDS[id], x, y, { order, lit: lvl === 1, short: short[i], builds, cost: cost[i], dmg: dmg[i] });
     });
     // the cast order: five slots
     const slotY = handY - 2 * LIFT - 14 - 44, n = 5, slw = Math.floor((w - GAP * (n - 1)) / n);
@@ -763,22 +763,23 @@ export class BattleScene implements Scene {
   }
 
   /**
-   * Each hand card's cost and how much resource it is missing right now (0 = payable). Picked cards are
+   * Each hand card's cost, damage multiplier (Arcane Blast's empower) and how much resource it is missing right now (0 = payable). Picked cards are
    * checked at their place in the cast order; the rest as if queued next, after what the picks spend, gain
    * and discount (Arcane Power picked first shows the next spells 1 cheaper).
    */
-  private handPlan(): { short: number[]; cost: number[] } {
+  private handPlan(): { short: number[]; cost: number[]; dmg: number[] } {
     const b = this.b, f = b.f[this.me], offer = b.offer[this.me];
     const picked = this.picks.map(i => CARDS[offer[i]]);
     const plan = b.planCosts(f, picked);
-    const short: number[] = [], cost: number[] = [];
+    const short: number[] = [], cost: number[] = [], dmg: number[] = [];
     offer.forEach((id, i) => {
       const at = this.picks.indexOf(i);
       const p = at >= 0 ? plan : b.planCosts(f, [...picked, CARDS[id]]), n = at >= 0 ? at : picked.length;
       short.push(Math.max(0, -p.left[n]));
       cost.push(p.cost[n]);
+      dmg.push(p.dmg[n]);
     });
-    return { short, cost };
+    return { short, cost, dmg };
   }
 
   /** Header resource pips, with what the picked spells would add blinking in. */

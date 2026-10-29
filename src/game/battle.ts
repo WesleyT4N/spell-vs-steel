@@ -99,6 +99,8 @@ export interface Fighter {
   castStun: number;
   /** Cold Blood: the next attack spell deals double. */
   coldBlood: boolean;
+  /** Arcane Blast: damage multiplier on the next damaging spell (0 = none). */
+  empowered: number;
   /** Shadow Clone: where the decoy stands. */
   decoyCol: number;
   decoyRow: number;
@@ -855,14 +857,19 @@ export class Battle {
    * paying pick i (negative = short by that much), `cost[i]` is what pick i costs once earlier picks'
    * cost changes (Arcane Power, Power Infusion, transforms) apply, `rest` is what the queue leaves for one
    * more spell. Resource gained mid-fight (Rage from hits) isn't counted, so it reads "affordable now".
-   * Mirrors costOf + cast's bookkeeping; timed effects are assumed to still be up.
+   * Mirrors costOf + cast's bookkeeping; timed effects are assumed to still be up. `dmg[i]` is the damage
+   * multiplier Arcane Blast's empower gives pick i (1 = none).
    */
-  planCosts(f: Fighter, cards: CardDef[]): { left: number[]; cost: number[]; rest: number } {
+  planCosts(f: Fighter, cards: CardDef[]): { left: number[]; cost: number[]; dmg: number[]; rest: number } {
     let free = f.st.avatar > 0 || f.st.ascendance > 0, less = f.st.powerInfusion > 0;
     const cap = f.cls === 'mage' ? TUNING.mage.manaCap : TUNING.warrior.rageMax;
     let max = f.cls === 'mage' ? f.resMax : cap, res = Math.floor(f.res), power = f.powerLeft;
-    const cost: number[] = [];
+    const cost: number[] = [], dmg: number[] = [];
+    let emp = f.empowered;
     const left = cards.map(card => {
+      dmg.push(card.damaging && emp > 0 ? emp : 1);
+      if (card.damaging) emp = 0;
+      if (card.empowers) emp = TUNING.mage.blastEmpower;
       let c = 0;
       if (!free) {
         c = card.cost === 'all' ? Math.max(1, res) : Math.max(0, card.cost - (power > 0 ? 1 : 0) - (less ? 1 : 0));
@@ -886,7 +893,7 @@ export class Battle {
       }
       return short;
     });
-    return { left, cost, rest: res };
+    return { left, cost, dmg, rest: res };
   }
 
   // ---------- attacks ----------
@@ -1394,6 +1401,7 @@ export class Battle {
       if (f.shout > 0) { mult *= f.shout; f.shout = 0; }
       if (f.rallyLeft > 0) { mult *= 1.3; f.rallyLeft--; }
       if (f.coldBlood) { mult *= 2; f.coldBlood = false; }
+      if (f.empowered > 0) { mult *= f.empowered; f.empowered = 0; }
       if (f.st.vanishStun > 0) { f.st.vanishStun = 0; f.castStun = TUNING.rogue.vanishStun; }
     }
     this.sound('cast_' + card.element, { pan: panOf(f.col) });
@@ -1573,7 +1581,7 @@ function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => nu
     deck: shuffle(deck, rand), discard: [], queue: [], shields: [], st,
     shout: 0, rallyLeft: 0, powerLeft: 0, frostNovaUsed: false, lastStandAbsorbed: 0, glacialCd: 0,
     poison: 0, poisonT: 0, poisonAcc: 0, dodges: 0,
-    homeCol: -1, homeRow: -1, castTimes: [], castSeq: 0, dpSeq: 0, castStun: 0, coldBlood: false, decoyCol: 0, decoyRow: 0,
+    homeCol: -1, homeRow: -1, castTimes: [], castSeq: 0, dpSeq: 0, castStun: 0, coldBlood: false, empowered: 0, decoyCol: 0, decoyRow: 0,
     stillT: 0, lastCol: -1, lastRow: -1, dots: [], deathMarkAcc: 0,
     flash: 0, pose: 'idle', poseT: 0, dead: false,
   };

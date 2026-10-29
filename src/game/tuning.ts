@@ -50,6 +50,10 @@ export const TUNING = {
     manaCap: 5,
     /** Counterspell also silences the caster it cancels for this long. */
     counterSilence: 3,
+    /** Meteor: seconds from cast until it lands (the plus-shape warning shows the whole time). */
+    meteorFall: 1.5,
+    /** Arcane Blast: damage multiplier on the caster's next damaging spell. */
+    blastEmpower: 1.25,
   },
 
   // Draft classes (Rogue, Ranger, Priest): basics follow the same x0.7 scale as Warrior and Mage.

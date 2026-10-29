@@ -34,5 +34,12 @@ compare('mage', ['ascendance', 'fireball', 'meteor'], 5);
 compare('priest', ['power_infusion', 'power_infusion'], 5);
 compare('warrior', ['avatar_of_war', 'avatar_of_war'], 5);
 
+// Arcane Blast's empower lands on the next damaging pick only, skipping spells that deal none
+{
+  const b = new Battle({ cls: 'mage', deck: toList(starterDeck('mage')), name: 'A' }, { cls: 'warrior', deck: toList(starterDeck('warrior')), name: 'B' }, 1);
+  const dmg = b.planCosts(b.f[0], ['arcane_blast', 'ice_wall', 'fireball', 'fireball'].map(id => CARDS[id])).dmg;
+  check(`mage arcane_blast > ice_wall > fireball > fireball: dmg ${dmg.join(',')}`, dmg.join() === '1,1,1.25,1');
+}
+
 if (failed) { console.log(`${failed} failed`); process.exit(1); }
 console.log('plan costs: all match');

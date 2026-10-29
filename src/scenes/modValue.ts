@@ -22,6 +22,9 @@ export function modSign(base: number, now: number, lowerIsBetter: boolean): numb
 /** Ink for a value that is `sign` (see modSign), `plain` when unchanged. */
 export const modInk = (sign: number, plain: string): string => (sign > 0 ? BUFF_INK : sign < 0 ? NERF_INK : plain);
 
+/** A damage multiplier's change as text: 1.25 -> +25%. */
+export const pctText = (mult: number): string => deltaText(Math.round((mult - 1) * 100)) + '%';
+
 /** The change as text: -1, +300. */
 export const deltaText = (delta: number): string => (delta > 0 ? `+${delta}` : String(delta));
 

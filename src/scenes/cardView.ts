@@ -5,7 +5,7 @@ import { drawText, drawTextCentered, textWidth, wrap } from '../engine/font';
 import { ELEMENT_COLOR, RARITY_COLOR, type CardDef, type Element } from '../game/cards';
 import { CLASS_INFO } from '../game/classes';
 import { cardIconCanvas, ICON_SIZE } from '../art/cardIcons';
-import { modSign, modInk, drawDelta, deltaText, BUFF_WAX, NERF_WAX } from './modValue';
+import { modSign, modInk, drawDelta, deltaText, pctText, BUFF_WAX, NERF_WAX } from './modValue';
 
 const EMBLEM: Record<Element | 'shield', string[]> = {
   shield: ['#########', '####.####', '####.####', '#.......#', '####.####', '.###.###.', '.###.###.', '..##.##..', '...#.#...'],
@@ -59,8 +59,8 @@ function artBox(el: Element, w: number, h: number): HTMLCanvasElement {
 }
 
 /** Name, rarity, cost, damage and rules text in a column `w` pixels wide, in ink for a parchment window. Returns the y below it. */
-/** `cost` is what the card costs right now, when something has changed it (shown in the modifier look). */
-export function drawCardDetail(c: Ctx, card: CardDef, x: number, y: number, w: number, z = 1, cost?: number): number {
+/** `cost` is what the card costs right now, when something has changed it (shown in the modifier look); `dmg` its damage multiplier. */
+export function drawCardDetail(c: Ctx, card: CardDef, x: number, y: number, w: number, z = 1, cost?: number, dmg = 1): number {
   const chars = Math.floor(w / (6 * z));
   let yy = y;
   const big = textWidth(card.name.toUpperCase(), 2 * z) <= w;
@@ -76,7 +76,13 @@ export function drawCardDetail(c: Ctx, card: CardDef, x: number, y: number, w: n
   drawText(c, ` ${resName(card)}`, cx, yy, resInk(card), z); cx += textWidth(` ${resName(card)}`, z);
   if (sign) drawDelta(c, costDeltaText(card, cost!), sign, cx + 6, yy + (z - 1) * 3);
   yy += 11 * z;
-  if (card.dmg !== '-') { drawText(c, `DAMAGE ${card.dmg.toUpperCase()}`, x, yy, RED_INK, z); yy += 11 * z; }
+  if (card.dmg !== '-') {
+    // DAMAGE 1850 [+25%]: an empowered hit, in the modifier look
+    const t = `DAMAGE ${card.dmg.toUpperCase()}`, up = modSign(1, dmg, false);
+    drawText(c, t, x, yy, modInk(up, RED_INK), z);
+    if (up) drawDelta(c, pctText(dmg), up, x + textWidth(t, z) + 6, yy + (z - 1) * 3);
+    yy += 11 * z;
+  }
   yy += 6 * z;
   for (const line of wrap(card.short.toUpperCase(), chars)) { drawText(c, line, x, yy, INK, z); yy += 11 * z; }
   return yy;
@@ -96,7 +102,7 @@ export const CARD_H = 104;
  * it costs right now: when that differs from the print, the seal turns green (cheaper) or grey (dearer)
  * and the printed cost sits struck through beside it.
  */
-export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: { order?: number; lit?: boolean; faded?: boolean; short?: number; builds?: boolean; cost?: number } = {}): void {
+export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: { order?: number; lit?: boolean; faded?: boolean; short?: number; builds?: boolean; cost?: number; dmg?: number } = {}): void {
   const w = CARD_W, h = CARD_H, order = opts.order ?? -1;
   const edge = order >= 0 ? WAX : opts.lit ? GOLD : FRAME;
   P(c, 'rgba(40,20,0,0.5)', x + 3, y + 3, w, h); // drop shadow
@@ -125,10 +131,12 @@ export function drawCardFace(c: Ctx, card: CardDef, x: number, y: number, opts: 
   c.drawImage(artBox(card.element, aw, ah), ax, ay);
   drawSpellArt(c, card, ax + aw / 2, ay + ah / 2, 2);
   // damage
-  const d = card.dmg === '-' ? '' : card.dmg.toUpperCase();
+  const d = card.dmg === '-' ? '' : card.dmg.toUpperCase(), up = d ? modSign(1, opts.dmg ?? 1, false) : 0, dInk = modInk(up, RED_INK);
   if (!d) drawTextCentered(c, 'EFFECT', x + w / 2, y + 87, INK2, 1, false);
-  else if (textWidth(d, 2) <= w - 8) drawTextCentered(c, d, x + w / 2, y + 84, RED_INK, 2, false);
-  else drawTextCentered(c, d.slice(0, 12), x + w / 2, y + 87, RED_INK, 1, false);
+  else if (textWidth(d, 2) <= w - 8) drawTextCentered(c, d, x + w / 2, y + 84, dInk, 2, false);
+  else drawTextCentered(c, d.slice(0, 12), x + w / 2, y + 87, dInk, 1, false);
+  // an empowered hit: green damage and its +25% tag in the art's top-right corner (clear of the NEED tag)
+  if (up) { const t = pctText(opts.dmg!); drawDelta(c, t, up, ax + aw - textWidth(t) - 5, ay + 3); }
   if (opts.faded || hard) { c.fillStyle = `rgba(60,40,10,${opts.faded || !opts.lit ? 0.45 : 0.2})`; c.fillRect(x, y, w, h); }
   if (short > 0) {
     const tag = hard ? `NEED ${short}` : `+${short} ${resName(card)}`, tw = textWidth(tag) + 6;

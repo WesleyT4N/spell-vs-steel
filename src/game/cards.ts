@@ -27,6 +27,8 @@ export interface CardDef {
    * `free` = every spell costs nothing (Avatar, Ascendance). Display only; `cast` applies the real effect.
    */
   costMod?: { next?: number; less?: boolean; free?: boolean };
+  /** The caster's next damaging spell deals more (Arcane Blast, by TUNING.mage.blastEmpower). Display only, like costMod. */
+  empowers?: boolean;
   /** Only castable while the caster is in Stealth (Ambush); otherwise it waits at the top of the queue. */
   needsStealth?: boolean;
   /** One-line rules text (keep under ~90 chars, it has to fit a 240px screen). */
