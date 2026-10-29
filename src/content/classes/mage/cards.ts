@@ -281,10 +281,10 @@ export const mage: CardDef[] = [
   },
   {
     id: 'inferno', name: 'Inferno', cls: 'mage', cost: 5, rarity: 'mythic', element: 'fire', damaging: true, lock: 0.5,
-    dmg: '290/s', short: 'All enemy panels burn for 10s. Outlasts the next custom screen.',
+    dmg: '300/s', short: 'All enemy panels burn for 10s. Outlasts the next custom screen.',
     cast: x => {
       x.b.cheer = 2;
-      for (const [c, r] of allEnemyPanels(x.b, x.f.side)) { x.b.burn(c, r, 10, 290 * x.mult); x.b.addFx('explode', x.f.side, c, r, 0.3); }
+      for (const [c, r] of allEnemyPanels(x.b, x.f.side)) { x.b.burn(c, r, 10, 300 * x.mult); x.b.addFx('explode', x.f.side, c, r, 0.3); }
     },
   },
   {

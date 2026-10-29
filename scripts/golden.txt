@@ -1,4 +1,4 @@
-cards 53f34572
+cards 3750df48
 classes 348dbf39
 decks 6b351d59
 tuning afea3643
@@ -86,7 +86,7 @@ priest starter vs warrior starter seed 7400: 5307 frames, winner 1, hp 0/20, tur
 priest lightbringer vs warrior earthshaker seed 7401: 4062 frames, winner 0, hp 3950/0, turns 6, hash 9ba496b0
 priest sanctifier vs warrior juggernaut seed 7402: 3525 frames, winner 1, hp 0/2754, turns 5, hash d6decdd1
 priest voidcaller vs warrior bulwark seed 7403: 3348 frames, winner 0, hp 5095/0, turns 5, hash 44c3931e
-priest lightbringer vs mage starter seed 7410: 2754 frames, winner 1, hp 0/740, turns 4, hash cae0743d
+priest lightbringer vs mage starter seed 7410: 2754 frames, winner 1, hp 0/740, turns 4, hash 0b3738ce
 priest sanctifier vs mage pyromancer seed 7411: 3792 frames, winner 0, hp 3720/0, turns 6, hash 547bfce5
 priest voidcaller vs mage archmage seed 7412: 2920 frames, winner 1, hp 0/370, turns 4, hash 601b738e
 priest starter vs mage cryomancer seed 7413: 2516 frames, winner 0, hp 5260/0, turns 4, hash c7369362
