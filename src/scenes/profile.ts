@@ -67,7 +67,7 @@ export class ProfileScene implements Scene {
   private ranked(): [string, string] {
     const r = this.rating;
     if (!r) return ['...', ''];
-    if (!r.games) return ['UNRANKED', 'PLAY A RANKED SET TO GET A RATING'];
+    if (!r.games) return ['UNRANKED', 'NO RATING YET'];
     return [String(r.rating), `${r.wins}-${r.losses} IN ${r.games} SETS`];
   }
 
@@ -158,8 +158,7 @@ export class ProfileScene implements Scene {
     const [rate, rateSub] = this.ranked();
     drawTextCentered(ui, 'RANKED', rx, y + 16, INK2, 2, false);
     drawTextCentered(ui, rate, rx, y + 40, RED_INK, rate.length > 5 ? 2 : 4, false);
-    const sub = rateSub.length > 20 ? 'NO RATING YET' : rateSub;
-    drawTextCentered(ui, sub, rx, y + 76, INK2, textWidth(sub, 2) <= w / 2 - 8 ? 2 : 1, false);
+    drawTextCentered(ui, rateSub, rx, y + 76, INK2, textWidth(rateSub, 2) <= w / 2 - 32 ? 2 : 1, false);
     const fy = y + 118, fav = favoriteClass(p), deck = favoriteDeck(p);
     drawText(ui, 'FAVORITE FIGHTER', x0 + 12, fy, INK2, 2);
     drawText(ui, fav ? CLASS_INFO[fav].name.toUpperCase() : '-', x0 + 12, fy + 22, INK, 3);
