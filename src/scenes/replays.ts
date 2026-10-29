@@ -1,7 +1,7 @@
-// Replays: the list of saved matches (title > REPLAYS), and the player that watches one. Playback
+// Replays: the list of saved matches (title > PROFILE > REPLAYS), and the player that watches one. Playback
 // runs the recorded controls through a fresh battle and skips the Draw screens, Battle Network style.
-import { pushScene, popScene, replaceScene, popTo, hint, zone, hot, isHot, listMouse, showSel, resetSel, type Scene } from './scene';
-import { actionBar, barTapped, panel, rowList, swipeIn, tallArea, Scroller, GAP, PAD } from './touchUi';
+import { pushScene, popScene, replaceScene, popTo, hint, zone, hot, isHot, listMouse, showSel, resetSel, button, type Scene } from './scene';
+import { actionBar, barTapped, bigButton, panel, rowList, swipeIn, tallArea, Scroller, GAP, PAD, TAP } from './touchUi';
 import { BattleScene } from './battle';
 import { getArena, useStage } from '../game/battleView';
 import { drawStage } from '../art/arena';
@@ -16,7 +16,7 @@ import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engi
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { touchText, touchActive, type PadMode } from '../engine/touch';
 import { sfx, playMusic, stopMusic, chargeHum } from '../engine/audio';
-import { win, selRow, banner, PAPER, BURN, INK, INK2, RED_INK, TRIM } from './skin';
+import { win, selRow, banner, PAPER, PAPER2, BURN, INK, INK2, RED_INK, TRIM } from './skin';
 
 const MODE_NAME: Record<ReplayMode, string> = { cpu: 'VS CPU', arcade: 'ARCADE', versus: '2 PLAYERS', watch: 'CPU VS CPU', online: 'ONLINE', ranked: 'RANKED' };
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -219,12 +219,24 @@ export class ReplaysScene implements Scene {
   }
 }
 
-const SPEEDS = [1, 2, 4] as const;
+/** Playback speeds: slow motion, normal, fast forward. */
+const SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
+const NORMAL = 2;
+const speedName = (s: number): string => (s === 0.25 ? '1/4X' : s === 0.5 ? '1/2X' : `${s}X`);
+/** The playback controls, by zone id: on every layout, so mouse and fingers get what keys and pads do. */
+type Ctl = 'slow' | 'play' | 'fast' | 'step';
+const CTLS: Ctl[] = ['slow', 'play', 'fast', 'step'];
 
-/** Watches one replay, a round at a time. Draw screens are skipped: the fight plays straight through. */
+/**
+ * Watches one replay, a round at a time. Draw screens are skipped: the fight plays straight through.
+ * Slow motion, pausing and frame steps only change how many recorded updates run per frame, so the
+ * battle still plays back exactly as recorded.
+ */
 export class ReplayScene extends BattleScene {
   private player: TapePlayer;
-  private speed = 0;
+  private speed = NORMAL;
+  /** Recorded updates owed at the current speed (slow motion runs one every few frames). */
+  private owed = 0;
   private halt = false;
   /** The round ended differently from the recording (a rules change since). */
   private stale = false;
@@ -250,30 +262,54 @@ export class ReplayScene extends BattleScene {
     super.enter();
   }
 
+  // phones in portrait: the controls fill the space under the fight, EXIT among them
+  pad(): PadMode { return spread.tall && this.b.phase !== 'over' ? 'none' : super.pad(); }
+
   private get last(): boolean { return this.roundNo + 1 >= this.replay.rounds.length; }
   protected get resultItems(): string[] { return this.last ? ['WATCH AGAIN', 'REPLAYS'] : ['NEXT ROUND', 'WATCH AGAIN', 'REPLAYS']; }
+
+  /** The control tapped or clicked this frame, if any. */
+  private tapped(): Ctl | 'exit' | null {
+    if (!mouse.click) return null;
+    if (isHot('bar:back')) return 'exit';
+    return CTLS.find(c => isHot(`rc:${c}`)) ?? null;
+  }
+
+  /** One recorded update, with any Draw screen around it fast-forwarded. False once the tape is done. */
+  private runOne(): boolean {
+    this.player.skipDraw();
+    const ok = this.player.step();
+    this.player.skipDraw();
+    return ok;
+  }
 
   update(dt: number): void {
     const b = this.b;
     this.callouts();
     this.fightBanner = Math.max(0, this.fightBanner - dt);
     if (b.phase === 'over') { this.updateResult(dt); return; }
-    if (wasPressed('back') || mouse.rclick) { this.exit(); return; }
-    // a tap pauses; a tap on the speed label up top changes speed
-    const onSpeed = mouse.click && isHot('rspeed');
-    if (wasPressed('custom') || wasPressed('pause') || (mouse.click && !onSpeed)) { this.halt = !this.halt; sfx('select'); }
-    if (wasPressed('confirm') || onSpeed) { this.speed = (this.speed + 1) % SPEEDS.length; sfx('move'); }
-    if (this.halt) { for (const f of b.f) chargeHum(f.side, null); return; }
+    const tap = this.tapped();
+    if (wasPressed('back') || mouse.rclick || tap === 'exit') { this.exit(); return; }
+    // ←/→ change speed, the Draw button plays and pauses, attack steps one frame; a tap anywhere else pauses
+    const slower = navPressed('left', dt) || tap === 'slow', faster = navPressed('right', dt) || tap === 'fast';
+    const step = wasPressed('confirm') || tap === 'step';
+    if (slower || faster) {
+      const to = Math.max(0, Math.min(SPEEDS.length - 1, this.speed + (faster ? 1 : -1)));
+      if (to !== this.speed) { this.speed = to; this.owed = 0; sfx('move'); }
+      if (this.halt) { this.halt = false; sfx('select'); }
+    }
+    if (wasPressed('custom') || wasPressed('pause') || tap === 'play' || (mouse.click && !tap && !spread.tall)) { this.halt = !this.halt; sfx('select'); }
+    if (step) { this.halt = true; this.owed = 0; }
 
     const first = b.turn === 1 && b.phase === 'custom';
-    for (let n = SPEEDS[this.speed]; n > 0; n--) {
-      this.player.skipDraw();
-      if (!this.player.step()) break;
-      this.player.skipDraw();
-      if ((b.phase as string) === 'over') break;
+    if (step) this.runOne();
+    else if (!this.halt) {
+      this.owed += SPEEDS[this.speed];
+      for (; this.owed >= 1; this.owed--) if (!this.runOne() || (b.phase as string) === 'over') { this.owed = 0; break; }
     }
     if (first && b.phase === 'fight') this.fightBanner = 0.9;
-    for (const f of b.f) chargeHum(f.side, b.phase === 'fight' && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / heavyChargeOf(f)) : null);
+    const humming = !this.halt && b.phase === 'fight';
+    for (const f of b.f) chargeHum(f.side, humming && f.charging && f.charge > 0.15 ? Math.min(1, f.charge / heavyChargeOf(f)) : null);
     if (this.player.done && (b.phase as string) !== 'over') b.phase = 'over'; // a tape that stops early (should not happen)
     if ((b.phase as string) === 'over' && !this.ended) {
       this.ended = true;
@@ -320,11 +356,48 @@ export class ReplayScene extends BattleScene {
       if (this.stale) drawTextCentered(ui, 'THIS ROUND PLAYED OUT DIFFERENTLY: IT WAS RECORDED ON AN OLDER BUILD', UW / 2, 290, '#f8b800', 1);
       return;
     }
-    // under the round counter (where online play shows the ping), and the keys in the bottom right
-    const label = this.halt ? (tick % 30 < 20 ? 'REPLAY  PAUSED' : 'REPLAY') : `REPLAY  ${SPEEDS[this.speed]}X`;
+    // under the round counter (where online play shows the ping)
+    const label = this.halt ? (tick % 30 < 20 ? 'REPLAY  PAUSED' : 'REPLAY') : `REPLAY  ${speedName(SPEEDS[this.speed])}`;
     drawTextOutlined(ui, label, Math.round(UW / 2 - textWidth(label) / 2), 48, this.halt ? '#f8b800' : '#fcfcfc');
-    zone('rspeed', UW / 2 - 60, 40, 120, 24);
-    const help = touchActive() ? 'TAP: PAUSE   TAP REPLAY: SPEED' : `${k('attack')}: SPEED   ${k('custom')} / CLICK: PAUSE   ${k('cast')}: EXIT`;
-    drawTextOutlined(ui, help, UW - 8 - textWidth(help), 302, '#bcbcbc');
+    if (spread.tall) return;
+    // the controls under the label, clear of the grid, and their keys in the bottom right
+    const bw = 36, bh = 18, gap = 4, x0 = Math.round(UW / 2 - (CTLS.length * (bw + gap) - gap) / 2), y = 58;
+    CTLS.forEach((c, i) => button(ui, `rc:${c}`, this.ctlLabel(c), x0 + i * (bw + gap), y, bw, bh, c === 'play' && this.halt));
+    if (!touchActive()) {
+      const help = `${k('left')}/${k('right')}: SPEED   ${k('custom')}: PAUSE   ${k('attack')}: STEP   ${k('cast')}: EXIT`;
+      drawTextOutlined(ui, help, UW - 8 - textWidth(help), 304, '#bcbcbc');
+    }
+  }
+
+  private ctlLabel(c: Ctl): string {
+    return c === 'slow' ? '<<' : c === 'fast' ? '>>' : c === 'step' ? '+1' : this.halt ? 'PLAY' : 'II';
+  }
+
+  /** Phones in portrait: the controls as big buttons under the fight. */
+  drawBelow(ui: Ctx, tick: number): void {
+    super.drawBelow(ui, tick);
+    if (this.b.phase === 'over') return;
+    const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
+    const barTop = actionBar(ui, { back: 'EXIT' });
+    // everything below sits in the middle of the space between the fight and the bar
+    const panelH = TAP * 2 + GAP * 3 + 48, contentH = 60 + panelH;
+    let y = Math.max(this.splitTop + 18, Math.round((this.splitTop + barTop - contentH) / 2));
+    const round = this.replay.rounds.length > 1 ? `ROUND ${this.roundNo + 1} OF ${this.replay.rounds.length}` : 'SINGLE ROUND';
+    drawTextCentered(ui, 'REPLAY', UW / 2, y, PAPER, 3, true);
+    drawTextCentered(ui, round, UW / 2, y + 28, PAPER2, 2, false);
+    y += 60;
+    panel(ui, x0 - 6, y, w + 12, panelH);
+    y += 12;
+    // speed: slower and faster either side of the current speed
+    bigButton(ui, 'rc:slow', '<< SLOWER', x0 + 6, y, (w - 12) * 0.36, TAP);
+    bigButton(ui, 'rc:fast', 'FASTER >>', x0 + 6 + (w - 12) * 0.64, y, (w - 12) * 0.36, TAP);
+    drawTextCentered(ui, 'SPEED', UW / 2, y + 10, INK2, 1, false);
+    drawTextCentered(ui, speedName(SPEEDS[this.speed]), UW / 2, y + 26, RED_INK, 3, false);
+    y += TAP + GAP;
+    const half = (w - 12 - GAP) / 2;
+    bigButton(ui, 'rc:play', this.halt ? 'PLAY' : 'PAUSE', x0 + 6, y, half, TAP, { primary: this.halt });
+    bigButton(ui, 'rc:step', 'STEP +1', x0 + 6 + half + GAP, y, half, TAP);
+    y += TAP + GAP;
+    drawTextCentered(ui, this.halt ? 'PAUSED: STEP GOES ONE FRAME AT A TIME' : 'SLOW DOWN TO SEE EVERY HIT', UW / 2, y + 4, INK2, 1, false);
   }
 }

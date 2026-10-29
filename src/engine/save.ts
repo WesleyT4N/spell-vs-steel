@@ -38,6 +38,8 @@ export interface SaveData {
   labScript: string | null;
   /** Touch controls: pad size, left-handed, vibration (see TouchSettings in touch.ts). */
   touch: Obj | null;
+  /** Sets won and lost by class and mode, and spell decks played (see Profile in game/profile.ts). */
+  profile: Obj | null;
 }
 
 /** A saved replay, as far as the save module cares: newest-first order and the kept flag. */
@@ -57,7 +59,7 @@ interface Envelope { game: string; v: number; data: unknown }
 
 const defaults = (): SaveData => ({
   keys: {}, p2keys: {}, pads: null, audio: {}, muted: false, decks: {}, match: null, training: null,
-  tutorialDone: false, arcade: {}, rating: null, rankedPending: null, labScript: null, touch: null,
+  tutorialDone: false, arcade: {}, rating: null, rankedPending: null, labScript: null, touch: null, profile: null,
 });
 
 /** MIGRATIONS[n] turns a version n-1 save into version n. Never edit a shipped entry; add the next one. */
@@ -96,6 +98,7 @@ function normalize(raw: Obj): SaveData {
     rankedPending: objOr(r.rankedPending, d.rankedPending),
     labScript: typeof r.labScript === 'string' ? r.labScript : null,
     touch: objOr(r.touch, d.touch),
+    profile: objOr(r.profile, d.profile),
   };
 }
 

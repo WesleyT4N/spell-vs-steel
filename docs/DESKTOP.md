@@ -40,7 +40,7 @@ Never commit the keystore (`*.keystore` is ignored).
 
 ## What works in the app
 
-- Everything offline: Arcade, Versus (keyboard and gamepads), Training, Tutorial, Deck Builder, Replays.
+- Everything offline: Arcade, Versus (keyboard and gamepads), Training, Tutorial, Deck Builder, Profile and Replays.
 - Online **Create Room / Join Room**: PeerJS over WebRTC, using the public PeerJS signaling server (see
   `src/net/transport.ts`). The room screen copies the code, since a link can't open the app.
 - Lobby, Ranked and Tournaments need the claude.ai page (room + db capabilities); elsewhere they say "not supported yet".

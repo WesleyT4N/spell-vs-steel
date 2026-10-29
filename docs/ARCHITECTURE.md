@@ -161,7 +161,8 @@ flowchart LR
 | `scenes/lobby.ts` | Who's online, chat, challenges |
 | `scenes/ranked.ts` | Queue, pairing, Elo in the artifact db (`ratings`), pending result recovery |
 | `scenes/tournament.ts` | Bracket host and players over presence |
-| `scenes/replays.ts` | Replay list and playback |
+| `scenes/profile.ts` | Player profile: sets won/lost by class and mode (`game/profile.ts`, counted as each set ends), ranked rating, favorite fighter and spell deck, arcade bests; the way into the replays |
+| `scenes/replays.ts` | Replay list and playback (pause, 1/4x to 4x, frame step: only how many recorded updates run per frame changes, so playback stays exact) |
 
 - Both links must publish with the `room`, `db` (ratings rules) and `user` (profile) capabilities, or ranked breaks.
 - `npm run rankedcheck` exercises the ranked flow by hand.
@@ -292,7 +293,7 @@ flowchart LR
   title -- ARCADE --> cs0[Fighter select] --> dk0[Spell deck select] --> ar["Arcade ladder<br/>4 rivals at 60-90% power<br/>+ Shadow Self boss"] --> bs
   title -- VERSUS --> cs1[Fighter select] --> dk1[Spell deck select] --> ss1[Stage select] --> bs[BattleScene]
   title -- ONLINE --> om["Online menu<br/>LOBBY, RANKED MATCH, TOURNAMENT,<br/>MATCH, CREATE/JOIN ROOM"] --> cs2[Fighter select] --> dk2["Spell deck select<br/>both lock in"] --> ss2[Stage vote] --> ob[OnlineBattleScene]
-  title -- REPLAYS --> rp[Replay list] --> bs
+  title -- PROFILE --> pf[Player profile] --> rp[Replay list] --> bs
   title -- TRAINING --> cs3[Fighter select] --> dk3[Spell deck select] --> tr[TrainingScene]
   title -- TUTORIAL --> cs4[Fighter select] --> tu[TutorialScene]
   title -- SPELL DECKS --> db[Deck builder]
@@ -399,7 +400,7 @@ One module, `engine/save.ts`, on top of the platform's file storage (`platform/s
 
 ```mermaid
 flowchart LR
-  callers["input, audio, deck, match, arcade,<br/>training, tutorial, touch, replay, net/rating"] -->|getSave / updateSave| S["save.ts<br/>in-memory SaveData"]
+  callers["input, audio, deck, match, arcade,<br/>training, tutorial, touch, replay, profile, net/rating"] -->|getSave / updateSave| S["save.ts<br/>in-memory SaveData"]
   S -->|read once at boot<br/>flush at end of tick| P[PlatformStorage]
   P --> web["webStorage<br/>localStorage svs:file:NAME"]
   P -.later.-> native[Steam / Capacitor files]
@@ -407,7 +408,7 @@ flowchart LR
 
 | File | Holds |
 | --- | --- |
-| `save.json` | keys, P2 keys, pads, audio, mute, decks, last match, training, tutorial done, arcade, rating, pending ranked result, lab script, touch controls |
+| `save.json` | keys, P2 keys, pads, audio, mute, decks, last match, training, tutorial done, arcade, rating, pending ranked result, lab script, touch controls, profile (set results by class and mode, deck play counts) |
 | `replays.json` | 20 recent + up to 20 starred replays, about 3 MB budget |
 
 - Each file is `{game, v, data}`. Changing the shape means bumping `SAVE_VERSION` and adding `MIGRATIONS[n]`; never edit a shipped one.
