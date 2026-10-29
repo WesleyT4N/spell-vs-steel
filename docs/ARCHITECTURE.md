@@ -185,11 +185,11 @@ flowchart LR
 
 | Class | HP | Light / heavy | Resource | Comes back | Cards |
 | --- | --- | --- | --- | --- | --- |
-| Warrior | 965 | 10 / 28 | Rage, max 5 | Heavy hits +1.5, taking damage 1 per 40 (max 1 per hit) | `content/classes/warrior/cards.ts` |
-| Mage | 690 | 6 / 28 | Mana | Max 1, +1 per Draw (cap 5), refills each Draw | `content/classes/mage/cards.ts` |
-| Rogue | 650 | 10 / 22 | Energy | Topped up to 5 each Draw | `content/classes/rogue/cards.ts` |
-| Ranger | 765 | 10 / 20 | Energy | Starts 2, +1 per Draw, grows standing still | `content/classes/ranger/cards.ts` |
-| Priest | 660 | 6 / 28 | Mana | Starts 3, +3 per Draw (cap 5) | `content/classes/priest/cards.ts` |
+| Warrior | 9650 | 100 / 280 | Rage, max 5 | Heavy hits +1.5, taking damage 1 per 400 (max 1 per hit) | `content/classes/warrior/cards.ts` |
+| Mage | 6900 | 60 / 280 | Mana | Max 1, +1 per Draw (cap 5), refills each Draw | `content/classes/mage/cards.ts` |
+| Rogue | 6500 | 100 / 220 | Energy | Topped up to 5 each Draw | `content/classes/rogue/cards.ts` |
+| Ranger | 7650 | 100 / 200 | Energy | Starts 2, +1 per Draw, grows standing still | `content/classes/ranger/cards.ts` |
+| Priest | 6600 | 60 / 280 | Mana | Starts 3, +3 per Draw (cap 5) | `content/classes/priest/cards.ts` |
 
 `tuning.ts` is the source of truth for numbers. Each class has 26 cards, a starter deck and 3 Mythic decks (`game/deck.ts`). Deck rules: exactly 30, 4 / 2 / 1 copies by rarity, max 5 Legendaries, exactly 1 Mythic. Custom decks save per class in `save.json`; `game/deckYaml.ts` imports and exports YAML.
 
@@ -349,7 +349,7 @@ Hard also holds heavies (not Ranger or Rogue) and sidesteps out of the row when 
 | Tool | Run | Gives |
 | --- | --- | --- |
 | Sim CLI | `npm run sim -- 100 --cards` | All class pairs with starters, per-card table |
-| Balance lab | dev build, `#lab` | The same in the browser: full grid on web workers, live `TUNING`, script box (`hp.mage = 700`, `card.power = 110%`) |
+| Balance lab | dev build, `#lab` | The same in the browser: full grid on web workers, live `TUNING`, script box (`hp.mage = 7000`, `card.power = 110%`) |
 | Sandbox | `#sandbox` | Cast anything, dummies, can't-die, slow time, frame step, hit log |
 | Encyclopedia | `#cards` | Every card face with filters |
 | Grid CLI | `npm run balance -- --pools starter,archetype --n 40` | Full matchup grid on worker threads (~750 matches/s), `--set` / `--script` tweaks |

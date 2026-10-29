@@ -243,7 +243,7 @@ type Recipe = (o: RealOpts) => void;
 const P0 = (o: RealOpts): number => o.pan ?? 0;
 const REAL: Record<string, Recipe> = {
   // combat
-  hit: o => { const p = P0(o), big = (o.amt ?? 20) >= 60; punch(big ? 1.15 : 0.85, p); elementHit(o.element ?? 'steel', big ? 1.1 : 0.8, p); },
+  hit: o => { const p = P0(o), big = (o.amt ?? 200) >= 600; punch(big ? 1.15 : 0.85, p); elementHit(o.element ?? 'steel', big ? 1.1 : 0.8, p); },
   heavyImpact: o => { const p = P0(o); punch(1.3, p); thud(0.8, p); elementHit(o.element ?? 'steel', 1.1, p); },
   block: o => metalClang(0.8, P0(o), 0, 1700),
   break: o => { const p = P0(o); punch(1, p); crunch({ dur: 0.2, rate: 160, vol: 0.5, pan: p, f: 2200 }); crackles({ dur: 0.6, rate: 40, vol: 0.3, pan: p, decay: true, lo: 1500, hi: 5000 }); },
@@ -347,7 +347,7 @@ const FX: Record<string, Recipe> = {
 // older names still used around the game
 Object.assign(REAL, {
   missile: arcaneBolt, explode: FX.explode, slash: FX.cleave, slashHeavy: FX.cleaveHeavy, bolt: FX.bolt, boltHeavy: FX.boltHeavy,
-  hitBig: (o: RealOpts) => REAL.hit({ ...o, amt: 80 }), fire: REAL.cast_fire, frost: REAL.cast_frost, arcane: REAL.cast_arcane, cast: REAL.cast_arcane,
+  hitBig: (o: RealOpts) => REAL.hit({ ...o, amt: 800 }), fire: REAL.cast_fire, frost: REAL.cast_frost, arcane: REAL.cast_arcane, cast: REAL.cast_arcane,
   shot_hawk: FX.hawkDive,
 });
 

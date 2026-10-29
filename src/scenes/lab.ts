@@ -48,7 +48,7 @@ let lastMatrix: Map<string, Task> | null = null;
 let lastGrid: { plan: GridPlan; run: GridRun; report: GridReport } | null = null;
 
 const SCRIPT_HELP = `# One edit per line. Runs from the shipped numbers every time.
-# hp.mage = 700              any number from the Tuning list below
+# hp.mage = 7000             any number from the Tuning list below
 # warrior.heavyDamage *= 1.1 also += and -=
 # fireball.power = 110%      a card's damage
 # fireball.cost = 2          a card's cost

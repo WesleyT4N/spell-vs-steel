@@ -27,12 +27,12 @@ import { bigButton, actionBar, barTapped, panel, tallArea, TAP, GAP, PAD } from 
 export const tutorialDone = (): boolean => getSave('tutorialDone');
 const markDone = (): void => setSave('tutorialDone', true);
 
-const SHOT_DAMAGE = 30;
-const FINALE_HP = 300;
+const SHOT_DAMAGE = 300;
+const FINALE_HP = 3000;
 /** Index of the Draw gauge lesson; the gauge stays empty before it so the Draw screen can't open early. */
 const GAUGE_STEP = 4;
-/** Basic hits dealing at least this much were heavies (light hits are 6-11 even on a frozen target). */
-const HEAVY_MIN = 18;
+/** Basic hits dealing at least this much were heavies (light hits are 60-110 even on a frozen target). */
+const HEAVY_MIN = 180;
 
 interface Page { title: string; body: string[] }
 

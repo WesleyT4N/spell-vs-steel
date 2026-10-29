@@ -16,6 +16,8 @@ import { ComboTracker, cantAct } from './combo';
 export { shuffle };
 
 export const COLS = 6, ROWS = 3;
+/** Hits this big shake the screen, slow the fight a moment and get the big impact and damage number. */
+export const BIG_HIT = 800;
 export type Side = 0 | 1;
 
 /** What a controller (keyboard or CPU) wants this frame. */
@@ -612,19 +614,19 @@ export class Battle {
         for (const o of this.traps) if (o.group === t.group) o.fired = true;
         v.st.stealth = 0;
         this.addFx('trapPop', t.side, t.col, t.row, 0.5, { kind: 'mine' });
-        this.damage(v, 40, src, { spell: true, element: 'nature' });
+        this.damage(v, 400, src, { spell: true, element: 'nature' });
         this.stun(v, TUNING.ranger.tripwireStun);
         this.text(v, 'TRIPWIRE', '#f8b800');
         continue;
       }
       this.addFx('trapPop', t.side, t.col, t.row, 0.5, { kind: t.kind });
-      if (t.kind === 'freeze') { this.damage(v, 20, src, { spell: true, element: 'frost' }); this.freeze(v, 2); }
+      if (t.kind === 'freeze') { this.damage(v, 200, src, { spell: true, element: 'frost' }); this.freeze(v, 2); }
       else if (t.kind === 'explode') {
         const cells: Array<[number, number]> = [[t.col, t.row], [t.col - 1, t.row], [t.col + 1, t.row], [t.col, t.row - 1], [t.col, t.row + 1]];
         for (const [c, r] of cells) if (this.inGrid(c, r)) this.addFx('explode', t.side, c, r, 0.35);
-        this.strike(src, cells, 90, { spell: true, element: 'fire' });
-      } else if (t.kind === 'mine') { this.damage(v, 50, src, { spell: true, element: 'nature', knockback: true }); }
-      else { this.addFx('explode', t.side, t.col, t.row, 0.35); this.damage(v, 60, src, { spell: true, element: 'fire' }); }
+        this.strike(src, cells, 900, { spell: true, element: 'fire' });
+      } else if (t.kind === 'mine') { this.damage(v, 500, src, { spell: true, element: 'nature', knockback: true }); }
+      else { this.addFx('explode', t.side, t.col, t.row, 0.35); this.damage(v, 600, src, { spell: true, element: 'fire' }); }
     }
     this.traps = this.traps.filter(t => !t.fired);
   }
@@ -1306,12 +1308,12 @@ export class Battle {
     }
     // impact spark for the view, and the hit pause (BN-style: the whole fight stops for a few frames, so it is part of the rules)
     if (!opts.dot) {
-      const tier = target.hp <= 0 ? 3 : amt >= 80 ? 2 : opts.basic === 'heavy' || amt >= TUNING.flinchThreshold ? 1 : 0;
+      const tier = target.hp <= 0 ? 3 : amt >= BIG_HIT ? 2 : opts.basic === 'heavy' || amt >= TUNING.flinchThreshold ? 1 : 0;
       this.addFx('impact', src && src !== target ? src.side : (1 - target.side) as Side, target.col, target.row, 0.3 + tier * 0.06, { el: opts.element ?? 'steel', tier });
       if (tier >= 3 || this.time - this.stopEnd >= TUNING.hitStopGap) { this.hitStop = Math.max(this.hitStop, TUNING.hitStop[tier]); this.stopT = 0; }
       if (tier >= 2) this.slowmo = Math.max(this.slowmo, tier >= 3 ? TUNING.slowmo.ko : TUNING.slowmo.big);
     }
-    if (amt >= 80) { this.shake = Math.max(this.shake, 0.25); this.cheer = 1.5; }
+    if (amt >= BIG_HIT) { this.shake = Math.max(this.shake, 0.25); this.cheer = 1.5; }
     if (opts.basic === 'heavy') this.shake = Math.max(this.shake, 0.18);
     if (opts.stun) this.stun(target, opts.stun);
     if (vanishStun) this.stun(target, vanishStun);
@@ -1320,9 +1322,9 @@ export class Battle {
     this.sound(opts.basic === 'heavy' ? 'heavyImpact' : 'hit', { pan: panOf(target.col), amt, element: opts.element });
     this.emit({ type: 'hit', side: target.side, col: target.col, row: target.row, amt, element: opts.element, basic: opts.basic, spell: opts.spell, dot: opts.dot, blocked: false });
     // hurt voice: not for damage over time or chip hits, not from inside a block of ice, and not every hit of a flurry
-    if (target.hp > 0 && !opts.dot && amt >= 8 && target.st.frozen <= 0 && target.st.iceBlock <= 0 && this.time - this.hurtT[target.side] > 0.35) {
+    if (target.hp > 0 && !opts.dot && amt >= 80 && target.st.frozen <= 0 && target.st.iceBlock <= 0 && this.time - this.hurtT[target.side] > 0.35) {
       this.hurtT[target.side] = this.time;
-      this.voice(target, amt >= 60 ? 'hurtBig' : 'hurt');
+      this.voice(target, amt >= 600 ? 'hurtBig' : 'hurt');
     }
     return out;
   }
@@ -1428,7 +1430,7 @@ export class Battle {
         const w = this.wallAt(c, p.row);
         if (w && w.side !== p.side && p.pierce) {
           if (!p.hitWalls) p.hitWalls = [];
-          if (!p.hitWalls.includes(w)) { p.hitWalls.push(w); this.hitWall(w, 60, this.f[p.side], {}); }
+          if (!p.hitWalls.includes(w)) { p.hitWalls.push(w); this.hitWall(w, 600, this.f[p.side], {}); }
         } else if (w && w.side !== p.side) {
           p.dead = true;
           const owner = this.f[w.side];

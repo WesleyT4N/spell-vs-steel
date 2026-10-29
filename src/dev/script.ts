@@ -1,5 +1,5 @@
 // Balance scripts: plain-text edits to class and card numbers for the dev tools, one per line.
-//   hp.mage = 700              any TUNING number, by its dotted path (see the Tuning list in the lab)
+//   hp.mage = 7000             any TUNING number, by its dotted path (see the Tuning list in the lab)
 //   warrior.heavyDamage *= 1.1 also +=, -= and *= (relative to the shipped number)
 //   fireball.power = 110%      a card's damage multiplier (110% or 1.1)
 //   fireball.cost = 2          a card's resource cost

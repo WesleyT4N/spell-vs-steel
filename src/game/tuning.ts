@@ -2,7 +2,7 @@
 
 export const TUNING = {
   // re-searched after the CPU stopped freezing up when stunned mid-charge (#45): the HP-only patch closest to the 55-65 wheel at Normal, at Hard and with the starters (scripts/tune.ts)
-  hp: { warrior: 965, mage: 690, rogue: 650, ranger: 765, priest: 660 },
+  hp: { warrior: 9650, mage: 6900, rogue: 6500, ranger: 7650, priest: 6600 },
 
   /** Seconds for the shared custom gauge to fill. */
   gaugeSeconds: 10,
@@ -27,23 +27,23 @@ export const TUNING = {
   heavyCharge: 1.0,
 
   warrior: {
-    lightDamage: 10,
-    heavyDamage: 28,
+    lightDamage: 100,
+    heavyDamage: 280,
     lightLock: 0.45,
     heavyLock: 0.4,
     rageMax: 5,
     rageLightHit: 0,
     rageHeavyHit: 1.5,
     /** Taking damage builds Rage in proportion to the damage: 1 pip per this much, capped per hit. */
-    rageDamagePerPip: 40,
+    rageDamagePerPip: 400,
     rageWhenHitMax: 1,
   },
 
   mage: {
     /** Arcane Orb and Beam flight speed (panels per second, capped by maxShotSpeed). */
     shotSpeed: 14,
-    lightDamage: 6,
-    heavyDamage: 28,
+    lightDamage: 60,
+    heavyDamage: 280,
     lightLock: 0.4,
     heavyLock: 0.35,
     manaStart: 1,
@@ -57,9 +57,9 @@ export const TUNING = {
     /** Throwing Knife flight speed (panels per second, capped by maxShotSpeed). */
     shotSpeed: 12,
     /** Light: a dagger stab that hits every panel up to `stabReach` ahead. Heavy: a throwing knife down the row. */
-    // light 12 / 650 HP: sims put the Rogue near 60% vs Mage and 40% vs Warrior (2026-10-25)
-    lightDamage: 10,
-    heavyDamage: 22,
+    // light 120 / 6500 HP: sims put the Rogue near 60% vs Mage and 40% vs Warrior (2026-10-25)
+    lightDamage: 100,
+    heavyDamage: 220,
     stabReach: 1,
     lightLock: 0.35,
     heavyLock: 0.35,
@@ -70,14 +70,14 @@ export const TUNING = {
     backstabWindow: 2,
     /** Vanish: the next attack spell stuns for this long. */
     vanishStun: 2,
-    riposteDamage: 80,
+    riposteDamage: 800,
   },
 
   ranger: {
     /** Light: a travel-time Arrow (panels per second). Heavy: an Aimed Shot on the normal charge, flying at aimedSpeed. */
-    // heavy 20 / 740 HP: sims put the Ranger at ~39% vs Warrior, ~63% vs Mage, ~60% vs Rogue (2026-10-25)
-    lightDamage: 10,
-    heavyDamage: 20,
+    // heavy 200 / 7400 HP: sims put the Ranger at ~39% vs Warrior, ~63% vs Mage, ~60% vs Rogue (2026-10-25)
+    lightDamage: 100,
+    heavyDamage: 200,
     arrowSpeed: 12,
     /** Aimed Shot, the sniper shot: the one projectile allowed past maxShotSpeed (Wes). */
     aimedSpeed: 15,
@@ -95,48 +95,48 @@ export const TUNING = {
   priest: {
     /** Holy Spark flight speed (panels per second, capped by maxShotSpeed). */
     shotSpeed: 12,
-    lightDamage: 6,
-    // Smite at 28 flinches (threshold 20 since 2026-10-28); it finds the enemy within smiteRange columns
-    heavyDamage: 28,
+    lightDamage: 60,
+    // Smite at 280 flinches (threshold 200 since 2026-10-28); it finds the enemy within smiteRange columns
+    heavyDamage: 280,
     lightLock: 0.4,
     heavyLock: 0.5,
     /** Smite finds the enemy within this many columns (any row); farther away it lands this many panels ahead and misses. */
     smiteRange: 3,
-    holyWallHp: 100,
+    holyWallHp: 1000,
     holyWallTime: 6,
     smiteKnock: 0,
     manaStart: 3,
     manaPerDraw: 3,
     manaCap: 5,
     /** Cursed panels: damage per second to an enemy standing on one. Cursed or Hexed fighters deal this multiplier. */
-    curseDps: 10,
+    curseDps: 100,
     /** Each further second on the same cursed panel adds this much, up to curseMax per tick. */
-    curseRamp: 4,
-    curseMax: 26,
+    curseRamp: 40,
+    curseMax: 260,
     weakened: 0.75,
     /** Blessed panels (all last until the next Draw screen): Hallowed Ground damage, Aegis Field shield, Wellspring Mana. */
     hallowedBonus: 1.35,
-    blessShieldPerSec: 15,
+    blessShieldPerSec: 150,
     /** Every holy shield (Power Word: Shield, Aegis Field, Holy Sanctum) shares one pool up to this. */
-    shieldCap: 100,
+    shieldCap: 1000,
     blessManaSeconds: 2,
   },
 
   /** Each Poison stack deals this per second for poisonSeconds. */
-  poisonDps: 5,
+  poisonDps: 50,
   poisonSeconds: 6,
   poisonMaxStacks: 3,
   /** Healing blessed panels (Sanctuary, Sacred Ground) heal their owner this much per second. */
-  blessHps: 16,
+  blessHps: 160,
 
   /** Frost Nova hits an enemy within this many columns of the caster. */
   frostNovaRange: 3,
-  frostNovaDamage: 25,
+  frostNovaDamage: 250,
 
   /** Frozen or stunned targets take this multiplier from all sources. */
   frozenBonus: 1.5,
   /** Hits this big make the target flinch (cancels charging, brief lockout). */
-  flinchThreshold: 20,
+  flinchThreshold: 200,
   flinchTime: 0.3,
   /** No projectile flies faster than this (panels per second), so every shot can be read and dodged. */
   maxShotSpeed: 15,

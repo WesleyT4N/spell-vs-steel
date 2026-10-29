@@ -12,7 +12,7 @@ import { win, bar, pip as skinPip, toInk, PAPER, PAPER2, INK, INK2, TRIM, WAX_HI
 import { COMBO_HOLD } from './combo';
 import { CARDS, ELEMENT_COLOR } from './cards';
 import { TUNING } from './tuning';
-import { heavyChargeOf } from './battle';
+import { heavyChargeOf, BIG_HIT } from './battle';
 import type { Battle, BlessKind, Fighter, Fx, Warn, Pet, Projectile, Side, StatusKey, Trap, Wall } from './battle';
 import { CLASS_INFO } from './classes';
 import { drawOver, drawUnder, lookOf, observe } from './fighterAnim';
@@ -666,7 +666,7 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0, sha
     if (!big) { drawTextCentered(ui, t.text, pc.x * UI, (pc.y - 34) * UI - t.t * 28, t.color, 1); continue; }
     // damage numbers pop in a size up and white-hot, then settle into the element color as they float off
     const n = Number(t.text), pop = t.t < 0.07;
-    const scale = (n >= 80 ? 3 : 2) + (pop ? 1 : 0);
+    const scale = (n >= BIG_HIT ? 3 : 2) + (pop ? 1 : 0);
     const k = Math.min(1, t.t / 0.35), rise = 22 * (1 - (1 - k) * (1 - k)) + Math.max(0, t.t - 0.35) * 12;
     drawTextCentered(ui, t.text, pc.x * UI, (pc.y - 34) * UI - rise - (pop ? 4 : 0), pop ? '#fcfcfc' : t.color, scale);
   }
