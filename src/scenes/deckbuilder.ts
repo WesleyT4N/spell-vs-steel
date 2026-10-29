@@ -1,13 +1,13 @@
 // Spell deck builder: 30 spells, 4/2/1 copy limits, max 5 Legendaries, exactly 1 Mythic. Autosaves.
 // Opening it (or switching class) shows your spell decks for the class, to edit, rename, clone or delete; a new
-// one starts from a ready-made deck, an empty one or a YAML file. Opened on one of your decks, it edits that.
+// one starts from a ready-made deck, an empty one or a friend's share code. Opened on one of your decks, it edits that.
 import { popScene, hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { teamColor, type ClassId } from '../art/sprites';
 import { P, UW, screenRect, spread, vy, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
-import { wasPressed, navPressed, mouse, gesture, k } from '../engine/input';
+import { wasPressed, navPressed, mouse, gesture, k, usingPad } from '../engine/input';
 import { touchActive, type PadMode } from '../engine/touch';
 import { sfx } from '../engine/audio';
 import { cardsFor, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef } from '../game/cards';
@@ -20,9 +20,9 @@ import { loadMatch, saveMatch } from '../game/match';
 import { PLAYABLE, CLASS_INFO } from '../game/classes';
 import { drawCardDetail, drawCardFace, resInk, CARD_W, CARD_H } from './cardView';
 import { CardPreview } from './cardPreview';
-import { openDeckPanel } from './deckPanel';
+import { openDeckPanel, type DeckPanel } from './deckPanel';
 import { NameEntry } from './nameEntry';
-import type { SpellDeck } from '../game/deckYaml';
+import type { SpellDeck } from '../game/deckCode';
 import { win, selRow, plaque, ink, PAPER, BURN, INK, INK2, RED_INK, GOLD, TRIM } from './skin';
 import { bigButton, actionBar, barTapped, swipeIn, tallArea, tabs, sheet, panel, rowList, Scroller, TAP, GAP, PAD } from './touchUi';
 
@@ -38,7 +38,7 @@ const PREVIEW_H = 80;
 // touch: a scrollable grid of card tiles instead of thin rows; each tile has its count and -/+ buttons under the card
 const COLS = 3, TX = LX + 8, TPX = 86, TPY = CARD_H + 28, TBTN = 26, TBH = 18;
 /** What can be done to one of your decks from the list. */
-const ACTS = ['EDIT', 'RENAME', 'CLONE', 'DELETE'] as const;
+const ACTS = ['EDIT', 'RENAME', 'CLONE', 'SHARE', 'DELETE'] as const;
 type Act = typeof ACTS[number];
 
 export class DeckBuilderScene implements Scene {
@@ -50,8 +50,8 @@ export class DeckBuilderScene implements Scene {
   msgT = 0;
 
   private preview = new CardPreview();
-  /** Closes the YAML panel while it is open. */
-  private closeYaml: (() => void) | null = null;
+  /** The share / import panel while it is open. */
+  private sharing: DeckPanel | null = null;
   /** The start-from picker for a new deck: its choices (a ready-made deck id, 'empty', 'import'), or null when closed. */
   private picks: string[] | null = null;
   private pickSel = 0;
@@ -125,6 +125,7 @@ export class DeckBuilderScene implements Scene {
     if (!d) return;
     if (a !== 'DELETE') this.armed = null;
     if (a === 'EDIT') { this.edit(d.id); return; }
+    if (a === 'SHARE') { this.openShare(); return; }
     if (a === 'RENAME') { this.naming = { entry: new NameEntry(d.name, 'NAME THIS SPELL DECK', cleanDeckName, DECK_NAME_MAX), id: d.id }; sfx('select'); return; }
     if (a === 'CLONE') {
       const c = cloneCustom(this.cls, d.id);
@@ -203,13 +204,20 @@ export class DeckBuilderScene implements Scene {
     this.sel = this.top; this.scroll = 0; this.tscroll = 0;
   }
 
-  /** The YAML import/export panel (a DOM overlay); while it is open the builder ignores input. */
-  private openYaml(): void {
+  /**
+   * The share / import panel (a DOM overlay) for the deck under the list cursor or being edited; from the
+   * start-from picker (or NEW in the list) it only imports. While it is open the builder ignores input, except a
+   * gamepad's A (copy the code) and B (close), since a pad can't reach the panel's buttons.
+   */
+  private openShare(): void {
     sfx('select');
-    this.closeYaml = openDeckPanel({
-      current: this.listing ? { cls: this.cls, name: this.listed?.name, deck: this.listed?.cards ?? {} } : { cls: this.cls, name: this.editing ? this.editingName : undefined, deck: this.deck },
+    const d = this.listing ? this.listed : null;
+    const current = this.picks ? undefined : this.listing ? d && { cls: this.cls, name: d.name, deck: d.cards } : { cls: this.cls, name: this.editing ? this.editingName : undefined, deck: this.deck };
+    this.sharing = openDeckPanel({
+      current: current ?? undefined,
       onImport: g => this.applyImport(g),
-      onClose: () => { this.closeYaml = null; },
+      onClose: () => { this.sharing = null; },
+      pad: usingPad(),
     });
   }
 
@@ -238,7 +246,7 @@ export class DeckBuilderScene implements Scene {
   }
 
   private choosePick(id: string): void {
-    if (id === 'import') { this.openYaml(); return; }
+    if (id === 'import') { this.openShare(); return; }
     const p = this.presets.find(x => x.id === id);
     const made = createCustom(this.cls, p ? `MY ${p.name}` : 'SPELL DECK', p ? p.cards : {});
     if (!made) { this.flash(`${MAX_CUSTOM_DECKS} SPELL DECKS IS THE MOST: DELETE ONE FIRST`); sfx('deny'); return; }
@@ -329,10 +337,14 @@ export class DeckBuilderScene implements Scene {
     this.msgT = Math.max(0, this.msgT - dt);
     this.preview.show(!this.picks && !this.listing && showSel() ? this.cardAt(this.sel) ?? null : null);
     this.preview.update(dt);
-    if (this.closeYaml) return;
+    if (this.sharing) {
+      if (usingPad() && wasPressed('back')) this.sharing.close();
+      else if (usingPad() && wasPressed('confirm')) { this.sharing.copyCode(); sfx('confirm'); }
+      return;
+    }
     if (this.naming) { this.updateNaming(dt); return; }
     if (spread.tall) { this.updateTall(dt); return; }
-    if (isHot('yaml') && mouse.click) { this.openYaml(); return; }
+    if (isHot('share') && mouse.click) { this.openShare(); return; }
     if (this.picks || this.listing) {
       if (isHot('done') && mouse.click) { if (this.listing) { sfx('back'); this.back(); } else this.closePicker(); return; }
       // class tabs still switch class (and reopen the list for it)
@@ -407,7 +419,7 @@ export class DeckBuilderScene implements Scene {
       return;
     }
     if (this.listing) { this.updateTallList(); return; }
-    if (barTapped('mid')) { this.openYaml(); return; }
+    if (barTapped('mid')) { this.openShare(); return; }
     if (barTapped('back') || barTapped('primary') || wasPressed('back') || mouse.rclick) {
       if (this.picks) this.closePicker(); else this.exit();
       return;
@@ -486,7 +498,7 @@ export class DeckBuilderScene implements Scene {
     drawText(ui, `MYTHIC ${myth}/1`, 212, 31 + hy, myth === 1 ? ink(RARITY_COLOR.mythic) : RED_INK);
     const ok = validate(head).length === 0;
     drawText(ui, ok ? 'READY' : 'NOT READY', 300, 23 + hy, ok ? '#007800' : RED_INK);
-    button(ui, 'yaml', 'YAML', UW - 112, 13 + hy, 46, 24, false, INK2);
+    button(ui, 'share', 'SHARE', UW - 112, 13 + hy, 46, 24, false, INK2);
     button(ui, 'done', 'DONE', UW - 60, 13 + hy, 46, 24, false, RED_INK);
 
     // list
@@ -610,8 +622,8 @@ export class DeckBuilderScene implements Scene {
       zone(`pick:${i}`, x + 4, ry - 2, colW, rh);
       if (on) selRow(ui, x + 4, ry - 2, colW, rh);
       const p = this.presets.find(q => q.id === id);
-      const name = id === 'empty' ? 'EMPTY SPELL DECK' : id === 'import' ? 'IMPORT YAML...' : p!.name.toUpperCase() + (id === 'starter' ? ' (STARTER)' : '');
-      const sub = id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE OR PICK A FILE'
+      const name = id === 'empty' ? 'EMPTY SPELL DECK' : id === 'import' ? 'IMPORT A CODE...' : p!.name.toUpperCase() + (id === 'starter' ? ' (STARTER)' : '');
+      const sub = id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE A FRIEND\'S CODE'
           : `MYTHIC: ${(this.cards.find(c => c.id === p!.mythic)?.name ?? '').toUpperCase()}`;
       drawText(ui, name, x + 22, ry + 2 + ro, on ? INK : INK2);
       drawText(ui, sub, x + 22, ry + 11 + ro, p ? ink(RARITY_COLOR.mythic) : TRIM);
@@ -622,7 +634,7 @@ export class DeckBuilderScene implements Scene {
     const list = this.presets.find(q => q.id === id)?.cards ?? {};
     const cards = this.cards.filter(c => list[c.id]);
     if (!id) drawText(ui, 'TOUCH A SPELL DECK TO SEE IT', lx, y + 24, INK2);
-    else if (id === 'import') ['PASTE A SPELL DECK OR PICK A', '.YAML FILE. IMPORTS THAT', 'BREAK A DECK RULE ARE', 'REFUSED. YAML IN THE', 'HEADER EXPORTS YOUR DECK.'].forEach((l, i) => drawText(ui, l, lx, y + 24 + i * 11, INK2));
+    else if (id === 'import') ['PASTE A FRIEND\'S SPELL DECK', 'CODE. ONE THAT BREAKS A DECK', 'RULE IS REFUSED. SHARE', 'MAKES A CODE FOR YOUR OWN.'].forEach((l, i) => drawText(ui, l, lx, y + 24 + i * 11, INK2));
     else if (!cards.length) drawText(ui, 'NO SPELLS YET', lx, y + 24, INK2);
     cards.forEach((c, i) => drawText(ui, `${list[c.id]}X ${c.name.toUpperCase()}`, lx, y + 24 + i * 11, c.rarity === 'common' ? INK2 : ink(RARITY_COLOR[c.rarity])));
     if (id) drawText(ui, `SAVED AS A NEW DECK (${this.decks.length + 1}/${MAX_CUSTOM_DECKS})`, lx, y + hgt - 14, TRIM);
@@ -658,7 +670,7 @@ export class DeckBuilderScene implements Scene {
     if (!d) {
       const lines = !showSel() ? ['TOUCH A SPELL DECK TO SEE IT']
         : decks.length >= MAX_CUSTOM_DECKS ? [`YOU HAVE ${MAX_CUSTOM_DECKS} SPELL DECKS, THE MOST`, 'THERE IS ROOM FOR. DELETE ONE', 'TO START ANOTHER.']
-          : ['START A NEW SPELL DECK FROM A', 'READY-MADE ONE, AN EMPTY ONE OR', 'A YAML FILE.'];
+          : ['START A NEW SPELL DECK FROM A', 'READY-MADE ONE, AN EMPTY ONE OR', 'A FRIEND\'S CODE.'];
       lines.forEach((l, i) => drawText(ui, l, lx, y + 24 + i * 11, INK2));
     } else {
       // what to do with it
@@ -701,7 +713,7 @@ export class DeckBuilderScene implements Scene {
 
     const barTop = a.y + a.h - 84, msgY = barTop - 22;
     if (this.picks) actionBar(ui, {});
-    else actionBar(ui, { mid: { id: 'yaml', label: 'YAML' }, primary: { id: 'done', label: 'DONE' } });
+    else actionBar(ui, { mid: { id: 'share', label: 'SHARE' }, primary: { id: 'done', label: 'DONE' } });
     const errs = validate(this.deck);
     const note = this.msgT > 0 ? [this.msg, '#f8b800'] : errs.length ? [errs[0], '#f83800'] : ['SPELL DECK READY. SAVED HERE.', '#58d854'];
     drawTextCentered(ui, note[0], UW / 2, msgY, note[1], note[0].length * 12 < w ? 2 : 1);
@@ -780,7 +792,8 @@ export class DeckBuilderScene implements Scene {
       bigButton(ui, 't:rename', 'RENAME', sx, by, bw, TAP);
       bigButton(ui, 't:clone', 'CLONE', sx + bw + GAP, by, bw, TAP, { disabled: full });
       bigButton(ui, 't:delete', armed ? 'SURE?' : 'DELETE', sx + (bw + GAP) * 2, by, bw, TAP, { sub: armed ? 'TAP AGAIN' : undefined });
-      bigButton(ui, 't:edit', 'EDIT', sx, by + TAP + GAP, sw, TAP, { primary: true });
+      bigButton(ui, 't:share', 'SHARE', sx, by + TAP + GAP, bw, TAP);
+      bigButton(ui, 't:edit', 'EDIT', sx + bw + GAP, by + TAP + GAP, sw - bw - GAP, TAP, { primary: true });
     });
   }
 
@@ -792,8 +805,8 @@ export class DeckBuilderScene implements Scene {
     const rh = Math.min(TAP + 16, Math.floor((h - 44) / picks.length) - 6);
     picks.forEach((id, i) => {
       const p = this.presets.find(q => q.id === id);
-      const name = id === 'empty' ? 'EMPTY DECK' : id === 'import' ? 'IMPORT YAML' : p!.name.toUpperCase() + (id === 'starter' ? ' (STARTER)' : '');
-      const sub = id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE OR PICK A FILE'
+      const name = id === 'empty' ? 'EMPTY DECK' : id === 'import' ? 'IMPORT A CODE' : p!.name.toUpperCase() + (id === 'starter' ? ' (STARTER)' : '');
+      const sub = id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE A FRIEND\'S CODE'
           : `MYTHIC: ${(this.cards.find(c => c.id === p!.mythic)?.name ?? '').toUpperCase()}`;
       bigButton(ui, `pick:${i}`, name, x + 6, y + 40 + i * (rh + 6), w - 12, rh, { sub, scale: name.length * 12 < w - 30 ? 2 : 1, on: i === this.peek });
     });

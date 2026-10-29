@@ -38,6 +38,8 @@ jobs:
         run: npx tsx tests/scene-stack.ts
       - name: Gamepad input
         run: npx tsx tests/gamepad.ts
+      - name: Spell deck share codes
+        run: npx tsx tests/deckCode.ts
       - name: Online determinism
         run: npx tsx scripts/netcheck.ts 25
       - name: Combo counter
