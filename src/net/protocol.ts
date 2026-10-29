@@ -6,7 +6,7 @@ import type { ClassId } from '../art/sprites';
 import type { Dir, Intent } from '../game/battle';
 
 /** Bump when the rules or the protocol change, so mismatched builds refuse to play each other. */
-export const PROTOCOL = 8;
+export const PROTOCOL = 9;
 
 export interface Hello { cls: ClassId; skin: string; deck: string[] }
 
@@ -19,6 +19,8 @@ export interface Lobby {
   /** Stage under the cursor, or this side's vote once `voted` ('random' is a vote too). */
   stage: string;
   voted: boolean;
+  /** First round of the set these picks are for: a rematch with new picks starts over, so older picks don't count. */
+  set: number;
 }
 
 export interface Packet {
@@ -38,6 +40,8 @@ export interface Packet {
   start?: { seed: number; bestOf: 1 | 3 | 5 };
   /** Highest round this side is ready to start (1 = first round). */
   ready: number;
+  /** A rematch where this side wants to pick fighters, spell decks and the stage again: the round it would start. */
+  repick?: number;
   /** Round the inputs below belong to. */
   round: number;
   /** This side's input delay in frames. */

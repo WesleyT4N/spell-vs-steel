@@ -36,6 +36,10 @@ export class NetSession {
   remote: Packet | null = null;
   start?: { seed: number; bestOf: 1 | 3 | 5 };
   myReady = 0;
+  /** This side asked for a rematch with new picks, starting at this round (0: no). */
+  myRepick = 0;
+  /** First round of the set being picked or played (a rematch carries on the round count). */
+  setStart = 1;
   round = 0;
   delay = 2;
   /** This side's current battle frame, sent so the other side can keep pace. */
@@ -50,7 +54,7 @@ export class NetSession {
   /** This page is in a background tab: it only pings, so the other side waits instead of timing out. */
   away = false;
   /** This side's character and stage select state. */
-  lobby: Lobby = { step: 0, tile: 0, stage: 'colosseum', voted: false };
+  lobby: Lobby = { step: 0, tile: 0, stage: 'colosseum', voted: false, set: 1 };
 
   private seq = 0;
   private lastSeq = -1;
@@ -78,8 +82,19 @@ export class NetSession {
 
   get side(): 0 | 1 { return this.role === 'host' ? 0 : 1; }
   get rival(): Hello | null { return this.remote?.hello ?? null; }
-  get rivalLobby(): Lobby | null { return this.remote?.lobby ?? null; }
+  /** The rival's select state, once it is for the set being picked now (not left over from the last one). */
+  get rivalLobby(): Lobby | null { const l = this.remote?.lobby; return l && l.set === this.setStart ? l : null; }
   get remoteReady(): number { return this.remote?.ready ?? 0; }
+  get remoteRepick(): number { return this.remote?.repick ?? 0; }
+
+  /**
+   * Both sides agreed to a rematch with new picks starting at round `r`: back to an empty select.
+   * The stage roulette and the round seeds carry on from the round count, so nothing repeats.
+   */
+  beginRepick(r: number): void {
+    this.setStart = r;
+    this.lobby = { step: 0, tile: this.lobby.tile, stage: this.lobby.stage, voted: false, set: r };
+  }
   get remoteDelay(): number { return this.remote?.delay ?? this.delay; }
   /** The other player's tab is in the background. */
   get rivalAway(): boolean { return !!this.remote?.away; }
@@ -105,7 +120,7 @@ export class NetSession {
       v: PROTOCOL, id: this.id, role: this.role, seq: ++this.seq,
       t: Math.round(now), et: this.remoteT, ed: this.remoteT ? Math.round(now - this.remoteAt) : 0,
       hello: this.hello, lobby: this.lobby, start: this.role === 'host' ? this.start : undefined,
-      ready: this.myReady, round: this.round, delay: this.delay, fr: this.frame,
+      ready: this.myReady, repick: this.myRepick || undefined, round: this.round, delay: this.delay, fr: this.frame,
       base: from, inp: this.local.slice(from).join(''), ack: this.remoteContig,
       picks: this.picks, hash: this.hash, bye: this.bye || undefined, away: this.away || undefined,
     };
