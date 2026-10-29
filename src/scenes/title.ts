@@ -7,7 +7,7 @@ import type { FrameId } from '../art/fighterFrames';
 import { FIRE as FIRE_RAMP, STEEL, SHADOW, HOLY } from '../game/fxView';
 import { P, W, UW, UH, view, screenRect, spread, clamp, dith, type Ctx } from '../engine/gfx';
 import { PLAYABLE } from '../game/classes';
-import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
+import { drawText, drawTextCentered, drawTextOutlined } from '../engine/font';
 import { wasPressed, navPressed, anyPressed, k, mouse, page } from '../engine/input';
 import type { PadMode } from '../engine/touch';
 import { playMusic, sfx, isMuted } from '../engine/audio';
@@ -16,10 +16,8 @@ import { DeckBuilderScene } from './deckbuilder';
 import { OptionsScene } from './options';
 import { OnlineScene } from './online';
 import { ProfileScene } from './profile';
-import { tutorialDone } from './tutorial';
 import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
-import { RED_INK } from './skin';
 import { bigButton, tallArea, panel, TAP, GAP, PAD } from './touchUi';
 import { platform } from '../platform';
 import { flushSave } from '../engine/save';
@@ -327,11 +325,6 @@ export class TitleScene implements Scene {
     drawMenu(ui, ITEMS, this.sel, UW / 2, MENU_Y, tick, { width, gap, scale, grow: false });
     ui.restore();
     if (intro < INTRO) return;
-    // first-timers get a nudge toward the tutorial
-    if (!tutorialDone() && tick % 8 < 6) {
-      const x = scale > 1 ? UW / 2 + textWidth('TUTORIAL', scale) / 2 + 8 : UW / 2 + 40;
-      drawText(ui, 'NEW!', x, MENU_Y + ITEMS.indexOf('TUTORIAL') * gap + Math.round((gap - 17) / 2), RED_INK);
-    }
     drawTextOutlined(ui, DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2', 8, 8, '#fcfcfc');
     drawTextCentered(ui, 'DESIGNED BY WES   -   BUILT BY CLAUDE', UW / 2, versionY, '#fcfcfc');
     if (isMuted()) drawTextOutlined(ui, 'MUTED', 8, 22, '#fcfcfc');
@@ -353,7 +346,6 @@ export class TitleScene implements Scene {
         const i = ITEMS.indexOf(item);
         const x = a.x + PAD + (r.items.length > 1 ? j * (half + GAP) : 0);
         bigButton(ui, `menu:${i}`, TALL_LABEL[item] ?? item, x, y, r.items.length > 1 ? half : w, r.h, { primary: item === 'ARCADE MODE', on: i === this.sel && showSel() && item !== 'ARCADE MODE' });
-        if (item === 'TUTORIAL' && !tutorialDone() && this.t % 1 < 0.75) drawText(ui, 'NEW!', x + half - 34, y + 6, RED_INK);
       });
       y += r.h + GAP;
     }
