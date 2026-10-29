@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at b89f8df (2026-10-28).
+How the game is put together, one section per system. Describes `main` at 16e8390 (2026-10-28).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -185,11 +185,11 @@ flowchart LR
 
 | Class | HP | Light / heavy | Resource | Comes back | Cards |
 | --- | --- | --- | --- | --- | --- |
-| Warrior | 890 | 7 / 32 | Rage, max 5 | Heavy hits +1.5, taking damage 1 per 40 (max 1 per hit) | `content/classes/warrior/cards.ts` |
-| Mage | 665 | 6 / 28 | Mana | Max 1, +1 per Draw (cap 5), refills each Draw | `content/classes/mage/cards.ts` |
-| Rogue | 650 | 12 / 22 | Energy | Topped up to 5 each Draw | `content/classes/rogue/cards.ts` |
-| Ranger | 695 | 8 / 20 | Energy | Starts 2, +1 per Draw, grows standing still | `content/classes/ranger/cards.ts` |
-| Priest | 630 | 6 / 28 | Mana | Starts 3, +3 per Draw (cap 5) | `content/classes/priest/cards.ts` |
+| Warrior | 965 | 10 / 28 | Rage, max 5 | Heavy hits +1.5, taking damage 1 per 40 (max 1 per hit) | `content/classes/warrior/cards.ts` |
+| Mage | 690 | 6 / 28 | Mana | Max 1, +1 per Draw (cap 5), refills each Draw | `content/classes/mage/cards.ts` |
+| Rogue | 650 | 10 / 22 | Energy | Topped up to 5 each Draw | `content/classes/rogue/cards.ts` |
+| Ranger | 765 | 10 / 20 | Energy | Starts 2, +1 per Draw, grows standing still | `content/classes/ranger/cards.ts` |
+| Priest | 660 | 6 / 28 | Mana | Starts 3, +3 per Draw (cap 5) | `content/classes/priest/cards.ts` |
 
 `tuning.ts` is the source of truth for numbers. Each class has 26 cards, a starter deck and 3 Mythic decks (`game/deck.ts`). Deck rules: exactly 30, 4 / 2 / 1 copies by rarity, max 5 Legendaries, exactly 1 Mythic. Custom decks save per class in `save.json`; `game/deckYaml.ts` imports and exports YAML.
 
@@ -236,7 +236,9 @@ flowchart LR
 ```
 
 - Fighters stay 24×24 and are never stretched in menus; spell effects keep a 24×24 footprint and take their element's colour.
-- Visual state never goes into the Battle, so rollback and the hash never see it. Hit feel (#34, `game/hitFeel.ts`): element impact sparks, render-only hit-stop, screen kick and popping damage numbers, deduped so a rollback doesn't replay them.
+- Visual state never goes into the Battle, so rollback and the hash never see it. Hit feel (#34, #73): the hit pause and slow-mo are rules (`Battle.hitStop` / `stopT` / `slowmo`, by hit tier from `TUNING.hitStop` and `TUNING.slowmo`; presses made during a pause are buffered and played after it), so they stay in lockstep and rollback. `game/hitFeel.ts` is the render-only part: a directional screen kick, a 1 px shudder while a pause runs, element impact sparks and popping damage numbers, deduped so a rollback doesn't replay them.
+- Basic shots are real projectiles at a constant speed (`TUNING.<cls>.shotSpeed`, capped by `maxShotSpeed` 15; only Aimed Shot may pass it), so full-row heavies can be dodged. A shot lights its row in the shooter's team colour until it is gone.
+- Team colours (#75, `game/teamColors.ts`, view-only): `team(side)` makes the watching player blue and the opponent red for panel rims and faces, telegraphs, reticles, shot paths and HUD ribbons. P1 is "you" in local 2P and CPU vs CPU.
 - The canvas fits the window between 4:3 and 21:9 (shows more stage, no letterbox); phones in portrait give the bottom half to the touch pad.
 - Screens with a full-height phone layout (`Scene.tall`: title, fighter select, spell deck select (#69), decks, stages, options, online, lobby, ranked, replays, tournament, arcade, training, tutorial, spell encyclopedia) take the whole portrait screen instead and draw big controls from `scenes/touchUi.ts`: the action bar, tabs, scrolling row lists, sheets and swipes.
 - UI skin: Parchment (`scenes/skin.ts`). Cards: `scenes/cardView.ts`. Font: `engine/font.ts` (5×7).
@@ -352,7 +354,7 @@ Hard also holds heavies (not Ranger or Rogue) and sidesteps out of the row when 
 | Encyclopedia | `#cards` | Every card face with filters |
 | Grid CLI | `npm run balance -- --pools starter,archetype --n 40` | Full matchup grid on worker threads (~750 matches/s), `--set` / `--script` tweaks |
 | Sweep | `npx tsx scripts/sweep.ts --out dir` | Every class pair at every CPU level over shipped decks, styles, starters and random decks |
-| Tuner | `npx tsx scripts/tune.ts --out dir` | Searches small HP / attack / power tweaks that put every wheel matchup in the target band |
+| Tuner | `npx tsx scripts/tune.ts --out dir` | Searches small HP / attack / power / shot speed tweaks that put every wheel matchup in the target band |
 
 ```mermaid
 flowchart LR
