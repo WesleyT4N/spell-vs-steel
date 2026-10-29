@@ -13,7 +13,7 @@ function check(name: string, ok: boolean, detail = ''): void {
 
 /** Plans `ids` from `res` Mana, then casts them one by one and records what each really cost. */
 function compare(cls: ClassId, ids: string[], res: number): void {
-  const b = new Battle({ cls, deck: toList(starterDeck(cls)) }, { cls: 'warrior', deck: toList(starterDeck('warrior')) }, 1);
+  const b = new Battle({ cls, deck: toList(starterDeck(cls)), name: 'A' }, { cls: 'warrior', deck: toList(starterDeck('warrior')), name: 'B' }, 1);
   b.phase = 'fight';
   const f = b.f[0];
   f.resMax = Math.min(f.resMax, 5); f.res = res;
