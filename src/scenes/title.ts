@@ -15,7 +15,7 @@ import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { OptionsScene } from './options';
 import { OnlineScene } from './online';
-import { ReplaysScene } from './replays';
+import { ProfileScene } from './profile';
 import { tutorialDone } from './tutorial';
 import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
@@ -25,7 +25,7 @@ import { platform } from '../platform';
 import { flushSave } from '../engine/save';
 
 // QUIT only in an app that can close itself (a web page can't)
-const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'SPELL DECK BUILDER', 'REPLAYS', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : []), ...(platform.lifecycle.canQuit ? ['QUIT'] : [])];
+const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'SPELL DECK BUILDER', 'PROFILE', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : []), ...(platform.lifecycle.canQuit ? ['QUIT'] : [])];
 
 // eight rows (nine in dev builds) still clear the version line
 const MENU_Y = ITEMS.length > 8 ? 156 : ITEMS.length > 7 ? 162 : ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 8 ? 14 : ITEMS.length > 7 ? 15 : ITEMS.length > 6 ? 16 : 18;
@@ -220,7 +220,7 @@ export class TitleScene implements Scene {
       if (item === 'TRAINING MODE') pushScene(new CharSelectScene(undefined, 0, 'training'));
       if (item === 'TUTORIAL') pushScene(new CharSelectScene(undefined, 0, 'tutorial'));
       if (item === 'SPELL DECK BUILDER') pushScene(new DeckBuilderScene(loadMatch().p1));
-      if (item === 'REPLAYS') pushScene(new ReplaysScene());
+      if (item === 'PROFILE') pushScene(new ProfileScene());
       if (item === 'OPTIONS') pushScene(new OptionsScene());
       // loaded on demand, so the prod build (DEV_TOOLS off) carries none of the dev tools code
       // write out the save first, then close the app

@@ -29,6 +29,7 @@ import { CharSelectScene } from './select';
 import { StatsPanel, type StatsData } from './statsView';
 import { trackStats, roundRecord, setTotals, topSpell, type BattleStats, type RoundRecord } from '../game/stats';
 import { OptionsScene } from './options';
+import { recordSet } from '../game/profile';
 import { recordRound, saveReplay, newReplayId, RULES_VERSION, type Replay, type ReplayMode, type RoundTape } from '../game/replay';
 
 /** The replay being recorded for each set, keyed by the set's list of rounds (a new set starts a new list). */
@@ -352,8 +353,12 @@ export class BattleScene implements Scene {
     r.rounds.push(t);
     r.at = Date.now();
     saveReplay(r);
+    recordSet(r, this.myDeck);
     this.afterRound(r);
   }
+
+  /** The spell deck choice the player at this keyboard fights with, for the profile's favorite deck. */
+  protected get myDeck(): string { return this.decks[this.me]; }
 
   /** The set's replay so far, once a round of it has ended. */
   protected get setReplay(): Replay | null { return SET_REPLAYS.get(this.rounds) ?? null; }

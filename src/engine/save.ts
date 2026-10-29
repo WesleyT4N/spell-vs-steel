@@ -38,6 +38,8 @@ export interface SaveData {
   labScript: string | null;
   /** Touch controls: pad size, left-handed, vibration (see TouchSettings in touch.ts). */
   touch: Obj | null;
+  /** Sets won and lost by class and mode, and spell decks played (see Profile in game/profile.ts). */
+  profile: Obj | null;
 }
 
 /** One of the player's own spell decks: an id unique within its class, a name, and card id -> copies. */
@@ -60,7 +62,7 @@ interface Envelope { game: string; v: number; data: unknown }
 
 const defaults = (): SaveData => ({
   keys: {}, p2keys: {}, pads: null, audio: {}, muted: false, decks: {}, match: null, training: null,
-  tutorialDone: false, arcade: {}, rating: null, rankedPending: null, labScript: null, touch: null,
+  tutorialDone: false, arcade: {}, rating: null, rankedPending: null, labScript: null, touch: null, profile: null,
 });
 
 /** MIGRATIONS[n] turns a version n-1 save into version n. Never edit a shipped entry; add the next one. */
@@ -68,7 +70,7 @@ const MIGRATIONS: Record<number, (d: Obj) => Obj> = {
   // 1: the first versioned save. Nothing before it but the legacy keys, which importLegacy handles.
   1: d => d,
   // 2: many spell decks per class. The one custom deck of each class (card id -> copies) becomes the first
-  // of a list, and a match setup that picked 'custom' now names that deck.
+  // of a list, and a match setup (and the profile's deck counts) that said 'custom' now name that deck.
   2: d => {
     const decks: Obj = {};
     for (const [cls, cards] of Object.entries(clean(d.decks))) {
@@ -81,6 +83,16 @@ const MIGRATIONS: Record<number, (d: Obj) => Obj> = {
         if (m[deck] === 'custom') m[deck] = typeof m[side] === 'string' && decks[m[side] as string] ? 'custom:d1' : 'starter';
       }
       out.match = m;
+    }
+    // the profile counts sets per '<class>|<deck choice>'
+    if (isObj(d.profile) && isObj(d.profile.decks)) {
+      const counts: Obj = {};
+      for (const [key, n] of Object.entries(clean(d.profile.decks))) {
+        const [cls, deck] = key.split('|');
+        const to = deck === 'custom' ? (decks[cls] ? `${cls}|custom:d1` : `${cls}|starter`) : key;
+        counts[to] = (typeof counts[to] === 'number' ? counts[to] as number : 0) + (typeof n === 'number' ? n : 0);
+      }
+      out.profile = { ...clean(d.profile), decks: counts };
     }
     return out;
   },
@@ -119,6 +131,7 @@ function normalize(raw: Obj): SaveData {
     rankedPending: objOr(r.rankedPending, d.rankedPending),
     labScript: typeof r.labScript === 'string' ? r.labScript : null,
     touch: objOr(r.touch, d.touch),
+    profile: objOr(r.profile, d.profile),
   };
 }
 

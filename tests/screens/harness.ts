@@ -27,7 +27,11 @@ import { PLAYABLE } from '../../src/game/classes';
 import { SKINS, type ClassId } from '../../src/art/sprites';
 import { LobbyScene } from '../../src/scenes/lobby';
 import { RankedScene } from '../../src/scenes/ranked';
-import { ReplaysScene } from '../../src/scenes/replays';
+import { ReplaysScene, ReplayScene } from '../../src/scenes/replays';
+import { ProfileScene } from '../../src/scenes/profile';
+import { Battle, type Intent } from '../../src/game/battle';
+import { Cpu } from '../../src/game/ai';
+import { TapeWriter } from '../../src/game/replay';
 import { TournamentScene } from '../../src/scenes/tournament';
 import { tournaments, type Bracket } from '../../src/net/tournament';
 import { lobbyId, type Lobby, type Here } from '../../src/net/lobby';
@@ -111,6 +115,40 @@ function fakeReplay(id: string, mode: Replay['mode'], a: ClassId, b: ClassId, wi
   const specs = [{ cls: a, deck: [], name: a.toUpperCase() }, { cls: b, deck: [], name: b.toUpperCase() }];
   const rounds = wins.map((w, i) => ({ seed: i, specs, frames: [], events: [], n: 3600 + i * 1700, hash: 0, winner: w }));
   return { id, v: 0, at: AT - ago * 3600_000, mode, me: 0, bestOf: wins.length > 1 ? 3 : 1, stage: 'plains', rounds, keep } as unknown as Replay;
+}
+/** A real recorded round (CPU vs CPU, warrior against mage), `secs` of fighting long, to play back. */
+function recordedReplay(secs = 40): Replay {
+  const deck = (c: ClassId): string[] => toList(presetDeck(c, 'starter'));
+  const b = new Battle({ cls: 'warrior', deck: deck('warrior'), name: 'YOU' }, { cls: 'mage', deck: deck('mage'), name: 'RIVAL' }, 1234);
+  const w = new TapeWriter(b), cpus = [new Cpu('hard'), new Cpu('hard')];
+  for (let f = 0; f < secs * 60 && b.phase !== 'over'; f++) {
+    if (b.phase === 'custom') { const picks: [number[], number[]] = [cpus[0].pick(b, b.f[0]), cpus[1].pick(b, b.f[1])]; w.endCustom(picks); b.endCustom(picks); }
+    if (b.canOpenCustom() && f % 900 === 899) { w.beginCustom(); b.beginCustom(); continue; }
+    const ins: [Intent, Intent] = [cpus[0].intent(b, b.f[0], STEP), cpus[1].intent(b, b.f[1], STEP)];
+    w.update(ins);
+    b.update(STEP, ins);
+  }
+  return { id: 'rw', v: 0, at: AT, mode: 'cpu', me: 0, bestOf: 3, stage: 'plains', rounds: [w.finish()] } as unknown as Replay;
+}
+function fakeProfile(empty: boolean): ProfileScene {
+  const s = new ProfileScene();
+  s.enter = () => {};
+  if (empty) {
+    s.profile = { classes: {}, modes: {}, decks: {} };
+    s.rating = { rating: 1000, games: 0, wins: 0, losses: 0 };
+    s.arcade = {};
+    s.replays = 0;
+    return s;
+  }
+  s.profile = {
+    classes: { warrior: { w: 21, l: 9 }, mage: { w: 7, l: 8 }, rogue: { w: 2, l: 4 }, priest: { w: 5, l: 1 } },
+    modes: { cpu: { w: 14, l: 6 }, arcade: { w: 9, l: 3 }, online: { w: 4, l: 6 }, ranked: { w: 8, l: 7 } },
+    decks: { 'warrior|starter': 18, 'warrior|custom': 9, 'mage|starter': 15 },
+  };
+  s.rating = { rating: 1284, games: 15, wins: 8, losses: 7 };
+  s.arcade = { warrior: { time: 754, continues: 0 }, mage: { time: 1022, continues: 2 } };
+  s.replays = 9;
+  return s;
 }
 function fakeTournament(state: Bracket['state']): TournamentScene {
   const me = lobbyId();
@@ -303,6 +341,16 @@ const screens: Record<string, () => void> = {
     setScene(s);
   },
   'replays-empty': () => { const s = new ReplaysScene(); s.list = []; setScene(s); },
+  'profile': () => setScene(fakeProfile(false)),
+  'profile-empty': () => setScene(fakeProfile(true)),
+  // watching a replay, and paused in slow motion
+  'replay-watch': () => { setScene(new ReplayScene(recordedReplay())); run(8); },
+  'replay-paused': () => {
+    const s = new ReplayScene(recordedReplay());
+    setScene(s);
+    run(8);
+    Object.assign(s, { speed: 0, halt: true });
+  },
   // open tournaments to join, and an 8-player bracket a round in
   'tournament-browse': () => setScene(fakeTournament('open')),
   'tournament-bracket': () => setScene(fakeTournament('live')),
