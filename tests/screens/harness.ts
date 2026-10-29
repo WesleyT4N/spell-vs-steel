@@ -302,9 +302,9 @@ const screens: Record<string, () => void> = {
   'deck-builder-import': () => {
     setScene(new DeckBuilderScene('mage', title));
     const d = builder(); d.choosePick('import');
-    const box = document.querySelector<HTMLTextAreaElement>('.svs-yaml textarea')!;
+    const box = document.querySelector<HTMLTextAreaElement>('.svs-share textarea')!;
     box.value = 'SVS1-MAGE-4ZZZZ12';
-    document.querySelectorAll<HTMLButtonElement>('.svs-yaml button').forEach(b => { if (b.textContent === 'Import') b.click(); });
+    document.querySelectorAll<HTMLButtonElement>('.svs-share button').forEach(b => { if (b.textContent === 'Import') b.click(); });
   },
   // editing one of your decks (opened from the deck select's EDIT)
   'deck-builder-edit': () => { const [id] = myDecks('mage'); setScene(new DeckBuilderScene('mage', title, id)); },

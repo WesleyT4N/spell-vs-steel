@@ -1,7 +1,6 @@
 // Spell deck share codes: every class's spells hash apart, every ready-made deck round-trips, and bad or
 // forged codes are refused with a reason. Usage: npx tsx tests/deckCode.ts
-import { cardHash, decodeDeckCode, encodeDeckCode, hasDeckCode } from '../src/game/deckCode';
-import { importYaml } from '../src/game/deckYaml';
+import { cardHash, decodeDeckCode, encodeDeckCode } from '../src/game/deckCode';
 import { cardsFor } from '../src/game/cards';
 import { PLAYABLE } from '../src/game/classes';
 import { presetsFor } from '../src/game/deck';
@@ -37,7 +36,6 @@ check('inside a chat message', decodeDeckCode(`try my deck: ${code} it's great`)
 const cut = code.indexOf('-', 10) - 7;
 check('broken over two lines', decodeDeckCode(`${code.slice(0, cut)}\n${code.slice(cut)}`).ok);
 check('no name is fine', (r => r.ok && r.spellDeck.name === undefined)(decodeDeckCode(encodeDeckCode({ cls: 'mage', deck: mage.cards }))));
-check('hasDeckCode', hasDeckCode(`x ${code}`) && !hasDeckCode('class: mage\nspells:\n  fireball: 2'));
 check('empty deck round-trips', (r => r.ok && !Object.keys(r.spellDeck.deck).length)(decodeDeckCode(encodeDeckCode({ cls: 'rogue', deck: {} }))));
 // a mistyped O for 0 still reads
 const zero = code.replace(/0/, 'O');
@@ -62,9 +60,6 @@ const commons = cardsFor('mage').filter(c => c.rarity === 'common');
 refused(forge('mage', Object.fromEntries(commons.slice(0, 8).map(c => [c.id, 4]))), /TOO MANY SPELLS/);
 // a warrior spell in a mage code is simply dropped when encoding, and a stray __proto__ never gets in
 check('other class spells are left out', !(r => r.ok && Object.keys(r.spellDeck.deck).includes('step_slash'))(decodeDeckCode(forge('mage', { step_slash: 2, __proto__: 1 } as Record<string, number>))));
-// YAML still imports, sharing the rule checks
-check('YAML import still works', importYaml('class: mage\nspells:\n  fireball: 2').ok);
-check('YAML refuses __proto__', !importYaml('class: mage\nspells:\n  __proto__: 2').ok);
 
 console.log(failed ? `\n${failed} FAILED` : '\nall deck code checks passed');
 process.exit(failed ? 1 : 0);

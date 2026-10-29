@@ -6,14 +6,28 @@
 // optional. The spells come in groups by copy count: the count, how many spells have it, then three characters
 // per spell, a 15-bit hash of its card id. Hashes, not positions in the card list, so adding cards to a class
 // never changes the codes of decks that already exist (tests/deckCode.ts fails if two spells of one class ever
-// hash alike). The letters are Crockford base 32: no I, L, O or U, case doesn't
-// matter, and a mistyped O, I or L still reads. Reading a code never runs anything: it only looks spells up in
-// the class's own pool and then checks the deck rules, the same way a YAML import does.
-import { cardsFor, MAX_COPIES, type CardDef } from './cards';
+// hash alike). The letters are Crockford base 32: no I, L, O or U, case doesn't matter, and a mistyped O, I or
+// L still reads. Reading a code never runs anything: it only looks spells up in the class's own pool and then
+// checks the deck rules. A legal deck that is not finished yet (under 30 spells, no Mythic) comes in and shows
+// NOT READY like any other.
+import { CARDS, cardsFor, MAX_COPIES, type CardDef } from './cards';
 import { CLASS_INFO, PLAYABLE } from './classes';
-import { cleanDeckName, type DeckCounts } from './deck';
-import { deckRuleBroken, type SpellDeck } from './deckYaml';
+import { cleanDeckName, countRarity, deckSize, DECK_SIZE, MAX_LEGENDARIES, MYTHICS_REQUIRED, type DeckCounts } from './deck';
 import type { ClassId } from '../art/sprites';
+
+export interface SpellDeck { cls: ClassId; name?: string; deck: DeckCounts }
+
+/** The first deck rule an imported deck breaks (the same limits the builder enforces when adding a card), or null. */
+export function deckRuleBroken(deck: DeckCounts): string | null {
+  for (const [id, k] of Object.entries(deck)) {
+    const c = CARDS[id];
+    if (k > MAX_COPIES[c.rarity]) return `${c.name.toUpperCase()}: MAX ${MAX_COPIES[c.rarity]} COPIES (HAS ${k})`;
+  }
+  if (deckSize(deck) > DECK_SIZE) return `TOO MANY SPELLS: ${deckSize(deck)} (MAX ${DECK_SIZE})`;
+  if (countRarity(deck, 'legendary') > MAX_LEGENDARIES) return `TOO MANY LEGENDARIES: ${countRarity(deck, 'legendary')} (MAX ${MAX_LEGENDARIES})`;
+  if (countRarity(deck, 'mythic') > MYTHICS_REQUIRED) return `ONLY ${MYTHICS_REQUIRED} MYTHIC ALLOWED`;
+  return null;
+}
 
 const PREFIX = 'SVS1';
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -65,9 +79,6 @@ export function encodeDeckCode(g: SpellDeck): string {
   const name = cleanDeckName(g.name ?? '').trim().replace(/ /g, '_');
   return `${PREFIX}-${g.cls.toUpperCase()}-${body}${check(g.cls, body)}${name ? `-${name}` : ''}`;
 }
-
-/** Whether some pasted text holds a share code (so it is read as one, not as YAML). */
-export const hasDeckCode = (text: string): boolean => new RegExp(`(^|\\s)${PREFIX}-`, 'i').test(text);
 
 /**
  * Reads the first share code in `text` (a chat message around it is fine, and so is a code a chat app broke

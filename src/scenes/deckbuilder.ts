@@ -1,6 +1,6 @@
 // Spell deck builder: 30 spells, 4/2/1 copy limits, max 5 Legendaries, exactly 1 Mythic. Autosaves.
 // Opening it (or switching class) shows your spell decks for the class, to edit, rename, clone or delete; a new
-// one starts from a ready-made deck, an empty one, a friend's share code or a YAML file. Opened on one of your decks, it edits that.
+// one starts from a ready-made deck, an empty one or a friend's share code. Opened on one of your decks, it edits that.
 import { popScene, hint, zone, hot, isHot, button, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
@@ -22,7 +22,7 @@ import { drawCardDetail, drawCardFace, resInk, CARD_W, CARD_H } from './cardView
 import { CardPreview } from './cardPreview';
 import { openDeckPanel, type DeckPanel } from './deckPanel';
 import { NameEntry } from './nameEntry';
-import type { SpellDeck } from '../game/deckYaml';
+import type { SpellDeck } from '../game/deckCode';
 import { win, selRow, plaque, ink, PAPER, BURN, INK, INK2, RED_INK, GOLD, TRIM } from './skin';
 import { bigButton, actionBar, barTapped, swipeIn, tallArea, tabs, sheet, panel, rowList, Scroller, TAP, GAP, PAD } from './touchUi';
 
@@ -623,7 +623,7 @@ export class DeckBuilderScene implements Scene {
       if (on) selRow(ui, x + 4, ry - 2, colW, rh);
       const p = this.presets.find(q => q.id === id);
       const name = id === 'empty' ? 'EMPTY SPELL DECK' : id === 'import' ? 'IMPORT A CODE...' : p!.name.toUpperCase() + (id === 'starter' ? ' (STARTER)' : '');
-      const sub = id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE A CODE OR YAML'
+      const sub = id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE A FRIEND\'S CODE'
           : `MYTHIC: ${(this.cards.find(c => c.id === p!.mythic)?.name ?? '').toUpperCase()}`;
       drawText(ui, name, x + 22, ry + 2 + ro, on ? INK : INK2);
       drawText(ui, sub, x + 22, ry + 11 + ro, p ? ink(RARITY_COLOR.mythic) : TRIM);
@@ -634,7 +634,7 @@ export class DeckBuilderScene implements Scene {
     const list = this.presets.find(q => q.id === id)?.cards ?? {};
     const cards = this.cards.filter(c => list[c.id]);
     if (!id) drawText(ui, 'TOUCH A SPELL DECK TO SEE IT', lx, y + 24, INK2);
-    else if (id === 'import') ['PASTE A FRIEND\'S SPELL DECK', 'CODE OR YAML, OR PICK A', '.YAML FILE. ONE THAT BREAKS', 'A DECK RULE IS REFUSED.', 'SHARE MAKES YOUR OWN CODE.'].forEach((l, i) => drawText(ui, l, lx, y + 24 + i * 11, INK2));
+    else if (id === 'import') ['PASTE A FRIEND\'S SPELL DECK', 'CODE. ONE THAT BREAKS A DECK', 'RULE IS REFUSED. SHARE', 'MAKES A CODE FOR YOUR OWN.'].forEach((l, i) => drawText(ui, l, lx, y + 24 + i * 11, INK2));
     else if (!cards.length) drawText(ui, 'NO SPELLS YET', lx, y + 24, INK2);
     cards.forEach((c, i) => drawText(ui, `${list[c.id]}X ${c.name.toUpperCase()}`, lx, y + 24 + i * 11, c.rarity === 'common' ? INK2 : ink(RARITY_COLOR[c.rarity])));
     if (id) drawText(ui, `SAVED AS A NEW DECK (${this.decks.length + 1}/${MAX_CUSTOM_DECKS})`, lx, y + hgt - 14, TRIM);
@@ -806,7 +806,7 @@ export class DeckBuilderScene implements Scene {
     picks.forEach((id, i) => {
       const p = this.presets.find(q => q.id === id);
       const name = id === 'empty' ? 'EMPTY DECK' : id === 'import' ? 'IMPORT A CODE' : p!.name.toUpperCase() + (id === 'starter' ? ' (STARTER)' : '');
-      const sub = id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE A CODE OR YAML'
+      const sub = id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE A FRIEND\'S CODE'
           : `MYTHIC: ${(this.cards.find(c => c.id === p!.mythic)?.name ?? '').toUpperCase()}`;
       bigButton(ui, `pick:${i}`, name, x + 6, y + 40 + i * (rh + 6), w - 12, rh, { sub, scale: name.length * 12 < w - 30 ? 2 : 1, on: i === this.peek });
     });
