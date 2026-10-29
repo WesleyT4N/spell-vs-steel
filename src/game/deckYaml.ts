@@ -130,14 +130,18 @@ export function importYaml(text: string): { ok: true; spellDeck: SpellDeck } | {
     deck[card.id] = (deck[card.id] ?? 0) + count;
   }
   for (const id of Object.keys(deck)) if (!deck[id]) delete deck[id];
+  const why = deckRuleBroken(deck);
+  return why ? fail(why) : { ok: true, spellDeck: { cls: classId, name, deck } };
+}
 
-  // the same limits the builder enforces when adding a card
+/** The first deck rule an imported deck breaks (the same limits the builder enforces when adding a card), or null. */
+export function deckRuleBroken(deck: DeckCounts): string | null {
   for (const [id, k] of Object.entries(deck)) {
     const c = CARDS[id];
-    if (k > MAX_COPIES[c.rarity]) return fail(`${c.name.toUpperCase()}: MAX ${MAX_COPIES[c.rarity]} COPIES (HAS ${k})`);
+    if (k > MAX_COPIES[c.rarity]) return `${c.name.toUpperCase()}: MAX ${MAX_COPIES[c.rarity]} COPIES (HAS ${k})`;
   }
-  if (deckSize(deck) > DECK_SIZE) return fail(`TOO MANY SPELLS: ${deckSize(deck)} (MAX ${DECK_SIZE})`);
-  if (countRarity(deck, 'legendary') > MAX_LEGENDARIES) return fail(`TOO MANY LEGENDARIES: ${countRarity(deck, 'legendary')} (MAX ${MAX_LEGENDARIES})`);
-  if (countRarity(deck, 'mythic') > MYTHICS_REQUIRED) return fail(`ONLY ${MYTHICS_REQUIRED} MYTHIC ALLOWED`);
-  return { ok: true, spellDeck: { cls: classId, name, deck } };
+  if (deckSize(deck) > DECK_SIZE) return `TOO MANY SPELLS: ${deckSize(deck)} (MAX ${DECK_SIZE})`;
+  if (countRarity(deck, 'legendary') > MAX_LEGENDARIES) return `TOO MANY LEGENDARIES: ${countRarity(deck, 'legendary')} (MAX ${MAX_LEGENDARIES})`;
+  if (countRarity(deck, 'mythic') > MYTHICS_REQUIRED) return `ONLY ${MYTHICS_REQUIRED} MYTHIC ALLOWED`;
+  return null;
 }

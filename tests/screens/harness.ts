@@ -164,7 +164,7 @@ function myDecks(cls: ClassId = 'warrior', n = 3): string[] {
   saveMatch(match({ p1: cls, p1Deck: customChoice(ids[0]) }));
   return ids;
 }
-type Builder = { listSel: number; onActs: boolean; actSel: number; act(a: string): void; naming: { entry: { text: string } } | null };
+type Builder = { listSel: number; onActs: boolean; actSel: number; act(a: string): void; choosePick(id: string): void; naming: { entry: { text: string } } | null };
 const builder = (): Builder => getScene() as unknown as Builder;
 
 const screens: Record<string, () => void> = {
@@ -238,6 +238,17 @@ const screens: Record<string, () => void> = {
   // renaming: typing on a keyboard, and picking letters on a pad
   'deck-builder-rename': () => { myDecks(); setScene(new DeckBuilderScene('warrior', title)); builder().act('RENAME'); builder().naming!.entry.text = 'EARTHQUAKE'; },
   'deck-builder-rename-pad': () => { fakePad(); myDecks(); setScene(new DeckBuilderScene('warrior', title)); builder().act('RENAME'); run(0.1); },
+  // SHARE on one of your decks: the code to copy and the import box (a pad gets its button hints); the import-only
+  // panel from the start-from picker, with a refused code's reason showing
+  'deck-builder-share': () => { myDecks(); setScene(new DeckBuilderScene('warrior', title)); builder().act('SHARE'); },
+  'deck-builder-share-pad': () => { fakePad(); myDecks(); setScene(new DeckBuilderScene('warrior', title)); run(0.1); builder().act('SHARE'); },
+  'deck-builder-import': () => {
+    setScene(new DeckBuilderScene('mage', title));
+    const d = builder(); d.choosePick('import');
+    const box = document.querySelector<HTMLTextAreaElement>('.svs-yaml textarea')!;
+    box.value = 'SVS1-MAGE-4ZZZZ12';
+    document.querySelectorAll<HTMLButtonElement>('.svs-yaml button').forEach(b => { if (b.textContent === 'Import') b.click(); });
+  },
   // editing one of your decks (opened from the deck select's EDIT)
   'deck-builder-edit': () => { const [id] = myDecks('mage'); setScene(new DeckBuilderScene('mage', title, id)); },
   // the opening Draw screen, with you on the left against the CPU
