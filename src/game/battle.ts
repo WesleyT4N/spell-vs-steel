@@ -3,13 +3,14 @@ import { TUNING } from './tuning';
 import { CARDS, type CardDef, type Element } from './cards';
 import { defaultSkin, mirrorSkin, type ClassId } from '../art/sprites';
 import { getDefaultSink, type BattleEvent, type EventSink, type SoundOpts, type VoiceKind } from './events';
+import { classRules } from '../content/classes';
 import { effect, runEffect, type EffectRec, type ShotHit } from '../content/effects';
 
 /** Sound a shot makes leaving the caster (the light Arrow plays its own). */
 const SHOT_SOUND: Partial<Record<string, string>> = { orb: 'fx:bolt', spark: 'fx:holySpark', beam: 'fx:boltHeavy', aimed: 'fx:aimed', fireball: 'shot_fireball', hook: 'shot_chain', gust: 'shot_wind', knife: 'shot_knife', arrow: 'shot_arrow', sting: 'shot_arrow', net: 'shot_net', wolf: 'shot_beast', hammer: 'shot_spin', vial: 'shot_net' };
 
-/** Stereo position of a column: -1 left edge to +1 right edge. */
-export const panOf = (col: number): number => (col - 2.5) / 3;
+import { panOf, basicShot } from './shots';
+export { panOf };
 import { seeded, randomSeed, shuffle } from './rng';
 import { CLASS_INFO } from './classes';
 import { ComboTracker, cantAct } from './combo';
@@ -410,17 +411,7 @@ export class Battle {
       // uncast picks from last turn are discarded
       f.discard.push(...f.queue);
       f.queue = [];
-      if (f.cls === 'mage') {
-        if (this.turn > 1) f.resMax = Math.min(TUNING.mage.manaCap, f.resMax + 1);
-        f.res = f.resMax + f.bonusManaNext;
-        f.bonusManaNext = 0;
-      } else if (f.cls === 'rogue') {
-        f.res = Math.max(f.res, TUNING.rogue.energyTopUp);
-      } else if (f.cls === 'ranger' && this.turn > 1) {
-        f.res = Math.min(TUNING.ranger.energyCap, f.res + 1);
-      } else if (f.cls === 'priest' && this.turn > 1) {
-        f.res = Math.min(TUNING.priest.manaCap, f.res + TUNING.priest.manaPerDraw);
-      }
+      classRules(f.cls).onDraw?.(this, f);
       // the shield pool and Shadowform last one round
       f.shields = f.shields.filter(s => s.kind !== 'holy');
       f.st.shadowform = 0;
@@ -710,17 +701,7 @@ export class Battle {
     if (f.dead) return;
     this.updatePoison(f, dt);
     this.updateDots(f, dt);
-    if (f.cls === 'ranger') {
-      // Energy comes from standing still; any change of panel restarts the count
-      // (Light Footed keeps the count through moves; Deadeye doubles the rate)
-      if ((f.col !== f.lastCol || f.row !== f.lastRow) && f.st.lightFoot <= 0) f.stillT = 0;
-      else f.stillT += dt * (f.st.deadeye > 0 ? 2 : 1);
-      const R = TUNING.ranger;
-      while (f.stillT >= R.stillSeconds) {
-        f.stillT -= R.stillSeconds;
-        if (f.res < R.energyCap) { f.res = Math.min(R.energyCap, f.res + 1); this.sound('pip'); }
-      }
-    }
+    classRules(f.cls).tick?.(this, f, dt);
     f.lastCol = f.col; f.lastRow = f.row;
     // Smokescreen: stealthed while standing in your own smoke, even right after an attack
     const sp = this.panels[f.col][f.row];
@@ -827,17 +808,14 @@ export class Battle {
 
   // ---------- resources ----------
   gainRage(f: Fighter, amt: number, fromCard = false): void {
-    if (f.cls !== 'warrior' || amt <= 0) return;
-    const before = Math.floor(f.res);
-    f.res = Math.min(TUNING.warrior.rageMax, f.res + amt);
-    if (Math.floor(f.res) > before && fromCard) this.sound('pip');
+    classRules(f.cls).gainRage?.(this, f, amt, fromCard);
   }
 
   /** Energy, Mana or Rage from a card or effect, up to the class cap. */
   gainRes(f: Fighter, amt: number): void {
-    if (f.cls === 'warrior') { this.gainRage(f, amt, true); return; }
-    const cap = f.cls === 'mage' ? 99 : f.resMax;
-    f.res = Math.min(cap, f.res + amt);
+    const rules = classRules(f.cls);
+    if (rules.gainRes) { rules.gainRes(this, f, amt); return; }
+    f.res = Math.min(f.resMax, f.res + amt);
     this.sound('pip');
   }
 
@@ -862,8 +840,8 @@ export class Battle {
    */
   planCosts(f: Fighter, cards: CardDef[]): { left: number[]; cost: number[]; dmg: number[]; rest: number } {
     let free = f.st.avatar > 0 || f.st.ascendance > 0, less = f.st.powerInfusion > 0;
-    const cap = f.cls === 'mage' ? TUNING.mage.manaCap : TUNING.warrior.rageMax;
-    let max = f.cls === 'mage' ? f.resMax : cap, res = Math.floor(f.res), power = f.powerLeft;
+    const { cap, max: max0 } = classRules(f.cls).pool(f);
+    let max = max0, res = Math.floor(f.res), power = f.powerLeft;
     const cost: number[] = [], dmg: number[] = [];
     let emp = f.empowered;
     const left = cards.map(card => {
@@ -897,101 +875,16 @@ export class Battle {
   }
 
   // ---------- attacks ----------
-  /** The Warrior's Cleave (light) or Heavy Cleave on `cells`. */
-  cleave(f: Fighter, kind: 'light' | 'heavy', cells: Array<[number, number]>, dmg: number): void {
-    const T = TUNING.warrior;
-    this.addFx(kind === 'light' ? 'cleave' : 'cleaveHeavy', f.side, f.col + this.dir(f), f.row, kind === 'light' ? 0.18 : 0.34);
-    const res = this.strike(f, cells, dmg, { basic: kind, element: 'steel' });
-    if (res.fighter && kind === 'heavy') this.gainRage(f, T.rageHeavyHit * (f.st.berserk > 0 ? 2 : 1));
-    if (res.fighter && kind === 'light' && T.rageLightHit) this.gainRage(f, T.rageLightHit * (f.st.berserk > 0 ? 2 : 1));
-  }
-
   basicAttack(f: Fighter, kind: 'light' | 'heavy'): void {
-    const foe = this.foe(f);
-    const d = this.dir(f);
     f.pose = kind === 'light' ? 'attack' : 'heavy';
     f.poseT = kind === 'light' ? 0.2 : 0.32;
     if (kind === 'heavy') this.voice(f, 'grunt');
-    if (f.cls === 'warrior') {
-      const T = TUNING.warrior;
-      const dmg = kind === 'light' ? T.lightDamage : T.heavyDamage;
-      f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
-      const cells: Array<[number, number]> = [[f.col + d, f.row], [f.col + 2 * d, f.row]];
-      this.cleave(f, kind, cells, dmg);
-      // Avatar of War: every Cleave hits twice
-      if (f.st.avatar > 0) this.later(0.12, cleaveAgain({ side: f.side, kind, cells, dmg }));
-    } else if (f.cls === 'mage') {
-      const T = TUNING.mage;
-      const dmg = kind === 'light' ? T.lightDamage : T.heavyDamage;
-      f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
-      this.flyingShot(f, kind === 'light' ? 'orb' : 'beam', dmg, { basic: kind, element: 'arcane' });
-    } else if (f.cls === 'rogue') {
-      const T = TUNING.rogue;
-      f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
-      if (kind === 'light') {
-        // Stab: a dagger thrust that reaches the panels ahead
-        const cells: Array<[number, number]> = [];
-        for (let i = 1; i <= T.stabReach; i++) cells.push([f.col + i * d, f.row]);
-        this.addFx('dagger', f.side, f.col, f.row, 0.18, { reach: T.stabReach });
-        this.strike(f, cells, T.lightDamage, { basic: kind, element: 'steel' });
-      } else {
-        // Throwing Knife: a heavy knife down the row
-        this.flyingShot(f, 'knife', T.heavyDamage, { basic: kind, element: 'steel' });
-      }
-    } else if (f.cls === 'ranger') {
-      const T = TUNING.ranger;
-      // Hunter's Mark: both attacks home in on the enemy wherever they are
-      const homing = foe.st.hunted > 0 && this.targetable(foe);
-      if (kind === 'light') {
-        // Arrow: a visible, dodgeable shot with travel time
-        f.lock = f.st.rapidFire > 0 ? T.lightLock / 2 : T.lightLock;
-        const dmg = T.lightDamage * (f.st.deadeye > 0 ? 3 : 1);
-        const opts: HitOpts = { basic: kind, element: 'steel' };
-        if (homing) {
-          this.sound('shot_arrow', { pan: panOf(f.col), data: { dir: d } });
-          this.projectiles.push({
-            side: f.side, row: f.row, x: f.col, speed: 0, kind: 'arrow', reflectable: true,
-            homing: { p: 0, dur: Math.max(0.15, Math.abs(foe.col - f.col) / T.arrowSpeed), sx: f.col, sy: f.row, target: foe.side },
-            onHit: basicShot({ side: f.side, dmg, opts }),
-          });
-        } else {
-          this.shoot(f, {
-            speed: T.arrowSpeed * d, kind: 'arrow', reflectable: true,
-            onHit: basicShot({ side: f.side, dmg, opts }),
-          });
-        }
-      } else {
-        // Aimed Shot: instant, pierces during Deadeye
-        f.lock = T.heavyLock;
-        if (homing) {
-          this.sound('fx:aimed', { pan: panOf(f.col), data: { dir: d } });
-          this.projectiles.push({
-            side: f.side, row: f.row, x: f.col, speed: 0, kind: 'aimed', reflectable: false,
-            homing: { p: 0, dur: Math.max(0.1, Math.abs(foe.col - f.col) / T.aimedSpeed), sx: f.col, sy: f.row, target: foe.side },
-            onHit: basicShot({ side: f.side, dmg: T.heavyDamage, opts: { basic: kind, element: 'steel', targeted: true } }),
-          });
-        } else this.flyingShot(f, 'aimed', T.heavyDamage, { basic: kind, element: 'steel' }, f.st.deadeye > 0);
-      }
-    } else {
-      const T = TUNING.priest;
-      f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
-      if (kind === 'light') {
-        this.flyingShot(f, 'spark', T.lightDamage, { basic: kind, element: 'holy' });
-      } else {
-        // Smite: a pillar of light on the enemy, in any row, when they're within smiteRange columns (and not stealthed);
-        // otherwise it lands smiteRange panels ahead in our row and misses. The Priest can stay on its blessings and still hit.
-        const near = !foe.dead && this.targetable(foe) && Math.abs(foe.col - f.col) <= T.smiteRange;
-        const c = near ? foe.col : f.col + T.smiteRange * d, r = near ? foe.row : f.row;
-        this.addFx('holyPillar', f.side, c, r, 0.4);
-        this.strike(f, [[c, r]], T.heavyDamage, { basic: kind, element: 'holy', knockback: T.smiteKnock > 0 });
-      }
-    }
+    classRules(f.cls).basic(this, f, kind);
     this.breakStealth(f);
-    void foe;
   }
 
   /** A basic shot down the row at a set speed, so the target can step out of its way. */
-  private flyingShot(f: Fighter, kind: 'orb' | 'spark' | 'beam' | 'knife' | 'aimed', dmg: number, opts: HitOpts, pierce = false): void {
+  flyingShot(f: Fighter, kind: 'orb' | 'spark' | 'beam' | 'knife' | 'aimed', dmg: number, opts: HitOpts, pierce = false): void {
     const speed = kind === 'aimed' ? TUNING.ranger.aimedSpeed : (TUNING[f.cls] as { shotSpeed?: number }).shotSpeed ?? TUNING.maxShotSpeed;
     this.shoot(f, { speed: speed * this.dir(f), kind, reflectable: false, pierce, onHit: basicShot({ side: f.side, dmg, opts }) });
   }
@@ -1317,7 +1210,7 @@ export class Battle {
     target.pose = 'hurt';
     target.poseT = 0.15;
     this.texts.push({ x: target.col, y: target.row, text: String(amt), color: HIT_TEXT[opts.element ?? 'steel'], t: 0 });
-    if (target.cls === 'warrior') this.gainRage(target, Math.min(TUNING.warrior.rageWhenHitMax, amt / TUNING.warrior.rageDamagePerPip));
+    classRules(target.cls).onHurt?.(this, target, amt);
     if (amt >= TUNING.flinchThreshold && !opts.noFlinch && target.st.noKnock <= 0 && target.st.avatar <= 0) {
       target.st.flinch = TUNING.flinchTime;
       target.charging = false;
@@ -1452,7 +1345,7 @@ export class Battle {
         } else if (w && w.side !== p.side) {
           p.dead = true;
           const owner = this.f[w.side];
-          if (w.kind === 'stone' && owner.cls === 'warrior') this.gainRage(owner, 1, true);
+          if (w.kind === 'stone') this.gainRage(owner, 1, true);
           this.runEffect(p.onHit, { t: null, w, col: c, p });
           break;
         }
@@ -1540,12 +1433,6 @@ export interface CastRef {
 }
 
 // ---------- the battle's own delayed effects ----------
-const cleaveAgain = effect('battle.cleave', (b, a: { side: Side; kind: 'light' | 'heavy'; cells: Array<[number, number]>; dmg: number }) => b.cleave(b.f[a.side], a.kind, a.cells, a.dmg));
-/** A basic shot (the Ranger's Arrow). */
-const basicShot = effect('battle.basicShot', (b, a: { side: Side; dmg: number; opts: HitOpts }, h: ShotHit) => {
-  if (h.w) b.hitWall(h.w, a.dmg, b.f[a.side], a.opts);
-  else if (h.t) b.damage(h.t, a.dmg, b.f[a.side], a.opts);
-});
 const shadowDanceReturn = effect('battle.shadowDance', (b, a: { side: Side }) => { const f = b.f[a.side]; if (f.st.shadowDance > 0) b.stealth(f, 2); });
 /** Riposte's counter on the attacker, wherever they are. */
 const riposte = effect('battle.riposte', (b, a: { side: Side }) => {
@@ -1563,8 +1450,6 @@ export function heavyChargeOf(f: Fighter): number {
 
 export interface FighterSpec { cls: ClassId; deck: string[]; name: string; skin?: string }
 
-// Rogue Energy tops up at the first Draw screen, so it starts empty here.
-const START_RES: Record<ClassId, number> = { warrior: 0, mage: TUNING.mage.manaStart, rogue: 0, ranger: TUNING.ranger.energyStart, priest: TUNING.priest.manaStart };
 
 function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => number): Fighter {
   const { cls, deck, name } = spec;
@@ -1575,8 +1460,8 @@ function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => nu
     side, cls, skin: spec.skin ?? defaultSkin(cls), alt, name, hp: maxHp, maxHp, power: 1,
     col: side === 0 ? 1 : 4, row: 1, dx: 0, dy: 0,
     lock: 0, moveCd: 0, stepCd: 0, moveBuf: null, castCd: 0, charging: false, charge: 0,
-    res: START_RES[cls],
-    resMax: cls === 'mage' ? TUNING.mage.manaStart : cls === 'warrior' ? TUNING.warrior.rageMax : 5,
+    res: classRules(cls).startRes(),
+    resMax: classRules(cls).startResMax(),
     bonusManaNext: 0,
     deck: shuffle(deck, rand), discard: [], queue: [], shields: [], st,
     shout: 0, rallyLeft: 0, powerLeft: 0, frostNovaUsed: false, lastStandAbsorbed: 0, glacialCd: 0,
