@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at 16e8390 (2026-10-28).
+How the game is put together, one section per system. Describes `main` at def3e1c (2026-10-30).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -474,5 +474,5 @@ New screens go in `tests/screens/harness.ts`.
 
 ## In flight
 
-- Modularize: stages are modules (#35) and spells (#62) and rules sit in `src/content/classes/<id>/`; next the rest of each class (sprites, tuning, decks, voices, lessons).
+- Modularize: stages are modules (#35); spells (#62), rules (#87), decks, CPU and tutorial lessons (#88) sit in `src/content/classes/<id>/`; next art, animation, voices, class info and tuning.
 - BN indicators (#32).
