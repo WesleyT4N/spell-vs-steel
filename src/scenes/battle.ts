@@ -1,5 +1,6 @@
 // Local Versus: runs a Battle, the custom screen, pause and results. Either side can be a player at this
 // keyboard or the CPU, so it covers you vs the CPU (on either side), two players on one keyboard, and CPU vs CPU.
+import { classRules } from '../content/classes';
 import { pushScene, replaceScene, popTo, goHome, dim, drawMenu, hint, zone, zoneAt, hot, isHot, listMouse, showSel, resetSel, type Scene } from './scene';
 import { CLASS_INFO } from '../game/classes';
 import { Battle, NO_INTENT, heavyChargeOf, type Dir, type Intent, type Side } from '../game/battle';
@@ -785,15 +786,14 @@ export class BattleScene implements Scene {
   /** Header resource pips, with what the picked spells would add blinking in. */
   private drawResourcePreview(ui: Ctx, tick: number): void {
     const b = this.b, f = b.f[this.me], offer = b.offer[this.me];
-    const mage = f.cls === 'mage', info = CLASS_INFO[f.cls];
+    const info = CLASS_INFO[f.cls];
     let gainMax = 0, gainRes = 0, refill = false;
     for (const i of this.picks) {
       const g = CARDS[offer[i]].gain;
       if (!g) continue;
       gainMax += g.max ?? 0; gainRes += g.res ?? 0; refill ||= !!g.refill;
     }
-    const cap = mage ? TUNING.mage.manaCap : f.cls === 'warrior' ? TUNING.warrior.rageMax : f.resMax;
-    const max = mage ? f.resMax : cap;
+    const { cap, max } = classRules(f.cls).pool(f);
     const newMax = Math.min(cap, max + gainMax);
     const now = Math.floor(f.res);
     const after = Math.max(refill ? newMax : now, now) + gainRes;

@@ -1,5 +1,6 @@
 // Training mode: a fight that never ends, for testing decks. The dummy's behavior, both sides' HP and
 // resources, and the Draw gauge are set from the pause menu; R puts both fighters back to the start of the turn.
+import { classRules } from '../content/classes';
 import { getSave, setSave } from '../engine/save';
 import { replaceScene, popTo, goHome, dim, hint, zone, hot, showSel, drawMenu, listMouse } from './scene';
 import { clearStats } from '../game/stats';
@@ -8,7 +9,6 @@ import { NO_INTENT, heavyChargeOf, type Battle, type Dir, type Fighter, type Int
 import { Cpu } from '../game/ai';
 import { CARDS } from '../game/cards';
 import { CLASS_INFO } from '../game/classes';
-import { TUNING } from '../game/tuning';
 import type { MatchConfig } from '../game/match';
 import { UW, spread, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
@@ -216,7 +216,7 @@ export class TrainingScene extends BattleScene {
     b.f.forEach((f, i) => {
       const r = this.s.res[i];
       if (r === 'normal') return;
-      const cap = f.cls === 'mage' ? TUNING.mage.manaCap : f.cls === 'warrior' ? TUNING.warrior.rageMax : f.resMax;
+      const { cap } = classRules(f.cls).pool(f);
       const want = r === 'full' ? cap : r;
       if (f.cls === 'mage') f.resMax = Math.max(f.resMax, Math.min(cap, want));
       f.res = want;
