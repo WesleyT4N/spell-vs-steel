@@ -1,0 +1,31 @@
+// Warrior tutorial lessons: what the tutorial says and deals that is specific to this class.
+import type { ClassLessons } from '../../api';
+
+const lessons: ClassLessons = {
+  dummyCol: 4,
+  hand: ['battle_shout', 'step_slash', 'guard', 'lunge', 'execute'],
+  tryText: 'TRY BATTLE SHOUT, THEN STEP SLASH',
+  light: [
+    `TAP {attack} TO SWING YOUR SWORD. IT HITS THE 2 PANELS IN FRONT OF YOU.`,
+    'THE DUMMY STANDS IN THE MIDDLE OF ITS SIDE, SO MOVE TO YOUR FRONT COLUMN (THE ONE NEXT TO THE BLUE PANELS) AND LINE UP IN ITS ROW.',
+    'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. CHASE IT!',
+  ],
+  lightTip: 'GET IN ITS ROW, IN REACH, AND TAP {attack}',
+  resLine: 'WARRIORS RUN ON RAGE (TOP LEFT). EVERY HEAVY THAT LANDS BUILDS 1.5 RAGE. LIGHT ATTACKS BUILD NONE.',
+  heavyTip: 'HOLD {attack} UNTIL HEAVY!, THEN RELEASE. WATCH YOUR RAGE FILL',
+  pointRes: true,
+  dodgeLine: 'A SILVER LINING FOR WARRIORS: TAKING DAMAGE BUILDS RAGE TOO.',
+  spend: {
+    title: 'SPENDING RAGE',
+    body: [
+      'EVERY SPELL COSTS RAGE, PAID WHEN YOU CAST IT IN THE FIGHT. YOU HAVE THE RAGE FROM YOUR HEAVY HITS (TOP RIGHT).',
+      'CHEAP SPELLS LIKE GUARD (0) AND STEP SLASH (1) KEEP YOU BUSY. SAVE UP FOR BIG ONES LIKE EXECUTE (3).',
+      'NOT ENOUGH RAGE WHEN YOU CAST? NOTHING HAPPENS UNTIL YOU BUILD MORE, SO KEEP SWINGING.',
+    ],
+  },
+  castLine: 'BATTLE SHOUT MAKES YOUR NEXT SPELL HIT 50% HARDER. ORDER MATTERS!',
+  short: 'NEED RAGE: LAND HEAVY HITS TO BUILD IT',
+  refillsAtDraw: false,
+  ccLine: 'WARRIOR SPELLS LIKE CHAIN HOOK STUN. LAND ONE, THEN FOLLOW UP WITH YOUR HARDEST HITTER.',
+};
+export default lessons;

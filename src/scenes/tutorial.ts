@@ -8,6 +8,7 @@ import { CharSelectScene } from './select';
 import { DeckBuilderScene } from './deckbuilder';
 import { Battle, NO_INTENT, COLS, type Fighter, type Intent, type Mark, type Projectile, type Side } from '../game/battle';
 import { effect, type ShotHit } from '../content/effects';
+import { classModule, type ClassLessons, type LessonPage as Page } from '../content/classes';
 import { drawBattle, getArena } from '../game/battleView';
 import { CLASS_INFO } from '../game/classes';
 import type { Cpu } from '../game/ai';
@@ -34,173 +35,15 @@ const GAUGE_STEP = 4;
 /** Basic hits dealing at least this much were heavies (light hits are 60-110 even on a frozen target). */
 const HEAVY_MIN = 180;
 
-interface Page { title: string; body: string[] }
 
 /** Every playable class (the tutorial follows PLAYABLE). */
 export type TutorialClass = ClassId;
 
-/** What changes per class: how the basics reach, how the resource works, and the spells shown off. */
-interface ClassLessons {
-  /** The dummy's home column: in reach of the class's light attack from the player's front column. */
-  dummyCol: number;
-  /** Hand dealt on the tutorial's Draw screen: cheap spells that show off cost, order and aiming. */
-  hand: string[];
-  tryText: string;
-  light: string[];
-  lightTip: string;
-  /** Heavy lesson: how this class gets its resource. */
-  resLine: string;
-  heavyTip: string;
-  /** Point at the resource meter during the heavy lesson (it fills from fighting). */
-  pointRes: boolean;
-  dodgeLine?: string;
-  spend: Page;
-  castLine: string;
-  /** Goal tip when the next spell can't be paid for. */
-  short: string;
-  /** The resource only comes back at the next Draw: a full queue can strand the player. */
-  refillsAtDraw: boolean;
-  ccLine: string;
-}
 
-const LESSONS: Record<TutorialClass, ClassLessons> = {
-  warrior: {
-    dummyCol: 4,
-    hand: ['battle_shout', 'step_slash', 'guard', 'lunge', 'execute'],
-    tryText: 'TRY BATTLE SHOUT, THEN STEP SLASH',
-    light: [
-      `TAP {attack} TO SWING YOUR SWORD. IT HITS THE 2 PANELS IN FRONT OF YOU.`,
-      'THE DUMMY STANDS IN THE MIDDLE OF ITS SIDE, SO MOVE TO YOUR FRONT COLUMN (THE ONE NEXT TO THE BLUE PANELS) AND LINE UP IN ITS ROW.',
-      'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. CHASE IT!',
-    ],
-    lightTip: 'GET IN ITS ROW, IN REACH, AND TAP {attack}',
-    resLine: 'WARRIORS RUN ON RAGE (TOP LEFT). EVERY HEAVY THAT LANDS BUILDS 1.5 RAGE. LIGHT ATTACKS BUILD NONE.',
-    heavyTip: 'HOLD {attack} UNTIL HEAVY!, THEN RELEASE. WATCH YOUR RAGE FILL',
-    pointRes: true,
-    dodgeLine: 'A SILVER LINING FOR WARRIORS: TAKING DAMAGE BUILDS RAGE TOO.',
-    spend: {
-      title: 'SPENDING RAGE',
-      body: [
-        'EVERY SPELL COSTS RAGE, PAID WHEN YOU CAST IT IN THE FIGHT. YOU HAVE THE RAGE FROM YOUR HEAVY HITS (TOP RIGHT).',
-        'CHEAP SPELLS LIKE GUARD (0) AND STEP SLASH (1) KEEP YOU BUSY. SAVE UP FOR BIG ONES LIKE EXECUTE (3).',
-        'NOT ENOUGH RAGE WHEN YOU CAST? NOTHING HAPPENS UNTIL YOU BUILD MORE, SO KEEP SWINGING.',
-      ],
-    },
-    castLine: 'BATTLE SHOUT MAKES YOUR NEXT SPELL HIT 50% HARDER. ORDER MATTERS!',
-    short: 'NEED RAGE: LAND HEAVY HITS TO BUILD IT',
-    refillsAtDraw: false,
-    ccLine: 'WARRIOR SPELLS LIKE CHAIN HOOK STUN. LAND ONE, THEN FOLLOW UP WITH YOUR HARDEST HITTER.',
-  },
-  mage: {
-    dummyCol: 4,
-    hand: ['arcane_missiles', 'ignite', 'arcane_focus', 'frost_nova', 'fireball'],
-    tryText: 'TRY ARCANE MISSILES, THEN IGNITE',
-    light: [
-      `TAP {attack} TO FIRE A BOLT FROM YOUR STAFF. IT FLIES DOWN YOUR WHOLE ROW AND HITS THE FIRST THING IN ITS WAY.`,
-      'ALL THAT MATTERS IS BEING IN THE SAME ROW AS YOUR TARGET, SO YOU CAN STAY BACK WHERE IT IS SAFE.',
-      'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. FOLLOW IT!',
-    ],
-    lightTip: 'GET IN ITS ROW AND TAP {attack}',
-    resLine: 'MAGES RUN ON MANA (TOP LEFT). ATTACKS DON\'T BUILD MANA: IT COMES FROM THE DRAW SCREEN, WHICH YOU WILL SEE SOON.',
-    heavyTip: 'HOLD {attack} UNTIL HEAVY!, THEN RELEASE',
-    pointRes: false,
-    spend: {
-      title: 'SPENDING MANA',
-      body: [
-        'EVERY SPELL COSTS MANA (TOP RIGHT). MANA REFILLS TO FULL EACH TIME YOU OPEN THIS SCREEN, AND YOUR MAX GROWS BY 1 EACH TIME, UP TO 5.',
-        'YOU HAVE 2 MANA NOW. KEEP THE TOTAL COST OF YOUR PICKS WITHIN IT: IT TURNS RED WHEN YOU GO OVER.',
-        'EARLY TURNS ARE SMALL, LATE TURNS ARE HUGE. THAT IS THE MAGE\'S GAME.',
-      ],
-    },
-    castLine: 'ARCANE MISSILES HOME IN WHEREVER THE TARGET IS. IGNITE SETS THE TARGET\'S COLUMN ON FIRE.',
-    short: 'NOT ENOUGH MANA. IT REFILLS AT THE NEXT DRAW',
-    refillsAtDraw: true,
-    ccLine: 'MAGE FROST SPELLS LIKE FROST NOVA FREEZE. FREEZE FIRST, THEN HIT HARD.',
-  },
-  rogue: {
-    // the dagger only reaches 1 panel, so the dummy waits at the front of its side
-    dummyCol: 3,
-    hand: ['shadowstep', 'shiv', 'kick', 'evasion', 'vanish'],
-    tryText: 'TRY SHADOWSTEP, THEN SHIV',
-    light: [
-      `TAP {attack} TO STAB WITH YOUR DAGGERS. IT HITS ONLY THE PANEL RIGHT IN FRONT OF YOU, SO YOU HAVE TO GET CLOSE.`,
-      'FOR NOW THE DUMMY STANDS AT THE FRONT OF ITS SIDE. MOVE TO YOUR FRONT COLUMN (THE ONE NEXT TO THE BLUE PANELS) AND LINE UP IN ITS ROW.',
-      'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. CHASE IT!',
-    ],
-    lightTip: 'GET IN ITS ROW, IN YOUR FRONT COLUMN, AND TAP {attack}',
-    resLine: 'ROGUES RUN ON ENERGY (TOP LEFT). ATTACKS DON\'T BUILD IT: IT TOPS UP TO FULL AT EVERY DRAW SCREEN, WHICH YOU WILL SEE SOON. YOUR HEAVY IS A THROWING KNIFE THAT FLIES DOWN THE ROW.',
-    heavyTip: 'HOLD {attack} UNTIL HEAVY!, THEN RELEASE',
-    pointRes: false,
-    spend: {
-      title: 'SPENDING ENERGY',
-      body: [
-        'EVERY SPELL COSTS ENERGY (TOP RIGHT). IT TOPS UP TO 5 EACH TIME YOU OPEN THIS SCREEN, SO SPEND IT ALL.',
-        'ROGUES WIN BY CHAINING CHEAP SPELLS FAST. MOST OF THESE COST 1, AND SHIV HITS TWICE AS HARD RIGHT AFTER ANOTHER SPELL.',
-        'KEEP THE TOTAL COST OF YOUR PICKS WITHIN 5: IT TURNS RED WHEN YOU GO OVER.',
-      ],
-    },
-    castLine: 'SHADOWSTEP BLINKS YOU IN FRONT OF THE DUMMY AND STABS IT. YOU GET 2 SECONDS THERE BEFORE YOU BLINK HOME, SO CAST SHIV RIGHT AWAY.',
-    short: 'NOT ENOUGH ENERGY. IT REFILLS AT THE NEXT DRAW',
-    refillsAtDraw: true,
-    ccLine: 'ROGUE SPELLS LIKE KIDNEY SHOT STUN, AND VANISH MAKES YOUR NEXT ATTACK SPELL STUN. STUN FIRST, THEN STRIKE.',
-  },
-  ranger: {
-    dummyCol: 4,
-    hand: ['steady_focus', 'hawk_strike', 'net', 'multi_shot', 'power_shot'],
-    tryText: 'TRY STEADY FOCUS, THEN HAWK STRIKE',
-    light: [
-      `TAP {attack} TO LOOSE AN ARROW. IT FLIES DOWN YOUR WHOLE ROW AND HITS THE FIRST THING IN ITS WAY.`,
-      'ALL THAT MATTERS IS BEING IN THE SAME ROW AS YOUR TARGET, SO YOU CAN STAY BACK WHERE IT IS SAFE.',
-      'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. FOLLOW IT!',
-    ],
-    lightTip: 'GET IN ITS ROW AND TAP {attack}',
-    resLine: 'RANGERS RUN ON ENERGY (TOP LEFT). STAND STILL FOR 2 SECONDS TO GAIN 1, AND EVERY DRAW SCREEN GIVES 1 MORE. A GOOD SPOT IS WORTH HOLDING.',
-    heavyTip: 'HOLD {attack} UNTIL HEAVY!, THEN RELEASE. STAND STILL TO BUILD ENERGY',
-    pointRes: true,
-    spend: {
-      title: 'SPENDING ENERGY',
-      body: [
-        'EVERY SPELL COSTS ENERGY (TOP RIGHT), PAID WHEN YOU CAST IT IN THE FIGHT. YOU KEEP BUILDING IT BY STANDING STILL, UP TO 5.',
-        'STEADY FOCUS COSTS 0: IT ROOTS YOU IN PLACE AND GIVES 2 ENERGY. HAWK STRIKE (1) DIVES ON THE ENEMY WHEREVER THEY ARE.',
-        'NOT ENOUGH ENERGY WHEN YOU CAST? NOTHING HAPPENS UNTIL YOU BUILD MORE, SO HOLD STILL.',
-      ],
-    },
-    castLine: 'STEADY FOCUS ROOTS YOU FOR 4 SECONDS AND MAKES YOUR HITS 25% STRONGER. HAWK STRIKE FINDS THE DUMMY IN ANY ROW.',
-    short: 'NEED ENERGY: STAND STILL TO BUILD IT',
-    refillsAtDraw: false,
-    ccLine: 'RANGER TRAPS LIKE FREEZING TRAP FREEZE. TRAP THEIR PATH, THEN SHOOT.',
-  },
-  priest: {
-    dummyCol: 4,
-    hand: ['hallowed_ground', 'holy_fire', 'shadow_word_pain', 'flash_heal', 'penance'],
-    tryText: 'TRY HALLOWED GROUND, THEN HOLY FIRE',
-    light: [
-      `TAP {attack} TO CAST A HOLY SPARK. IT FLIES DOWN YOUR WHOLE ROW AND HITS THE FIRST THING IN ITS WAY.`,
-      'ALL THAT MATTERS IS BEING IN THE SAME ROW AS YOUR TARGET, SO YOU CAN STAY BACK WHERE IT IS SAFE.',
-      'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. FOLLOW IT!',
-    ],
-    lightTip: 'GET IN ITS ROW AND TAP {attack}',
-    resLine: 'PRIESTS RUN ON MANA (TOP LEFT). YOUR HEAVY IS SMITE: A PILLAR OF LIGHT THAT FINDS THE ENEMY IN ANY ROW WITHIN 3 COLUMNS. STAND IN YOUR MIDDLE COLUMN TO REACH THE DUMMY.',
-    heavyTip: 'STAND 3 PANELS FROM THE DUMMY, HOLD {attack} UNTIL HEAVY!, THEN RELEASE',
-    pointRes: false,
-    spend: {
-      title: 'SPENDING MANA',
-      body: [
-        'EVERY SPELL COSTS MANA (TOP RIGHT). YOU GET 3 MORE EACH TIME YOU OPEN THIS SCREEN, UP TO 5, AND UNSPENT MANA CARRIES OVER.',
-        'SKIPPING A SPELL BANKS MANA FOR THE BIG 5-COST MIRACLES. KEEP THE TOTAL COST OF YOUR PICKS WITHIN WHAT YOU HAVE: IT TURNS RED WHEN YOU GO OVER.',
-        'HALLOWED GROUND BLESSES THE PANEL YOU STAND ON. BLESSINGS ONLY WORK WHILE YOU STAY ON THEM, AND LAST UNTIL THE NEXT DRAW.',
-      ],
-    },
-    castLine: 'HALLOWED GROUND MAKES YOUR HITS 35% STRONGER WHILE YOU STAND ON IT. HOLY FIRE BURNS THE DUMMY WHEREVER IT IS.',
-    short: 'NOT ENOUGH MANA. YOU GET 3 MORE AT THE NEXT DRAW',
-    refillsAtDraw: true,
-    ccLine: 'PRIEST SPELLS LIKE PSYCHIC SCREAM STUN. CURSED PANELS HURT MORE EVERY SECOND THE ENEMY STAYS ON ONE.',
-  },
-};
 
 /** A lesson line with the player's current key bindings filled in. */
 const keyed = (s: string): string => s.replace(/\{(\w+)\}/g, (_m, a: string) => k(a as Parameters<typeof k>[0]));
-const L = (t: TutorialScene): ClassLessons => LESSONS[t.cls];
+const L = (t: TutorialScene): ClassLessons => classModule(t.cls).lessons;
 interface Point { x: number; y: number; dir: '←' | '→' | '↑' | '↓' }
 
 interface Step {
@@ -583,7 +426,7 @@ export class TutorialScene implements Scene {
     this.inner.cpu = this.dummy as unknown as Cpu;
     // matches open on the Draw screen; the tutorial starts straight in the fight and gets there later
     this.b.endCustom([[], []]);
-    this.dummy.col = this.dummyF.col = LESSONS[cls].dummyCol;
+    this.dummy.col = this.dummyF.col = classModule(cls).lessons.dummyCol;
     this.startStep(0);
   }
 

@@ -1,0 +1,31 @@
+// Rogue tutorial lessons: what the tutorial says and deals that is specific to this class.
+import type { ClassLessons } from '../../api';
+
+const lessons: ClassLessons = {
+  // the dagger only reaches 1 panel, so the dummy waits at the front of its side
+  dummyCol: 3,
+  hand: ['shadowstep', 'shiv', 'kick', 'evasion', 'vanish'],
+  tryText: 'TRY SHADOWSTEP, THEN SHIV',
+  light: [
+    `TAP {attack} TO STAB WITH YOUR DAGGERS. IT HITS ONLY THE PANEL RIGHT IN FRONT OF YOU, SO YOU HAVE TO GET CLOSE.`,
+    'FOR NOW THE DUMMY STANDS AT THE FRONT OF ITS SIDE. MOVE TO YOUR FRONT COLUMN (THE ONE NEXT TO THE BLUE PANELS) AND LINE UP IN ITS ROW.',
+    'THE DUMMY HOPS TO A NEW ROW EVERY TIME YOU HIT IT. CHASE IT!',
+  ],
+  lightTip: 'GET IN ITS ROW, IN YOUR FRONT COLUMN, AND TAP {attack}',
+  resLine: 'ROGUES RUN ON ENERGY (TOP LEFT). ATTACKS DON\'T BUILD IT: IT TOPS UP TO FULL AT EVERY DRAW SCREEN, WHICH YOU WILL SEE SOON. YOUR HEAVY IS A THROWING KNIFE THAT FLIES DOWN THE ROW.',
+  heavyTip: 'HOLD {attack} UNTIL HEAVY!, THEN RELEASE',
+  pointRes: false,
+  spend: {
+    title: 'SPENDING ENERGY',
+    body: [
+      'EVERY SPELL COSTS ENERGY (TOP RIGHT). IT TOPS UP TO 5 EACH TIME YOU OPEN THIS SCREEN, SO SPEND IT ALL.',
+      'ROGUES WIN BY CHAINING CHEAP SPELLS FAST. MOST OF THESE COST 1, AND SHIV HITS TWICE AS HARD RIGHT AFTER ANOTHER SPELL.',
+      'KEEP THE TOTAL COST OF YOUR PICKS WITHIN 5: IT TURNS RED WHEN YOU GO OVER.',
+    ],
+  },
+  castLine: 'SHADOWSTEP BLINKS YOU IN FRONT OF THE DUMMY AND STABS IT. YOU GET 2 SECONDS THERE BEFORE YOU BLINK HOME, SO CAST SHIV RIGHT AWAY.',
+  short: 'NOT ENOUGH ENERGY. IT REFILLS AT THE NEXT DRAW',
+  refillsAtDraw: true,
+  ccLine: 'ROGUE SPELLS LIKE KIDNEY SHOT STUN, AND VANISH MAKES YOUR NEXT ATTACK SPELL STUN. STUN FIRST, THEN STRIKE.',
+};
+export default lessons;
