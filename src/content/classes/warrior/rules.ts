@@ -12,7 +12,6 @@ function cleave(b: Battle, f: Fighter, kind: 'light' | 'heavy', cells: Array<[nu
 const cleaveAgain = effect('battle.cleave', (b, a: { side: 0 | 1; kind: 'light' | 'heavy'; cells: Array<[number, number]>; dmg: number }) => cleave(b, b.f[a.side], a.kind, a.cells, a.dmg));
 
 export default {
-  id: 'warrior',
   startRes: () => 0,
   startResMax: () => TUNING.warrior.rageMax,
   pool: () => ({ cap: TUNING.warrior.rageMax, max: TUNING.warrior.rageMax }),

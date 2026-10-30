@@ -2,7 +2,6 @@
 import { TUNING, basicShot, panOf, type ClassRules, type HitOpts } from '../../api';
 
 export default {
-  id: 'ranger',
   startRes: () => TUNING.ranger.energyStart,
   startResMax: () => 5,
   pool: f => ({ cap: f.resMax, max: f.resMax }),

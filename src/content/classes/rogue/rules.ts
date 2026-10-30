@@ -2,7 +2,6 @@
 import { TUNING, type ClassRules } from '../../api';
 
 export default {
-  id: 'rogue',
   startRes: () => 0,
   startResMax: () => 5,
   pool: f => ({ cap: f.resMax, max: f.resMax }),

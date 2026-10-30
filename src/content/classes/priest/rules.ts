@@ -2,7 +2,6 @@
 import { TUNING, type ClassRules } from '../../api';
 
 export default {
-  id: 'priest',
   startRes: () => TUNING.priest.manaStart,
   startResMax: () => 5,
   pool: f => ({ cap: f.resMax, max: f.resMax }),

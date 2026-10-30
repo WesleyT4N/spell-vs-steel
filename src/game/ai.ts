@@ -3,6 +3,7 @@
 // exactly from its seed (sims, tests, the balance grid) without touching Math.random or the rules' own rolls.
 import { NO_INTENT, heavyChargeOf, type Battle, type BlessKind, type Dir, type Fighter, type Intent } from './battle';
 import { CARDS } from './cards';
+import { classModule } from '../content/classes';
 import { TUNING, type Difficulty } from './tuning';
 import { shuffle, substream, type Rng } from './rng';
 import { BALANCED, playedAt, roleOf, type Playstyle } from './playstyles';
@@ -91,28 +92,21 @@ export class Cpu {
     // 3. Basic attacks.
     const dist = (foe.col - f.col) * d;
     const seen = foe.st.stealth <= 0;
-    const inReach = seen && (f.cls === 'warrior' ? aligned && dist >= 1 && dist <= 2
-      : f.cls === 'rogue' ? aligned && dist >= 1 && dist <= TUNING.rogue.stabReach
-      // Hunter's Mark: the Ranger's shots home in from any row
-      : aligned || (f.cls === 'ranger' && foe.st.hunted > 0));
-    // Smite finds the enemy in any row within its reach, so the Priest releases its heavy whenever they're that close;
-    // the Rogue's Throwing Knife flies down the whole row
-    const heavyReach = f.cls === 'rogue' ? seen && aligned
-      : f.cls === 'priest' ? b.targetable(foe) && dist >= 1 && dist <= TUNING.priest.smiteRange
-      : inReach;
+    const cpu = classModule(f.cls).cpu;
+    const { light: inReach, heavy: heavyReach } = cpu.reach(b, f, foe, dist, aligned, seen);
     const need = heavyChargeOf(f);
     // the press that started the hold never landed (we were flinching or locked): let go, or we'd hold forever
     if (this.holding && !f.charging && f.lock <= 0) this.holding = false;
     if (this.holding) {
       if (f.charge >= need && heavyReach) this.holding = false; // release fires the heavy
       else if (f.charge > need + 1.5) this.holding = false;
-    } else if (f.cls === 'rogue' && heavyReach && !inReach && f.lock <= 0) {
-      // out of stab range: wind up a Throwing Knife instead
+    } else if (cpu.windup && heavyReach && !inReach && f.lock <= 0) {
+      // out of light-attack range: wind up the heavy instead (the Rogue's Throwing Knife)
       if (this.rand() < 0.08) { this.wantTap = true; this.holding = true; }
     } else if (inReach && f.lock <= 0 && this.rand() < st.attack) {
       this.wantTap = true;
-      // Hard charges more heavies, except for the Ranger and Rogue, whose damage and Energy come from steady taps
-      this.holding = this.rand() < (hard && f.cls !== 'ranger' && f.cls !== 'rogue' ? 0.6 : this.difficulty === 'easy' ? 0.15 : 0.35) * st.attack;
+      // Hard charges more heavies, except for classes whose damage and resource come from steady taps
+      this.holding = this.rand() < (hard && !cpu.taps ? 0.6 : this.difficulty === 'easy' ? 0.15 : 0.35) * st.attack;
       if (this.rand() < 0.5) return;
     }
     // Hard doesn't stand in the enemy's row when it can't hit back
@@ -127,11 +121,10 @@ export class Cpu {
     }
     // a Rogue in a backstab window holds its panel: any move would blink it home
     if (f.st.backstab > 0) return;
-    // the Ranger earns Energy by standing still, so it repositions less (per second, however often this CPU thinks)
-    const stay = (p: number): boolean => this.rand() < p ** (this.cfg.think / TUNING.cpu.normal.think);
-    if (f.cls === 'ranger' && (aligned || !seen) && stay(0.85)) return;
-    // the Priest's blessings only work while it stands on them
-    if (f.cls === 'priest' && b.blessUnder(f) && stay(0.9)) return;
+    // some classes reposition less: the Ranger earns Energy standing still, the Priest's blessings work only underfoot
+    // (the chance is per second, however often this CPU thinks)
+    const hold = cpu.stay?.(b, f, aligned, seen) ?? 0;
+    if (hold > 0 && this.rand() < hold ** (this.cfg.think / TUNING.cpu.normal.think)) return;
 
     // 4. Positioning.
     const target = this.goal(b, f);
