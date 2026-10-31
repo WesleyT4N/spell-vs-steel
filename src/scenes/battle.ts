@@ -21,7 +21,8 @@ import { P, UW, screenRect, spread, view, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, drawTextOutlined, textWidth } from '../engine/font';
 import { wasPressed, isDown, heldDir, navPressed, k, mouse, gesture, localDir, localDown, localPressed, localNav, localKey } from '../engine/input';
 import { touchText, type PadMode } from '../engine/touch';
-import { playMusic, stopMusic, stageTrack, sfx, chargeHum, announce, voiceLine } from '../engine/audio';
+import { playMusic, stopMusic, sfx, chargeHum, announce, voiceLine } from '../engine/audio';
+import { stageMusic } from '../content/stages';
 import { drawCardDetail, drawCardFace, costSign, costDeltaText, resName, resInk, RES_INK, CARD_W, CARD_H, PICKED } from './cardView';
 import { drawDelta, modInk } from './modValue';
 import { CardPreview } from './cardPreview';
@@ -114,8 +115,8 @@ export class BattleScene implements Scene {
   /** On-screen key name for side `s`. */
   protected keyOf(s: Side, a: 'left' | 'right' | 'attack' | 'cast' | 'custom'): string { return this.twoPlayer ? localKey(s, a) : k(a); }
 
-  enter(): void { playMusic(stageTrack(getArena().id)); }
-  resume(): void { playMusic(stageTrack(getArena().id)); }
+  enter(): void { playMusic(stageMusic(getArena().id)); }
+  resume(): void { playMusic(stageMusic(getArena().id)); }
   // phones in portrait: the fight on top at its usual size, the pad, Draw screen, pause and results below it
   tall(): boolean { return true; }
   split(): boolean { return true; }

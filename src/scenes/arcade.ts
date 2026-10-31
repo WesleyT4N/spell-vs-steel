@@ -166,7 +166,7 @@ export class ArcadeBattleScene extends BattleScene {
     // every rival, the boss too, fights with a weakened kit (less HP, less damage)
     const f = this.b.f[1];
     f.power = rung.power;
-    f.maxHp = f.hp = Math.round(TUNING.hp[f.cls as ClassId] * rung.power);
+    f.maxHp = f.hp = Math.round(TUNING.hp[f.cls] * rung.power);
     if (rung.boss) f.name = BOSS_NAME;
   }
 

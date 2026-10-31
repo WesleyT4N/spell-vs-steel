@@ -66,7 +66,7 @@ export class TapeWriter {
     if (this.finished) return;
     if (!tape.n) {
       const f = b.f.map(x => [x.name, x.maxHp, x.power] as [string, number, number]) as [[string, number, number], [string, number, number]];
-      if (f.some((x, i) => x[0] !== tape.specs[i].name || x[1] !== TUNING.hp[tape.specs[i].cls as ClassId] || x[2] !== 1)) tape.fx = f;
+      if (f.some((x, i) => x[0] !== tape.specs[i].name || x[1] !== TUNING.hp[tape.specs[i].cls] || x[2] !== 1)) tape.fx = f;
     }
     const code = encode(ins[0]) + encode(ins[1]);
     const last = tape.frames[tape.frames.length - 1];

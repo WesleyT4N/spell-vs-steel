@@ -2,7 +2,7 @@
 // on it, and a row of stage tiles. Clicking or tapping a tile only picks it; FIGHT! (or OK) starts. Online, each player votes; the same pick comes out on both machines (a tie wins, otherwise a seeded coin
 // flip between the two votes, shown as a roulette).
 import { replaceScene, popScene, goHome, hint, zone, hot, isHot, showSel, type Scene } from './scene';
-import { getStage, STAGE_IDS } from '../content/stages';
+import { getStage, stageMusic, STAGE_IDS } from '../content/stages';
 import { drawPanel, drawStage, panelFoot } from '../art/arena';
 import { useStage } from '../game/battleView';
 import { getSprite, drawFighterSprite, skinOf, mirrorSkin } from '../art/sprites';
@@ -10,7 +10,7 @@ import { P, W, H, UW, rng, screenRect, fillScreen, vy, spread, type Ctx } from '
 import { drawText, drawTextCentered } from '../engine/font';
 import { win, plaque, banner, stepTrail, FRAME, GOLD, PAPER, INK, INK2, RED_INK } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
-import { sfx, preloadMusic, stageTrack } from '../engine/audio';
+import { sfx, preloadMusic } from '../engine/audio';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
 import type { Hello } from '../net/protocol';
 import type { NetSession } from '../net/session';
@@ -107,7 +107,7 @@ export class StageSelectScene implements Scene {
     sfx('confirm');
     if (this.net) { this.net.lobby = { ...this.net.lobby, stage: pick, voted: true }; return; }
     this.final = pick === 'random' ? STAGE_IDS[Math.floor(Math.random() * STAGE_IDS.length)] : pick;
-    preloadMusic(stageTrack(this.final));
+    preloadMusic(stageMusic(this.final));
     this.swing = null;
     this.t = ROULETTE; // straight to the reveal
   }
@@ -135,7 +135,7 @@ export class StageSelectScene implements Scene {
         // a rematch with new picks rolls a fresh roulette (the first set keeps the match seed)
         const res = resolveStage((net.start!.seed ^ Math.imul(net.setStart - 1, 0x9e3779b9)) >>> 0, host, guest);
         this.final = res.stage;
-        preloadMusic(stageTrack(this.final));
+        preloadMusic(stageMusic(this.final));
         this.swing = res.votes[0] !== res.votes[1] ? res.votes : null;
         this.t = this.swing ? 0 : ROULETTE;
       }

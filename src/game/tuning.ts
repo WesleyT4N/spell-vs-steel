@@ -6,10 +6,11 @@ import mage, { hp as mageHp } from '../content/classes/mage/tuning';
 import rogue, { hp as rogueHp } from '../content/classes/rogue/tuning';
 import ranger, { hp as rangerHp } from '../content/classes/ranger/tuning';
 import priest, { hp as priestHp } from '../content/classes/priest/tuning';
+import type { ClassId } from '../content/classes/registry';
 
 export const TUNING = {
   // re-searched after the CPU stopped freezing up when stunned mid-charge (#45): the HP-only patch closest to the 55-65 wheel at Normal, at Hard and with the starters (scripts/tune.ts)
-  hp: { warrior: warriorHp, mage: mageHp, rogue: rogueHp, ranger: rangerHp, priest: priestHp },
+  hp: { warrior: warriorHp, mage: mageHp, rogue: rogueHp, ranger: rangerHp, priest: priestHp } as Record<ClassId, number>,
 
   /** Seconds for the shared custom gauge to fill. */
   gaugeSeconds: 10,
