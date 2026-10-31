@@ -8,14 +8,14 @@ import { popScene, type Scene } from './scene';
 import { CLASSES, classRules, type ClassLab, type LabLook, type LabSpell } from '../content/classes';
 import { Battle, NO_INTENT } from '../game/battle';
 import { drawBattle, getArena, useStage } from '../game/battleView';
-import { STAGES, getStage } from '../content/stages';
+import { STAGES, getStage, stageMusic } from '../content/stages';
 import { Cpu } from '../game/ai';
 import { CARDS, cardsFor } from '../game/cards';
 import { starterDeck, toList } from '../game/deck';
 import { registerPfx, unregisterPfx, registerShotPfx, unregisterShotPfx } from '../game/pfx';
 import { EFFECTS, PLAYS, SHOT_PLAYS } from '../fx';
 import { playBattleEvent } from '../engine/battleAudio';
-import { unlockAudio, playMusic, stopMusic, stageTrack } from '../engine/audio';
+import { unlockAudio, playMusic, stopMusic } from '../engine/audio';
 import { UW, UH, P, type Ctx } from '../engine/gfx';
 import { drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k } from '../engine/input';
@@ -122,7 +122,7 @@ export class ArtLabScene implements Scene {
   pad(): PadMode { return 'none'; }
 
   enter(): void {
-    playMusic(stageTrack(getArena().id));
+    playMusic(stageMusic(getArena().id));
     this.mount();
     window.addEventListener('keydown', this.onKey);
     window.addEventListener('resize', this.onResize);
@@ -265,13 +265,13 @@ export class ArtLabScene implements Scene {
     if (tab !== STAGES_TAB) {
       saved.cls = tab as ClassId;
       if (!this.looks().includes(saved.look)) saved.look = 'game';
-      playMusic(stageTrack(this.home));
-    } else playMusic(stageTrack(saved.stage));
+      playMusic(stageMusic(this.home));
+    } else playMusic(stageMusic(saved.stage));
     this.restart(); this.render();
   }
   private setStage(id: string): void {
     saved.stage = id;
-    playMusic(stageTrack(id));
+    playMusic(stageMusic(id));
     this.restart(); this.render();
   }
   private togglePause(): void { this.paused = !this.paused; this.render(); }
