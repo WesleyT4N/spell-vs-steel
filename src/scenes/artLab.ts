@@ -4,10 +4,10 @@
 // entries, so new content shows up here on its own. Controls live in a DOM panel: docked right, or along the
 // bottom in phone portrait.
 import { popScene, type Scene } from './scene';
-import { CLASSES, classRules, type ClassLab, type LabLook } from '../content/classes';
+import { CLASSES, classRules, type ClassLab, type LabLook, type LabSpell } from '../content/classes';
 import { Battle, NO_INTENT } from '../game/battle';
 import { drawBattle, getArena } from '../game/battleView';
-import { CARDS } from '../game/cards';
+import { CARDS, cardsFor } from '../game/cards';
 import { starterDeck, toList } from '../game/deck';
 import { registerPfx, unregisterPfx, registerShotPfx, unregisterShotPfx } from '../game/pfx';
 import { EFFECTS, PLAYS, SHOT_PLAYS } from '../fx';
@@ -37,11 +37,16 @@ const labOf = (cls: string): ClassLab => CLASSES.get(cls)?.lab ?? { spells: [] }
 
 function entriesOf(cls: string): Entry[] {
   const m = CLASSES.get(cls)!, lab = labOf(cls);
-  const col = lab.basicsFoeCol ?? 3;
+  // melee classes fight from up close; the rest from across the field
+  const near = m.info.melee ? 3 : 4;
+  const col = lab.basicsFoeCol ?? near;
+  // lab.ts tunes and orders spells; any spell it leaves out still shows, after them, with defaults
+  const listed = lab.spells.filter(s => CARDS[s.card]);
+  const rest = cardsFor(cls as ClassId).filter(c => !listed.some(s => s.card === c.id)).map(c => ({ card: c.id }) as LabSpell);
   return [
     { label: `LIGHT: ${m.info.basics[0]}`, basic: 'light', foeCol: col, loop: 1.2 },
     { label: `HEAVY: ${m.info.basics[1]}`, basic: 'heavy', foeCol: col, loop: 1.6 },
-    ...lab.spells.filter(s => CARDS[s.card]).map(s => ({ label: CARDS[s.card].name, card: s.card, foeCol: s.foeCol ?? 3, loop: s.loop ?? 2, hp: s.hp })),
+    ...[...listed, ...rest].map(s => ({ label: CARDS[s.card].name, card: s.card, foeCol: s.foeCol ?? near, loop: s.loop ?? 2, hp: s.hp })),
   ];
 }
 
@@ -127,7 +132,11 @@ export class ArtLabScene implements Scene {
     if (en.hp) f.hp = Math.round(f.maxHp * en.hp);
     f.castCd = 0; f.lock = 0;
     if (en.basic) classRules(cls).basic(b, f, en.basic);
-    else if (en.card) { f.queue = [en.card]; b.castTop(f, null); }
+    else if (en.card) {
+      // spells that need stealth start in it
+      if (CARDS[en.card].needsStealth) f.st.stealth = 1;
+      f.queue = [en.card]; b.castTop(f, null);
+    }
     this.b = b;
     this.t = 0;
   }
