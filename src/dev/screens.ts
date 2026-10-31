@@ -53,10 +53,10 @@ export function run(seconds: number, until?: () => boolean): void {
 }
 const title = (): void => setScene(new TitleScene());
 const match = (over: Partial<MatchConfig> = {}): MatchConfig => ({ ...loadMatch(), ...over });
-/** Mage in the Wizard skin against Ranger in the Sylvan skin (the example skin mods). */
+/** Mage in the Wizard skin against Ranger in the Druid skin (the example skin mods). */
 const modSkins = (): MatchConfig => {
   const m = loadMatch();
-  return { ...m, p1: 'mage', cpu: 'ranger', p1Skin: { ...m.p1Skin, mage: 'wizard' }, cpuSkin: { ...m.cpuSkin, ranger: 'sylvan' } };
+  return { ...m, p1: 'mage', cpu: 'ranger', p1Skin: { ...m.p1Skin, mage: 'wizard' }, cpuSkin: { ...m.cpuSkin, ranger: 'druid' } };
 };
 const battle = (): BattleScene => getScene() as BattleScene;
 
@@ -246,7 +246,7 @@ export const screens: Record<string, () => void> = {
   'select-skin': () => setScene(new CharSelectScene(undefined, 1)),
   'select-rival': () => setScene(new CharSelectScene(undefined, 2)),
   'select-rival-skin': () => setScene(new CharSelectScene(undefined, 3)),
-  // skin mods (mods/*.json): the Wizard Mage against the Sylvan Ranger, choosing the rival's color
+  // skin mods (mods/*.json): the Wizard Mage against the Druid Ranger, choosing the rival's color
   'select-mod-skins': () => { saveMatch(modSkins()); setScene(new CharSelectScene(undefined, 3)); },
   // the spell deck select: both sides in versus, the cursor on the CPU's list, on the bottom row; arcade and training
   'deck-select': () => setScene(new DeckSelectScene()),
@@ -455,9 +455,9 @@ export const screens: Record<string, () => void> = {
   'art-lab': () => { setScene(new ArtLabScene(title, { tab: 'warrior', section: 'fx', zoom: 1 })); run(0.15); },
   'art-lab-anims': () => { setScene(new ArtLabScene(title, { tab: 'rogue', section: 'anims', entry: 6, zoom: 3 })); run(0.35); },
   'art-lab-sprites': () => { setScene(new ArtLabScene(title, { tab: 'mage', section: 'sprites' })); run(0.05); },
-  // the example skin mods in the lab: the Wizard Mage's frames, the Sylvan Ranger animating
+  // the example skin mods in the lab: the Wizard Mage's frames, the Druid Ranger animating
   'art-lab-sprites-mod': () => { setScene(new ArtLabScene(title, { tab: 'mage', section: 'sprites', skin: 'wizard' })); run(0.05); },
-  'art-lab-anims-mod': () => { setScene(new ArtLabScene(title, { tab: 'ranger', section: 'anims', entry: 6, zoom: 3, skin: 'sylvan' })); run(0.35); },
+  'art-lab-anims-mod': () => { setScene(new ArtLabScene(title, { tab: 'ranger', section: 'anims', entry: 6, zoom: 3, skin: 'druid' })); run(0.35); },
   'art-lab-sounds': () => { setScene(new ArtLabScene(title, { tab: 'priest', section: 'sounds', entry: 7 })); run(0.6); },
   // every panel state on the first stage
   'art-lab-stages': () => { setScene(new ArtLabScene(title, { tab: 'stages', entry: 1 })); run(0.15); },

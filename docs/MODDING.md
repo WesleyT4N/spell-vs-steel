@@ -13,9 +13,9 @@ the same file and the same rules as they become data.
 | File | Adds |
 | --- | --- |
 | `mods/wizard.json` | Mage skin **Wizard**: brown hair, glasses, blue robe, orb staff |
-| `mods/sylvan-ranger.json` | Ranger skin **Sylvan**: long dark hair, leaf headband, green cloak |
+| `mods/druid.json` | Ranger skin **Druid**: long dark hair, leaf headband, green cloak |
 
-Both show up as an extra color swatch after the built-in ones on the character select, and in the Art Lab
+Both were downscaled from a generated sprite sheet with the same cleanup the built-in fighters got, then posed into every frame with the frame rig. Both show up as an extra color swatch after the built-in ones on the character select, and in the Art Lab
 (DEV TOOLS > ART LAB, the class tab's Animations or Sprites section; left and right, or the skin picker, switch skins).
 
 ## File format
@@ -67,8 +67,9 @@ Portraits are 40 by 32.
 ### Art rules
 
 Skins follow the game's sprite rules: the 24x24 NES look, fighters fit a 24 by 24 box, drawn frames rather than
-stretched or rotated copies, and every frame on-model. The easiest start is the class's own frames
-(`src/art/fighterFrames.ts`): keep the poses and redraw the head, clothes and colors.
+stretched or rotated copies, and every frame on-model. The easiest start is a larger drawing of the character in the class's idle pose: downscale it to about 22
+pixels tall with one palette, clean the outline, then move its parts (head, body, weapon, legs) into the class's
+poses, matching `src/art/fighterFrames.ts`.
 
 ## Limits
 
