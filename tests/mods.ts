@@ -1,4 +1,4 @@
-// The mod format refuses anything it does not name: every shipped mod parses, and broken or hostile files
+// The mod format refuses anything it does not name: the test fixture and every shipped mod parse, and broken or hostile files
 // come back as errors instead of loading.
 import { readFileSync, readdirSync } from 'node:fs';
 import { parseMod, MAX_MOD_SIZE } from '../src/mods/format';
@@ -6,15 +6,16 @@ import { parseMod, MAX_MOD_SIZE } from '../src/mods/format';
 let failed = 0;
 const check = (ok: boolean, what: string): void => { if (!ok) { failed++; console.error(`FAIL ${what}`); } };
 
+// mods/ may be empty; a known-good skin mod lives in tests/fixtures so the checks below always have one.
+const fixture = new URL('./fixtures/skin-mod.json', import.meta.url);
 const dir = new URL('../mods/', import.meta.url);
-const files = readdirSync(dir).filter(f => f.endsWith('.json'));
-check(files.length > 0, 'mods/ has at least one mod');
+const files = [fixture, ...readdirSync(dir).filter(f => f.endsWith('.json')).map(f => new URL(f, dir))];
 for (const f of files) {
-  const r = parseMod(readFileSync(new URL(f, dir), 'utf8'));
-  check(r.ok, `${f} parses${r.ok ? '' : `: ${r.error}`}`);
+  const r = parseMod(readFileSync(f, 'utf8'));
+  check(r.ok, `${f.pathname} parses${r.ok ? '' : `: ${r.error}`}`);
 }
 
-const good = JSON.parse(readFileSync(new URL(files[0], dir), 'utf8'));
+const good = JSON.parse(readFileSync(fixture, 'utf8'));
 const bad = (what: string, edit: (m: any) => unknown): void => {
   const m = structuredClone(good);
   const out = edit(m), text = typeof out === 'string' ? out : JSON.stringify(m);

@@ -8,15 +8,12 @@ the checks is skipped with a console warning; the game still starts.
 Today a mod can add **skins with their own drawn art**. More kinds of content (spells, stages, classes) will use
 the same file and the same rules as they become data.
 
-## Example mods
+## Example
 
-| File | Adds |
-| --- | --- |
-| `mods/wizard.json` | Mage skin **Wizard**: brown hair, blue robe, orb staff |
-| `mods/druid.json` | Ranger skin **Druid**: long dark hair, leaf headband, green cloak |
-
-Both were downscaled from a generated sprite sheet with the same cleanup the built-in fighters got, then posed into every frame with the frame rig. Both show up as an extra color swatch after the built-in ones on the character select, and in the Art Lab
-(DEV TOOLS > ART LAB, the class tab's Animations or Sprites section; left and right, or the skin picker, switch skins).
+No mods ship right now (the first two example skins were pulled until the art is better). A known-good skin mod
+used by the tests is in `tests/fixtures/skin-mod.json`; copy it into `mods/` to try one. A mod skin shows up as an
+extra color swatch after the built-in ones on the character select, and in the Art Lab (DEV TOOLS > ART LAB, the
+class tab's Animations or Sprites section).
 
 ## File format
 

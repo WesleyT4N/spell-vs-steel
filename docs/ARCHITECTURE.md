@@ -215,8 +215,8 @@ flowchart TD
 ```
 
 - Format `spell-vs-steel-mod/1`: `id`, `name`, `author`, 1 to 16 `skins`. Each skin names a built-in `class`, a new `id`, a `palette` (letters `a`..`z` to `#rrggbb`, no gaps, `a` = outline), a `team` letter, `frames` at the class's 36x24 size (`idle0` required, missing ones fall back to it) and an optional 40x32 `portrait`. `__proto__`, unknown keys, HTML-ish names and files over 256 KB are refused.
-- `format.ts` is pure (no DOM, no game state); `tests/mods.ts` (in `npm test`) checks the shipped mods and 19 hostile files.
-- `Skin.art: SkinArt` (`pal`, `team`, `ax`, `frames`, `portrait`) sits beside the palette recolours; the menu still sprite is `idle0` trimmed. Shipped: `mods/wizard.json` (Mage) and `mods/druid.json` (Ranger).
+- `format.ts` is pure (no DOM, no game state); `tests/mods.ts` (in `npm test`) checks the fixture, any shipped mods and 19 hostile files.
+- `Skin.art: SkinArt` (`pal`, `team`, `ax`, `frames`, `portrait`) sits beside the palette recolours; the menu still sprite is `idle0` trimmed. No mods ship today; `tests/fixtures/skin-mod.json` is the known-good example the tests use.
 - Cosmetic and render-only: the sim never sees mods. Online, an opponent without the mod sees your default colour.
 
 ## Stages
