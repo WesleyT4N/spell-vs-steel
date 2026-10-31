@@ -26,8 +26,10 @@ const chainHookHit = spellStep('chain_hook.hit', (x, _a, h: ShotHit) => {
   const src = b.f[h.p.side];
   const res = b.damage(t, 180 * x.mult, src, { spell: true, element: 'steel' });
   if (res.blocked && !res.dealt) return;
-  const front = b.frontCol(t.side);
+  const front = b.frontCol(t.side), was = t.col;
   if (t.st.noKnock <= 0 && b.canStand(t, front, t.row)) { t.col = front; }
+  // render-only: the bite and the yank, from where the foe was hooked (its box runs back toward the caster)
+  b.addFx('chainHookHit', t.side, was, t.row, 0.45, { pull: Math.abs(was - t.col), reach: Math.abs(was - src.col) });
   b.stun(t, 2);
   b.gainRage(src, 1, true);
 });

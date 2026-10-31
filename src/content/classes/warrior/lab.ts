@@ -18,7 +18,7 @@ export default {
     stepSlash: 'cleaveHeavy', rampage: 'cleaveHeavy', leapSmash: 'smash', execute: 'smash', hammer: 'smash', shieldSlam: 'smash', mortal: 'smash',
     groundSlam: 'shockwave', shatter: 'shockwave', lastStandBlast: 'shockwave', seismic: 'quake', titanFall: 'quake',
     battleShout: 'shout', roar: 'shout', berserk: 'shout', rally: 'shout', avatar: 'transform', lastStand: 'transform',
-    guardUp: null, ironSkin: null, unbreakable: null, reflectUp: null, wallRise: null,
+    chainHookHit: null, guardUp: null, ironSkin: null, unbreakable: null, reflectUp: null, wallRise: null,
   },
   drafts: [],
 } satisfies ClassLab;

@@ -620,12 +620,7 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
   const x = X0 + p.x * PW + PW / 2, y = base.y - 9;
   const dir = Math.sign(p.speed);
   if (drawShotPfx(c, b, p, x, y, dir)) return;
-  if (p.kind === 'hook') {
-    const owner = b.f[p.side];
-    const ox = panelFoot(owner.col, owner.row).x;
-    for (let xx = ox; dir > 0 ? xx < x : xx > x; xx += dir * 3) P(c, '#7c7c7c', xx, y + ((xx >> 1) % 2), 2, 1);
-    P(c, '#000000', x - 3, y - 3, 7, 7); P(c, '#bcbcbc', x - 2, y - 2, 5, 5); P(c, '#fcfcfc', x - 1 + dir, y - 1, 2, 2);
-  } else if (p.kind === 'hammer') {
+  if (p.kind === 'hammer') {
     const spin = Math.floor(b.time * 16) % 4;
     blob(c, '#000000', x, y, 5);
     P(c, HOLY[1], x - 3, y - 3, 7, 7); P(c, HOLY[3], x - 2, y - 2, 2, 2);

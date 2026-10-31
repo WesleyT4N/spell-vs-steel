@@ -14,8 +14,9 @@ import { team } from './teamColors';
 /** The painter pixelfx hands an effect (see src/vendor/pixelfx/painter.js). Loosely typed: the vendored core is JS. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Painter = any;
+/** `data` is the fx's own plain data (Battle.addFx), e.g. how far a hit pulled its target. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type Opts = Record<string, any> & { seed: number; flip: boolean; team: ReturnType<typeof team> };
+export type Opts = Record<string, any> & { seed: number; flip: boolean; team: ReturnType<typeof team>; data?: Record<string, number | string> };
 
 export interface PfxMeta {
   name: string;
@@ -74,7 +75,7 @@ export function drawPfx(c: Ctx, b: Battle, e: Fx): boolean {
   let live = map.get(key);
   if (!live || tt < live.tt) {
     // the painter puts the effect's origin at the panel's feet (world pixels), mirrored for the right-hand side
-    const inst = createFx(mod, { x: Math.round(foot.x), y: Math.round(foot.y), flip, team: team(e.side), seed: hash(...[...key].map(ch => ch.charCodeAt(0))) % 100000 });
+    const inst = createFx(mod, { x: Math.round(foot.x), y: Math.round(foot.y), flip, team: team(e.side), data: e.data ?? {}, seed: hash(...[...key].map(ch => ch.charCodeAt(0))) % 100000 });
     map.set(key, live = { inst, tt: 0, seen: frameNo });
   }
   if (tt > live.tt) { live.inst.update(tt - live.tt); live.tt = tt; }
