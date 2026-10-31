@@ -120,7 +120,7 @@ export const shotBoxOf = (m: PfxMeta): { x0: number; x1: number; y0: number; y1:
  * is registered. Its clock is the shot's own flight time, so a rollback resim draws the same picture.
  */
 export function drawShotPfx(c: Ctx, b: Battle, p: Projectile, x: number, y: number, dir: number): boolean {
-  const mod = shots.get(p.kind);
+  const mod = shots.get(p.look ?? p.kind);
   if (!mod) return false;
   const { meta } = mod, flip = dir < 0;
   const h = p.homing;

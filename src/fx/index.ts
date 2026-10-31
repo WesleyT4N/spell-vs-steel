@@ -133,6 +133,40 @@ Object.assign(PLAYS, {
   shadowformCurse: 'priest/shadowform-curse',
 });
 
+// Ranger: the Arrow's and Aimed Shot's hits, the pets' attacks, the traps going off, and a kind per spell (cards.ts)
+Object.assign(PLAYS, {
+  arrowHit: 'ranger/clean-shaft-hit',
+  aimedHit: 'ranger/sonic-boom-hit',
+  hawkStrikeHit: 'ranger/hawk-strike-hit',
+  netHit: 'ranger/net-hit',
+  bite: 'ranger/bite',
+  hawkDive: 'ranger/hawk-dive',
+  claw: 'ranger/spirit-bear-claw',
+  aimed: 'ranger/power-shot',
+  arrowRain: 'ranger/volley',
+  steadyFocus: 'ranger/steady-focus',
+  huntersMark: 'ranger/hunters-mark',
+  disengage: 'ranger/disengage',
+  trapFreeze: 'ranger/freezing-trap',
+  trapExplode: 'ranger/explosive-trap',
+  trapBlast: 'ranger/explosive-trap',
+  trapWire: 'ranger/tripwire',
+  trapMine: 'ranger/minefield',
+  rapidFire: 'ranger/rapid-fire',
+  lightFooted: 'ranger/light-footed',
+  spiritBear: 'ranger/spirit-bear',
+  killShotAim: 'ranger/kill-shot-aim',
+  killShot: 'ranger/kill-shot',
+  barrage: 'ranger/barrage',
+  explosiveShot: 'ranger/explosive-shot',
+  killCommand: 'ranger/kill-command',
+  bestialWrath: 'ranger/bestial-wrath',
+  feignDeath: 'ranger/feign-death',
+  deadeye: 'ranger/deadeye',
+  huntersDomain: 'ranger/hunters-domain',
+  callOfTheWild: 'ranger/call-of-the-wild',
+});
+
 for (const [kind, id] of Object.entries(PLAYS)) registerPfx(kind, EFFECTS[id]);
 
 /** The effect each flying projectile kind plays (Projectile.kind); kinds not listed keep their hand-drawn shot. */
@@ -148,5 +182,18 @@ export const SHOT_PLAYS: Record<string, string> = {
 
 // Priest: the Holy Spark (its hit is the sparkHit fx above)
 Object.assign(SHOT_PLAYS, { spark: 'priest/holy-spark' });
+
+// Ranger: the Arrow, Aimed Shot, the Hawk, Net, the wolf, Wyvern Sting, and the arrows Multi-Shot and Explosive
+// Shot fire (Projectile.look: they are still 'arrow' shots to the battle)
+Object.assign(SHOT_PLAYS, {
+  arrow: 'ranger/clean-shaft',
+  aimed: 'ranger/sonic-boom',
+  hawk: 'ranger/hawk-strike',
+  net: 'ranger/net',
+  wolf: 'ranger/call-wolf',
+  sting: 'ranger/wyvern-sting',
+  multiArrow: 'ranger/multi-shot',
+  explosiveArrow: 'ranger/explosive-arrow',
+});
 
 for (const [kind, id] of Object.entries(SHOT_PLAYS)) registerShotPfx(kind, EFFECTS[id]);

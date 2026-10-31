@@ -15,9 +15,10 @@ const randomEnemyPanel = (b: Battle, f: Fighter): [number, number] => {
   return cells[Math.floor(b.rand() * cells.length)];
 };
 
-/** An arrow-type projectile down the caster's row: `onFoe` runs on the fighter it hits, a wall takes `wallDmg`. */
-function arrow(x: CastCtx, kind: 'arrow' | 'net' | 'wolf' | 'sting', speed: number, onFoe: EffectRec<Fighter>, wallDmg = 200, row = x.f.row): void {
-  x.b.shoot(x.f, { row, speed: speed * x.dir, kind, reflectable: true, onHit: arrowHit(x, { wallDmg, onFoe }) });
+/** An arrow-type projectile down the caster's row: `onFoe` runs on the fighter it hits, a wall takes `wallDmg`.
+ *  `look`: the shot's own pixelfx look when it isn't its kind's (Multi-Shot's and Explosive Shot's arrows). */
+function arrow(x: CastCtx, kind: 'arrow' | 'net' | 'wolf' | 'sting', speed: number, onFoe: EffectRec<Fighter>, wallDmg = 200, row = x.f.row, look?: string): void {
+  x.b.shoot(x.f, { row, speed: speed * x.dir, kind, reflectable: true, onHit: arrowHit(x, { wallDmg, onFoe }), ...(look ? { look } : {}) });
 }
 const arrowHit = spellStep('ranger.arrow', (x, { wallDmg, onFoe }: { wallDmg: number; onFoe: EffectRec<Fighter> }, h: ShotHit) => {
   if (h.w) { x.b.hitWall(h.w, wallDmg, x.f, {}); return; }
@@ -28,9 +29,12 @@ type Cells = Array<[number, number]>;
 
 // Spells' later steps (see spellStep): what lands after a delay, a telegraph or a flight.
 const hawkHit = spellStep('hawk_strike.hit', (x, _a, h: ShotHit) => {
-  if (h.t) x.b.damage(h.t, 400 * x.mult, x.b.f[1 - h.t.side], { spell: true, element: 'nature' });
+  if (h.t && x.b.damage(h.t, 400 * x.mult, x.b.f[1 - h.t.side], { spell: true, element: 'nature' }).dealt > 0) x.b.addFx('hawkStrikeHit', x.f.side, h.t.col, h.t.row, 0.3);
 });
-const netHit = spellStep('net.hit', (x, _a, t: Fighter) => { x.b.damage(t, 100 * x.mult, x.f, { spell: true, element: 'nature' }); x.b.root(t, 2); });
+const netHit = spellStep('net.hit', (x, _a, t: Fighter) => {
+  x.b.damage(t, 100 * x.mult, x.f, { spell: true, element: 'nature' }); x.b.root(t, 2);
+  x.b.addFx('netHit', x.f.side, t.col, t.row, 0.3);
+});
 const multiShotHit = spellStep('multi_shot.hit', (x, _a, t: Fighter) => { x.b.damage(t, 500 * x.mult, x.f, { spell: true, element: 'steel' }); });
 const wolfHit = spellStep('call_wolf.hit', (x, _a, t: Fighter) => {
   for (let i = 0; i < 3; i++) x.b.later(i * 0.25, wolfBite(x, { side: t.side, i }));
@@ -46,7 +50,7 @@ const volleyHit = spellStep('volley.hit', (x, { cells }: { cells: Cells }) => {
 });
 const killShotHit = spellStep('kill_shot.hit', x => {
   const { b, f, foe } = x;
-  b.addFx('aimed', f.side, f.col, f.row, 0.35, { to: foe.col, toRow: foe.row });
+  b.addFx('killShot', f.side, foe.col, foe.row, 0.35);
   b.shake = 0.3;
   b.damage(foe, 2200 * x.mult, f, { spell: true, element: 'steel', targeted: true, pierce: true });
 });
@@ -57,7 +61,7 @@ const barrageArrow = spellStep('barrage.arrow', x => {
   b.warn(f, [[c, r]], TUNING.warnTime, barrageHit(x, { c, r }));
 });
 const barrageHit = spellStep('barrage.hit', (x, { c, r }: { c: number; r: number }) => {
-  x.b.addFx('arrowRain', x.f.side, c, r, 0.3);
+  x.b.addFx('barrage', x.f.side, c, r, 0.3);
   x.b.strike(x.f, [[c, r]], 300 * x.mult, { spell: true, element: 'steel', noFlinch: true });
 });
 const explosiveHit = spellStep('explosive_shot.hit', (x, _a, t: Fighter) => {
@@ -74,7 +78,7 @@ const explosiveArm = spellStep('explosive_shot.arm', (x, { side }: { side: Side 
 const explosiveBlast = spellStep('explosive_shot.blast', (x, { cells }: { cells: Cells }) => {
   const { b } = x;
   b.shake = 0.25;
-  for (const [c, r] of cells) if (b.inGrid(c, r)) b.addFx('explode', x.f.side, c, r, 0.4);
+  for (const [c, r] of cells) if (b.inGrid(c, r)) b.addFx('explosiveShot', x.f.side, c, r, 0.4);
   b.strike(x.f, cells, 1200 * x.mult, { spell: true, element: 'fire' });
 });
 const petStrike = spellStep('kill_command.strike', (x, { p }: { p: Pet }) => x.b.petAttack(p, 3 * x.mult));
@@ -89,6 +93,7 @@ export const ranger: CardDef[] = [
     dmg: '-', short: 'Root yourself for 4s. While rooted your damage is +25%. +2 Energy.', gain: { res: 2 },
     cast: x => {
       x.f.st.rooted = Math.max(x.f.st.rooted, 4); x.f.st.focus = 4;
+      x.b.addFx('steadyFocus', x.f.side, x.f.col, x.f.row, 0.6);
       x.b.gainRes(x.f, 2); x.b.text(x.f, '+2 ENERGY', '#f8d878');
     },
   },
@@ -111,6 +116,7 @@ export const ranger: CardDef[] = [
       // a mark finds a stealthed target: it is how the Ranger hunts Rogues
       x.foe.st.hunted = 6; x.foe.st.stealth = 0;
       x.b.text(x.foe, 'HUNTED', '#f83800');
+      x.b.addFx('huntersMark', x.f.side, x.foe.col, x.foe.row, 0.6);
     },
   },
   {
@@ -126,7 +132,7 @@ export const ranger: CardDef[] = [
       const { b, f, foe } = x;
       if (Math.abs(foe.col - f.col) <= 2) { b.damage(foe, 200 * x.mult, f, { spell: true, element: 'nature' }); b.knockback(foe, 1); }
       const back = b.backCol(f.side);
-      if (b.canStand(f, back, f.row)) { b.addFx('smoke', f.side, f.col, f.row, 0.3); f.col = back; }
+      if (b.canStand(f, back, f.row)) { b.addFx('disengage', f.side, f.col, f.row, 0.3); f.col = back; }
     },
     ai: (b, f) => enemyNear(b, f, 2),
   },
@@ -143,7 +149,7 @@ export const ranger: CardDef[] = [
   {
     id: 'multi_shot', name: 'Multi-Shot', cls: 'ranger', cost: 2, rarity: 'common', element: 'steel', damaging: true, lock: 0.35,
     dmg: '500', short: 'Three arrows, one down each row.',
-    cast: x => { for (let r = 0; r < 3; r++) arrow(x, 'arrow', 12, multiShotHit(x), 500, r); },
+    cast: x => { for (let r = 0; r < 3; r++) arrow(x, 'arrow', 12, multiShotHit(x), 500, r, 'multiArrow'); },
   },
   {
     id: 'call_wolf', name: 'Call Wolf', cls: 'ranger', cost: 2, rarity: 'common', element: 'nature', damaging: true, lock: 0.3,
@@ -175,12 +181,12 @@ export const ranger: CardDef[] = [
   {
     id: 'rapid_fire', name: 'Rapid Fire', cls: 'ranger', cost: 2, rarity: 'uncommon', element: 'steel', damaging: false, lock: 0.2,
     dmg: 'Arrow x2', short: 'For 4s your light Arrow fires twice as fast.',
-    cast: x => { x.f.st.rapidFire = 4; x.b.text(x.f, 'RAPID FIRE', '#fcfcfc'); },
+    cast: x => { x.f.st.rapidFire = 4; x.b.text(x.f, 'RAPID FIRE', '#fcfcfc'); x.b.addFx('rapidFire', x.f.side, x.f.col, x.f.row, 0.5); },
   },
   {
     id: 'light_footed', name: 'Light Footed', cls: 'ranger', cost: 1, rarity: 'uncommon', element: 'nature', damaging: false, lock: 0.2,
     dmg: '-', short: "For 6s moving doesn't reset your stand-still Energy count.",
-    cast: x => { x.f.st.lightFoot = 6; x.b.text(x.f, 'LIGHT FOOTED', '#58d854'); },
+    cast: x => { x.f.st.lightFoot = 6; x.b.text(x.f, 'LIGHT FOOTED', '#58d854'); x.b.addFx('lightFooted', x.f.side, x.f.col, x.f.row, 0.6); },
   },
   {
     id: 'volley', name: 'Volley', cls: 'ranger', cost: 3, rarity: 'uncommon', element: 'steel', damaging: true, lock: 0.35,
@@ -201,6 +207,7 @@ export const ranger: CardDef[] = [
       const { b, f } = x;
       const c = f.col + x.dir, r = f.row;
       if (!b.placeWall(f, c, r, 1600, 'bear', 8)) { b.text(f, 'BLOCKED', '#bcbcbc'); return; }
+      b.addFx('spiritBear', f.side, c, r, 0.6);
       b.pets.push({ side: f.side, kind: 'bear', row: r, col: c, t: 8, cd: 0.6, period: 1, dmg: 400 * x.mult });
     },
   },
@@ -210,6 +217,7 @@ export const ranger: CardDef[] = [
     dmg: '2200', short: 'A laser locks on for 1s, then the arrow hits the enemy wherever they are. Ignores barriers.',
     cast: x => {
       x.b.addFx('laser', x.f.side, x.f.col, x.f.row, 1);
+      x.b.addFx('killShotAim', x.f.side, x.f.col, x.f.row, 1);
       x.b.later(1, killShotHit(x));
     },
   },
@@ -224,7 +232,7 @@ export const ranger: CardDef[] = [
   {
     id: 'explosive_shot', name: 'Explosive Shot', cls: 'ranger', cost: 3, rarity: 'legendary', element: 'fire', damaging: true, lock: 0.35,
     dmg: '400+1200', short: 'Arrow down your row sticks to the enemy and explodes 2s later on them and around them.',
-    cast: x => arrow(x, 'arrow', 12, explosiveHit(x)),
+    cast: x => arrow(x, 'arrow', 12, explosiveHit(x), 200, x.f.row, 'explosiveArrow'),
     ai: (b, f) => sameRow(b, f),
   },
   {
@@ -234,7 +242,7 @@ export const ranger: CardDef[] = [
       const mine = x.b.pets.filter(p => p.side === x.f.side);
       if (!mine.length) { x.b.text(x.f, 'NO PETS', '#bcbcbc'); return; }
       mine.forEach((p, i) => x.b.later(i * 0.12, petStrike(x, { p })));
-      x.b.addFx('shout', x.f.side, x.f.col, x.f.row, 0.5);
+      x.b.addFx('killCommand', x.f.side, x.f.col, x.f.row, 0.5);
     },
     ai: (b, f) => b.pets.some(p => p.side === f.side),
   },
@@ -260,6 +268,7 @@ export const ranger: CardDef[] = [
       const { b, f } = x;
       b.pets.push({ side: f.side, kind: 'hawk', row: null, col: b.backCol(f.side), t: 6, cd: 0.5, period: 1, dmg: 150 * x.mult });
       b.pets.push({ side: f.side, kind: 'wolf', row: null, col: b.backCol(f.side), t: 6, cd: 0.3, period: 1, dmg: 200 * x.mult });
+      b.addFx('bestialWrath', f.side, f.col, f.row, 0.6);
     },
   },
   {
@@ -269,6 +278,7 @@ export const ranger: CardDef[] = [
       x.f.st.untargetable = 2;
       x.b.projectiles = x.b.projectiles.filter(p => !(p.homing && p.homing.target === x.f.side));
       x.b.gainRes(x.f, 2);
+      x.b.addFx('feignDeath', x.f.side, x.f.col, x.f.row, 0.8);
     },
     ai: (b, f) => b.warned(f.col, f.row, f.side) || b.projectiles.some(p => p.side !== f.side),
   },
@@ -276,7 +286,7 @@ export const ranger: CardDef[] = [
   {
     id: 'deadeye', name: 'Deadeye', cls: 'ranger', cost: 5, rarity: 'mythic', element: 'steel', damaging: false, lock: 0.3,
     dmg: '-', short: 'Rooted for 8s: +1 Energy per second, Aimed Shot charges instantly and pierces, Arrows deal triple damage.',
-    cast: x => { x.f.st.deadeye = 8; x.b.cheer = 2; x.b.addFx('transform', x.f.side, x.f.col, x.f.row, 0.8); },
+    cast: x => { x.f.st.deadeye = 8; x.b.cheer = 2; x.b.addFx('deadeye', x.f.side, x.f.col, x.f.row, 0.8); },
   },
   {
     id: 'hunters_domain', name: "Hunter's Domain", cls: 'ranger', cost: 5, rarity: 'mythic', element: 'nature', damaging: true, lock: 0.4,
@@ -284,6 +294,7 @@ export const ranger: CardDef[] = [
     cast: x => {
       const { b, f, foe } = x;
       allEnemyPanels(b, f.side).forEach(([c, r], i) => trap(b, f, c, r, i % 2 ? 'freeze' : 'blast', c === foe.col && r === foe.row ? 0 : 1));
+      b.addFx('huntersDomain', f.side, b.frontCol(foe.side), 1, 0.8);
       b.cheer = 2;
     },
   },
@@ -293,6 +304,7 @@ export const ranger: CardDef[] = [
     cast: x => {
       const { b, f } = x;
       for (let r = 0; r < 3; r++) b.pets.push({ side: f.side, kind: 'wolf', row: r, col: b.backCol(f.side), t: 10, cd: 0.3 + r * 0.2, period: 1, dmg: 200 * x.mult });
+      b.addFx('callOfTheWild', f.side, b.backCol(f.side), 1, 0.8);
       b.cheer = 2;
     },
   },

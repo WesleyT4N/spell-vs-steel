@@ -22,7 +22,7 @@ import { kickOffset, noteImpacts } from './hitFeel';
 import { endPfxFrame, drawShotPfx } from './pfx';
 import '../fx';
 import { isHome, setHome, team } from './teamColors';
-import { FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, useParticles } from './fxView';
+import { FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawBurn, drawFrozen, drawFx, drawParticles, useParticles } from './fxView';
 
 /** Whose hidden things (traps, a stealthed fighter) are visible: one side's, or everything in the dev sandbox. */
 export type Viewer = Side | 'all';
@@ -613,36 +613,18 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
     const s = panelFoot(p.homing.sx, p.homing.sy), e = fighterPos(b, t);
     const q = p.homing.p;
     const x = s.x + (e.x - s.x) * q, y = s.y - 10 + (e.y - 10 - (s.y - 10)) * q - Math.sin(q * Math.PI) * 18;
-    if (drawShotPfx(c, b, p, x, y, e.x - s.x > 0 ? 1 : -1)) return;
-    if (p.kind === 'hawk') {
-      const dd = e.x - s.x > 0 ? 1 : -1, flap = Math.floor(q * 12) % 2 ? 2 : 0;
-      const hx = Math.round(x), hy = Math.round(y);
-      drawHawk(c, hx, hy, dd, flap > 0);
-      return;
-    }
-    if (p.kind === 'arrow' || p.kind === 'aimed') {
-      // a homing Arrow or Aimed Shot (Hunter's Mark)
-      const dd = e.x - s.x > 0 ? 1 : -1;
-      P(c, '#000000', x - dd * 6, y - 1, 9, 3); P(c, '#ac7c00', x - dd * 5, y, 7, 1); P(c, '#fcfcfc', x + dd * 2, y - 1, 2, 3);
-      return;
-    }
-    return; // Arcane Missiles: drawn by its pixelfx shot (src/fx/mage/arcane-missiles.ts)
+    drawShotPfx(c, b, p, x, y, e.x - s.x > 0 ? 1 : -1);
+    return; // every homing shot (Arcane Missiles, the Hawk, a marked Arrow) is drawn by its pixelfx shot
   }
   const base = panelFoot(0, p.row);
   const x = X0 + p.x * PW + PW / 2, y = base.y - 9;
   const dir = Math.sign(p.speed);
   if (drawShotPfx(c, b, p, x, y, dir)) return;
-  if (drawShot(c, b, p, x, y, dir)) return;
   if (p.kind === 'hook') {
     const owner = b.f[p.side];
     const ox = panelFoot(owner.col, owner.row).x;
     for (let xx = ox; dir > 0 ? xx < x : xx > x; xx += dir * 3) P(c, '#7c7c7c', xx, y + ((xx >> 1) % 2), 2, 1);
     P(c, '#000000', x - 3, y - 3, 7, 7); P(c, '#bcbcbc', x - 2, y - 2, 5, 5); P(c, '#fcfcfc', x - 1 + dir, y - 1, 2, 2);
-  } else if (p.kind === 'net') {
-    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if ((i + j) % 2 === 0) P(c, '#bcbcbc', x - 4 + i * 2, y - 5 + j * 3, 1, 1);
-    P(c, '#7c7c7c', x - 5, y - 6, 1, 11); P(c, '#7c7c7c', x + 4, y - 6, 1, 11);
-  } else if (p.kind === 'wolf') {
-    drawWolf(c, Math.round(x), Math.round(y + 9), dir, Math.floor(b.time * 12) % 2 === 0);
   } else if (p.kind === 'hammer') {
     const spin = Math.floor(b.time * 16) % 4;
     blob(c, '#000000', x, y, 5);

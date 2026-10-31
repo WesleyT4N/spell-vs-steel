@@ -385,6 +385,15 @@ Object.assign(FX, {
   psychicScream: FX.shout, powerInfusion: FX.transform, sanctum: FX.transform, shadowform: FX.transform,
 });
 
+// the Ranger's spells and traps each have their own look but keep the sounds of the kinds they replaced. A trap
+// keeps its snap (trapPop reads data.kind); the blast traps snap and explode as before. The new hit kinds and the
+// spells that had no effect before stay quiet: the shot and cast sounds already cover them.
+Object.assign(FX, {
+  trapFreeze: FX.trapPop, trapMine: FX.trapPop, trapWire: FX.trapPop,
+  trapExplode: (o: RealOpts) => { FX.trapPop(o); FX.explode(o); }, trapBlast: (o: RealOpts) => { FX.trapPop(o); FX.explode(o); },
+  disengage: FX.smoke, killShot: FX.aimed, barrage: FX.arrowRain, explosiveShot: FX.explode, killCommand: FX.shout, deadeye: FX.transform,
+});
+
 const lastPlayed: Record<string, number> = {};
 
 /** Play a realistic recipe into `out`. Returns false if there is none (the caller falls back to its old blip). */

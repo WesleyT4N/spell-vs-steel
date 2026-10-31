@@ -4,6 +4,7 @@ import rules from './rules';
 import decks from './decks';
 import cpu from './cpu';
 import lessons from './tutorial';
+import lab from './lab';
 
 export default {
   id: 'ranger',
@@ -13,5 +14,5 @@ export default {
     blurb: ['ARROWS, TRAPS AND PETS', 'STAND STILL FOR ENERGY'],
     backdrop: ['#002800', '#005800', '#00a800'],
   },
-  rules, decks, cpu, lessons,
+  rules, decks, cpu, lessons, lab,
 } satisfies ClassModule;
