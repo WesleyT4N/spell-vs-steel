@@ -993,12 +993,12 @@ export class Battle {
     if (f.poisonT <= 0) { f.poison = 0; f.poisonAcc = 0; }
   }
 
-  /** Put a Priest DoT on `t`, picking them wherever they are (misses in Stealth). Recasting refreshes it. */
-  addDot(t: Fighter, src: Fighter, id: string, dps: number, secs: number): boolean {
+  /** Put a Priest DoT on `t`, picking them wherever they are (misses in Stealth). Recasting refreshes it. `fx` is its look. */
+  addDot(t: Fighter, src: Fighter, id: string, dps: number, secs: number, fx: string): boolean {
     if (t.dead || t.st.iceBlock > 0) return false;
     if (!this.targetable(t)) { this.text(t, 'MISS', '#bcbcbc'); return false; }
     t.dots = [...t.dots.filter(d => d.id !== id), { id, dps, t: secs, acc: 0, src: src.side }];
-    this.addFx('shadowHit', src.side, t.col, t.row, 0.35);
+    this.addFx(fx, src.side, t.col, t.row, 0.35);
     return true;
   }
 

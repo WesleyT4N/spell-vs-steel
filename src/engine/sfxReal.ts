@@ -376,6 +376,15 @@ Object.assign(FX, {
   vialLob: FX.lob, vialBurst: FX.toxicPuff, deadlyPoison: FX.toxicPuff, envenom: FX.toxicPuff, blind: FX.toxicPuff, pandemic: FX.toxicPuff,
 });
 
+// the Priest's spells each have their own look but keep the sounds of the kinds they replaced (shadowHit, healBurst
+// and the new prayer / pwShield / holyWallRise / sparkHit had none, so they stay silent)
+Object.assign(FX, {
+  smite: FX.holyPillar, holyFire: FX.holyPillar, penanceBolt: FX.holyPillar, haloBolt: FX.holyPillar, wrath: FX.holyPillar,
+  flashHeal: FX.healBurst, hymnTick: FX.healBurst, blessPower: FX.healBurst, blessHeal: FX.healBurst, blessMana: FX.healBurst,
+  blessShield: FX.healBurst, blessSacred: FX.healBurst, sanctumBless: FX.healBurst,
+  psychicScream: FX.shout, powerInfusion: FX.transform, sanctum: FX.transform, shadowform: FX.transform,
+});
+
 const lastPlayed: Record<string, number> = {};
 
 /** Play a realistic recipe into `out`. Returns false if there is none (the caller falls back to its old blip). */
