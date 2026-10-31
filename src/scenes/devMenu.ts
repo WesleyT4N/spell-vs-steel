@@ -1,4 +1,4 @@
-// Dev tools menu: card encyclopedia, debug sandbox and balance lab.
+// Dev tools menu: card encyclopedia, debug sandbox, balance lab and art lab.
 import { pushScene, popScene, drawMenu, hint, listMouse, showSel, type Scene } from './scene';
 import { getArena, useStage } from '../game/battleView';
 import { BattleScene } from './battle';
@@ -13,12 +13,14 @@ import { EncyclopediaScene } from './encyclopedia';
 import { SandboxScene } from './sandbox';
 import { LabScene } from './lab';
 import { VoiceTestScene } from './voiceTest';
+import { ArtLabScene } from './artLab';
 
-const ITEMS = ['CARD ENCYCLOPEDIA', 'SANDBOX', 'BALANCE LAB', 'VOICE TEST', 'BACK'];
+const ITEMS = ['CARD ENCYCLOPEDIA', 'SANDBOX', 'BALANCE LAB', 'ART LAB', 'VOICE TEST', 'BACK'];
 const ABOUT = [
   'EVERY SPELL OF EVERY CLASS, WITH FILTERS',
   'DEBUG MODE: CAST ANY SPELL, DUMMIES, SLOW-MO, HIT LOG',
   'CPU VS CPU SIMS, PER-CARD STATS, LIVE TUNING',
+  'EVERY ATTACK AND SPELL ON LOOP: SHIPPED, BEFORE AND DRAFT LOOKS',
   'EVERY CLASS VOICE LINE AND ANNOUNCER CALL',
   '',
 ];
@@ -37,8 +39,9 @@ export class DevMenuScene implements Scene {
     if (i === 0) openEncyclopedia();
     if (i === 1) pushScene(new SandboxScene());
     if (i === 2) pushScene(new LabScene());
-    if (i === 3) pushScene(new VoiceTestScene());
-    if (i === 4) { sfx('back'); this.back(); }
+    if (i === 3) pushScene(new ArtLabScene());
+    if (i === 4) pushScene(new VoiceTestScene());
+    if (i === 5) { sfx('back'); this.back(); }
   }
 
   update(dt: number): void {
@@ -62,7 +65,7 @@ export class DevMenuScene implements Scene {
   }
 }
 
-/** Open a dev tool straight from the URL hash (#cards, #sandbox, #lab), for local work. BACK leads to the dev menu, then the title.
+/** Open a dev tool straight from the URL hash (#cards, #sandbox, #lab, #art), for local work. BACK leads to the dev menu, then the title.
  *  #bench=stage[,classA,classB] starts a CPU vs CPU match to watch, for frame-rate profiling. */
 export function devFromHash(): boolean {
   const tag = location.hash.slice(1);
@@ -72,11 +75,12 @@ export function devFromHash(): boolean {
     pushScene(new BattleScene({ ...loadMatch(), p1: a as ClassId, cpu: b as ClassId, p1Deck: 'starter', cpuDeck: 'starter', stage, bestOf: 5 }, [0, 0], undefined, [], ['cpu', 'cpu']));
     return true;
   }
-  if (!['cards', 'sandbox', 'lab', 'voices', 'dev'].includes(tag)) return false;
+  if (!['cards', 'sandbox', 'lab', 'art', 'voices', 'dev'].includes(tag)) return false;
   pushScene(new DevMenuScene());
   if (tag === 'cards') openEncyclopedia();
   else if (tag === 'sandbox') pushScene(new SandboxScene());
   else if (tag === 'lab') pushScene(new LabScene());
+  else if (tag === 'art') pushScene(new ArtLabScene());
   else if (tag === 'voices') pushScene(new VoiceTestScene());
   return true;
 }

@@ -4,6 +4,7 @@ import rules from './rules';
 import decks from './decks';
 import cpu from './cpu';
 import lessons from './tutorial';
+import lab from './lab';
 
 export default {
   id: 'warrior',
@@ -15,5 +16,5 @@ export default {
     builds: true,
     melee: true,
   },
-  rules, decks, cpu, lessons,
+  rules, decks, cpu, lessons, lab,
 } satisfies ClassModule;
