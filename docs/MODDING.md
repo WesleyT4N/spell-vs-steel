@@ -12,7 +12,7 @@ the same file and the same rules as they become data.
 
 | File | Adds |
 | --- | --- |
-| `mods/wizard.json` | Mage skin **Wizard**: brown hair, glasses, blue robe, orb staff |
+| `mods/wizard.json` | Mage skin **Wizard**: brown hair, blue robe, orb staff |
 | `mods/druid.json` | Ranger skin **Druid**: long dark hair, leaf headband, green cloak |
 
 Both were downscaled from a generated sprite sheet with the same cleanup the built-in fighters got, then posed into every frame with the frame rig. Both show up as an extra color swatch after the built-in ones on the character select, and in the Art Lab
