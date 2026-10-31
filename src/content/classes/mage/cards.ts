@@ -30,11 +30,11 @@ const fireballHit = spellStep('fireball.hit', (x, _a, { col, p }: ShotHit) => {
   const r2 = row === 2 ? 1 : row + 1;
   const cells: Cells = [[col, row], [col + d, row], [col, r2], [col + d, r2]];
   b.shake = 0.2;
-  for (const [c, rr] of cells) { b.addFx('explode', src.side, c, rr, 0.35); b.burn(c, rr, 5, 180); }
+  for (const [c, rr] of cells) { b.addFx('fireballBlast', src.side, c, rr, 0.35); b.burn(c, rr, 5, 180); }
   b.strike(src, cells, 1450 * x.mult, { spell: true, element: 'fire' });
 });
 const scorchHit = spellStep('scorch.hit', (x, { cells }: { cells: Cells }) => {
-  for (const [c, r] of cells) x.b.addFx('explode', x.f.side, c, r, 0.35);
+  for (const [c, r] of cells) x.b.addFx('scorch', x.f.side, c, r, 0.35);
   x.b.strike(x.f, cells, 900 * x.mult, { spell: true, element: 'fire' });
 });
 const arcaneBlastHit = spellStep('arcane_blast.hit', x => {
@@ -65,18 +65,18 @@ const blizzardHit = spellStep('blizzard.hit', (x, { c, r, n }: { c: number; r: n
 const meteorHit = spellStep('meteor.hit', (x, { cells }: { cells: Cells }) => {
   x.b.shake = 0.5;
   x.b.cheer = 2;
-  for (const [c, r] of cells) { x.b.addFx('explode', x.f.side, c, r, 0.5); x.b.burn(c, r, 5, 180); }
+  for (const [c, r] of cells) { x.b.addFx('meteorBlast', x.f.side, c, r, 0.5); x.b.burn(c, r, 5, 180); }
   x.b.strike(x.f, cells, 2100 * x.mult, { spell: true, element: 'fire' });
 });
 const surgeHit = spellStep('arcane_surge.hit', (x, { dmg }: { dmg: number }) => {
-  x.b.addFx('arcaneHit', x.f.side, x.foe.col, x.foe.row, 0.5);
+  x.b.addFx('arcaneSurge', x.f.side, x.foe.col, x.foe.row, 0.5);
   x.b.shake = 0.3;
   x.b.damage(x.foe, dmg, x.f, { spell: true, element: 'arcane', targeted: true });
 });
 const cometWarn = spellStep('comet_storm.warn', (x, { c, r }: { c: number; r: number }) => x.b.warn(x.f, [[c, r]], 0.5, cometHit(x, { c, r })));
 const cometHit = spellStep('comet_storm.hit', (x, { c, r }: { c: number; r: number }) => {
   const { b, f } = x;
-  b.addFx('explode', f.side, c, r, 0.35);
+  b.addFx('comet', f.side, c, r, 0.35);
   b.burn(c, r, 5, 180);
   b.strike(f, [[c, r]], 700 * x.mult, { spell: true, element: 'fire', noFlinch: true });
 });
@@ -92,12 +92,12 @@ export const mage: CardDef[] = [
   {
     id: 'arcane_focus', name: 'Arcane Focus', cls: 'mage', cost: 0, rarity: 'common', element: 'arcane', damaging: false, lock: 0.2,
     dmg: '-', short: 'Gain +1 Mana this turn. Can go above your max.', gain: { res: 1 },
-    cast: x => { x.f.res += 1; x.b.text(x.f, '+1 MANA', '#f878f8'); },
+    cast: x => { x.f.res += 1; x.b.text(x.f, '+1 MANA', '#f878f8'); x.b.addFx('arcaneFocus', x.f.side, x.f.col, x.f.row, 0.4); },
   },
   {
     id: 'arcane_barrier', name: 'Arcane Barrier', cls: 'mage', cost: 1, rarity: 'common', element: 'arcane', damaging: false, lock: 0.2,
     dmg: '-', short: 'Absorb 600 damage for 5s. If it breaks, +1 Mana next turn.',
-    cast: x => x.b.addShield(x.f, 'barrier', 600, 5),
+    cast: x => { x.b.addShield(x.f, 'barrier', 600, 5); x.b.addFx('arcaneBarrier', x.f.side, x.f.col, x.f.row, 0.45); },
     ai: (b, f) => b.foe(f).cls === 'warrior' ? Math.abs(b.foe(f).col - f.col) <= 2 : sameRow(b, f),
   },
   {
@@ -137,7 +137,11 @@ export const mage: CardDef[] = [
   {
     id: 'ignite', name: 'Ignite', cls: 'mage', cost: 1, rarity: 'common', element: 'fire', damaging: true, lock: 0.3,
     dmg: '220/s', short: 'The column the enemy stands in burns for 5s.',
-    cast: x => { for (let r = 0; r < 3; r++) x.b.burn(x.foe.col, r, 5, 220 * x.mult); },
+    cast: x => {
+      for (let r = 0; r < 3; r++) x.b.burn(x.foe.col, r, 5, 220 * x.mult);
+      // one effect covers the whole column (its box spans the three rows round the middle one)
+      x.b.addFx('ignite', x.f.side, x.foe.col, 1, 0.5);
+    },
   },
   {
     id: 'fireball', name: 'Fireball', cls: 'mage', cost: 3, rarity: 'common', element: 'fire', damaging: true, lock: 0.4,
@@ -160,7 +164,10 @@ export const mage: CardDef[] = [
   {
     id: 'ice_wall', name: 'Ice Wall', cls: 'mage', cost: 1, rarity: 'common', element: 'frost', damaging: false, lock: 0.3,
     dmg: '-', short: 'Ice block (600 HP) on the panel in front of you blocks shots in your row.',
-    cast: x => { if (!x.b.placeWall(x.f, x.f.col + x.dir, x.f.row, 600, 'ice', 12)) x.b.text(x.f, 'BLOCKED', '#bcbcbc'); },
+    cast: x => {
+      if (x.b.placeWall(x.f, x.f.col + x.dir, x.f.row, 600, 'ice', 12)) x.b.addFx('iceWall', x.f.side, x.f.col + x.dir, x.f.row, 0.4);
+      else x.b.text(x.f, 'BLOCKED', '#bcbcbc');
+    },
     ai: (b, f) => sameRow(b, f),
   },
   {
@@ -172,7 +179,11 @@ export const mage: CardDef[] = [
   {
     id: 'arcane_intellect', name: 'Arcane Intellect', cls: 'mage', cost: 1, rarity: 'uncommon', element: 'arcane', damaging: false, lock: 0.3,
     dmg: '-', short: 'Permanently +1 max Mana (cap 5).', gain: { max: 1, res: 1 },
-    cast: x => { if (x.f.resMax < 5) { x.f.resMax += 1; x.f.res += 1; } x.b.text(x.f, '+1 MAX MANA', '#f878f8'); },
+    cast: x => {
+      if (x.f.resMax < 5) { x.f.resMax += 1; x.f.res += 1; }
+      x.b.text(x.f, '+1 MAX MANA', '#f878f8');
+      x.b.addFx('arcaneIntellect', x.f.side, x.f.col, x.f.row, 0.5);
+    },
   },
   {
     id: 'arcane_blast', name: 'Arcane Blast', cls: 'mage', cost: 2, rarity: 'uncommon', element: 'arcane', damaging: true, lock: 0.35,
@@ -205,7 +216,7 @@ export const mage: CardDef[] = [
   {
     id: 'ice_block', name: 'Ice Block', cls: 'mage', cost: 2, rarity: 'uncommon', element: 'frost', damaging: false, lock: 0,
     dmg: '-', short: 'Immune to everything for 2s, but you cannot move or act.',
-    cast: x => { x.f.st.iceBlock = 2; },
+    cast: x => { x.f.st.iceBlock = 2; x.b.addFx('iceBlock', x.f.side, x.f.col, x.f.row, 0.4); },
     ai: (b, f) => b.warned(f.col, f.row, f.side) || (lowHp(f, 0.3) && Math.abs(b.foe(f).col - f.col) <= 2),
   },
   {
@@ -236,12 +247,12 @@ export const mage: CardDef[] = [
   {
     id: 'arcane_power', name: 'Arcane Power', cls: 'mage', cost: 2, rarity: 'legendary', element: 'arcane', damaging: false, lock: 0.3,
     dmg: '-', short: 'Your next 3 spells cost 1 less Mana.', costMod: { next: 3 },
-    cast: x => { x.f.powerLeft = 3; },
+    cast: x => { x.f.powerLeft = 3; x.b.addFx('arcanePower', x.f.side, x.f.col, x.f.row, 0.5); },
   },
   {
     id: 'evocation', name: 'Evocation', cls: 'mage', cost: 0, rarity: 'legendary', element: 'arcane', damaging: false, lock: 0.3,
     dmg: '-', short: 'Refill Mana to max, but you cannot cast for 2s.', gain: { refill: true },
-    cast: x => { x.f.res = Math.max(x.f.res, x.f.resMax); x.f.st.evoLock = 2; },
+    cast: x => { x.f.res = Math.max(x.f.res, x.f.resMax); x.f.st.evoLock = 2; x.b.addFx('evocation', x.f.side, x.f.col, x.f.row, 0.6); },
     ai: (_b, f) => f.res <= 1,
   },
   {
@@ -253,7 +264,7 @@ export const mage: CardDef[] = [
       const cells: Array<[number, number]> = [];
       for (const c of [c1, c2]) for (let r = 0; r < 3; r++) cells.push([c, r]);
       // like BN's fire arms, the breath is instant; the burning panels it leaves are the warning
-      for (const [c, r] of cells) { b.addFx('explode', f.side, c, r, 0.4); b.burn(c, r, 5, 180); }
+      for (const [c, r] of cells) { b.addFx('dragonsBreath', f.side, c, r, 0.4); b.burn(c, r, 5, 180); }
       b.strike(f, cells, 1450 * x.mult, { spell: true, element: 'fire' });
     },
     ai: (b, f) => { const foe = b.foe(f); return Math.abs(foe.col - b.frontCol(foe.side)) <= 1; },
@@ -272,7 +283,7 @@ export const mage: CardDef[] = [
     dmg: '-', short: 'Freeze the enemy for 3s. They cannot move or act.',
     cast: x => {
       if (!x.b.targetable(x.foe)) { x.b.text(x.foe, 'MISS', '#bcbcbc'); return; }
-      x.b.addFx('shard', x.f.side, x.foe.col, x.foe.row, 0.4);
+      x.b.addFx('deepFreeze', x.f.side, x.foe.col, x.foe.row, 0.4);
       x.b.freeze(x.foe, 3);
     },
   },
@@ -280,14 +291,14 @@ export const mage: CardDef[] = [
   {
     id: 'ascendance', name: 'Ascendance', cls: 'mage', cost: 5, rarity: 'mythic', element: 'arcane', damaging: false, lock: 0.5,
     dmg: '-', short: 'Transform for 8s: your spells cost 0 Mana and every spell fires twice.', costMod: { free: true },
-    cast: x => { x.f.st.ascendance = 8; x.b.cheer = 2; x.b.addFx('transform', x.f.side, x.f.col, x.f.row, 0.8); },
+    cast: x => { x.f.st.ascendance = 8; x.b.cheer = 2; x.b.addFx('ascendance', x.f.side, x.f.col, x.f.row, 0.8); },
   },
   {
     id: 'inferno', name: 'Inferno', cls: 'mage', cost: 5, rarity: 'mythic', element: 'fire', damaging: true, lock: 0.5,
     dmg: '300/s', short: 'All enemy panels burn for 10s. Outlasts the next custom screen.',
     cast: x => {
       x.b.cheer = 2;
-      for (const [c, r] of allEnemyPanels(x.b, x.f.side)) { x.b.burn(c, r, 10, 300 * x.mult); x.b.addFx('explode', x.f.side, c, r, 0.3); }
+      for (const [c, r] of allEnemyPanels(x.b, x.f.side)) { x.b.burn(c, r, 10, 300 * x.mult); x.b.addFx('inferno', x.f.side, c, r, 0.3); }
     },
   },
   {
@@ -302,6 +313,7 @@ export const mage: CardDef[] = [
       for (let r = 0; r < 3; r++) b.placeWall(f, col, r, 999, 'glacial', 10, true);
       f.st.glacial = 10;
       b.cheer = 2;
+      b.addFx('glacialFortress', f.side, col, 1, 0.6);
     },
   },
 ];

@@ -22,7 +22,7 @@ import { kickOffset, noteImpacts } from './hitFeel';
 import { endPfxFrame, drawShotPfx } from './pfx';
 import '../fx';
 import { isHome, setHome, team } from './teamColors';
-import { FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawArcaneMissile, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, useParticles } from './fxView';
+import { FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, useParticles } from './fxView';
 
 /** Whose hidden things (traps, a stealthed fighter) are visible: one side's, or everything in the dev sandbox. */
 export type Viewer = Side | 'all';
@@ -626,8 +626,7 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
       P(c, '#000000', x - dd * 6, y - 1, 9, 3); P(c, '#ac7c00', x - dd * 5, y, 7, 1); P(c, '#fcfcfc', x + dd * 2, y - 1, 2, 3);
       return;
     }
-    drawArcaneMissile(c, b, k => ({ x: s.x + (e.x - s.x) * k, y: s.y - 10 + (e.y - 10 - (s.y - 10)) * k - Math.sin(k * Math.PI) * 18 }), q);
-    return;
+    return; // Arcane Missiles: drawn by its pixelfx shot (src/fx/mage/arcane-missiles.ts)
   }
   const base = panelFoot(0, p.row);
   const x = X0 + p.x * PW + PW / 2, y = base.y - 9;
