@@ -5,7 +5,7 @@ import { registerPfx, registerShotPfx, type PfxModule } from '../game/pfx';
 /** Every effect module, by id ("warrior/cleave-a"), for the labs and the contact-sheet tool. */
 export const EFFECTS: Record<string, PfxModule> = Object.fromEntries(
   Object.entries(import.meta.glob<{ default: PfxModule }>('./*/*.ts', { eager: true }))
-    .map(([path, m]) => [path.slice(2, -3), m.default]),
+    .filter(([, m]) => m.default).map(([path, m]) => [path.slice(2, -3), m.default]),
 );
 
 /** The effect each fx kind plays in the game. */
@@ -38,11 +38,46 @@ export const PLAYS: Record<string, string> = {
   reflectUp: 'warrior/reflect-up',
   wallRise: 'warrior/wall-rise',
   banner: 'warrior/banner',
+  // Rogue
+  dagger: 'rogue/flick-cut',
+  knifeHit: 'rogue/spinning-knife-hit',
+  shadowBlink: 'rogue/blink',
+  vanish: 'rogue/vanish',
+  shadowstep: 'rogue/shadowstep',
+  ambush: 'rogue/ambush',
+  shiv: 'rogue/shiv',
+  evasion: 'rogue/evasion',
+  kick: 'rogue/kick',
+  vialLob: 'rogue/poison-vial',
+  vialBurst: 'rogue/poison-vial-burst',
+  deadlyPoison: 'rogue/deadly-poison',
+  envenom: 'rogue/envenom',
+  fanKnife: 'rogue/fan-of-knives',
+  flurry: 'rogue/blade-flurry',
+  cloak: 'rogue/cloak-of-shadows',
+  pickpocket: 'rogue/pickpocket',
+  riposte: 'rogue/riposte',
+  riposteHit: 'rogue/riposte-hit',
+  coldBlood: 'rogue/cold-blood',
+  smokescreen: 'rogue/smokescreen',
+  eviscerate: 'rogue/eviscerate',
+  spree: 'rogue/killing-spree',
+  shadowDance: 'rogue/shadow-dance',
+  blind: 'rogue/blind',
+  adrenaline: 'rogue/adrenaline-rush',
+  kidneyShot: 'rogue/kidney-shot',
+  shadowClone: 'rogue/shadow-clone',
+  nightsEmbrace: 'rogue/nights-embrace',
+  pandemic: 'rogue/pandemic',
+  deathMark: 'rogue/death-mark',
 };
 
 for (const [kind, id] of Object.entries(PLAYS)) registerPfx(kind, EFFECTS[id]);
 
 /** The effect each flying projectile kind plays (Projectile.kind); kinds not listed keep their hand-drawn shot. */
-export const SHOT_PLAYS: Record<string, string> = {};
+export const SHOT_PLAYS: Record<string, string> = {
+  // Rogue
+  knife: 'rogue/spinning-knife',
+};
 
 for (const [kind, id] of Object.entries(SHOT_PLAYS)) registerShotPfx(kind, EFFECTS[id]);

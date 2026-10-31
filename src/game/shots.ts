@@ -7,7 +7,8 @@ import { effect, type ShotHit } from '../content/effects';
 export const panOf = (col: number): number => (col - 2.5) / 3;
 
 /** A basic shot (the Ranger's Arrow, every class's projectile attack). */
-export const basicShot = effect('battle.basicShot', (b, a: { side: Side; dmg: number; opts: HitOpts }, h: ShotHit) => {
+export const basicShot = effect('battle.basicShot', (b, a: { side: Side; dmg: number; opts: HitOpts; fx?: string }, h: ShotHit) => {
   if (h.w) b.hitWall(h.w, a.dmg, b.f[a.side], a.opts);
-  else if (h.t) b.damage(h.t, a.dmg, b.f[a.side], a.opts);
+  // fx: the shot's own hit look (the Rogue's knife), drawn over the usual impact
+  else if (h.t && b.damage(h.t, a.dmg, b.f[a.side], a.opts).dealt > 0 && a.fx) b.addFx(a.fx, a.side, h.t.col, h.t.row, 0.3);
 });
