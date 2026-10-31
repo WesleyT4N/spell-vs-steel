@@ -4,6 +4,7 @@ import rules from './rules';
 import decks from './decks';
 import cpu from './cpu';
 import lessons from './tutorial';
+import lab from './lab';
 
 export default {
   id: 'priest',
@@ -13,5 +14,5 @@ export default {
     blurb: ['OUTLASTS AND CHIPS', 'HEALS AND CURSES'],
     backdrop: ['#503000', '#ac7c00', '#f8d878'],
   },
-  rules, decks, cpu, lessons,
+  rules, decks, cpu, lessons, lab,
 } satisfies ClassModule;

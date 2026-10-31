@@ -367,6 +367,24 @@ Object.assign(FX, {
   ignite: FX.pillar, iceWall: FX.shard, iceBlock: FX.shard, glacialFortress: FX.novaZone, arcanePower: FX.transform,
 });
 
+// the Rogue's spells each have their own look but keep the sounds of the kinds they split off (Cloak of Shadows,
+// Cold Blood, Adrenaline Rush, Death Mark and the knife's hit had no fx sound and still have none)
+Object.assign(FX, {
+  shadowBlink: FX.smoke, vanish: FX.smoke, evasion: FX.smoke, smokescreen: FX.smoke, shadowDance: FX.smoke, shadowClone: FX.smoke, nightsEmbrace: FX.smoke,
+  shadowstep: FX.stab, ambush: FX.stab, flurry: FX.stab, spree: FX.stab, eviscerate: FX.stab, fanKnife: FX.stab, riposteHit: FX.stab,
+  shiv: FX.dagger, pickpocket: FX.dagger, kidneyShot: FX.dagger, kick: FX.smash, riposte: FX.guard,
+  vialLob: FX.lob, vialBurst: FX.toxicPuff, deadlyPoison: FX.toxicPuff, envenom: FX.toxicPuff, blind: FX.toxicPuff, pandemic: FX.toxicPuff,
+});
+
+// the Priest's spells each have their own look but keep the sounds of the kinds they replaced (shadowHit, healBurst
+// and the new prayer / pwShield / holyWallRise / sparkHit had none, so they stay silent)
+Object.assign(FX, {
+  smite: FX.holyPillar, holyFire: FX.holyPillar, penanceBolt: FX.holyPillar, haloBolt: FX.holyPillar, wrath: FX.holyPillar,
+  flashHeal: FX.healBurst, hymnTick: FX.healBurst, blessPower: FX.healBurst, blessHeal: FX.healBurst, blessMana: FX.healBurst,
+  blessShield: FX.healBurst, blessSacred: FX.healBurst, sanctumBless: FX.healBurst,
+  psychicScream: FX.shout, powerInfusion: FX.transform, sanctum: FX.transform, shadowform: FX.transform,
+});
+
 const lastPlayed: Record<string, number> = {};
 
 /** Play a realistic recipe into `out`. Returns false if there is none (the caller falls back to its old blip). */

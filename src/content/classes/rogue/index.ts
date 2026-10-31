@@ -4,6 +4,7 @@ import rules from './rules';
 import decks from './decks';
 import cpu from './cpu';
 import lessons from './tutorial';
+import lab from './lab';
 
 export default {
   id: 'rogue',
@@ -14,5 +15,5 @@ export default {
     backdrop: ['#000000', '#1c1c38', '#5b162a'],
     melee: true,
   },
-  rules, decks, cpu, lessons,
+  rules, decks, cpu, lessons, lab,
 } satisfies ClassModule;

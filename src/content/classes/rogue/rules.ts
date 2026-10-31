@@ -13,11 +13,11 @@ export default {
       // Stab: a dagger thrust that reaches the panels ahead
       const cells: Array<[number, number]> = [];
       for (let i = 1; i <= T.stabReach; i++) cells.push([f.col + i * d, f.row]);
-      b.addFx('dagger', f.side, f.col, f.row, 0.18, { reach: T.stabReach });
+      b.addFx('dagger', f.side, f.col, f.row, 0.24, { reach: T.stabReach });
       b.strike(f, cells, T.lightDamage, { basic: kind, element: 'steel' });
     } else {
       // Throwing Knife: a heavy knife down the row
-      b.flyingShot(f, 'knife', T.heavyDamage, { basic: kind, element: 'steel' });
+      b.flyingShot(f, 'knife', T.heavyDamage, { basic: kind, element: 'steel' }, false, 'knifeHit');
     }
   },
   onDraw(_b, f) {
