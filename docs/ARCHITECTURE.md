@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at def3e1c (2026-10-30).
+How the game is put together, one section per system. Describes `main` at 14efe03 (2026-10-31).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -194,9 +194,9 @@ flowchart LR
 
 `tuning.ts` is the source of truth for numbers. Each class has 26 cards, a starter deck and 3 Mythic decks (`game/deck.ts`). Deck rules: exactly 30, 4 / 2 / 1 copies by rarity, max 5 Legendaries, exactly 1 Mythic. Players keep up to 10 named spell decks per class in `save.json` (`createCustom` / `renameCustom` / `cloneCustom` / `deleteCustom` in `deck.ts`); a match setup names one as `custom:<id>`. The deck builder opens on that list (edit, rename, clone, share, delete, or start a new one from a ready-made deck, an empty one or a share code; a new deck, an import and a clone are named before they are saved), and `scenes/nameEntry.ts` is the name box (typing, a phone's keyboard, or an on-screen QWERTY keyboard for gamepads). `game/deckCode.ts` makes and reads share codes, the only import / export (`SVS1-MAGE-<spells><check>-<NAME>`: spells grouped by copy count, 3 base-32 characters per spell from a 15-bit hash of its card id, so new cards never change old codes; `tests/deckCode.ts` fails if two spells of a class hash alike). Reading one only looks spells up in the class's own pool, then checks the deck rules (`deckRuleBroken`); an import becomes a new deck. `scenes/deckPanel.ts` is the DOM share / import panel (a gamepad's A copies the code, B closes).
 
-Adding a class today touches: `art/sprites.ts` (+ generated sprites and frames), `game/classes.ts`, a `tuning.ts` block, `content/classes/<id>/` (`cards.ts` listed in `game/cards.ts`; `index.ts` registered in `content/classes/index.ts`), `game/fighterAnim.ts`, and voice lines. Spells, rules, decks, CPU and tutorial lessons live in the class folder; art, animation, voices, class info and tuning move there next.
+Adding a class today touches: `content/classes/<id>/` (`cards.ts` listed in `game/cards.ts`, `tuning.ts` gathered by `game/tuning.ts` in roster order, `index.ts` registered in `content/classes/index.ts`), plus `art/sprites.ts` (+ generated sprites and frames), `game/fighterAnim.ts`, the HUD resource meter in `battleView.ts`, and voice lines. Spells, rules, tuning and HP, class info, decks, CPU and tutorial lessons live in the class folder (#87, #88, #90, #91); `game/classes.ts` reads `CLASS_IDS` / `PLAYABLE` / `CLASS_INFO` from the registry. Only art and animation still branch on the class.
 
-A class folder's `index.ts` is its `ClassModule`: `{ id, rules, decks, cpu, lessons }`, each from its own file. `decks.ts` holds the starter and one deck per Mythic (`game/deck.ts` reads them), `cpu.ts` the three playstyles, Hard's pick per matchup, how far the basics reach, where to stand and which spells to take from an offer (`game/ai.ts` asks `reach`, `taps`, `windup`, `stay`, `goal`, `pick`; shared building blocks `meleeGoal`, `rangedGoal`, `poolPick` live in `game/cpuKit.ts`), and `tutorial.ts` the class's tutorial lessons. The temperaments the styles start from live in `game/temperaments.ts`.
+A class folder's `index.ts` is its `ClassModule`: `{ id, info, rules, decks, cpu, lessons }`. `info` (`ClassInfo`) holds the name, resource and its colours, attack names, select-screen blurb and backdrop, and the `builds` / `melee` flags; the rest come from their own files. `decks.ts` holds the starter and one deck per Mythic (`game/deck.ts` reads them), `cpu.ts` the three playstyles, Hard's pick per matchup, how far the basics reach, where to stand and which spells to take from an offer (`game/ai.ts` asks `reach`, `taps`, `windup`, `stay`, `goal`, `pick`; shared building blocks `meleeGoal`, `rangedGoal`, `poolPick` live in `game/cpuKit.ts`), and `tutorial.ts` the class's tutorial lessons. The temperaments the styles start from live in `game/temperaments.ts`.
 
 A class's `rules.ts` is a `ClassRules` object the engine asks about that class: `startRes` / `startResMax`, `pool(f)` (cap and current max for Draw-screen cost planning), `basic(b, f, kind)` (light and heavy attacks), and optional hooks `onDraw`, `tick`, `onHurt`, `gainRage`, `gainRes`. `battle.ts` has no `cls === '…'` branches; it calls `classRules(f.cls)`. Rules keep no state of their own (it lives on the Fighter), so rollback and replays see everything. `game/shots.ts` holds `panOf` and the `basicShot` effect so class modules never import `battle.ts` (which imports the class registry).
 
@@ -474,5 +474,5 @@ New screens go in `tests/screens/harness.ts`.
 
 ## In flight
 
-- Modularize: stages are modules (#35); spells (#62), rules (#87), decks, CPU and tutorial lessons (#88) sit in `src/content/classes/<id>/`; next art, animation, voices, class info and tuning.
+- Modularize: stages are modules (#35); spells (#62), rules (#87), decks, CPU and lessons (#88), tuning and class info (#90, #91) sit in `src/content/classes/<id>/`; next art, animation and voices.
 - BN indicators (#32).
