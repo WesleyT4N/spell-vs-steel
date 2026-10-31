@@ -24,6 +24,7 @@
     "fuzz:ui": "vite build --minify false --outDir dist-fuzz && node scripts/uifuzz.mjs",
     "perf": "vite build && node scripts/perf.mjs",
     "test": "tsx tests/saves.ts && tsx tests/matches.ts && tsx tests/scene-stack.ts && tsx tests/gamepad.ts && tsx tests/deckCode.ts && tsx tests/planCosts.ts && tsx scripts/netcheck.ts && tsx scripts/combo-check.ts && tsx scripts/rollcheck.ts 25",
+    "fx:sheet": "vite build --config tests/fx/vite.config.ts --logLevel warn && tsx tests/fx/run.ts",
     "test:screens": "vite build --config tests/screens/vite.config.ts && tsx tests/screens/run.ts",
     "desktop": "npm run build:prod && electron .",
     "dist:win": "npm run build:prod && electron-builder --win portable",

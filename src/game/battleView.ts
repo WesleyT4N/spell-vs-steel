@@ -19,6 +19,8 @@ import { CLASS_INFO } from './classes';
 import { drawOver, drawUnder, lookOf, observe } from './fighterAnim';
 
 import { kickOffset, noteImpacts } from './hitFeel';
+import { endPfxFrame, drawShotPfx } from './pfx';
+import '../fx';
 import { isHome, setHome, team } from './teamColors';
 import { FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawArcaneMissile, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, useParticles } from './fxView';
 
@@ -94,6 +96,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
   drawParticles(c, b);
   c.restore();
   noteImpacts(b);
+  endPfxFrame(b);
 }
 
 /** When each panel's crack and hole appeared, in battle time: view-only, for the crack-in and crumble animations. */
@@ -610,6 +613,7 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
     const s = panelFoot(p.homing.sx, p.homing.sy), e = fighterPos(b, t);
     const q = p.homing.p;
     const x = s.x + (e.x - s.x) * q, y = s.y - 10 + (e.y - 10 - (s.y - 10)) * q - Math.sin(q * Math.PI) * 18;
+    if (drawShotPfx(c, b, p, x, y, e.x - s.x > 0 ? 1 : -1)) return;
     if (p.kind === 'hawk') {
       const dd = e.x - s.x > 0 ? 1 : -1, flap = Math.floor(q * 12) % 2 ? 2 : 0;
       const hx = Math.round(x), hy = Math.round(y);
@@ -628,6 +632,7 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
   const base = panelFoot(0, p.row);
   const x = X0 + p.x * PW + PW / 2, y = base.y - 9;
   const dir = Math.sign(p.speed);
+  if (drawShotPfx(c, b, p, x, y, dir)) return;
   if (drawShot(c, b, p, x, y, dir)) return;
   if (p.kind === 'hook') {
     const owner = b.f[p.side];
