@@ -1,8 +1,15 @@
-// Every number worth tweaking after a playtest lives here.
+// Every number worth tweaking after a playtest lives here. Each class's own numbers live in its folder
+// (content/classes/<id>/tuning.ts) and are gathered here in roster order, so TUNING keeps one shape for the
+// balance lab, sims and golden digest.
+import warrior, { hp as warriorHp } from '../content/classes/warrior/tuning';
+import mage, { hp as mageHp } from '../content/classes/mage/tuning';
+import rogue, { hp as rogueHp } from '../content/classes/rogue/tuning';
+import ranger, { hp as rangerHp } from '../content/classes/ranger/tuning';
+import priest, { hp as priestHp } from '../content/classes/priest/tuning';
 
 export const TUNING = {
   // re-searched after the CPU stopped freezing up when stunned mid-charge (#45): the HP-only patch closest to the 55-65 wheel at Normal, at Hard and with the starters (scripts/tune.ts)
-  hp: { warrior: 9650, mage: 6900, rogue: 6500, ranger: 7650, priest: 6600 },
+  hp: { warrior: warriorHp, mage: mageHp, rogue: rogueHp, ranger: rangerHp, priest: priestHp },
 
   /** Seconds for the shared custom gauge to fill. */
   gaugeSeconds: 10,
@@ -26,105 +33,12 @@ export const TUNING = {
   /** Holding the attack button this long arms the heavy attack. */
   heavyCharge: 1.0,
 
-  warrior: {
-    lightDamage: 100,
-    heavyDamage: 280,
-    lightLock: 0.45,
-    heavyLock: 0.4,
-    rageMax: 5,
-    rageLightHit: 0,
-    rageHeavyHit: 1.5,
-    /** Taking damage builds Rage in proportion to the damage: 1 pip per this much, capped per hit. */
-    rageDamagePerPip: 400,
-    rageWhenHitMax: 1,
-  },
-
-  mage: {
-    /** Arcane Orb and Beam flight speed (panels per second, capped by maxShotSpeed). */
-    shotSpeed: 14,
-    lightDamage: 60,
-    heavyDamage: 280,
-    lightLock: 0.4,
-    heavyLock: 0.35,
-    manaStart: 1,
-    manaCap: 5,
-    /** Counterspell also silences the caster it cancels for this long. */
-    counterSilence: 3,
-    /** Meteor: seconds from cast until it lands (the plus-shape warning shows the whole time). */
-    meteorFall: 1.5,
-    /** Arcane Blast: damage multiplier on the caster's next damaging spell. */
-    blastEmpower: 1.25,
-  },
-
-  // Draft classes (Rogue, Ranger, Priest): basics follow the same x0.7 scale as Warrior and Mage.
-  rogue: {
-    /** Throwing Knife flight speed (panels per second, capped by maxShotSpeed). */
-    shotSpeed: 12,
-    /** Light: a dagger stab that hits every panel up to `stabReach` ahead. Heavy: a throwing knife down the row. */
-    // light 120 / 6500 HP: sims put the Rogue near 60% vs Mage and 40% vs Warrior (2026-10-25)
-    lightDamage: 100,
-    heavyDamage: 220,
-    stabReach: 1,
-    lightLock: 0.35,
-    heavyLock: 0.35,
-    /** Energy tops up to this at every Draw screen (5 = a full refill, so every turn can chain cheap skills). */
-    energyTopUp: 5,
-    energyCap: 5,
-    /** After a backstab the Rogue may keep acting from in front of the enemy this long before blinking home. */
-    backstabWindow: 2,
-    /** Vanish: the next attack spell stuns for this long. */
-    vanishStun: 2,
-    riposteDamage: 800,
-  },
-
-  ranger: {
-    /** Light: a travel-time Arrow (panels per second). Heavy: an Aimed Shot on the normal charge, flying at aimedSpeed. */
-    // heavy 200 / 7400 HP: sims put the Ranger at ~39% vs Warrior, ~63% vs Mage, ~60% vs Rogue (2026-10-25)
-    lightDamage: 100,
-    heavyDamage: 200,
-    arrowSpeed: 12,
-    /** Aimed Shot, the sniper shot: the one projectile allowed past maxShotSpeed (Wes). */
-    aimedSpeed: 15,
-    lightLock: 0.4,
-    heavyLock: 0.4,
-    /** Steady Focus: damage multiplier while rooted. */
-    focusBonus: 1.25,
-    tripwireStun: 2,
-    energyStart: 2,
-    energyCap: 5,
-    /** Standing still this long gives 1 Energy (plus 1 per Draw screen). */
-    stillSeconds: 2,
-  },
-
-  priest: {
-    /** Holy Spark flight speed (panels per second, capped by maxShotSpeed). */
-    shotSpeed: 12,
-    lightDamage: 60,
-    // Smite at 280 flinches (threshold 200 since 2026-10-28); it finds the enemy within smiteRange columns
-    heavyDamage: 280,
-    lightLock: 0.4,
-    heavyLock: 0.5,
-    /** Smite finds the enemy within this many columns (any row); farther away it lands this many panels ahead and misses. */
-    smiteRange: 3,
-    holyWallHp: 1000,
-    holyWallTime: 6,
-    smiteKnock: 0,
-    manaStart: 3,
-    manaPerDraw: 3,
-    manaCap: 5,
-    /** Cursed panels: damage per second to an enemy standing on one. Cursed or Hexed fighters deal this multiplier. */
-    curseDps: 100,
-    /** Each further second on the same cursed panel adds this much, up to curseMax per tick. */
-    curseRamp: 40,
-    curseMax: 260,
-    weakened: 0.75,
-    /** Blessed panels (all last until the next Draw screen): Hallowed Ground damage, Aegis Field shield, Wellspring Mana. */
-    hallowedBonus: 1.35,
-    blessShieldPerSec: 150,
-    /** Every holy shield (Power Word: Shield, Aegis Field, Holy Sanctum) shares one pool up to this. */
-    shieldCap: 1000,
-    blessManaSeconds: 2,
-  },
+  // each class's block, from its folder
+  warrior,
+  mage,
+  rogue,
+  ranger,
+  priest,
 
   /** Each Poison stack deals this per second for poisonSeconds. */
   poisonDps: 50,

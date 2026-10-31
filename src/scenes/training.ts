@@ -85,7 +85,7 @@ class Dummy extends Cpu {
       } else if (this.t <= 0) {
         // follow your row (melee classes close in), swing, and every third swing charge a heavy
         const foe = b.foe(f);
-        const melee = f.cls === 'warrior' || f.cls === 'rogue';
+        const melee = !!CLASS_INFO[f.cls].melee;
         const col = melee ? b.frontCol(f.side) : f.col;
         const step = this.toward(b, f, col, foe.row);
         if (step) { out.move = step; this.t = 0.15; }
@@ -218,7 +218,8 @@ export class TrainingScene extends BattleScene {
       if (r === 'normal') return;
       const { cap } = classRules(f.cls).pool(f);
       const want = r === 'full' ? cap : r;
-      if (f.cls === 'mage') f.resMax = Math.max(f.resMax, Math.min(cap, want));
+      // a max that grows (Mage Mana) grows to fit
+      if (f.resMax < cap) f.resMax = Math.max(f.resMax, Math.min(cap, want));
       f.res = want;
     });
     if (this.s.gauge === 'full' && b.phase === 'fight') b.gauge = 1;

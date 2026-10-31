@@ -1,5 +1,5 @@
 // Ranger CPU: its three playstyles, Hard's pick per matchup, and how far its basic attacks reach.
-import { AGGRO, CONSERVATIVE, DEFENSIVE, type ClassCpu } from '../../api';
+import { AGGRO, CONSERVATIVE, DEFENSIVE, rangedGoal, crowding, poolPick, type ClassCpu } from '../../api';
 
 const cpu: ClassCpu = {
   styles: [
@@ -16,5 +16,8 @@ const cpu: ClassCpu = {
   },
   taps: true,
   stay: (_b, _f, aligned, seen) => (aligned || !seen ? 0.85 : 0),
+  goal: x => rangedGoal(x, crowding(x.b, x.foe)),
+  // it earns about 2 more Energy standing still; the core combo is Steady Focus, Hunter's Mark, Rapid Fire
+  pick: x => poolPick(x, { expect: 2, first: { steady_focus: -9, hunters_mark: -8, rapid_fire: -7 } }),
 };
 export default cpu;

@@ -4,6 +4,7 @@ export type { Battle, BlessKind, CastCtx, Fighter, HitOpts, HitResult, Pet, Side
 export { basicShot, panOf } from '../game/shots';
 export type { ClassModule, ClassRules, ClassDecks, ClassCpu, ClassLessons } from './classes/registry';
 export { AGGRO, CONSERVATIVE, DEFENSIVE } from '../game/temperaments';
+export { meleeGoal, rangedGoal, crowding, poolPick, type GoalCtx, type PickCtx } from '../game/cpuKit';
 export type { CardDef, Element, Rarity } from '../game/cards';
 export { TUNING } from '../game/tuning';
 export { shuffle } from '../game/rng';

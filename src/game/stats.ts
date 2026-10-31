@@ -5,6 +5,7 @@
 import type { Battle, Fighter, HitOpts, Panel, Side } from './battle';
 import type { EffectRec } from '../content/effects';
 import { CARDS } from './cards';
+import { CLASS_INFO } from './classes';
 import type { ClassId } from '../art/sprites';
 
 /** Damage and healing one source did, and how often it was used. Sources are card ids, 'light' / 'heavy', or 'other'. */
@@ -61,20 +62,12 @@ export interface RoundRecord {
   stats: BattleStats;
 }
 
-const BASIC_NAME: Record<ClassId, [string, string]> = {
-  warrior: ['CLEAVE', 'HEAVY CLEAVE'],
-  mage: ['ARCANE BOLT', 'CHARGED BOLT'],
-  rogue: ['STAB', 'THROWING KNIFE'],
-  ranger: ['ARROW', 'AIMED SHOT'],
-  priest: ['HOLY SPARK', 'SMITE'],
-};
-
 const DOT_NAME: Record<string, string> = { poison: 'POISON', fire: 'BURNING PANELS', holy: 'HOLY FIRE', shadow: 'CURSES' };
 
 /** Display name of a stats source for a class. */
 export function sourceLabel(id: string, cls: ClassId): string {
-  if (id === 'light') return BASIC_NAME[cls][0];
-  if (id === 'heavy') return BASIC_NAME[cls][1];
+  if (id === 'light') return CLASS_INFO[cls].basics[0];
+  if (id === 'heavy') return CLASS_INFO[cls].basics[1];
   if (id === 'other') return 'EFFECTS';
   if (id.startsWith('dot:')) return DOT_NAME[id.slice(4)] ?? 'EFFECTS';
   return CARDS[id]?.name.toUpperCase() ?? id.toUpperCase();
