@@ -30,7 +30,7 @@ export const PROFILES: Profile[] = [
   { name: 'phone-landscape', w: 844, h: 390, touch: true },
 ];
 /** Screens that dock DOM panels over or beside the canvas, so the canvas doesn't fill the window. */
-const DOM_PANELS = new Set(['balance-lab', 'art-lab']);
+const DOM_PANELS = new Set(['balance-lab', 'art-lab', 'art-lab-stages']);
 
 export interface Shot { screen: string; profile: string; file: string; problems: string[] }
 
