@@ -1,29 +1,15 @@
-// Per-class labels and resource colors, shared by the HUD, cards and menus.
+// Per-class labels and resource colors, read live from the class registry (each class's index.ts).
 import type { ClassId } from '../art/sprites';
+import { CLASSES, type ClassInfo } from '../content/classes';
 
-export interface ClassInfo {
-  name: string;
-  /** Resource name as shown on cards and the HUD. */
-  res: 'RAGE' | 'MANA' | 'ENERGY';
-  /** Text color for the resource. */
-  resColor: string;
-  /** Cost gem color. */
-  gem: string;
-  /** Empty and filled pip colors. */
-  pipBase: string;
-  pip: string;
-  /** How the resource comes back, shown on the Draw screen. */
-  refill: string;
-}
+export type { ClassInfo };
 
-export const CLASS_IDS: ClassId[] = ['warrior', 'mage', 'rogue', 'ranger', 'priest'];
+/** Class ids in roster order (the registry's own array, so classes registered later show up). */
+export const CLASS_IDS = CLASSES.ids as ClassId[];
 /** Classes shown in menus, the deck builder and the dev tools. */
-export const PLAYABLE: ClassId[] = ['warrior', 'mage', 'rogue', 'ranger', 'priest'];
+export const PLAYABLE: ClassId[] = CLASS_IDS;
 
-export const CLASS_INFO: Record<ClassId, ClassInfo> = {
-  warrior: { name: 'WARRIOR', res: 'RAGE', resColor: '#f87858', gem: '#d82800', pipBase: '#503000', pip: '#d82800', refill: 'PAY ON CAST' },
-  mage: { name: 'MAGE', res: 'MANA', resColor: '#a4e4fc', gem: '#0058f8', pipBase: '#0000a8', pip: '#3cbcfc', refill: 'REFILLS' },
-  rogue: { name: 'ROGUE', res: 'ENERGY', resColor: '#f8d878', gem: '#ac7c00', pipBase: '#503000', pip: '#f8b800', refill: 'REFILLS' },
-  ranger: { name: 'RANGER', res: 'ENERGY', resColor: '#f8d878', gem: '#ac7c00', pipBase: '#503000', pip: '#f8b800', refill: 'STAND STILL' },
-  priest: { name: 'PRIEST', res: 'MANA', resColor: '#a4e4fc', gem: '#0058f8', pipBase: '#0000a8', pip: '#3cbcfc', refill: '+3 PER DRAW' },
-};
+/** A class's name, resource and colors, by id. */
+export const CLASS_INFO = new Proxy({} as Record<ClassId, ClassInfo>, {
+  get: (_t, id) => (typeof id === 'string' ? CLASSES.get(id)?.info : undefined),
+});

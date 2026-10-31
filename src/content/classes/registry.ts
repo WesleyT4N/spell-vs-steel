@@ -12,10 +12,28 @@ import { Registry } from '../registry';
 
 export interface ClassModule {
   id: string;
+  /** Name, resource and its colors, for the HUD, cards and menus. */
+  info: ClassInfo;
   rules: ClassRules;
   decks: ClassDecks;
   cpu: ClassCpu;
   lessons: ClassLessons;
+}
+
+/** Per-class labels and resource colors, shared by the HUD, cards and menus. */
+export interface ClassInfo {
+  name: string;
+  /** Resource name as shown on cards and the HUD. */
+  res: 'RAGE' | 'MANA' | 'ENERGY';
+  /** Text color for the resource. */
+  resColor: string;
+  /** Cost gem color. */
+  gem: string;
+  /** Empty and filled pip colors. */
+  pipBase: string;
+  pip: string;
+  /** How the resource comes back, shown on the Draw screen. */
+  refill: string;
 }
 
 /** What the battle engine asks a class. */
