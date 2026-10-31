@@ -355,7 +355,7 @@ Hard also holds heavies (not Ranger or Rogue) and sidesteps out of the row when 
 | --- | --- | --- |
 | Sim CLI | `npm run sim -- 100 --cards` | All class pairs with starters, per-card table |
 | Balance lab | dev build, `#lab` | The same in the browser: full grid on web workers, live `TUNING`, script box (`hp.mage = 7000`, `card.power = 110%`) |
-| Art lab | dev build, `#art` | Attacks and spells on loop from the real battle: shipped look, the look before the last pass, or drafts. Fed by each class folder's `lab.ts`. Stages tab: every registered stage idle, with all panel states, or under a CPU fight. Screens tab: opens any screen from `src/dev/screens.ts` with saves paused |
+| Art lab | dev build, `#art` | Per class: Spell FX (attacks and spells on loop from the real battle: shipped look, the look before the last pass, or drafts; fed by each class folder's `lab.ts`), Animations (every fighter move in any skin, zoomable), Sprites (frames, tints, portrait, spell icons; `src/scenes/artLabSprites.ts`) and Sounds (voice lines, and every sound a move fires, listed live). Stages tab: every registered stage idle, with all panel states, or under a CPU fight. Screens tab: opens any screen from `src/dev/screens.ts` with saves paused |
 | Sandbox | `#sandbox` | Cast anything, dummies, can't-die, slow time, frame step, hit log |
 | Encyclopedia | `#cards` | Every card face with filters |
 | Grid CLI | `npm run balance -- --pools starter,archetype --n 40` | Full matchup grid on worker threads (~750 matches/s), `--set` / `--script` tweaks |

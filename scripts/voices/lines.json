@@ -32,7 +32,7 @@
       "semitones": -1,
       "speed": 1.0
     },
-    "cleric": {
+    "priest": {
       "voice": "bf_emma",
       "lang": "en-gb",
       "semitones": 0,
@@ -82,9 +82,6 @@
     "ann:wins_priest": [
       "Priest wins!"
     ],
-    "ann:wins_cleric": [
-      "Cleric wins!"
-    ],
     "ann:match_warrior": [
       "Warrior wins the match!"
     ],
@@ -99,9 +96,6 @@
     ],
     "ann:match_priest": [
       "Priest wins the match!"
-    ],
-    "ann:match_cleric": [
-      "Cleric wins the match!"
     ],
     "warrior:cast": [
       "Take this!",
@@ -177,19 +171,19 @@
       "Right on target.",
       "The hunt is over."
     ],
-    "cleric:cast": [
+    "priest:cast": [
       "Be blessed.",
       "Light!",
       "Smite!"
     ],
-    "cleric:castBig": [
+    "priest:castBig": [
       "By the light!",
       "Heaven's judgment!"
     ],
-    "cleric:death": [
+    "priest:death": [
       "The light... fades..."
     ],
-    "cleric:win": [
+    "priest:win": [
       "The light prevails.",
       "Go in peace."
     ]
