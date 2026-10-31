@@ -185,10 +185,11 @@ export class ArtLabScene implements Scene {
   private home = getArena().id;
 
   /** `opts` opens on a tab (a class id, 'stages' or 'screens'), section and entry, e.g. for the screen tests. */
-  constructor(private back: () => void = popScene, opts: { tab?: string; section?: Section; entry?: number; zoom?: number } = {}) {
+  constructor(private back: () => void = popScene, opts: { tab?: string; section?: Section; entry?: number; zoom?: number; skin?: string } = {}) {
     if (opts.tab) { saved.tab = opts.tab; saved.entry = opts.entry ?? 0; if (CLASSES.has(opts.tab)) saved.cls = opts.tab as ClassId; }
     if (opts.section) saved.section = opts.section;
     if (opts.zoom) saved.zoom = opts.zoom;
+    if (opts.skin) saved.skins[saved.cls] = opts.skin;
     if (!CLASSES.has(saved.cls)) saved.cls = CLASSES.ids[0] as ClassId;
     if (!STAGES.has(saved.stage)) saved.stage = this.home;
     this.restart();

@@ -424,7 +424,7 @@ export class CharSelectScene implements Scene {
     drawTextCentered(ui, CLASS_INFO[cls].name, cx, this.py + 95, INK, 2, false);
     CLASS_INFO[cls].blurb.forEach((l, i) => drawTextCentered(ui, l, cx, this.py + 111 + i * 9, INK2, 1, false));
     // skins: clickable swatches for your slot (and the CPU's)
-    const list = SKINS[cls], sw = 14, sx = Math.round(cx - (list.length * sw) / 2);
+    const list = SKINS[cls], sw = Math.min(14, Math.floor((PW - 6) / list.length)), sx = Math.round(cx - (list.length * sw) / 2);
     if (s === 1 && net) return;
     const skinStep = (s === 0 && this.step === 1) || (s === 1 && this.step === 3);
     list.forEach((sk, n) => {
