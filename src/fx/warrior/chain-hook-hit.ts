@@ -1,4 +1,4 @@
-// Chain Hook draft A hit, "Iron Links": the barb bites with a white star while the chain stands taut back to the
+// Chain Hook hit ("Iron Links"): the barb bites with a white star while the chain stands taut back to the
 // Warrior's fist, the foe is yanked in along drag lines with a gouge in the floor, then the hook tears free and the
 // Warrior reels the slack chain home.
 // The fx sits where the foe was hooked, facing the Warrior (data.pull: panels the foe was dragged, data.reach:
@@ -8,7 +8,7 @@ import { sparks, dust } from '../lib';
 import { STEEL, STEEL_SPARKS, dragLines, hook, ironChain, skid } from './chain-lib';
 import type { PfxModule, Opts, Painter } from '../../game/pfx';
 
-export const meta = { name: 'Chain Hook: Iron Links hit', desc: 'Bite, taut chain, drag lines, then the chain is reeled in slack.', duration: 0.45, panels: 6, ink: '#000000' };
+export const meta = { name: 'Chain Hook hit', desc: 'Bite, taut chain, drag lines, then the chain is reeled in slack.', duration: 0.45, panels: 6, ink: '#000000' };
 
 export function create(o: Opts) {
   const R = new Rng(o.seed);

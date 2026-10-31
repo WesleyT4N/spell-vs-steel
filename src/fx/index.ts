@@ -38,6 +38,7 @@ export const PLAYS: Record<string, string> = {
   reflectUp: 'warrior/reflect-up',
   wallRise: 'warrior/wall-rise',
   banner: 'warrior/banner',
+  chainHookHit: 'warrior/chain-hook-hit',
   // Mage
   arcaneHit: 'mage/arcane-blast',
   arcaneSurge: 'mage/arcane-surge',
@@ -171,6 +172,7 @@ for (const [kind, id] of Object.entries(PLAYS)) registerPfx(kind, EFFECTS[id]);
 
 /** The effect each flying projectile kind plays (Projectile.kind); kinds not listed keep their hand-drawn shot. */
 export const SHOT_PLAYS: Record<string, string> = {
+  hook: 'warrior/chain-hook',
   orb: 'mage/rune-star',
   beam: 'mage/rune-comet',
   missile: 'mage/arcane-missiles',

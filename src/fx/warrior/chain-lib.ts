@@ -1,4 +1,4 @@
-// Chain Hook drafting recipes (shared by the chain-hook-a..c looks). Same local space as src/fx/lib.ts: x forward,
+// Chain Hook drawing recipes (the hook, its iron chain, the drag after the pull). Same local space as src/fx/lib.ts: x forward,
 // y down, 1 unit = 1 world pixel. Steel only: black ink, the NES grays, a white edge.
 import { clamp, fit, hex } from '../../vendor/pixelfx/index.js';
 import { RAMPS } from '../palette';
@@ -54,79 +54,6 @@ const HOOK = [
 export function hook(p: Painter, x: number, y: number, a = 1, back = false): void {
   // back: pointing the other way (toward -x), with (x, y) still the eye
   p.sprite(HOOK, { o: '#7c7c7c', w: '#fcfcfc', l: '#bcbcbc', g: '#7c7c7c' }, Math.round(back ? x - 11 : x), Math.round(y) - 1, { a, flip: back });
-}
-
-/**
- * The grapple: a cast-iron shaft with a spear point and two claws that curl back from its crown like an anchor's.
- * `open` 0 (claws hugging the shaft) to 1 (flung wide). (x, y) is the ring at its back; s = -1 points it backward.
- */
-export function grapple(p: Painter, x: number, y: number, open: number, s = 1): void {
-  x = Math.round(x); y = Math.round(y);
-  const X = (d: number): number => x + s * d;
-  // the ring the cable ties to, and the shaft
-  p.rect(Math.min(X(0), X(1)), y - 2, 2, 4, STEEL[2]);
-  p.line(X(2), y, X(9), y, STEEL[3]); p.line(X(2), y - 1, X(9), y - 1, WHITE);
-  // spear point
-  p.poly([[X(9), y - 2], [X(13), y - 0.5], [X(9), y + 1]], STEEL[3]);
-  p.px(X(10), y - 1, WHITE);
-  // the two claws: out from the crown, then curling back to points
-  const sp = Math.round(2 + open * 3), back = Math.round(3 + open * 1);
-  p.line(X(9), y - 2, X(10), y - 1 - sp, STEEL[3]); p.line(X(10), y - 1 - sp, X(10 - back), y - 2 - sp, WHITE);
-  p.line(X(9), y + 1, X(10), y + sp, STEEL[2]); p.line(X(10), y + sp, X(10 - back), y + 1 + sp, STEEL[3]);
-}
-
-/**
- * A taut steel cable from x0 to x1 at height y, 2 px: light on top, gray below, with white glints running along it
- * (`run` slides them). `amp` shakes it in a standing wave (a twang) at phase `ph`.
- */
-export function cable(p: Painter, x0: number, x1: number, y: number, run = 0, amp = 0, ph = 0): void {
-  const a = Math.min(x0, x1), b = Math.max(x0, x1), L = b - a;
-  if (L < 1) return;
-  for (let x = Math.round(a); x <= b; x++) {
-    const k = (x - a) / L, yy = Math.round(y + amp * Math.sin(Math.PI * k) * Math.sin(k * Math.PI * 3 + ph));
-    const g = ((x + Math.round(run)) % 11 + 11) % 11 < 2;
-    p.px(x, yy, g ? WHITE : STEEL[3]);
-    p.px(x, yy + 1, STEEL[2]);
-  }
-}
-
-/**
- * A sickle blade spinning on its chain: a crescent of radius r, its horns turned by angle ang (snapped to eighth
- * turns so it clicks between clean poses), white along its cutting edge, round a dark hub.
- */
-export function sickle(p: Painter, x: number, y: number, ang: number, r = 6): void {
-  const a0 = Math.round(ang / (Math.PI / 4)) * (Math.PI / 4);
-  p.arc(x, y, r, (u: number) => 0.6 + 2.6 * Math.sin(Math.PI * u), a0, a0 + Math.PI * 1.2, (u: number, v: number) => (v > 0.55 ? WHITE : u < 0.25 ? STEEL[2] : STEEL[3]));
-  p.rect(x - 1, y - 1, 2, 2, STEEL[2]);
-}
-
-/**
- * A bead chain whipping in a wave from x0 back to x1 (either way along x) at height y: 2 px beads every 3 px, so
- * the ink beads them apart. The wave (amp, wavelength wl, phase ph) grows from nothing at x1 (the fist) to full.
- */
-export function beadChain(p: Painter, x0: number, x1: number, y: number, amp: number, wl: number, ph: number): void {
-  const L = Math.abs(x1 - x0), s = Math.sign(x1 - x0) || 1;
-  for (let d = 0; d <= L; d += 3) {
-    const env = clamp((L - d) / 24) * clamp(d / 10 + 0.3);
-    const x = Math.round(x0 + s * d), yy = Math.round(y + amp * env * Math.sin((d / wl) * Math.PI * 2 + ph));
-    const lit = ((d / 3) | 0) % 2 === 0;
-    p.px(x, yy, lit ? WHITE : STEEL[3]); p.px(x + 1, yy, STEEL[3]);
-    p.px(x, yy + 1, STEEL[3]); p.px(x + 1, yy + 1, STEEL[2]);
-  }
-}
-
-/**
- * A coil of chain cinched round a body at (x, y): an ellipse of links rx wide, 2 tall. The near half (below) is
- * lit, the far half dark. `a` fades it.
- */
-export function coil(p: Painter, x: number, y: number, rx: number, ph = 0): void {
-  const n = Math.max(6, Math.round(rx * 1.1));
-  for (let i = 0; i < n; i++) {
-    const ang = (i / n) * Math.PI * 2 + ph, cx = x + Math.cos(ang) * rx, cy = y + Math.sin(ang) * 2;
-    const near = Math.sin(ang) > -0.2;
-    p.px(cx, cy, near ? (i % 2 ? WHITE : STEEL[3]) : STEEL[2]);
-    p.px(cx + 1, cy, near ? STEEL[3] : STEEL[1]);
-  }
 }
 
 /**
