@@ -445,7 +445,9 @@ const screens: Record<string, () => void> = {
   'encyclopedia-card': () => { const e = new EncyclopediaScene(title, () => {}); e.cls = 'mage'; e.sel = e.reading = 4; setScene(e); run(0.5); },
   'balance-lab': () => setScene(new LabScene(title)),
   // Warrior's light attack, mid-swing
-  'art-lab': () => { setScene(new ArtLabScene(title)); run(0.15); },
+  'art-lab': () => { setScene(new ArtLabScene(title, { tab: 'warrior' })); run(0.15); },
+  // every panel state on the first stage
+  'art-lab-stages': () => { setScene(new ArtLabScene(title, { tab: 'stages', entry: 1 })); run(0.15); },
 };
 
 declare global { interface Window { __test: unknown } }
