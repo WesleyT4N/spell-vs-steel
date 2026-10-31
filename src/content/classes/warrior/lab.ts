@@ -20,5 +20,10 @@ export default {
     battleShout: 'shout', roar: 'shout', berserk: 'shout', rally: 'shout', avatar: 'transform', lastStand: 'transform',
     guardUp: null, ironSkin: null, unbreakable: null, reflectUp: null, wallRise: null,
   },
-  drafts: [],
+  // Chain Hook: the shot ('hook') and its new hit kind (chainHookHit), three looks waiting for a pick
+  drafts: [
+    { name: 'Chain Hook: Iron Links', plays: { chainHookHit: 'warrior/chain-hook-a-hit' }, shots: { hook: 'warrior/chain-hook-a' } },
+    { name: 'Chain Hook: Grapple Line', plays: { chainHookHit: 'warrior/chain-hook-b-hit' }, shots: { hook: 'warrior/chain-hook-b' } },
+    { name: 'Chain Hook: Sickle Whip', plays: { chainHookHit: 'warrior/chain-hook-c-hit' }, shots: { hook: 'warrior/chain-hook-c' } },
+  ],
 } satisfies ClassLab;
