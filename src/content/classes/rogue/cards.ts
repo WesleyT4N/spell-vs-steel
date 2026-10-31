@@ -11,15 +11,15 @@ function backstab(x: CastCtx, hit: (col: number, row: number) => void, window = 
   hit(at.col, at.row);
 }
 
-/** A shadow blade on the given panels. */
-function slash(x: CastCtx, cells: Array<[number, number]>, dmg: number): HitResult {
-  for (const [c, r] of cells) x.b.addFx('stab', x.f.side, c, r, 0.25);
+/** A shadow blade on the given panels, drawn as fx `kind` (each backstab has its own look, src/fx/rogue/). */
+function slash(x: CastCtx, cells: Array<[number, number]>, dmg: number, kind: string, dur: number): HitResult {
+  for (const [c, r] of cells) x.b.addFx(kind, x.f.side, c, r, dur);
   return x.b.strike(x.f, cells, dmg * x.mult, { spell: true, element: 'shadow' });
 }
 
-/** A dagger thrust from the Rogue's panel over `reach` panels ahead. */
-function thrust(x: CastCtx, reach: number, dmg: number): HitResult {
-  x.b.addFx('dagger', x.f.side, x.f.col, x.f.row, 0.2, { reach });
+/** A dagger thrust from the Rogue's panel over `reach` panels ahead, drawn as fx `kind`. */
+function thrust(x: CastCtx, reach: number, dmg: number, kind: string, dur: number): HitResult {
+  x.b.addFx(kind, x.f.side, x.f.col, x.f.row, dur, { reach });
   return x.b.strike(x.f, cellsAhead(x, 1, reach), dmg * x.mult, { spell: true, element: 'steel' });
 }
 
@@ -35,13 +35,13 @@ const vialHit = spellStep('poison_vial.hit', (x, { cells }: { cells: Cells }) =>
   for (const [cc, rr] of cells) {
     const p = b.panel(cc, rr);
     if (!p) continue;
-    b.addFx('toxicPuff', f.side, cc, rr, 0.5);
+    b.addFx('vialBurst', f.side, cc, rr, 0.48);
     p.toxic = 4; p.toxicSide = f.side;
   }
   if (b.strike(f, cells, 240 * x.mult, { spell: true, element: 'poison' }).dealt > 0) b.addPoison(x.foe, 2);
 });
-const flurrySweep = spellStep('blade_flurry.sweep', (x, { c, r }: { c: number; r: number }) => { slash(x, [[c, r - 1], [c, r], [c, r + 1]], 360); });
-const spreeStrike = spellStep('killing_spree.strike', x => { const at = x.b.blinkFront(x.f); slash(x, [[at.col, at.row]], 420); });
+const flurrySweep = spellStep('blade_flurry.sweep', (x, { c, r }: { c: number; r: number }) => { slash(x, [[c, r - 1], [c, r], [c, r + 1]], 360, 'flurry', 0.24); });
+const spreeStrike = spellStep('killing_spree.strike', x => { const at = x.b.blinkFront(x.f); slash(x, [[at.col, at.row]], 420, 'spree', 0.24); });
 const spreeEnd = spellStep('killing_spree.end', x => x.b.blinkHome(x.f));
 
 export const rogue: CardDef[] = [
@@ -49,37 +49,37 @@ export const rogue: CardDef[] = [
   {
     id: 'vanish', name: 'Vanish', cls: 'rogue', cost: 1, rarity: 'common', element: 'shadow', damaging: false, lock: 0.15,
     dmg: '-', short: 'Enter Stealth for 3s. Your next attack spell stuns for 2s.',
-    cast: x => { x.b.stealth(x.f, 3); x.f.st.vanishStun = 10; },
+    cast: x => { x.b.stealth(x.f, 3, 'vanish', 0.4); x.f.st.vanishStun = 10; },
   },
   {
     id: 'shadowstep', name: 'Shadowstep', cls: 'rogue', cost: 1, rarity: 'common', element: 'shadow', damaging: true, lock: 0.35,
     dmg: '700', short: 'Blink in front of the enemy and stab. 2s to keep comboing before you blink home.',
-    cast: x => backstab(x, (c, r) => slash(x, [[c, r]], 700)),
+    cast: x => backstab(x, (c, r) => slash(x, [[c, r]], 700, 'shadowstep', 0.24)),
     ai: (b, f) => b.targetable(b.foe(f)),
   },
   {
     id: 'ambush', name: 'Ambush', cls: 'rogue', cost: 2, rarity: 'common', element: 'shadow', damaging: true, lock: 0.4, needsStealth: true,
     dmg: '1450', short: 'Stealth only. Blink in front of the enemy and strike with a bigger blade.',
-    cast: x => backstab(x, (c, r) => { x.b.shake = 0.2; slash(x, [[c, r]], 1450); }),
+    cast: x => backstab(x, (c, r) => { x.b.shake = 0.2; slash(x, [[c, r]], 1450, 'ambush', 0.36); }),
     ai: (_b, f) => f.st.stealth > 0,
   },
   {
     id: 'shiv', name: 'Shiv', cls: 'rogue', cost: 1, rarity: 'common', element: 'steel', damaging: true, lock: 0.25,
     dmg: '360/720', short: 'Stab up to 2 panels ahead. Double damage if you cast another spell in the last 2s.',
-    cast: x => { thrust(x, 2, x.castsWithin(2) > 0 ? 720 : 360); },
+    cast: x => { thrust(x, 2, x.castsWithin(2) > 0 ? 720 : 360, 'shiv', 0.24); },
     ai: (b, f) => ahead(b, f, 2),
   },
   {
     id: 'evasion', name: 'Evasion', cls: 'rogue', cost: 1, rarity: 'common', element: 'shadow', damaging: false, lock: 0.15,
     dmg: '-', short: 'Dodge the next 2 hits within 3s.',
-    cast: x => { x.f.st.evasion = 3; x.f.dodges = 2; x.b.addFx('smoke', x.f.side, x.f.col, x.f.row, 0.3); },
+    cast: x => { x.f.st.evasion = 3; x.f.dodges = 2; x.b.addFx('evasion', x.f.side, x.f.col, x.f.row, 0.36); },
     ai: (b, f) => b.projectiles.some(p => p.side !== f.side) || b.foe(f).charging || b.warns.some(w => w.side !== f.side),
   },
   {
     id: 'kick', name: 'Kick', cls: 'rogue', cost: 1, rarity: 'common', element: 'steel', damaging: true, lock: 0.3,
     dmg: '240', short: 'Kick 2 panels ahead. Silences for 2s: no spells, moving and basics still work.',
     cast: x => {
-      x.b.addFx('smash', x.f.side, x.f.col + x.dir, x.f.row, 0.2);
+      x.b.addFx('kick', x.f.side, x.f.col + x.dir, x.f.row, 0.3);
       if (x.b.strike(x.f, cellsAhead(x, 1, 2), 240 * x.mult, { spell: true, element: 'steel' }).dealt > 0) x.b.silence(x.foe, 2);
     },
     ai: (b, f) => ahead(b, f, 2),
@@ -92,7 +92,8 @@ export const rogue: CardDef[] = [
       const c = f.col + 3 * x.dir, r = f.row, r2 = r < 2 ? r + 1 : r - 1;
       const cells: Array<[number, number]> = [[c, r], [c + x.dir, r], [c, r2], [c + x.dir, r2]];
       // a lob, like BN's MiniBomb: a shadow grows on the landing panels while it falls
-      b.addFx('lob', f.side, f.col, r, 0.4, { to: c, color: '#b8f818' });
+      // its look always flies 3 panels and lands as the 0.4 s telegraph ends (0.32 x fxSlow)
+      b.addFx('vialLob', f.side, f.col, r, 0.32, { to: c, color: '#b8f818' });
       b.warn(f, cells, 0.4, vialHit(x, { cells }), 'shadow');
     },
     ai: (b, f) => {
@@ -103,14 +104,14 @@ export const rogue: CardDef[] = [
   {
     id: 'deadly_poison', name: 'Deadly Poison', cls: 'rogue', cost: 1, rarity: 'common', element: 'poison', damaging: false, lock: 0.2,
     dmg: '-', short: 'For 6s, basic attacks and attack spells apply 1 Poison stack on hit (once per spell).',
-    cast: x => { x.f.st.deadlyPoison = 6; x.b.addFx('toxicPuff', x.f.side, x.f.col, x.f.row, 0.4); },
+    cast: x => { x.f.st.deadlyPoison = 6; x.b.addFx('deadlyPoison', x.f.side, x.f.col, x.f.row, 0.48); },
   },
   {
     id: 'envenom', name: 'Envenom', cls: 'rogue', cost: 2, rarity: 'common', element: 'poison', damaging: true, lock: 0.3,
     dmg: '360+480/stk', short: 'Hits the enemy wherever they are and consumes their Poison: +480 per stack.',
     cast: x => {
       const stacks = stacksOf(x);
-      x.b.addFx('toxicPuff', x.f.side, x.foe.col, x.foe.row, 0.4);
+      x.b.addFx('envenom', x.f.side, x.foe.col, x.foe.row, 0.4);
       if (x.b.damage(x.foe, (360 + 480 * stacks) * x.mult, x.f, { spell: true, element: 'poison', targeted: true }).dealt > 0 && stacks) consume(x);
     },
     ai: (b, f) => b.foe(f).poison >= 2 && b.targetable(b.foe(f)),
@@ -122,7 +123,7 @@ export const rogue: CardDef[] = [
       const col = x.b.frontCol(x.foe.side);
       const cells: Array<[number, number]> = [[col, 0], [col, 1], [col, 2]];
       // thrown blades, instant like BN's sword-type chips
-      for (let r = 0; r < 3; r++) x.b.addFx('stab', x.f.side, col, r, 0.25);
+      for (let r = 0; r < 3; r++) x.b.addFx('fanKnife', x.f.side, col, r, 0.3);
       x.b.strike(x.f, cells, 600 * x.mult, { spell: true, element: 'steel' });
     },
     ai: (b, f) => b.foe(f).col === b.frontCol(b.foe(f).side),
@@ -139,19 +140,19 @@ export const rogue: CardDef[] = [
   {
     id: 'cloak_of_shadows', name: 'Cloak of Shadows', cls: 'rogue', cost: 2, rarity: 'uncommon', element: 'shadow', damaging: false, lock: 0.15,
     dmg: '-', short: 'Immune to spells for 3s (basics still hit). Removes Poison, burning and freeze.',
-    cast: x => { x.b.cleanse(x.f); x.f.st.spellImmune = 3; },
+    cast: x => { x.b.cleanse(x.f); x.f.st.spellImmune = 3; x.b.addFx('cloak', x.f.side, x.f.col, x.f.row, 0.48); },
     ai: (b, f) => f.poison >= 2 || b.warned(f.col, f.row, f.side),
   },
   {
     id: 'pickpocket', name: 'Pickpocket', cls: 'rogue', cost: 0, rarity: 'uncommon', element: 'steel', damaging: true, lock: 0.25,
     dmg: '240', short: 'Stab 2 panels ahead. On hit, gain 1 Energy.',
-    cast: x => { if (thrust(x, 2, 240).dealt > 0) x.b.gainRes(x.f, 1); },
+    cast: x => { if (thrust(x, 2, 240, 'pickpocket', 0.4).dealt > 0) x.b.gainRes(x.f, 1); },
     ai: (b, f) => ahead(b, f, 2),
   },
   {
     id: 'riposte', name: 'Riposte', cls: 'rogue', cost: 2, rarity: 'uncommon', element: 'steel', damaging: false, lock: 0.15,
     dmg: '800', short: 'For 1.5s, parry the next hit and counter the attacker wherever they are.',
-    cast: x => { x.f.st.riposte = 1.5; x.b.addFx('guard', x.f.side, x.f.col, x.f.row, 0.3); },
+    cast: x => { x.f.st.riposte = 1.5; x.b.addFx('riposte', x.f.side, x.f.col, x.f.row, 0.32); },
     ai: (b, f) => {
       const foe = b.foe(f);
       return foe.charging || foe.lock > 0 || b.projectiles.some(p => p.side !== f.side && p.row === f.row) || (foe.row === f.row && Math.abs(foe.col - f.col) <= 2);
@@ -160,7 +161,7 @@ export const rogue: CardDef[] = [
   {
     id: 'cold_blood', name: 'Cold Blood', cls: 'rogue', cost: 1, rarity: 'uncommon', element: 'shadow', damaging: false, lock: 0.15,
     dmg: '-', short: 'Your next attack spell deals double damage.',
-    cast: x => { x.f.coldBlood = true; x.b.text(x.f, 'COLD BLOOD', '#9878f8'); },
+    cast: x => { x.f.coldBlood = true; x.b.text(x.f, 'COLD BLOOD', '#9878f8'); x.b.addFx('coldBlood', x.f.side, x.f.col, x.f.row, 0.48); },
   },
   // ---------- Legendaries ----------
   {
@@ -175,7 +176,7 @@ export const rogue: CardDef[] = [
         const p = b.panels[col][r];
         p.owner = f.side;
         p.ownerT = 5;
-        for (const c of [own, col]) { b.panels[c][r].smoke = 5; b.panels[c][r].smokeSide = f.side; b.addFx('smoke', f.side, c, r, 0.5); }
+        for (const c of [own, col]) { b.panels[c][r].smoke = 5; b.panels[c][r].smokeSide = f.side; b.addFx('smokescreen', f.side, c, r, 0.56); }
       }
       b.walls = b.walls.filter(w => !(w.col === col && w.side === foe.side));
       if (foe.col === col) b.relocate(foe);
@@ -188,7 +189,7 @@ export const rogue: CardDef[] = [
     cast: x => backstab(x, (c, r) => {
       const stacks = stacksOf(x);
       x.b.shake = 0.3;
-      if (slash(x, [[c, r]], 2400 + 480 * stacks).dealt > 0 && stacks) consume(x);
+      if (slash(x, [[c, r]], 2400 + 480 * stacks, 'eviscerate', 0.4).dealt > 0 && stacks) consume(x);
     }),
     ai: (b, f) => b.targetable(b.foe(f)),
   },
@@ -208,13 +209,13 @@ export const rogue: CardDef[] = [
   {
     id: 'shadow_dance', name: 'Shadow Dance', cls: 'rogue', cost: 2, rarity: 'legendary', element: 'shadow', damaging: false, lock: 0.2,
     dmg: '-', short: 'For 8s, re-enter Stealth 1s after every attack or spell.',
-    cast: x => { x.f.st.shadowDance = 8; x.b.stealth(x.f, 2); },
+    cast: x => { x.f.st.shadowDance = 8; x.b.stealth(x.f, 2, 'shadowDance', 0.48); },
   },
   {
     id: 'blind', name: 'Blind', cls: 'rogue', cost: 2, rarity: 'legendary', element: 'shadow', damaging: false, lock: 0.3,
     dmg: '-', short: 'Dust 2 panels ahead stuns the enemy for 3s. Any damage breaks it (+50% on that hit).',
     cast: x => {
-      x.b.addFx('toxicPuff', x.f.side, x.f.col + x.dir, x.f.row, 0.4);
+      x.b.addFx('blind', x.f.side, x.f.col + x.dir, x.f.row, 0.4);
       if (ahead(x.b, x.f, 2)) x.b.sleep(x.foe, 3);
     },
     ai: (b, f) => ahead(b, f, 2),
@@ -222,21 +223,21 @@ export const rogue: CardDef[] = [
   {
     id: 'adrenaline_rush', name: 'Adrenaline Rush', cls: 'rogue', cost: 2, rarity: 'legendary', element: 'shadow', damaging: false, lock: 0.15,
     dmg: '-', short: 'For 6s, every spell you cast refunds 1 Energy.',
-    cast: x => { x.f.st.adrenaline = 6; x.b.text(x.f, 'ADRENALINE', '#f8d878'); },
+    cast: x => { x.f.st.adrenaline = 6; x.b.text(x.f, 'ADRENALINE', '#f8d878'); x.b.addFx('adrenaline', x.f.side, x.f.col, x.f.row, 0.4); },
   },
   {
     id: 'kidney_shot', name: 'Kidney Shot', cls: 'rogue', cost: 2, rarity: 'legendary', element: 'steel', damaging: true, lock: 0.3,
     dmg: '360', short: 'Hit the panel ahead. Stuns 2s, plus 0.25s per spell you cast in the last 3s (max 2.5s).',
     cast: x => {
       const stun = Math.min(2.5, 2 + 0.25 * x.castsWithin(3));
-      if (thrust(x, 1, 360).dealt > 0 && stun > 0) x.b.stun(x.foe, stun);
+      if (thrust(x, 1, 360, 'kidneyShot', 0.48).dealt > 0 && stun > 0) x.b.stun(x.foe, stun);
     },
     ai: (b, f) => ahead(b, f, 1),
   },
   {
     id: 'shadow_clone', name: 'Shadow Clone', cls: 'rogue', cost: 2, rarity: 'legendary', element: 'shadow', damaging: false, lock: 0.15,
     dmg: '-', short: 'Leave a decoy for 4s and enter Stealth. The next hit on you hits the decoy instead.',
-    cast: x => { x.f.st.decoy = 4; x.f.decoyCol = x.f.col; x.f.decoyRow = x.f.row; x.b.stealth(x.f, 3); },
+    cast: x => { x.f.st.decoy = 4; x.f.decoyCol = x.f.col; x.f.decoyRow = x.f.row; x.b.stealth(x.f, 3, 'shadowClone', 0.48); },
   },
   // ---------- Mythics (1 Energy, so a Mythic turn still chains combos) ----------
   {
@@ -245,7 +246,7 @@ export const rogue: CardDef[] = [
     cast: x => {
       x.f.st.revealed = 0;
       x.f.st.nightsEmbrace = 10;
-      x.b.stealth(x.f, 10);
+      x.b.stealth(x.f, 10, 'nightsEmbrace', 0.64);
       x.f.st.evasion = 10; x.f.dodges = 2;
       x.b.cheer = 2;
     },
@@ -258,7 +259,7 @@ export const rogue: CardDef[] = [
       x.foe.st.pandemic = 6;
       x.b.addPoison(x.foe, 4);
       x.foe.poisonT = 6;
-      for (const [c, r] of allEnemyPanels(x.b, x.f.side)) x.b.addFx('toxicPuff', x.f.side, c, r, 0.5);
+      for (const [c, r] of allEnemyPanels(x.b, x.f.side)) x.b.addFx('pandemic', x.f.side, c, r, 0.52);
       x.b.cheer = 2;
     },
     ai: (b, f) => b.targetable(b.foe(f)),
@@ -270,6 +271,7 @@ export const rogue: CardDef[] = [
       if (!x.b.targetable(x.foe)) { x.b.text(x.foe, 'MISS', '#bcbcbc'); return; }
       x.foe.st.deathMark = 6; x.foe.deathMarkAcc = 0;
       x.b.text(x.foe, 'MARKED', '#9878f8');
+      x.b.addFx('deathMark', x.f.side, x.foe.col, x.foe.row, 0.48);
       x.b.cheer = 2;
     },
     ai: (b, f) => b.targetable(b.foe(f)),

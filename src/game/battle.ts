@@ -755,7 +755,7 @@ export class Battle {
     if (k === 'deathMark') {
       const dmg = Math.round(f.deathMarkAcc * 0.5);
       f.deathMarkAcc = 0;
-      if (dmg > 0) { this.addFx('stab', f.side, f.col, f.row, 0.4); this.damage(f, dmg, this.foe(f), { spell: true, element: 'shadow' }); }
+      if (dmg > 0) { this.addFx('eviscerate', f.side, f.col, f.row, 0.4); this.damage(f, dmg, this.foe(f), { spell: true, element: 'shadow' }); }
     }
     if (k === 'nightsEmbrace') f.st.stealth = 0;
     if (k === 'backstab') this.blinkHome(f);
@@ -884,9 +884,9 @@ export class Battle {
   }
 
   /** A basic shot down the row at a set speed, so the target can step out of its way. */
-  flyingShot(f: Fighter, kind: 'orb' | 'spark' | 'beam' | 'knife' | 'aimed', dmg: number, opts: HitOpts, pierce = false): void {
+  flyingShot(f: Fighter, kind: 'orb' | 'spark' | 'beam' | 'knife' | 'aimed', dmg: number, opts: HitOpts, pierce = false, hitFx?: string): void {
     const speed = kind === 'aimed' ? TUNING.ranger.aimedSpeed : ((TUNING as Record<string, unknown>)[f.cls] as { shotSpeed?: number } | undefined)?.shotSpeed ?? TUNING.maxShotSpeed;
-    this.shoot(f, { speed: speed * this.dir(f), kind, reflectable: false, pierce, onHit: basicShot({ side: f.side, dmg, opts }) });
+    this.shoot(f, { speed: speed * this.dir(f), kind, reflectable: false, pierce, onHit: basicShot(hitFx ? { side: f.side, dmg, opts, fx: hitFx } : { side: f.side, dmg, opts }) });
   }
 
   /** Hit a set of cells for the attacker. Enemy walls in the cells take the hit too. */
@@ -939,10 +939,11 @@ export class Battle {
     if (f.st.shadowDance > 0) this.later(1, shadowDanceReturn({ side: f.side }));
   }
 
-  stealth(f: Fighter, t: number): void {
+  /** Enter Stealth for t seconds, with a puff of fx `fx` (a spell's own look, else the Rogue's blink). */
+  stealth(f: Fighter, t: number, fx = 'shadowBlink', dur = 0.32): void {
     if (f.st.revealed > 0 || f.st.hunted > 0) { this.text(f, 'REVEALED', '#f8b800'); return; }
     f.st.stealth = Math.max(f.st.stealth, t);
-    this.addFx('smoke', f.side, f.col, f.row, 0.4);
+    this.addFx(fx, f.side, f.col, f.row, dur);
   }
 
   /** Can this fighter be picked by a targeted or homing effect? */
@@ -956,9 +957,9 @@ export class Battle {
     const row = foe.row;
     let col = Math.max(0, Math.min(COLS - 1, foe.col - d));
     while (this.inGrid(col - d, row) && (this.wallAt(col, row) || this.panels[col][row].hole > 0 || (this.fighterAt(col, row) && this.fighterAt(col, row) !== f))) col -= d;
-    this.addFx('smoke', f.side, f.col, f.row, 0.3);
+    this.addFx('shadowBlink', f.side, f.col, f.row, 0.32);
     f.col = col; f.row = row; f.dx = 0; f.dy = 0;
-    this.addFx('smoke', f.side, col, row, 0.3);
+    this.addFx('shadowBlink', f.side, col, row, 0.32);
     return { col: col + d, row };
   }
 
@@ -966,7 +967,7 @@ export class Battle {
   blinkHome(f: Fighter): void {
     f.st.backstab = 0;
     if (f.homeCol < 0) return;
-    this.addFx('smoke', f.side, f.col, f.row, 0.3);
+    this.addFx('shadowBlink', f.side, f.col, f.row, 0.32);
     f.col = f.homeCol; f.row = f.homeRow;
     f.homeCol = -1; f.homeRow = -1;
     if (!f.dead) this.relocate(f);
@@ -1124,14 +1125,14 @@ export class Battle {
       target.st.riposte = 0;
       out.blocked = true;
       this.text(target, 'PARRY', '#fcfcfc');
-      this.addFx('guard', target.side, target.col, target.row, 0.3);
+      this.addFx('riposte', target.side, target.col, target.row, 0.32);
       if (src && src !== target) this.later(0.08, riposte({ side: target.side }));
       return out;
     }
     if (!opts.dot && target.st.decoy > 0) {
       target.st.decoy = 0;
       this.text(target, 'DECOY', '#bcbcbc');
-      this.addFx('smoke', target.side, target.decoyCol, target.decoyRow, 0.4);
+      this.addFx('shadowBlink', target.side, target.decoyCol, target.decoyRow, 0.32);
       return out;
     }
 
@@ -1437,7 +1438,7 @@ const shadowDanceReturn = effect('battle.shadowDance', (b, a: { side: Side }) =>
 /** Riposte's counter on the attacker, wherever they are. */
 const riposte = effect('battle.riposte', (b, a: { side: Side }) => {
   const f = b.f[a.side], src = b.foe(f);
-  b.addFx('stab', f.side, src.col, src.row, 0.25);
+  b.addFx('riposteHit', f.side, src.col, src.row, 0.24);
   b.damage(src, TUNING.rogue.riposteDamage, f, { spell: true, element: 'steel' });
 });
 const silence = effect('battle.silence', (b, a: { side: Side; secs: number }) => b.silence(b.f[a.side], a.secs));
