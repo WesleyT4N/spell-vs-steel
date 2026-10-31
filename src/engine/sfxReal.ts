@@ -351,6 +351,14 @@ Object.assign(REAL, {
   shot_hawk: FX.hawkDive,
 });
 
+// the Warrior's spells each have their own look but share these sounds
+Object.assign(FX, {
+  stepSlash: FX.cleaveHeavy, rampage: FX.cleaveHeavy, leapSmash: FX.smash, execute: FX.smash, hammer: FX.shockwave, shieldSlam: FX.smash,
+  mortal: FX.smash, groundSlam: FX.shockwave, shatter: FX.shockwave, lastStandBlast: FX.shockwave, seismic: FX.quake, titanFall: FX.quake,
+  battleShout: FX.shout, roar: FX.shout, berserk: FX.shout, rally: FX.shout, avatar: FX.transform, lastStand: FX.transform,
+  guardUp: FX.guard, ironSkin: FX.guard, unbreakable: FX.guard, reflectUp: FX.guard, wallRise: FX.smash,
+});
+
 const lastPlayed: Record<string, number> = {};
 
 /** Play a realistic recipe into `out`. Returns false if there is none (the caller falls back to its old blip). */

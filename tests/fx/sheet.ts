@@ -23,12 +23,14 @@ export interface Row {
   /** Seconds to show (default: until the attack's fx are gone). */
   span?: number;
 }
-export interface Job { rows: Row[]; frames?: number; zoom?: number; perLine?: number; boxes?: boolean }
+export interface Job { rows: Row[]; frames?: number; zoom?: number; perLine?: number; boxes?: boolean; /** Show the whole grid, not just the attacker's row. */ full?: boolean }
 
 const job: Job = JSON.parse(decodeURIComponent(location.hash.slice(1) || '{"rows":[]}'));
 const N = job.frames ?? 8, Z = job.zoom ?? 4, PER = job.perLine ?? 4;
 // the attacker's row (row 1), from just behind the attacker (column 1) to the foe's front column
-const CROP = { x: X0 + PW - 8, y: Y0 + (FACE + LIP) - 14, w: PW * 3 + 16, h: FACE + 18 };
+const CROP = job.full
+  ? { x: X0 - 2, y: Y0 - 26, w: PW * 6 + 4, h: (FACE + LIP) * 3 + 30 }
+  : { x: X0 + PW - 8, y: Y0 + (FACE + LIP) - 14, w: PW * 3 + 16, h: FACE + 18 };
 const LABEL = 18, GAP = 4;
 
 const world = document.createElement('canvas'); world.width = W; world.height = H;

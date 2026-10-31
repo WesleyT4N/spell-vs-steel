@@ -747,7 +747,7 @@ export class Battle {
       const dmg = Math.round(f.lastStandAbsorbed);
       f.lastStandAbsorbed = 0;
       const foe = this.foe(f);
-      this.addFx('shockwave', f.side, this.frontCol(foe.side), 1, 0.6);
+      this.addFx('lastStandBlast', f.side, this.frontCol(foe.side), 1, 0.6);
       this.shake = 0.4;
       if (dmg > 0) this.damage(foe, dmg, f, { spell: true, element: 'steel' });
     }

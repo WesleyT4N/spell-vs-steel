@@ -3,15 +3,19 @@
 // Each effect draws inside its box: 24 px tall above the panel's feet, 24 px wide, and `panels` panels long along
 // the attacker's facing (shots and multi-panel swings carry their box down the row). See docs/FX.md.
 import { createFrame, clearFrame, createFx, composite, hash, hex } from '../vendor/pixelfx/index.js';
-import { panelFoot, PW } from '../art/arena';
+import { panelFoot, PW, FACE, LIP } from '../art/arena';
+
+/** Pixels between one row's feet and the next row's. */
+export const ROW = FACE + LIP;
 import type { Ctx } from '../engine/gfx';
 import type { Battle, Fx } from './battle';
+import { team } from './teamColors';
 
 /** The painter pixelfx hands an effect (see src/vendor/pixelfx/painter.js). Loosely typed: the vendored core is JS. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Painter = any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type Opts = Record<string, any> & { seed: number; flip: boolean };
+export type Opts = Record<string, any> & { seed: number; flip: boolean; team: ReturnType<typeof team> };
 
 export interface PfxMeta {
   name: string;
@@ -20,6 +24,8 @@ export interface PfxMeta {
   duration: number;
   /** How many panels the box spans along the attacker's facing (1 = the anchor panel only). */
   panels?: number;
+  /** How many rows the box spans, centered on the anchor row (3 = a whole column, for column-wide spells). */
+  rows?: number;
   /**
    * Trace a 1px outline in this color around the effect's solid shapes, like the inked fighters and stages
    * (single stray pixels such as sparks stay unoutlined). Usually the darkest step of the element's ramp.
@@ -37,8 +43,10 @@ export interface PfxModule {
 
 /** Box bounds in local space (x forward from the anchor panel's center, y down from its feet). */
 export const BOX = { half: 12, top: -24, bottom: 3 };
-export const boxOf = (m: PfxMeta): { x0: number; x1: number; y0: number; y1: number } =>
-  ({ x0: -BOX.half, x1: BOX.half + ((m.panels ?? 1) - 1) * PW, y0: BOX.top, y1: BOX.bottom });
+export const boxOf = (m: PfxMeta): { x0: number; x1: number; y0: number; y1: number } => {
+  const extra = (((m.rows ?? 1) - 1) / 2) * ROW;
+  return { x0: -BOX.half, x1: BOX.half + ((m.panels ?? 1) - 1) * PW, y0: BOX.top - extra, y1: BOX.bottom + extra };
+};
 
 const registry = new Map<string, PfxModule>();
 /** Play `mod` for battle fx of this kind. */
@@ -66,7 +74,7 @@ export function drawPfx(c: Ctx, b: Battle, e: Fx): boolean {
   let live = map.get(key);
   if (!live || tt < live.tt) {
     // the painter puts the effect's origin at the panel's feet (world pixels), mirrored for the right-hand side
-    const inst = createFx(mod, { x: Math.round(foot.x), y: Math.round(foot.y), flip, seed: hash(...[...key].map(ch => ch.charCodeAt(0))) % 100000 });
+    const inst = createFx(mod, { x: Math.round(foot.x), y: Math.round(foot.y), flip, team: team(e.side), seed: hash(...[...key].map(ch => ch.charCodeAt(0))) % 100000 });
     map.set(key, live = { inst, tt: 0, seen: frameNo });
   }
   if (tt > live.tt) { live.inst.update(tt - live.tt); live.tt = tt; }
@@ -97,9 +105,9 @@ export function endPfxFrame(b: Battle): void {
   frameNo++;
 }
 
-/** Outline the solid shapes in a color buffer: every empty pixel beside a pixel that has a solid neighbor of its own. */
+/** Outline the solid shapes in a color buffer (faint, fading pixels don't count): every empty pixel beside a pixel that has a solid neighbor of its own. */
 export function inkOutline(C: Uint32Array, w: number, h: number, ink: number): void {
-  const on = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < w && y < h && C[y * w + x] >>> 24 > 0;
+  const on = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < w && y < h && C[y * w + x] >>> 24 > 0x90;
   // a pixel with no solid neighbor (a spark, a mote) is left alone, so it stays a light 1px speck
   const solid = (x: number, y: number): boolean => on(x, y) && (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1) || on(x - 1, y - 1) || on(x + 1, y - 1) || on(x - 1, y + 1) || on(x + 1, y + 1));
   const mark: number[] = [];

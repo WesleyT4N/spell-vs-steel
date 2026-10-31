@@ -180,40 +180,6 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
   const d = e.side === 0 ? 1 : -1;
   const ph = Math.floor(b.time * 24);
   switch (e.kind) {
-    case 'cleave': {
-      // a crescent swipe across the panel ahead: bright leading edge, steel smear, sparks off the tip
-      const cx = x + d * 2, cy = y - 11, r = 11, sweep = Math.min(1, p * 1.8);
-      for (let i = 0; i < 22; i++) {
-        const k = i / 21; if (k > sweep) break;
-        const ang = -1.35 + k * 2.5, age = sweep - k;
-        const px = cx + d * Math.cos(ang) * r, py = cy + Math.sin(ang) * r * 0.9;
-        if (age > 0.6 * (1 - p) + 0.15) continue;
-        P(c, age < 0.12 ? '#fcfcfc' : age < 0.3 ? '#bcbcbc' : '#7c7c7c', px - 1, py - 1, age < 0.12 ? 3 : 2, 2);
-        if (age < 0.3) P(c, '#7c7c7c', px - d * 2, py, 1, 1);
-      }
-      if (once(e, 'sp', p > 0.45)) emit(5, () => spark(cx + d * r, cy, STEEL.slice(1).reverse(), boxC(cx + d * r * 0.5, cy), 45));
-      break;
-    }
-    case 'cleaveHeavy': {
-      // a big overhead chop: gold arc over the panel, flash, dust, cracks where it lands
-      const cx = x + d * (PW * 0.5), cy = y - 12, r = 11, swing = Math.min(1, p * 2.2);
-      if (p < 0.6) for (let i = 0; i < 26; i++) {
-        const k = i / 25; if (k > swing) break;
-        const ang = -2.2 + k * 2.9, age = swing - k;
-        const px = cx + d * Math.cos(ang) * r, py = cy + Math.sin(ang) * r;
-        if (age < 0.45) P(c, age < 0.1 ? '#fcfcfc' : age < 0.3 ? '#f8b800' : '#fca044', px - 1, py - 1, age < 0.1 ? 4 : 3, 3);
-      }
-      if (p >= 0.4) {
-        const q = (p - 0.4) / 0.6;
-        for (const col of [e.col, e.col + d]) {
-          const pc = cellPx(col, e.row);
-          if (q < 0.35) glow(c, pc.x, pc.y - 4, 12, '248,184,0', 0.6 * (1 - q / 0.35));
-          dust(e, pc.x, pc.y, 8, 'd' + col); rocks(e, pc.x, pc.y, 4, 'r' + col);
-          crack(c, pc.x, pc.y);
-        }
-      }
-      break;
-    }
     case 'dagger': {
       // the blade shoots out over the panels ahead and snaps back, with a glint at the tip
       const reach = Number(e.data?.reach ?? 2);

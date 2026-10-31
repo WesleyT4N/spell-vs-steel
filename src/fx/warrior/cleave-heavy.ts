@@ -1,4 +1,4 @@
-// Heavy Cleave, draft B "Ground rend": the chop bites the panel ahead and tears a glowing fissure along the floor
+// Heavy Cleave "Ground rend": the chop bites the panel ahead and tears a glowing fissure along the floor
 // of both panels, with chunks popping up one after another as it runs and dust settling behind.
 import { Particles, Bits, B, P, Rng, fit, sparkle, clamp, ease, hex } from '../../vendor/pixelfx/index.js';
 import { RAMPS } from '../palette';

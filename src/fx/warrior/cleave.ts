@@ -1,4 +1,4 @@
-// Cleave, draft A "Crescent": a crescent smear whips across the panel ahead and an echo reaches the second panel,
+// Cleave "Crescent": a crescent smear whips across the panel ahead and an echo reaches the second panel,
 // white at the edge cooling to steel, with a glint at the tip and sparks off it.
 import { Particles, P, Rng, fit, sparkle, ease, clamp } from '../../vendor/pixelfx/index.js';
 import { RAMPS } from '../palette';
