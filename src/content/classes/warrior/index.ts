@@ -5,4 +5,8 @@ import decks from './decks';
 import cpu from './cpu';
 import lessons from './tutorial';
 
-export default { id: 'warrior', rules, decks, cpu, lessons } satisfies ClassModule;
+export default {
+  id: 'warrior',
+  info: { name: 'WARRIOR', res: 'RAGE', resColor: '#f87858', gem: '#d82800', pipBase: '#503000', pip: '#d82800', refill: 'PAY ON CAST' },
+  rules, decks, cpu, lessons,
+} satisfies ClassModule;
