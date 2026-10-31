@@ -20,6 +20,7 @@ import { TutorialScene } from '../../src/scenes/tutorial';
 import { DevMenuScene } from '../../src/scenes/devMenu';
 import { EncyclopediaScene } from '../../src/scenes/encyclopedia';
 import { LabScene } from '../../src/scenes/lab';
+import { ArtLabScene } from '../../src/scenes/artLab';
 import { ArcadeLadderScene, ArcadeClearScene } from '../../src/scenes/arcade';
 import { buildLadder, type ArcadeRun } from '../../src/game/arcade';
 import { loadMatch, saveMatch, type MatchConfig } from '../../src/game/match';
@@ -443,6 +444,8 @@ const screens: Record<string, () => void> = {
   // a card open for reading (on phones, the sheet with its clip and rules)
   'encyclopedia-card': () => { const e = new EncyclopediaScene(title, () => {}); e.cls = 'mage'; e.sel = e.reading = 4; setScene(e); run(0.5); },
   'balance-lab': () => setScene(new LabScene(title)),
+  // Warrior's light attack, mid-swing
+  'art-lab': () => { setScene(new ArtLabScene(title)); run(0.15); },
 };
 
 declare global { interface Window { __test: unknown } }
