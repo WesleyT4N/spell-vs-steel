@@ -154,14 +154,6 @@ function shatterShards(x: number, y: number): void {
   emit(16, () => part(x + rnd(-9, 9), y - rnd(2, 21), { vx: rnd(-50, 50), vy: rnd(-60, 0), g: 200, life: rnd(0.3, 0.6), ramp: ['#fcfcfc', '#a4e4fc', '#3cbcfc', '#0058f8'], size: rnd(1, 2.5), box }));
   emit(5, () => part(x + rnd(-8, 8), y - rnd(2, 18), { vx: rnd(-6, 6), vy: rnd(-5, -1), life: rnd(0.6, 1), ramp: ['#a4e4fc', '#3cbcfc', '#0058f8'], size: rnd(2, 3), shrink: -0.2, dither: true, box }));
 }
-/** Holy light: a column of light standing on a panel, 24 tall. */
-function lightColumn(c: Ctx, x: number, y: number, p: number, w0 = 10): void {
-  const w = Math.max(2, Math.round(w0 * (1 - p * 0.6))), h = Math.round(24 * Math.min(1, p * 5));
-  for (let yy = 0; yy < h; yy += 2) P(c, HOLY[1 + ((yy >> 2) + Math.floor(p * 12)) % 3], x - w / 2, y - yy - 2, w, 2);
-  P(c, HOLY[3], x - 1, y - h, 2, h - 2);
-  if (p < 0.25) blob(c, '#fcfcfc', x, y - 4, 3);
-  glow(c, x, y - 8, 11, '248,216,120', 0.6 * (1 - p));
-}
 /** A rising green cross. */
 function cross(c: Ctx, x: number, y: number, col: string, s = 1): void {
   P(c, '#000000', x - 1 - s, y - 1, 3 + 2 * s, 3); P(c, '#000000', x - 1, y - 1 - s, 3, 3 + 2 * s);
@@ -350,27 +342,6 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
       }
       break;
     }
-    case 'holyPillar': {
-      lightColumn(c, x, y, p);
-      if (once(e, 'm')) emit(10, () => mote(x + rnd(-8, 8), y - rnd(0, 6), [HOLY[3], HOLY[2], HOLY[1]], boxF(x, y)));
-      break;
-    }
-    case 'holyNova': {
-      // a burst of light: a golden ring, rays and motes
-      const r = Math.min(11, 4 + p * 9);
-      ring(c, p < 0.4 ? '#fcfcfc' : HOLY[2], x, y - 10, r, r * 0.8);
-      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + p, r0 = r * 0.5; P(c, HOLY[3], x + Math.cos(a) * r0, y - 10 + Math.sin(a) * r0 * 0.8, 1, 2); }
-      glow(c, x, y - 10, 12, '248,216,120', 0.6 * (1 - p));
-      if (once(e, 'm')) emit(14, () => mote(x + rnd(-9, 9), y - rnd(0, 18), [HOLY[3], HOLY[2], HOLY[1]], boxF(x, y)));
-      break;
-    }
-    case 'shadowHit': {
-      // a shadow bolt landing: dark motes collapsing inward
-      const r = 14 * (1 - p);
-      for (let i = 0; i < 10; i++) { const ang = (i / 10) * Math.PI * 2; P(c, SHADOW[1 + (i % 3)], x + Math.cos(ang) * r, y - 10 + Math.sin(ang) * r * 0.7, 2, 2); }
-      glow(c, x, y - 10, 12, '152,120,248', 0.5 * (1 - p));
-      break;
-    }
     case 'healBurst': {
       // green crosses and light motes rising around the fighter
       for (let i = 0; i < 5; i++) {
@@ -522,15 +493,6 @@ function impact(c: Ctx, e: Fx, x: number, y: number, p: number, d: number): void
 export function drawShot(c: Ctx, b: Battle, p: Projectile, x: number, y: number, dir: number): boolean {
   const ph = Math.floor(b.time * 20) % 2;
   const sx = X0 + (p.from ?? p.x) * PW + PW / 2, flown = Math.abs(x - sx);
-  if (p.kind === 'spark') {
-    // Holy Spark: a golden dart with a glittering tail, a warm flash at the hand
-    if (flown < 10) { glow(c, sx, y, 7, '248,216,120', 0.7 * (1 - flown / 10)); blob(c, HOLY[3], sx, y, 2); }
-    const len = Math.min(12, flown), tx = x - dir * len, xa = Math.round(Math.min(tx, x)), xb = Math.round(Math.max(tx, x));
-    P(c, '#000000', xa, y - 2, xb - xa, 5); P(c, HOLY[1], xa, y - 1, xb - xa, 3); P(c, HOLY[3], xa, y, xb - xa, 1);
-    for (let i = 0; i < 4; i++) P(c, HOLY[2], tx + (x - tx) * (i / 4), y + ((i * 7 + ph) % 5) - 2, 1, 1);
-    blob(c, '#000000', x, y, 3); blob(c, HOLY[2], x, y, 2); P(c, HOLY[3], x - 1, y - 1, 2, 2);
-    return true;
-  }
   if (p.kind === 'orb') {
     // Arcane Bolt: an orb with two circling motes and a dithered comet trail, a flare at the hand
     if (flown < 10) { const s = 1 - flown / 10; glow(c, sx, y, 7, '248,120,248', 0.7 * s); flare(c, sx, y, 3 * s + 1, ARC[2], false); }

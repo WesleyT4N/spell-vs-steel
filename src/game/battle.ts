@@ -884,9 +884,9 @@ export class Battle {
   }
 
   /** A basic shot down the row at a set speed, so the target can step out of its way. */
-  flyingShot(f: Fighter, kind: 'orb' | 'spark' | 'beam' | 'knife' | 'aimed', dmg: number, opts: HitOpts, pierce = false): void {
+  flyingShot(f: Fighter, kind: 'orb' | 'spark' | 'beam' | 'knife' | 'aimed', dmg: number, opts: HitOpts, pierce = false, hitFx?: string): void {
     const speed = kind === 'aimed' ? TUNING.ranger.aimedSpeed : ((TUNING as Record<string, unknown>)[f.cls] as { shotSpeed?: number } | undefined)?.shotSpeed ?? TUNING.maxShotSpeed;
-    this.shoot(f, { speed: speed * this.dir(f), kind, reflectable: false, pierce, onHit: basicShot({ side: f.side, dmg, opts }) });
+    this.shoot(f, { speed: speed * this.dir(f), kind, reflectable: false, pierce, onHit: basicShot({ side: f.side, dmg, opts, ...(hitFx ? { fx: hitFx } : {}) }) });
   }
 
   /** Hit a set of cells for the attacker. Enemy walls in the cells take the hit too. */
@@ -992,12 +992,12 @@ export class Battle {
     if (f.poisonT <= 0) { f.poison = 0; f.poisonAcc = 0; }
   }
 
-  /** Put a Priest DoT on `t`, picking them wherever they are (misses in Stealth). Recasting refreshes it. */
-  addDot(t: Fighter, src: Fighter, id: string, dps: number, secs: number): boolean {
+  /** Put a Priest DoT on `t`, picking them wherever they are (misses in Stealth). Recasting refreshes it. `fx` is its look. */
+  addDot(t: Fighter, src: Fighter, id: string, dps: number, secs: number, fx: string): boolean {
     if (t.dead || t.st.iceBlock > 0) return false;
     if (!this.targetable(t)) { this.text(t, 'MISS', '#bcbcbc'); return false; }
     t.dots = [...t.dots.filter(d => d.id !== id), { id, dps, t: secs, acc: 0, src: src.side }];
-    this.addFx('shadowHit', src.side, t.col, t.row, 0.35);
+    this.addFx(fx, src.side, t.col, t.row, 0.35);
     return true;
   }
 
