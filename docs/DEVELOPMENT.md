@@ -41,6 +41,7 @@ npm run test:screens  # every screen at every screen shape, saved to test-result
 ```
 
 - **Full matches** (`tests/matches.ts`): CPU vs CPU for every class pair (mirrors included) at every CPU level, plus every ready-made deck, three seeds each. Every frame checks rules that hold whatever the balance is (HP and resources in range, fighters on the grid and apart, nothing piling up), and every match must end in a KO. Ready-made decks must be legal. A failure prints its seed: `npx tsx tests/matches.ts --seed 123 --only warrior,mage` replays it.
+- **Mods** (`tests/mods.ts`): every file in `mods/` parses, and broken or hostile mod files (unknown keys, `__proto__`, bad colors, wrong sizes) are refused. The format is in [MODDING.md](MODDING.md).
 - **Screens** (`tests/screens/`): `src/dev/screens.ts` opens each screen the way the game does (title, options, every select step, stage select, each deck builder, online lobby, the Draw screen, a fight, pause, a whole round to the results, training, each tutorial, dev tools), and `run.ts` shoots it at 4:3, 3:2, 16:9, 21:9, 32:9, phone portrait and phone landscape. A shot fails if the page throws or logs an error, the screen is blank, or it doesn't fill the window the way `fit()` promises. Shots are seeded with a frozen clock, so the same code always draws the same pixels. **Add new screens to `src/dev/screens.ts`** (the Art Lab's Screens tab lists them too).
 - **Visual diff**: on a PR, CI also shoots main and lists every screen whose pixels changed (in the job summary), with base, PR and diff images side by side in the `screens-report` artifact (`report/report.html`). Changes there are expected when a PR touches visuals, so they never fail the build; they're there to spot changes nobody meant to make.
 
@@ -119,4 +120,5 @@ Every number worth tuning is in [`src/game/tuning.ts`](../src/game/tuning.ts). S
 - `src/art/` Cartridge NES sprites, the Grand Colosseum arena, the logo
 - `src/game/` battle rules (`battle.ts`), spells, decks, CPU, drawing (`battleView.ts`)
 - `src/scenes/` title, tutorial, setup, deck builder, battle (Draw screen, pause, results), online lobby and online battle, options, controls, card faces (`cardView.ts`); clickable zones live in `scene.ts`
+- `src/mods/` the data-only mod format (`format.ts`) and the loader for `mods/*.json` (`index.ts`); see [MODDING.md](MODDING.md)
 - `src/net/` online play: packets, transports, the session, rollback (`rollback.ts`, `snapshot.ts`), the desync checksum

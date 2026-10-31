@@ -2,7 +2,7 @@
 // Rogue, Ranger and Priest are the Classic set (art/classic-sprites.ts); their skins recolor the tint letters b/c/d.
 import type { Ctx } from '../engine/gfx';
 import { HIRES } from './hiresSprites';
-import { FRAMES, type FrameId } from './fighterFrames';
+import { FRAMES, type FrameId, type FrameSet } from './fighterFrames';
 import { PORTRAITS } from './portraits';
 
 /** Draw the 24px fighters from the reference sheet (art/hi-res) instead of the ~18px Cartridge sprites. */
@@ -46,7 +46,25 @@ const DEFS: Record<ClassId, SpriteDef> = {
 };
 
 /** A skin recolors palette letters and may repaint a few inner pixels; the outline never changes. */
-export interface Skin { id: string; name: string; set: Record<string, string>; px?: Array<[number, number, string]> }
+export interface Skin {
+  id: string; name: string; set: Record<string, string>; px?: Array<[number, number, string]>;
+  /** A skin with its own drawn art (a skin mod, see docs/MODDING.md) instead of a recolor. */
+  art?: SkinArt;
+}
+
+/** Drawn art for a skin: its own palette, every animation frame, and optionally a portrait. Plain data. */
+export interface SkinArt {
+  /** Palette by letter index ('a' is index 0, the outline). */
+  pal: string[];
+  /** Palette letter of the main cloth color (HUD ribbons, swatches). */
+  team: string;
+  /** Column of the feet in the frames. */
+  ax: number;
+  /** Animation frames, the same ids and size as the class's own; idle0 is required, missing ones fall back to it. */
+  frames: Partial<Record<FrameId, string[]>>;
+  /** Character select bust, the same size as the class's own portrait. */
+  portrait?: string[];
+}
 
 // Fighting-game style colors from the approved skins page (art/skins-data.ts). The first is the default.
 export const SKINS: Record<ClassId, Skin[]> = {
@@ -103,6 +121,22 @@ export const SKINS: Record<ClassId, Skin[]> = {
 };
 
 export const skinOf = (cls: ClassId, id: string): Skin => SKINS[cls].find(s => s.id === id) ?? SKINS[cls][0];
+
+/** Add a skin with drawn art to a class (skin mods). Built-ins keep their order; mod skins go after them. */
+export function addSkin(cls: ClassId, skin: Skin): boolean {
+  const list = SKINS[cls];
+  if (!list || list.some(s => s.id === skin.id)) return false;
+  list.push(skin);
+  return true;
+}
+
+/** The idle frame trimmed to its opaque columns and rows, as the still sprite of an art skin. */
+function artStill(art: SkinArt): { rows: string[]; ax: number } {
+  const f = art.frames.idle0!;
+  let x0 = f[0].length, x1 = -1, y0 = f.length;
+  f.forEach((r, y) => { for (let x = 0; x < r.length; x++) if (r[x] !== '.') { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); } });
+  return { rows: f.slice(y0).map(r => r.slice(x0, x1 + 1)), ax: art.ax - x0 };
+}
 export const defaultSkin = (cls: ClassId): string => SKINS[cls][0].id;
 
 /** Mirror matches: when both pick the same class and color, the second player takes the next color. */
@@ -113,6 +147,8 @@ export function mirrorSkin(cls: ClassId, mine: string, theirs: string): string {
 
 /** Palette and pixel rows for a class in a skin (plus the mirror-match ALT recolor). */
 function skinned(cls: ClassId, skinId: string, alt: boolean): { pal: string[]; rows: string[] } {
+  const art = skinOf(cls, skinId).art;
+  if (art) return { pal: art.pal, rows: artStill(art).rows };
   if (USE_HIRES) {
     const h = HIRES[cls], pal = h.pal.slice();
     for (const [ch, col] of Object.entries(h.skins[skinOf(cls, skinId).id] ?? {})) pal[ch.charCodeAt(0) - 97] = col;
@@ -172,7 +208,8 @@ export function getSprite(cls: ClassId, skin: string, alt: boolean): Sprite {
     const tints: Tint[] = ['none', 'flash', 'ice', 'stun', 'ghost'];
     const img = {} as Record<Tint, HTMLCanvasElement>;
     for (const t of tints) img[t] = bake({ rows }, pal, t);
-    const ax = USE_HIRES ? HIRES[cls].ax : def.ax;
+    const art = skinOf(cls, skin).art;
+    const ax = art ? artStill(art).ax : USE_HIRES ? HIRES[cls].ax : def.ax;
     s = { w: rows[0].length / RES, h: rows.length / RES, ax: ax / RES, res: RES, img };
     cache.set(key, s);
   }
@@ -182,7 +219,7 @@ export function getSprite(cls: ClassId, skin: string, alt: boolean): Sprite {
 const frameCache = new Map<string, Sprite>();
 /** One animation frame of a fighter (art/fighterFrames.ts) in a skin. Falls back to the idle frame. */
 export function getFrame(cls: ClassId, skin: string, alt: boolean, frame: FrameId): Sprite {
-  const set = FRAMES[cls], id = set.frames[frame] ? frame : 'idle0';
+  const set: FrameSet = skinOf(cls, skin).art ?? FRAMES[cls], id = set.frames[frame] ? frame : 'idle0';
   const key = `${cls}:${skin}${alt ? ':alt' : ''}:${id}`;
   let s = frameCache.get(key);
   if (!s) {
@@ -200,7 +237,13 @@ const portraitCache = new Map<string, HTMLCanvasElement>();
 export function getPortrait(cls: ClassId, skin: string): HTMLCanvasElement {
   const key = `${cls}:${skinOf(cls, skin).id}`;
   let img = portraitCache.get(key);
-  if (!img) { img = bake({ rows: PORTRAITS[cls] }, skinned(cls, skin, false).pal, 'none'); portraitCache.set(key, img); }
+  if (!img) {
+    const art = skinOf(cls, skin).art;
+    // an art skin without its own portrait shows the class's default one
+    img = art && !art.portrait ? getPortrait(cls, defaultSkin(cls))
+      : bake({ rows: art?.portrait ?? PORTRAITS[cls] }, skinned(cls, skin, false).pal, 'none');
+    portraitCache.set(key, img);
+  }
   return img;
 }
 
@@ -283,6 +326,8 @@ export function spriteRows(s: Sprite): Array<Array<[number, string]>> {
 /** The main team color of a fighter, for HUD accents. */
 export function teamColor(cls: ClassId, skin: string, alt: boolean): string {
   // the tabard (Warrior h), robe (Mage c) or the mid tint tone (c) of the Classic set
+  const art = skinOf(cls, skin).art;
+  if (art) return art.pal[art.team.charCodeAt(0) - 97];
   if (USE_HIRES) return skinned(cls, skin, alt).pal[HIRES[cls].team.charCodeAt(0) - 97];
   return skinned(cls, skin, alt).pal[cls === 'warrior' ? 7 : 2];
 }

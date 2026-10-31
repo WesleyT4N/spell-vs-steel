@@ -53,6 +53,11 @@ export function run(seconds: number, until?: () => boolean): void {
 }
 const title = (): void => setScene(new TitleScene());
 const match = (over: Partial<MatchConfig> = {}): MatchConfig => ({ ...loadMatch(), ...over });
+/** Mage in the Wizard skin against Ranger in the Druid skin (the example skin mods). */
+const modSkins = (): MatchConfig => {
+  const m = loadMatch();
+  return { ...m, p1: 'mage', cpu: 'ranger', p1Skin: { ...m.p1Skin, mage: 'wizard' }, cpuSkin: { ...m.cpuSkin, ranger: 'druid' } };
+};
 const battle = (): BattleScene => getScene() as BattleScene;
 
 /** An arcade run as a warrior, `at` fights won, with the same ladder every time. */
@@ -241,6 +246,8 @@ export const screens: Record<string, () => void> = {
   'select-skin': () => setScene(new CharSelectScene(undefined, 1)),
   'select-rival': () => setScene(new CharSelectScene(undefined, 2)),
   'select-rival-skin': () => setScene(new CharSelectScene(undefined, 3)),
+  // skin mods (mods/*.json): the Wizard Mage against the Druid Ranger, choosing the rival's color
+  'select-mod-skins': () => { saveMatch(modSkins()); setScene(new CharSelectScene(undefined, 3)); },
   // the spell deck select: both sides in versus, the cursor on the CPU's list, on the bottom row; arcade and training
   'deck-select': () => setScene(new DeckSelectScene()),
   'deck-select-cpu': () => { const d = new DeckSelectScene(); d.side = 1; setScene(d); },
@@ -362,6 +369,7 @@ export const screens: Record<string, () => void> = {
     const b = battle().b; b.endCustom([[], []]); run(1);
     const f = b.f[0]; f.empowered = 1.25; f.queue = ['meteor', 'fireball']; f.resMax = 5; f.res = 5; run(0.2);
   },
+  'battle-mod-skins': () => { setScene(new BattleScene(modSkins())); run(0.5); battle().b.endCustom([[0], [0]]); run(2.5); },
   'battle-fight': () => { watch(); run(8, () => battle().b.phase === 'over'); },
   // mid-fight as the player, so phones show the fight pad
   'battle-player': () => { setScene(new BattleScene(match({ p1: 'priest', cpu: 'ranger' }))); run(0.5); battle().b.endCustom([[0, 1], []]); run(3); },
@@ -447,6 +455,9 @@ export const screens: Record<string, () => void> = {
   'art-lab': () => { setScene(new ArtLabScene(title, { tab: 'warrior', section: 'fx', zoom: 1 })); run(0.15); },
   'art-lab-anims': () => { setScene(new ArtLabScene(title, { tab: 'rogue', section: 'anims', entry: 6, zoom: 3 })); run(0.35); },
   'art-lab-sprites': () => { setScene(new ArtLabScene(title, { tab: 'mage', section: 'sprites' })); run(0.05); },
+  // the example skin mods in the lab: the Wizard Mage's frames, the Druid Ranger animating
+  'art-lab-sprites-mod': () => { setScene(new ArtLabScene(title, { tab: 'mage', section: 'sprites', skin: 'wizard' })); run(0.05); },
+  'art-lab-anims-mod': () => { setScene(new ArtLabScene(title, { tab: 'ranger', section: 'anims', entry: 6, zoom: 3, skin: 'druid' })); run(0.35); },
   'art-lab-sounds': () => { setScene(new ArtLabScene(title, { tab: 'priest', section: 'sounds', entry: 7 })); run(0.6); },
   // every panel state on the first stage
   'art-lab-stages': () => { setScene(new ArtLabScene(title, { tab: 'stages', entry: 1 })); run(0.15); },
