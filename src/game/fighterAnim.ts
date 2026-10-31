@@ -16,7 +16,7 @@ const RAGE = ['#fcfcfc', '#f8b800', '#f83800', '#a81000'];
 const SMOKE = ['#bcbcbc', '#7c7c7c', '#3c3c3c'];
 
 /** How long each animation runs, in seconds. Steps finish inside TUNING.moveCooldown so the sprite is home before the next one. */
-const STEP = { warrior: 0.08, mage: 0.1, rogue: 0.12, ranger: 0.09, priest: 0.09 } satisfies Record<ClassId, number>;
+const STEP: Record<ClassId, number> = { warrior: 0.08, mage: 0.1, rogue: 0.12, ranger: 0.09, priest: 0.09 };
 const HIT = 0.28;
 const CAST = 0.45;
 

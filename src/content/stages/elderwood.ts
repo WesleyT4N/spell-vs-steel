@@ -4,7 +4,7 @@ import { stamp, sky, mod, bands, halo, clump, BW, XL, XR, YT, YB } from '../../a
 import { inkedStage, poly, IVY, IVY_INK } from './inked';
 
 export default inkedStage({
-  id: 'elderwood', name: 'Elderwood Ruins', tag: 'An overgrown temple at dusk', panelSeed: 909,
+  id: 'elderwood', music: 'stage_elderwood', name: 'Elderwood Ruins', tag: 'An overgrown temple at dusk', panelSeed: 909,
   panel: { face: '#b08a3c', hi: '#e8c878', lo: '#6a5020', lip: '#4a3818', lipLo: '#000000' },
   tex(c, x, y, w, h, r){
     const corner = Math.floor(r() * 4), mx = corner % 2 ? x + w - 5 : x, my = corner > 1 ? y + h - 2 : y;

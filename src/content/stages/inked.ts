@@ -4,10 +4,12 @@ import { clamp, vnoise, type Ctx } from '../../engine/gfx';
 import type { PanelLook, Stage } from '../../art/arena';
 import { wide, put, BW, XL, XR } from '../../art/ink';
 import type { StageModule } from './registry';
+import type { TrackId } from '../../engine/musicTracks';
 
 /** A stage as drafted: static layers painted once, animated bits drawn every frame. */
 export interface StageDef {
   id: string;
+  music?: TrackId;
   name: string;
   tag: string;
   panelSeed: number;
@@ -42,7 +44,7 @@ export class DraftStage implements Stage {
 }
 
 /** A stage module from a StageDef: built (and its static layers painted) the first time it is shown. */
-export const inkedStage = (d: StageDef): StageModule => ({ id: d.id, create: () => new DraftStage(d) });
+export const inkedStage = (d: StageDef): StageModule => ({ id: d.id, music: d.music, create: () => new DraftStage(d) });
 
 export function poly(c: Ctx, pts: number[][], fill: string): void {
   c.fillStyle = fill; c.beginPath();

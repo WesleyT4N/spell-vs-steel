@@ -129,6 +129,9 @@ export interface ClassLessons {
   drawRes?: number;
 }
 
+/** A class id: any id in the class registry (built-ins are warrior, mage, rogue, ranger, priest). */
+export type ClassId = string;
+
 /** One spell the Art Lab plays on loop. */
 export interface LabSpell {
   card: string;

@@ -7,7 +7,7 @@
 // back and replays when the real ones land. The delay grows a little with ping so corrections stay
 // short; a long silence still waits (after MAX_ROLLBACK guessed frames).
 import { CARDS } from '../game/cards';
-import { SKINS, type ClassId } from '../art/sprites';
+import { CLASS_IDS } from '../game/classes';
 import { PROTOCOL, decodeInput, encodeInput, type Hello, type Lobby, type NetInput, type Packet } from './protocol';
 import type { Transport } from './transport';
 
@@ -254,8 +254,7 @@ function keepalive(net: NetSession): (() => void) | undefined {
 }
 
 function validHello(h: Hello): boolean {
-  const classes = Object.keys(SKINS) as ClassId[];
-  if (!classes.includes(h.cls) || typeof h.skin !== 'string') return false;
+  if (!CLASS_IDS.includes(h.cls) || typeof h.skin !== 'string') return false;
   if (h.deck.length < 1 || h.deck.length > 40) return false;
   return h.deck.every(id => CARDS[id]?.cls === h.cls);
 }

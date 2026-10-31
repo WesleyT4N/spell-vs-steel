@@ -11,7 +11,7 @@ function inWin(x: number, y: number): boolean {
 }
 
 export default inkedStage({
-  id: 'archive', name: 'Arcane Archive', tag: 'A candlelit library tower', panelSeed: 707,
+  id: 'archive', music: 'stage_archive', name: 'Arcane Archive', tag: 'A candlelit library tower', panelSeed: 707,
   panel: { face: '#4a34a8', hi: '#7a5ce0', lo: '#2a1a78', lip: '#1c1258', lipLo: '#000000' },
   tex(c, x, y, w, h, r){
     const g = [[1,0,1,0,1, 0,1,1,1,0, 1,0,1,0,1], [0,1,1,1,0, 1,0,1,0,1, 0,1,1,1,0], [1,1,0,1,1, 0,1,1,1,0, 0,0,1,0,0]][Math.floor(r() * 3)];

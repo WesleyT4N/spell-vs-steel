@@ -3,7 +3,6 @@ import { pushScene, popScene, drawMenu, hint, listMouse, showSel, type Scene } f
 import { getArena, useStage } from '../game/battleView';
 import { BattleScene } from './battle';
 import { loadMatch } from '../game/match';
-import type { ClassId } from '../art/sprites';
 import { drawStage } from '../art/arena';
 import { UW, screenRect, spread, type Ctx } from '../engine/gfx';
 import { drawTextCentered } from '../engine/font';
@@ -72,7 +71,7 @@ export function devFromHash(): boolean {
   if (tag.startsWith('bench')) {
     const [stage = 'colosseum', a = 'mage', b = 'priest'] = tag.split('=')[1]?.split(',') ?? [];
     useStage(stage);
-    pushScene(new BattleScene({ ...loadMatch(), p1: a as ClassId, cpu: b as ClassId, p1Deck: 'starter', cpuDeck: 'starter', stage, bestOf: 5 }, [0, 0], undefined, [], ['cpu', 'cpu']));
+    pushScene(new BattleScene({ ...loadMatch(), p1: a, cpu: b, p1Deck: 'starter', cpuDeck: 'starter', stage, bestOf: 5 }, [0, 0], undefined, [], ['cpu', 'cpu']));
     return true;
   }
   if (!['cards', 'sandbox', 'lab', 'art', 'voices', 'dev'].includes(tag)) return false;

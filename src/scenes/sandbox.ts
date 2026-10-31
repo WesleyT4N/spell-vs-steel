@@ -16,7 +16,8 @@ import { UW, UH, P, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, isDown, heldDir, mouse, getKey, BINDABLE } from '../engine/input';
 import type { PadMode } from '../engine/touch';
-import { playMusic, stopMusic, stageTrack, chargeHum } from '../engine/audio';
+import { playMusic, stopMusic, chargeHum } from '../engine/audio';
+import { stageMusic } from '../content/stages';
 import { instrument, sourceName, type Hit, type Probe } from '../dev/instrument';
 import { classIds } from '../dev/simulate';
 import { h, btn, choice, check, reserveRight } from '../dev/dom';
@@ -67,7 +68,7 @@ export class SandboxScene implements Scene {
   }
 
   enter(): void {
-    playMusic(stageTrack(getArena().id));
+    playMusic(stageMusic(getArena().id));
     this.mount();
     window.addEventListener('keydown', this.onKey);
   }

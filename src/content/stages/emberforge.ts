@@ -5,7 +5,7 @@ import { stamp, mod, tone, disc, ball, halo, blocks, sparks, BW, XL, XR, YT, YB 
 import { inkedStage } from './inked';
 
 export default inkedStage({
-  id: 'emberforge', name: 'Emberforge', tag: 'A dwarven forge in a volcano', panelSeed: 1010,
+  id: 'emberforge', music: 'stage_emberforge', name: 'Emberforge', tag: 'A dwarven forge in a volcano', panelSeed: 1010,
   panel: { face: '#5a4a44', hi: '#8a7a6a', lo: '#2a201c', lip: '#3a2e28', lipLo: '#000000' },
   tex(c, x, y, w, h){
     [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]].forEach(([dx, dy]) => P(c, '#d8a030', x + dx, y + dy));

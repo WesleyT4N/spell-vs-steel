@@ -12,7 +12,8 @@ import { starterDeck, toList } from '../game/deck';
 import { registerPfx, unregisterPfx, registerShotPfx, unregisterShotPfx } from '../game/pfx';
 import { EFFECTS, PLAYS, SHOT_PLAYS } from '../fx';
 import { playBattleEvent } from '../engine/battleAudio';
-import { unlockAudio, playMusic, stopMusic, stageTrack } from '../engine/audio';
+import { unlockAudio, playMusic, stopMusic } from '../engine/audio';
+import { stageMusic } from '../content/stages';
 import { UW, UH, P, type Ctx } from '../engine/gfx';
 import { drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k } from '../engine/input';
@@ -87,14 +88,14 @@ export class ArtLabScene implements Scene {
   private onResize = (): void => this.layout();
 
   constructor(private back: () => void = popScene) {
-    if (!CLASSES.has(saved.cls)) saved.cls = CLASSES.ids[0] as ClassId;
+    if (!CLASSES.has(saved.cls)) saved.cls = CLASSES.ids[0];
     this.restart();
   }
 
   pad(): PadMode { return 'none'; }
 
   enter(): void {
-    playMusic(stageTrack(getArena().id));
+    playMusic(stageMusic(getArena().id));
     this.mount();
     window.addEventListener('keydown', this.onKey);
     window.addEventListener('resize', this.onResize);
@@ -152,7 +153,7 @@ export class ArtLabScene implements Scene {
     if (wasPressed('confirm')) { unlockAudio(); this.restart(); }
     if (wasPressed('lb') || wasPressed('rb')) {
       const ids = CLASSES.ids, i = ids.indexOf(saved.cls);
-      this.setClass(ids[(i + (wasPressed('rb') ? 1 : ids.length - 1)) % ids.length] as ClassId);
+      this.setClass(ids[(i + (wasPressed('rb') ? 1 : ids.length - 1)) % ids.length]);
     }
     if (wasPressed('pause') && !wasPressed('back')) this.togglePause();
     if (this.paused && !this.step) return;
@@ -225,7 +226,7 @@ export class ArtLabScene implements Scene {
     if (!this.body) return;
     const big = 'min-height:32px;';
     const tabs = h('div', { class: 'row' },
-      ...CLASSES.ids.map(id => { const b = btn(CLASSES.get(id)!.info.name, () => this.setClass(id as ClassId), id === saved.cls ? 'on' : ''); b.style.cssText = big; return b; }),
+      ...CLASSES.ids.map(id => { const b = btn(CLASSES.get(id)!.info.name, () => this.setClass(id), id === saved.cls ? 'on' : ''); b.style.cssText = big; return b; }),
       ...LATER.map(t => { const b = btn(t, () => {}); b.disabled = true; b.title = 'Coming next'; b.style.cssText = big; return b; }),
     );
     const looks = choice(this.looks().map(l => [String(l), this.lookName(l)] as [string, string]), String(saved.look), v => {
