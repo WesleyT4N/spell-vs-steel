@@ -3,7 +3,6 @@
 import { P, blob, glow, type Ctx } from '../engine/gfx';
 import { panelFoot, PW, X0 } from '../art/arena';
 import { drawFighterSprite, type Sprite } from '../art/sprites';
-import { drawTextCentered } from '../engine/font';
 import type { Battle, Fighter, Fx, Projectile } from './battle';
 import { team } from './teamColors';
 import { drawPfx } from './pfx';
@@ -242,71 +241,6 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
       break;
     }
     case 'explode': explosion(c, e, x, y, p, e.dur >= 0.45 * TUNING.fxSlow ? 1.4 : 1); break;
-    case 'pillar': {
-      // the panel glows, then a pillar of flame as tall as a fighter erupts and leaves embers rising
-      if (p < 0.15) { const k = p / 0.15; dblob(c, FIRE[0], x, y - 6, Math.round(2 + k * 4), ph); break; }
-      const q = (p - 0.15) / 0.85, hgt = Math.round(24 * Math.min(1, q * 4)), wid = Math.round(7 * (1 - q * 0.5)), t = b.time;
-      for (let yy = 0; yy < hgt; yy++) {
-        const wob = Math.round(Math.sin(yy * 0.5 + t * 30) * 2), w = wid + ((yy * 7 + Math.floor(t * 40)) % 3), k = yy / Math.max(1, hgt);
-        P(c, '#a81000', x - w - 1 + wob, y - yy, (w + 1) * 2, 1);
-        P(c, HEAT[Math.min(8, 5 + Math.floor(k * 3))], x - w + wob, y - yy, w * 2, 1);
-        P(c, HEAT[Math.min(8, 1 + Math.floor(k * 5))], x - (w >> 1) + wob, y - yy, w, 1);
-      }
-      if (q < 0.25) blob(c, '#fcfcfc', x, y - 4, 4);
-      if (Math.random() < 0.7) ember(x + rnd(-wid, wid), y - rnd(0, hgt), boxF(x, y), { vx: rnd(-30, 30), vy: rnd(-60, -20), g: 30 });
-      break;
-    }
-    case 'meteorFall': {
-      // a burning rock streaks in from above with a growing shadow on its target
-      const k = Math.min(1, p), mx = x - d * 60 * (1 - k), my = y - 12 - 110 * (1 - k) ** 1.2, fl = ph % 2;
-      const sr = Math.round(3 + k * 8);
-      for (let i = -sr; i <= sr; i++) if ((i + fl) & 1) P(c, '#000000', x + i, y - 2, 1, 1);
-      if (Math.random() < 0.9) ember(mx + rnd(-3, 3), my + rnd(-3, 3), boxC(mx, my), { vx: d * -rnd(10, 40), vy: rnd(-40, -10), g: 10, life: rnd(0.2, 0.4), ramp: HEAT.slice(2) });
-      if (Math.random() < 0.5) smoke(mx - d * 5, my - 4, boxC(mx, my), { vx: d * -rnd(15, 30), vy: rnd(-20, -10), size: 3, life: 0.5 });
-      dblob(c, '#f87800', mx, my, 11, fl); blob(c, '#000000', mx, my, 7);
-      blob(c, '#581000', mx, my, 6); blob(c, '#a81000', mx + d, my + 1, 5); blob(c, FIRE[0], mx + d, my + 1, 4);
-      blob(c, FIRE[2], mx + 2 * d, my + 2, 2); P(c, '#fcfcfc', mx + 3 * d, my + 3, 2, 1);
-      P(c, '#3c3c3c', mx - d, my - 2, 2, 2); P(c, '#3c3c3c', mx - 3 * d, my + 1, 1, 2);
-      break;
-    }
-    case 'shard': {
-      // an icicle drops onto the panel (its frost shadow growing) and shatters into shards and mist
-      const fall = Math.min(1, p * 2), ix = x + 6 * (1 - fall), iy = y - 2 - 22 * (1 - fall) ** 1.5;
-      if (fall < 1) {
-        const r = Math.round(2 + fall * 8);
-        for (let k = -r; k <= r; k++) if ((k + ph) & 1) P(c, ICE[0], x + k, y - 3, 1, 1);
-        P(c, '#000000', ix - 2, iy - 9, 5, 10); P(c, ICE[0], ix - 1, iy - 8, 3, 8); P(c, ICE[2], ix - 1, iy - 8, 1, 7); P(c, '#fcfcfc', ix, iy - 1, 1, 2);
-        if (Math.random() < 0.6) part(ix + rnd(-1, 1), iy - 6, { vx: rnd(2, 8), vy: rnd(-8, 0), life: 0.25, ramp: SNOW, box: boxF(x, y) });
-      } else {
-        if (once(e, 'hit')) {
-          const box = boxF(x, y);
-          emit(12, () => part(x + rnd(-2, 2), y - 3, { vx: rnd(-45, 45), vy: rnd(-55, -10), g: 220, life: rnd(0.25, 0.5), ramp: SNOW, size: rnd(1, 2), box }));
-          emit(4, () => part(x + rnd(-6, 6), y - 2, { vx: rnd(-6, 6), vy: rnd(-5, -1), life: rnd(0.6, 1), ramp: ['#a4e4fc', '#3cbcfc', '#0058f8'], size: rnd(2, 3), shrink: -0.2, dither: true, box }));
-        }
-        for (let k = 0; k < 7; k++) P(c, k & 1 ? ICE[2] : '#fcfcfc', x - 8 + ((k * 5) % 17), y - 4 + ((k * 3) % 4), 2, 1);
-      }
-      break;
-    }
-    case 'arcaneHit': {
-      // a rune opens under the target, a column of force slams down, the orb bursts
-      arcaneBlast(c, e, x, y, p);
-      break;
-    }
-    case 'blink': {
-      // the body unravels into a column of arcane motes
-      if (once(e, 'm')) emit(14, () => mote(x + rnd(-8, 8), y - rnd(0, 20), [ARC[3], ARC[2], ARC[1]], boxF(x, y), { vy: rnd(-40, -15) }));
-      if (p < 0.35) { const h = Math.round(24 * (1 - p / 0.35)); P(c, ARC[2], x - 1, y - h, 2, h); P(c, ARC[3], x, y - h, 1, h); glow(c, x, y - 10, 11, '248,120,248', 0.5); }
-      break;
-    }
-    case 'nova': case 'novaZone': {
-      // an icy burst: a frost ring with crystals spiking out of the floor and a puff of snow
-      const r = Math.min(11, 4 + p * 8);
-      ring(c, p < 0.5 ? '#fcfcfc' : ICE[1], x, y - 2, r, 1 + p * 2);
-      for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + 0.3, rr = 3 + p * 7; crystal(c, x + Math.cos(a) * rr, y - 1 + Math.sin(a) * rr * 0.25, Math.round(6 * (1 - p)) + 1, 1); }
-      if (p < 0.3) glow(c, x, y - 6, 11, '164,228,252', 0.5);
-      snowBurst(e, x, y, 14);
-      break;
-    }
     case 'guard': case 'shieldHit': case 'spark': {
       // steel on steel: a white star flash and a spray of sparks
       const sx = e.kind === 'spark' ? x : x + d * 8, sy = y - 11;
@@ -332,12 +266,6 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
       if (p < 0.6) { c.globalAlpha = 0.3; P(c, HOLY[2], x - 9, y - h, 19, h); c.globalAlpha = 1; }
       if (p > 0.45 && p < 0.7) glow(c, x, y - 12, 12, col, 0.7);
       if (once(e, 'fl', p > 0.5)) emit(14, () => spark(x, y - 12, [HOLY[3], HOLY[2], HOLY[1]], boxF(x, y), 60, { g: 30 }));
-      break;
-    }
-    case 'counter': {
-      // a spell torn apart: a purple X with splintering shards
-      drawTextCentered(c, '×', x, y - 30 - p * 4, '#f878f8', 2);
-      if (once(e, 'sh')) emit(10, () => spark(x, y - 24, [ARC[3], ARC[2], ARC[1]], boxC(x, y - 24), 60));
       break;
     }
     case 'banner': {
@@ -531,27 +459,6 @@ export function drawShot(c: Ctx, b: Battle, p: Projectile, x: number, y: number,
     blob(c, '#000000', x, y, 3); blob(c, HOLY[2], x, y, 2); P(c, HOLY[3], x - 1, y - 1, 2, 2);
     return true;
   }
-  if (p.kind === 'orb') {
-    // Arcane Bolt: an orb with two circling motes and a dithered comet trail, a flare at the hand
-    if (flown < 10) { const s = 1 - flown / 10; glow(c, sx, y, 7, '248,120,248', 0.7 * s); flare(c, sx, y, 3 * s + 1, ARC[2], false); }
-    for (let i = 3; i >= 1; i--) { const tx = x - dir * i * 5; if (i * 5 > flown) continue; dblob(c, i > 1 ? ARC[0] : ARC[1], tx, y, 4 - i, ph + i); }
-    blob(c, '#000000', x, y, 4); blob(c, ARC[1], x, y, 3); blob(c, ARC[2], x, y, 2); P(c, ARC[3], x - dir, y - 1, 2, 2);
-    for (let i = 0; i < 2; i++) { const a = b.time * 28 + i * Math.PI; P(c, i ? ARC[2] : ARC[3], x + Math.cos(a) * 6 - 1, y + Math.sin(a) * 3 - 1, 2, 2); }
-    return true;
-  }
-  if (p.kind === 'beam') {
-    // Arcane Beam: a big orb boring down the row, two strands twisting in its wake, a rune flash at the hand
-    if (flown < 14) { const s = 1 - flown / 14; glow(c, sx, y, 8, '248,120,248', 0.7 * s); ring(c, ARC[2], sx, y, 3 * s + 1, 9 * s + 1, 2); }
-    const len = Math.min(26, flown), tx = x - dir * len, xa = Math.round(Math.min(tx, x)), xb = Math.round(Math.max(tx, x));
-    P(c, '#000000', xa, y - 2, xb - xa, 5); P(c, ARC[0], xa, y - 1, xb - xa, 3); P(c, ARC[3], xa, y, xb - xa, 1);
-    for (let xx = xa; xx < xb; xx++) {
-      const k = Math.abs(xx - tx) / Math.max(1, len), a = (xx - sx) * dir * 0.32 - b.time * 40, s = Math.round(Math.sin(a) * 3 * k), front = Math.cos(a) > 0;
-      P(c, front ? ARC[3] : ARC[1], xx, y + s, 1, 1); P(c, front ? ARC[1] : ARC[2], xx, y - s, 1, 1);
-    }
-    blob(c, '#000000', x, y, 6); blob(c, ARC[1], x, y, 5); blob(c, ARC[2], x, y, 3); P(c, ARC[3], x - dir - 1, y - 2, 2, 2);
-    glow(c, x, y, 11, '248,120,248', 0.4);
-    return true;
-  }
   if (p.kind === 'knife') {
     // Throwing Knife: a spinning blade with a grey speed trail
     const spin = Math.floor(b.time * 30) % 4, dx = [3, 2, 0, -2][spin], dy = [0, -2, -3, -2][spin];
@@ -568,17 +475,6 @@ export function drawShot(c: Ctx, b: Battle, p: Projectile, x: number, y: number,
     P(c, '#000000', x - (dir > 0 ? 1 : 3), y - 3, 4, 5); P(c, '#fcfcfc', x - (dir > 0 ? 0 : 2), y - 2, 3, 3);
     return true;
   }
-  if (p.kind === 'fireball') {
-    // a flickering ball of fire trailing embers and smoke
-    const box = boxC(x, y);
-    if (Math.random() < 0.9) ember(x - dir * 4, y + rnd(-3, 3), box, { vx: -dir * rnd(15, 40), vy: rnd(-14, 6), g: -10, life: rnd(0.15, 0.3), ramp: HEAT.slice(2) });
-    if (Math.random() < 0.3) smoke(x - dir * 6, y - 2, box, { vx: -dir * rnd(0, 10), vy: rnd(-8, -3), life: 0.4, size: 2 });
-    dblob(c, '#f87800', x, y, 8, ph);
-    blob(c, '#000000', x, y, 5); blob(c, '#a81000', x - dir, y, 4); blob(c, FIRE[0], x, y, 4);
-    blob(c, '#f87800', x + dir, y, 3); blob(c, FIRE[2], x + dir, y - ph, 2); blob(c, FIRE[3], x + 2 * dir, y - 1, 1); P(c, '#fcfcfc', x + 2 * dir, y - 1, 1, 1);
-    for (let i = 0; i < 3; i++) P(c, HEAT[4 + i], x - dir * (6 + i * 2) - (dir < 0 ? 2 : 0), y - 2 + ((i + ph) % 3) * 2, 3, 1);
-    return true;
-  }
   if (p.kind === 'arrow' || p.kind === 'sting') {
     P(c, '#000000', x - dir * 8 - (dir < 0 ? 11 : 0), y - 1, 12, 3);
     P(c, '#ac7c00', x - dir * 7 - (dir < 0 ? 9 : 0), y, 10, 1);
@@ -586,10 +482,6 @@ export function drawShot(c: Ctx, b: Battle, p: Projectile, x: number, y: number,
     P(c, '#fcfcfc', x - dir * 8, y - 1, 2, 1); P(c, '#fcfcfc', x - dir * 8, y + 1, 2, 1);
     P(c, '#7c7c7c', x - dir * 13, y, 3, 1); // air streak
     if (p.kind === 'sting' && Math.random() < 0.4) part(x, y + 1, { vy: 15, g: 80, life: 0.25, ramp: [TOX[2], TOX[1]], box: boxC(x, y) });
-    return true;
-  }
-  if (p.kind === 'gust') {
-    repulseWave(c, b, x, y, dir);
     return true;
   }
   return false;
@@ -633,15 +525,6 @@ export function drawBurn(c: Ctx, b: Battle, col: number, row: number): void {
 
 export const xOfShot = (p: Projectile): number => X0 + p.x * PW + PW / 2;
 
-// ---------- Mage basic attacks: the Arcane Orb ----------
-/** A four-point flare: long arms that shrink with k (1 = full). */
-function flare(c: Ctx, x: number, y: number, s: number, col: string, out = true): void {
-  x = Math.round(x); y = Math.round(y); s = Math.max(1, Math.round(s));
-  if (out) { P(c, '#000000', x - s - 1, y - 1, s * 2 + 3, 3); P(c, '#000000', x - 1, y - s - 1, 3, s * 2 + 3); }
-  P(c, col, x - s, y, s * 2 + 1, 1); P(c, col, x, y - s, 1, s * 2 + 1);
-  P(c, '#fcfcfc', x - (s >> 1), y, s + 1, 1); P(c, '#fcfcfc', x, y - (s >> 1), 1, s + 1);
-}
-
 // ---------- arcane spells ----------
 /** A flat rune circle on the floor: a ring, ticks turning around it and a few glyph marks. */
 function floorRune(c: Ctx, x: number, y: number, r: number, spin: number, col: string, hot: string): void {
@@ -649,56 +532,4 @@ function floorRune(c: Ctx, x: number, y: number, r: number, spin: number, col: s
   ring(c, col, x, y, r, r * 0.35);
   for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + spin, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r * 0.35; P(c, hot, px - 1, py, 2, 1); }
   if (r > 5) ring(c, col, x, y, r * 0.55, r * 0.2, 2);
-}
-/** Arcane Missiles in flight: an orb with a glowing core and a ribbon trail along its arc. */
-export function drawArcaneMissile(c: Ctx, b: Battle, at: (q: number) => { x: number; y: number }, q: number): void {
-  const box = boxC(at(q).x, at(q).y);
-  for (let i = 6; i >= 1; i--) {
-    const k = q - i * 0.035; if (k <= 0) continue;
-    const t = at(k);
-    if (i > 3) dblob(c, ARC[0], t.x, t.y, 1, i); else blob(c, i > 1 ? ARC[1] : ARC[2], t.x, t.y, i > 2 ? 1 : 2);
-  }
-  const { x, y } = at(q);
-  glow(c, x, y, 9, '248,120,248', 0.6);
-  blob(c, '#000000', x, y, 4); blob(c, ARC[1], x, y, 3); blob(c, ARC[2], x, y, 2); P(c, ARC[3], x - 1, y - 1, 2, 2);
-  const a = b.time * 30; P(c, ARC[3], x + Math.cos(a) * 5, y + Math.sin(a) * 2, 1, 1);
-  if (Math.random() < 0.5) part(x, y, { vx: rnd(-10, 10), vy: rnd(-6, 12), g: 20, life: rnd(0.15, 0.3), ramp: [ARC[3], ARC[2], ARC[1]], box });
-}
-/** Arcane Blast / Arcane Surge: a rune opens under the target, a column of force slams down, the orb bursts. */
-function arcaneBlast(c: Ctx, e: Fx, x: number, y: number, p: number): void {
-  const big = e.dur >= 0.45 * TUNING.fxSlow, cy = y - 11, box = boxF(x, y), spin = p * 8;
-  // the rune opens on the floor first
-  floorRune(c, x, y - 1, Math.min(11, 4 + p * 14), spin, ARC[1], ARC[3]);
-  // the column drops from the top of the box and slams into the panel
-  if (p > 0.12 && p < 0.6) {
-    const k = (p - 0.12) / 0.48, w = Math.max(1, Math.round((big ? 7 : 5) * (1 - k))), top = y - 24, h = Math.round(24 * Math.min(1, k * 4));
-    P(c, '#000000', x - w - 1, top, w * 2 + 3, h); P(c, ARC[1], x - w, top, w * 2 + 1, h); P(c, ARC[2], x - Math.ceil(w / 2), top, Math.ceil(w / 2) * 2 + 1, h); P(c, '#fcfcfc', x, top, 1, h);
-  }
-  // the burst: an orb that swells and pops, a flare, a shock ring rolling out along the floor
-  if (p > 0.25) {
-    const k = (p - 0.25) / 0.75;
-    if (k < 0.35) { const r = Math.round((big ? 8 : 6) * (k / 0.35)) + 1; blob(c, '#000000', x, cy, r + 1); blob(c, ARC[1], x, cy, r); blob(c, ARC[2], x, cy, r - 2); blob(c, '#fcfcfc', x, cy, Math.max(0, r - 4)); }
-    else if (k < 0.7) flare(c, x, cy, (big ? 11 : 8) * (1 - (k - 0.35) / 0.35) + 1, ARC[2]);
-    ring(c, k < 0.4 ? ARC[3] : ARC[1], x, y - 1, Math.min(11, 3 + k * 12), Math.min(4, 1 + k * 4), k > 0.5 ? 2 : 0);
-    if (big && k < 0.6) ring(c, ARC[2], x, cy, Math.min(11, 2 + k * 14), Math.min(11, 2 + k * 14), 2);
-    if (k < 0.3) glow(c, x, cy, 12, '248,120,248', 0.8);
-  }
-  if (once(e, 'pop', p > 0.25)) {
-    emit(big ? 18 : 12, () => spark(x, cy, [ARC[3], ARC[2], ARC[1]], box, big ? 75 : 60, { g: 40 }));
-    emit(big ? 10 : 6, () => mote(x + rnd(-8, 8), y - rnd(0, 6), [ARC[3], ARC[2], ARC[1]], box, { vy: rnd(-40, -18) }));
-  }
-}
-/** Repulse: a curved wall of force rolling down the row, shedding motes. */
-function repulseWave(c: Ctx, b: Battle, x: number, y: number, dir: number): void {
-  const pulse = Math.floor(b.time * 24) % 2;
-  for (let k = 0; k < 3; k++) {
-    const cx = x - dir * k * 4, r = 9 - k * 2;
-    for (let i = -r; i <= r; i++) {
-      const bend = Math.round((i * i) / (r * 1.6));
-      const px = cx - dir * bend, py = y + i;
-      P(c, '#000000', px - 1, py, 3, 1);
-      P(c, k === 0 ? (pulse ? '#fcfcfc' : ARC[3]) : k === 1 ? ARC[2] : ARC[1], px, py, k === 0 ? 2 : 1, 1);
-    }
-  }
-  if (Math.random() < 0.6) part(x - dir * 6, y + rnd(-8, 8), { vx: -dir * rnd(10, 30), vy: rnd(-8, 8), drag: 0.9, life: rnd(0.15, 0.3), ramp: [ARC[3], ARC[2], ARC[1]], box: boxC(x - dir * 6, y) });
 }

@@ -4,6 +4,7 @@ import rules from './rules';
 import decks from './decks';
 import cpu from './cpu';
 import lessons from './tutorial';
+import lab from './lab';
 
 export default {
   id: 'mage',
@@ -13,5 +14,5 @@ export default {
     blurb: ['GLASS CANNON', 'MANA GROWS EVERY DRAW'],
     backdrop: ['#1c1c38', '#4428bc', '#940084'],
   },
-  rules, decks, cpu, lessons,
+  rules, decks, cpu, lessons, lab,
 } satisfies ClassModule;

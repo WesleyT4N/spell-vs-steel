@@ -359,6 +359,14 @@ Object.assign(FX, {
   guardUp: FX.guard, ironSkin: FX.guard, unbreakable: FX.guard, reflectUp: FX.guard, wallRise: FX.smash,
 });
 
+// the Mage's spells each have their own look but share these sounds. Arcane Focus, Arcane Barrier, Arcane
+// Intellect and Evocation had no effect before and stay quiet: the cast sound already covers them.
+Object.assign(FX, {
+  fireballBlast: FX.explode, scorch: FX.explode, meteorBlast: FX.explode, comet: FX.explode, dragonsBreath: FX.explode,
+  inferno: FX.explode, arcaneSurge: FX.arcaneHit, deepFreeze: FX.shard, ascendance: FX.transform,
+  ignite: FX.pillar, iceWall: FX.shard, iceBlock: FX.shard, glacialFortress: FX.novaZone, arcanePower: FX.transform,
+});
+
 const lastPlayed: Record<string, number> = {};
 
 /** Play a realistic recipe into `out`. Returns false if there is none (the caller falls back to its old blip). */
