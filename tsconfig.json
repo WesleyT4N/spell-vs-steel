@@ -9,6 +9,8 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false,
     "isolatedModules": true,
     "types": ["vite/client"]
   },

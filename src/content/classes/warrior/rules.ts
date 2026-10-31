@@ -4,7 +4,7 @@ import { TUNING, effect, type Battle, type ClassRules, type Fighter } from '../.
 /** Cleave (light) or Heavy Cleave on `cells`; a heavy hit builds Rage (double while Berserk). */
 function cleave(b: Battle, f: Fighter, kind: 'light' | 'heavy', cells: Array<[number, number]>, dmg: number): void {
   const T = TUNING.warrior;
-  b.addFx(kind === 'light' ? 'cleave' : 'cleaveHeavy', f.side, f.col + b.dir(f), f.row, kind === 'light' ? 0.18 : 0.34);
+  b.addFx(kind === 'light' ? 'cleave' : 'cleaveHeavy', f.side, f.col + b.dir(f), f.row, kind === 'light' ? 0.32 : 0.56);
   const res = b.strike(f, cells, dmg, { basic: kind, element: 'steel' });
   if (res.fighter && kind === 'heavy') b.gainRage(f, T.rageHeavyHit * (f.st.berserk > 0 ? 2 : 1));
   if (res.fighter && kind === 'light' && T.rageLightHit) b.gainRage(f, T.rageLightHit * (f.st.berserk > 0 ? 2 : 1));

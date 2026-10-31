@@ -6,6 +6,7 @@ scripts/music/out
 dist-fuzz
 fuzz-out
 dist-test
+dist-fx
 test-results
 release
 *.keystore

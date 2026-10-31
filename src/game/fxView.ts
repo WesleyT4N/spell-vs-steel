@@ -6,6 +6,7 @@ import { drawFighterSprite, type Sprite } from '../art/sprites';
 import { drawTextCentered } from '../engine/font';
 import type { Battle, Fighter, Fx, Projectile } from './battle';
 import { team } from './teamColors';
+import { drawPfx } from './pfx';
 import { TUNING } from './tuning';
 
 export const FIRE = ['#f83800', '#fca044', '#f8b800', '#fce0a8'];
@@ -172,6 +173,8 @@ export const ELEMENT_RAMP: Record<string, string[]> = { steel: STEEL, fire: FIRE
 const cellPx = (col: number, row: number): { x: number; y: number } => panelFoot(col, row);
 
 export function drawFx(c: Ctx, b: Battle, e: Fx): void {
+  // effects ported to the pixelfx method (src/fx/) draw themselves
+  if (drawPfx(c, b, e)) return;
   const p = Math.min(1, e.t / e.dur);
   const { x, y } = cellPx(e.col, e.row);
   const d = e.side === 0 ? 1 : -1;

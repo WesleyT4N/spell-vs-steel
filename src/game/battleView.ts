@@ -19,6 +19,8 @@ import { CLASS_INFO } from './classes';
 import { drawOver, drawUnder, lookOf, observe } from './fighterAnim';
 
 import { kickOffset, noteImpacts } from './hitFeel';
+import { endPfxFrame } from './pfx';
+import '../fx';
 import { isHome, setHome, team } from './teamColors';
 import { FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawArcaneMissile, drawBurn, drawFrozen, drawFx, drawParticles, drawShot, useParticles } from './fxView';
 
@@ -94,6 +96,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
   drawParticles(c, b);
   c.restore();
   noteImpacts(b);
+  endPfxFrame(b);
 }
 
 /** When each panel's crack and hole appeared, in battle time: view-only, for the crack-in and crumble animations. */
