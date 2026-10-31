@@ -354,11 +354,32 @@ export const exportSave = (): { save: SaveData; replays: StoredReplay[] } => ({ 
 /** True when the save came from a newer build and nothing will be written. */
 export const saveIsReadOnly = (): boolean => { live(); return readOnly; };
 
+/**
+ * Dev tools: keep playing on an in-memory copy of the save, so whatever happens next (the Art Lab opening screens
+ * that make decks) never reaches storage. Lasts until the page reloads. True when this call paused the saves.
+ */
+export function pauseSaves(): boolean {
+  if (paused) return false;
+  // what changed so far still goes to real storage
+  void flushSave();
+  const copy = (d: unknown): string => JSON.stringify({ game: GAME, v: SAVE_VERSION, data: d } satisfies Envelope);
+  const m = memoryStorage({ [SAVE_FILE]: copy(live()), [REPLAY_FILE]: copy({ list: replays }) });
+  backend = m;
+  data = null;
+  adopt(m.readSync!(SAVE_FILE), m.readSync!(REPLAY_FILE), null);
+  paused = true;
+  return true;
+}
+let paused = false;
+/** True after pauseSaves(). */
+export const savesPaused = (): boolean => paused;
+
 /** Tests: start over on in-memory files (and optionally old-layout keys). */
 export function resetSaveForTests(files: Record<string, string> = {}, legacy: Legacy | null = null): ReturnType<typeof memoryStorage> {
   const m = memoryStorage(files);
   backend = m;
   data = null;
+  paused = false;
   adopt(m.readSync!(SAVE_FILE), m.readSync!(REPLAY_FILE), legacy);
   return m;
 }
