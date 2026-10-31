@@ -8,6 +8,7 @@
 import type { Battle, Fighter } from '../../game/battle';
 import type { DeckCounts, DeckPreset } from '../../game/deck';
 import type { Playstyle } from '../../game/playstyles';
+import type { GoalCtx, PickCtx } from '../../game/cpuKit';
 import { Registry } from '../registry';
 
 export interface ClassModule {
@@ -34,6 +35,16 @@ export interface ClassInfo {
   pip: string;
   /** How the resource comes back, shown on the Draw screen. */
   refill: string;
+  /** Names of the light and heavy attacks (post-match stats). */
+  basics: [string, string];
+  /** Two short lines under the portrait on the character select. */
+  blurb: [string, string];
+  /** Portrait backdrop, dark to light, in the class's element. */
+  backdrop: [string, string, string];
+  /** The resource is earned in the fight and paid on cast (Rage), so a short card is "later", not "can't". */
+  builds?: boolean;
+  /** Fights up close from the front column. */
+  melee?: boolean;
 }
 
 /** What the battle engine asks a class. */
@@ -79,6 +90,12 @@ export interface ClassCpu {
   windup?: boolean;
   /** Chance per second to hold the panel instead of repositioning (0: move as usual). */
   stay?(b: Battle, f: Fighter, aligned: boolean, seen: boolean): number;
+  /** The panel to walk toward when nothing else is going on. */
+  goal(x: GoalCtx): [number, number];
+  /** Spells to take from the Draw-screen offer, in cast order (Normal and Hard; Easy picks at random). */
+  pick(x: PickCtx): number[];
+  /** Hugs the border: ranged CPUs back off while it stands at its front column. */
+  crowds?: boolean;
 }
 
 /** One page of tutorial text. */
@@ -106,6 +123,8 @@ export interface ClassLessons {
   /** The resource only comes back at the next Draw: a full queue can strand the player. */
   refillsAtDraw: boolean;
   ccLine: string;
+  /** Resource topped up to this when the Draw lesson starts (a class that builds it in the fight). */
+  drawRes?: number;
 }
 
 export const CLASSES = new Registry<ClassModule>('class');

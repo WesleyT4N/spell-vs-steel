@@ -7,6 +7,11 @@ import lessons from './tutorial';
 
 export default {
   id: 'ranger',
-  info: { name: 'RANGER', res: 'ENERGY', resColor: '#f8d878', gem: '#ac7c00', pipBase: '#503000', pip: '#f8b800', refill: 'STAND STILL' },
+  info: {
+    name: 'RANGER', res: 'ENERGY', resColor: '#f8d878', gem: '#ac7c00', pipBase: '#503000', pip: '#f8b800', refill: 'STAND STILL',
+    basics: ['ARROW', 'AIMED SHOT'],
+    blurb: ['ARROWS, TRAPS AND PETS', 'STAND STILL FOR ENERGY'],
+    backdrop: ['#002800', '#005800', '#00a800'],
+  },
   rules, decks, cpu, lessons,
 } satisfies ClassModule;

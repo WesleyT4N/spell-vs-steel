@@ -27,22 +27,6 @@ import { bigButton, actionBar, barTapped, swipeIn, tallArea, GAP, PAD } from './
 const TILES = PLAYABLE.length + 1;
 const RANDOM = PLAYABLE.length;
 
-const BLURB: Record<ClassId, [string, string]> = {
-  warrior: ['HEAVY ARMOR, BIG HITS', 'HITS BUILD RAGE'],
-  mage: ['GLASS CANNON', 'MANA GROWS EVERY DRAW'],
-  rogue: ['CHAINS CHEAP CARDS', 'STRIKES FROM BEHIND'],
-  ranger: ['ARROWS, TRAPS AND PETS', 'STAND STILL FOR ENERGY'],
-  priest: ['OUTLASTS AND CHIPS', 'HEALS AND CURSES'],
-};
-
-/** Portrait backdrops: a dark wash in each class's element (steel, arcane, shadow, nature, holy), dark to light. */
-const BACKDROP: Record<ClassId, [string, string, string]> = {
-  warrior: ['#1c1c38', '#3c3c3c', '#7c7c7c'],
-  mage: ['#1c1c38', '#4428bc', '#940084'],
-  rogue: ['#000000', '#1c1c38', '#5b162a'],
-  ranger: ['#002800', '#005800', '#00a800'],
-  priest: ['#503000', '#ac7c00', '#f8d878'],
-};
 const PORTRAIT_IN = 0.18;
 /** Portrait frame size (UI pixels) at a zoom: the 40x32 bust inside a 2px ink border (2x by default). */
 const frameW = (z: number): number => 40 * z + 4, frameH = (z: number): number => 32 * z + 4;
@@ -382,7 +366,7 @@ export class CharSelectScene implements Scene {
     P(ui, FRAME, x, y, FW, FH);
     const ix = x + 2, iy = y + 2, iw = FW - 4, ih = FH - 4;
     // dithered bands, light toward the bottom; dither cells match the portrait's pixels
-    const ramp = cls ? BACKDROP[cls] : ['#000000', '#1c1c38', '#3c3c3c'] as const;
+    const ramp = cls ? CLASS_INFO[cls].backdrop : ['#000000', '#1c1c38', '#3c3c3c'] as const;
     for (let yy = 0; yy < ih; yy += z) {
       const v = (yy / ih) * (ramp.length - 1), b = Math.min(ramp.length - 2, Math.floor(v)), f = v - b;
       for (let xx = 0; xx < iw; xx += z) P(ui, dith(xx / z, yy / z) < f ? ramp[b + 1] : ramp[b], ix + xx, iy + yy, Math.min(z, iw - xx), Math.min(z, ih - yy));
@@ -438,7 +422,7 @@ export class CharSelectScene implements Scene {
     }
     this.drawPortrait(ui, s, cls, skin, cx, this.py + 23);
     drawTextCentered(ui, CLASS_INFO[cls].name, cx, this.py + 95, INK, 2, false);
-    BLURB[cls].forEach((l, i) => drawTextCentered(ui, l, cx, this.py + 111 + i * 9, INK2, 1, false));
+    CLASS_INFO[cls].blurb.forEach((l, i) => drawTextCentered(ui, l, cx, this.py + 111 + i * 9, INK2, 1, false));
     // skins: clickable swatches for your slot (and the CPU's)
     const list = SKINS[cls], sw = 14, sx = Math.round(cx - (list.length * sw) / 2);
     if (s === 1 && net) return;
@@ -558,7 +542,7 @@ export class CharSelectScene implements Scene {
     }
     drawTextCentered(ui, CLASS_INFO[cls].name, cx, ty, INK, 2, false);
     ty += 20;
-    wrap(BLURB[cls][0], Math.floor((w - 16) / 6)).slice(0, 2).forEach((l, i) => drawTextCentered(ui, l, cx, ty + i * 10, INK2, 1, false));
+    wrap(CLASS_INFO[cls].blurb[0], Math.floor((w - 16) / 6)).slice(0, 2).forEach((l, i) => drawTextCentered(ui, l, cx, ty + i * 10, INK2, 1, false));
     // a nudge that the panel swipes
     if (!(net && s === 1) && !(s === 1 && (this.tutorial || this.arcade))) {
       drawText(ui, '<', x + 8, py + frameH(z) / 2 - 7, TRIM, 2);

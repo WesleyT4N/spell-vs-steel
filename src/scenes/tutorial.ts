@@ -183,7 +183,8 @@ const STEPS: Step[] = [
     instant: true,
     start: t => {
       t.b.gauge = 0.4;
-      if (t.cls === 'warrior') t.me.res = Math.max(t.me.res, 3);
+      const res = L(t).drawRes;
+      if (res) t.me.res = Math.max(t.me.res, res);
     },
     check: t => t.b.phase === 'custom',
   },

@@ -1,5 +1,5 @@
 // Mage CPU: its three playstyles, Hard's pick per matchup, and how far its basic attacks reach.
-import { AGGRO, CONSERVATIVE, DEFENSIVE, type ClassCpu } from '../../api';
+import { AGGRO, CONSERVATIVE, DEFENSIVE, rangedGoal, crowding, poolPick, type ClassCpu } from '../../api';
 
 const cpu: ClassCpu = {
   styles: [
@@ -13,5 +13,9 @@ const cpu: ClassCpu = {
     const light = seen && aligned;
     return { light, heavy: light };
   },
+  // holds the middle, backs off from a foe crowding the border
+  goal: x => rangedGoal(x, crowding(x.b, x.foe)),
+  // Arcane Focus first (it pays for itself), then the most expensive things we can afford
+  pick: x => poolPick(x, { payFirst: ['arcane_focus'], first: { arcane_focus: -10 } }),
 };
 export default cpu;

@@ -27,5 +27,6 @@ const lessons: ClassLessons = {
   short: 'NEED RAGE: LAND HEAVY HITS TO BUILD IT',
   refillsAtDraw: false,
   ccLine: 'WARRIOR SPELLS LIKE CHAIN HOOK STUN. LAND ONE, THEN FOLLOW UP WITH YOUR HARDEST HITTER.',
+  drawRes: 3,
 };
 export default lessons;
