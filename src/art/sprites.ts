@@ -10,7 +10,8 @@ export const USE_HIRES = true;
 /** Sprite pixels per world pixel (1: both sprite sets draw at world resolution). */
 const RES = 1;
 
-export type ClassId = 'warrior' | 'mage' | 'rogue' | 'ranger' | 'priest';
+export type { ClassId } from '../content/classes/registry';
+import type { ClassId } from '../content/classes/registry';
 
 interface SpriteDef { pal: string[]; rows: string[]; ax: number }
 

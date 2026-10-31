@@ -78,7 +78,7 @@ export function recordSet(r: Replay, deck: string): void {
 }
 
 export const total = (p: Profile): WinLoss =>
-  Object.values(p.classes).reduce((a, x) => ({ w: a.w + x.w, l: a.l + x.l }), { w: 0, l: 0 });
+  Object.values(p.classes).reduce<WinLoss>((a, x) => x ? { w: a.w + x.w, l: a.l + x.l } : a, { w: 0, l: 0 });
 
 /** Win rate as a whole percent ('-' before any sets). */
 export const pct = (x: WinLoss | undefined): string => (x && x.w + x.l ? `${Math.round((100 * x.w) / (x.w + x.l))}%` : '-');
@@ -100,7 +100,7 @@ export function favoriteDeck(p: Profile): { cls: ClassId; deck: string; n: numbe
   let best: { cls: ClassId; deck: string; n: number } | null = null;
   const fav = favoriteClass(p);
   for (const [key, n] of Object.entries(p.decks)) {
-    const i = key.indexOf('|'), cls = key.slice(0, i) as ClassId;
+    const i = key.indexOf('|'), cls = key.slice(0, i);
     if (!CLASS_IDS.includes(cls)) continue;
     if (!best || n > best.n || (n === best.n && cls === fav && best.cls !== fav)) best = { cls, deck: key.slice(i + 1), n };
   }

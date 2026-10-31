@@ -31,7 +31,7 @@ function merlons(c: Ctx, x0: number, x1: number, y: number, h: number, step: num
 }
 
 export default inkedStage({
-  id: 'courtyard', name: 'Castle Courtyard', tag: 'Flagstones inside the keep', panelSeed: 909,
+  id: 'courtyard', music: 'stage_courtyard', name: 'Castle Courtyard', tag: 'Flagstones inside the keep', panelSeed: 909,
   panel: { face: '#b8b4bc', hi: '#e8e4ea', lo: '#76727e', lip: '#56525e', lipLo: '#000000' },
   tex: stoneTex,
   back(c){

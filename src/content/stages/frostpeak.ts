@@ -16,7 +16,7 @@ function range(c: Ctx, prof: (x: number) => number, bottom: number, rock: string
 }
 
 export default inkedStage({
-  id: 'frostpeak', name: 'Frostpeak Pass', tag: 'A mountain pass under the aurora', panelSeed: 909,
+  id: 'frostpeak', music: 'stage_frostpeak', name: 'Frostpeak Pass', tag: 'A mountain pass under the aurora', panelSeed: 909,
   panel: { face: '#8a96b4', hi: '#c8d4ec', lo: '#4a5478', lip: '#2e3658', lipLo: '#000000' },
   tex(c, x, y, w, h, r){
     for (let i = 0; i < 3; i++) P(c, '#c8d4ec', x + Math.floor(r() * w), y + Math.floor(r() * h));

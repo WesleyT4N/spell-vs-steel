@@ -11,7 +11,7 @@ import { SKINS, type ClassId } from '../art/sprites';
 import { instrument } from './instrument';
 
 /** Every class with sprites; new classes show up in the dev tools as soon as they are added. */
-export const classIds = (): ClassId[] => (Object.keys(SKINS) as ClassId[]).filter(c => PLAYABLE.includes(c));
+export const classIds = (): ClassId[] => Object.keys(SKINS).filter(c => PLAYABLE.includes(c));
 
 export interface SideSpec { cls: ClassId; deck: DeckCounts; cpu: Difficulty; label?: string; /** Playstyle id (default: balanced). */ style?: string }
 

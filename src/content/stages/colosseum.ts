@@ -171,4 +171,4 @@ class Colosseum implements Stage {
   }
 }
 
-export default { id: 'colosseum', create: () => new Colosseum() } satisfies StageModule;
+export default { id: 'colosseum', music: 'stage_colosseum', create: () => new Colosseum() } satisfies StageModule;

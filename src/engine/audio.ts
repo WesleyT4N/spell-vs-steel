@@ -244,8 +244,6 @@ export function stopMusic(): void {
   p.src?.stop(t + 0.3);
 }
 
-/** The battle theme for a stage (falls back to the Colosseum theme). */
-export const stageTrack = (stageId: string): TrackId => (`stage_${stageId}` in TRACKS ? `stage_${stageId}` : 'stage_colosseum') as TrackId;
 
 // ---------- charge hum ----------
 // A held tone that rises while a heavy attack charges and warbles once it's ready. Call every frame

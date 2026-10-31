@@ -8,4 +8,4 @@ import priest from './priest';
 
 for (const m of [warrior, mage, rogue, ranger, priest]) registerClass(m);
 
-export { classModule, classRules, registerClass, CLASSES, type ClassModule, type ClassInfo, type ClassRules, type ClassDecks, type ClassCpu, type ClassLessons, type LessonPage, type ClassLab, type LabSpell, type LabLook } from './registry';
+export { classModule, classRules, registerClass, CLASSES, type ClassId, type ClassModule, type ClassInfo, type ClassRules, type ClassDecks, type ClassCpu, type ClassLessons, type LessonPage, type ClassLab, type LabSpell, type LabLook } from './registry';

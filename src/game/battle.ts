@@ -885,7 +885,7 @@ export class Battle {
 
   /** A basic shot down the row at a set speed, so the target can step out of its way. */
   flyingShot(f: Fighter, kind: 'orb' | 'spark' | 'beam' | 'knife' | 'aimed', dmg: number, opts: HitOpts, pierce = false): void {
-    const speed = kind === 'aimed' ? TUNING.ranger.aimedSpeed : (TUNING[f.cls] as { shotSpeed?: number }).shotSpeed ?? TUNING.maxShotSpeed;
+    const speed = kind === 'aimed' ? TUNING.ranger.aimedSpeed : ((TUNING as Record<string, unknown>)[f.cls] as { shotSpeed?: number } | undefined)?.shotSpeed ?? TUNING.maxShotSpeed;
     this.shoot(f, { speed: speed * this.dir(f), kind, reflectable: false, pierce, onHit: basicShot({ side: f.side, dmg, opts }) });
   }
 

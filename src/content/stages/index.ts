@@ -10,4 +10,4 @@ import elderwood from './elderwood';
 
 for (const m of [colosseum, courtyard, archive, frostpeak, emberforge, elderwood]) registerStage(m);
 
-export { getStage, registerStage, STAGE_IDS, STAGES, type StageModule } from './registry';
+export { getStage, registerStage, stageMusic, STAGE_IDS, STAGES, type StageModule } from './registry';
