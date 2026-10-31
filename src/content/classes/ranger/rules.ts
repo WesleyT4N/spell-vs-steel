@@ -20,12 +20,12 @@ export default {
         b.projectiles.push({
           side: f.side, row: f.row, x: f.col, speed: 0, kind: 'arrow', reflectable: true,
           homing: { p: 0, dur: Math.max(0.15, Math.abs(foe.col - f.col) / T.arrowSpeed), sx: f.col, sy: f.row, target: foe.side },
-          onHit: basicShot({ side: f.side, dmg, opts }),
+          onHit: basicShot({ side: f.side, dmg, opts, fx: 'arrowHit' }),
         });
       } else {
         b.shoot(f, {
           speed: T.arrowSpeed * d, kind: 'arrow', reflectable: true,
-          onHit: basicShot({ side: f.side, dmg, opts }),
+          onHit: basicShot({ side: f.side, dmg, opts, fx: 'arrowHit' }),
         });
       }
     } else {
@@ -36,9 +36,9 @@ export default {
         b.projectiles.push({
           side: f.side, row: f.row, x: f.col, speed: 0, kind: 'aimed', reflectable: false,
           homing: { p: 0, dur: Math.max(0.1, Math.abs(foe.col - f.col) / T.aimedSpeed), sx: f.col, sy: f.row, target: foe.side },
-          onHit: basicShot({ side: f.side, dmg: T.heavyDamage, opts: { basic: kind, element: 'steel', targeted: true } }),
+          onHit: basicShot({ side: f.side, dmg: T.heavyDamage, opts: { basic: kind, element: 'steel', targeted: true }, fx: 'aimedHit' }),
         });
-      } else b.flyingShot(f, 'aimed', T.heavyDamage, { basic: kind, element: 'steel' }, f.st.deadeye > 0);
+      } else b.flyingShot(f, 'aimed', T.heavyDamage, { basic: kind, element: 'steel' }, f.st.deadeye > 0, 'aimedHit');
     }
   },
   onDraw(b, f) {
