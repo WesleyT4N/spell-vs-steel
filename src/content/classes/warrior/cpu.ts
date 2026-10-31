@@ -1,5 +1,5 @@
 // Warrior CPU: its three playstyles, Hard's pick per matchup, and how far its basic attacks reach.
-import { AGGRO, CONSERVATIVE, DEFENSIVE, type ClassCpu } from '../../api';
+import { AGGRO, CONSERVATIVE, DEFENSIVE, meleeGoal, type ClassCpu } from '../../api';
 
 const cpu: ClassCpu = {
   styles: [
@@ -13,6 +13,22 @@ const cpu: ClassCpu = {
     // the Cleave reaches the 2 panels ahead
     const light = seen && aligned && dist >= 1 && dist <= 2;
     return { light, heavy: light };
+  },
+  crowds: true,
+  goal: meleeGoal,
+  // builders first, then spenders we can expect to afford this turn
+  pick({ idx, res, cost, want, style }) {
+    let budget = res + 3;
+    const builders = idx.filter(i => cost(i) === 0 && want(i) > -1);
+    const spenders = idx.filter(i => cost(i) > 0).sort((a, c) => cost(a) - cost(c) || want(c) - want(a));
+    const chosen = [...builders];
+    // a big finisher is worth banking for: queue it last and keep only what still leaves room for it
+    const bigMin = style.bigMin;
+    const big = bigMin ? spenders.filter(i => cost(i) >= bigMin).pop() : undefined;
+    if (big !== undefined) budget -= cost(big);
+    for (const i of spenders) if (i !== big && cost(i) <= budget) { chosen.push(i); budget -= cost(i); }
+    if (big !== undefined) chosen.push(big);
+    return chosen;
   },
 };
 export default cpu;

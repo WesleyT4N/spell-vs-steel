@@ -7,6 +7,11 @@ import lessons from './tutorial';
 
 export default {
   id: 'mage',
-  info: { name: 'MAGE', res: 'MANA', resColor: '#a4e4fc', gem: '#0058f8', pipBase: '#0000a8', pip: '#3cbcfc', refill: 'REFILLS' },
+  info: {
+    name: 'MAGE', res: 'MANA', resColor: '#a4e4fc', gem: '#0058f8', pipBase: '#0000a8', pip: '#3cbcfc', refill: 'REFILLS',
+    basics: ['ARCANE BOLT', 'CHARGED BOLT'],
+    blurb: ['GLASS CANNON', 'MANA GROWS EVERY DRAW'],
+    backdrop: ['#1c1c38', '#4428bc', '#940084'],
+  },
   rules, decks, cpu, lessons,
 } satisfies ClassModule;

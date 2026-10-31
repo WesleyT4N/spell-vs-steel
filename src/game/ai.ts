@@ -1,7 +1,7 @@
 // CPU opponent. Produces the same Intent a keyboard player would, so the battle can't tell the difference.
 // Every roll comes from a generator seeded by the battle's seed and the CPU's side, so a CPU match replays
 // exactly from its seed (sims, tests, the balance grid) without touching Math.random or the rules' own rolls.
-import { NO_INTENT, heavyChargeOf, type Battle, type BlessKind, type Dir, type Fighter, type Intent } from './battle';
+import { NO_INTENT, heavyChargeOf, type Battle, type Dir, type Fighter, type Intent } from './battle';
 import { CARDS } from './cards';
 import { classModule } from '../content/classes';
 import { TUNING, type Difficulty } from './tuning';
@@ -137,43 +137,9 @@ export class Cpu {
     const aim = this.rand() < this.cfg.aim;
     // a stealthed enemy can't be tracked: hold the current row
     const row = foe.st.stealth > 0 ? f.row : aim ? foe.row : Math.floor(this.rand() * 3);
-    const range = this.style.range;
-    if (f.cls === 'warrior' || f.cls === 'rogue') return [range < 0 ? b.frontCol(f.side) - b.dir(f) : b.frontCol(f.side), row];
-    if (range < 0 && f.cls !== 'priest') return [b.backCol(f.side), row];
-    if (f.cls === 'priest') {
-      // go stand on the most useful blessing we have
-      const spot = this.bestBlessing(b, f);
-      if (spot) return spot;
-      // otherwise stand where Smite can reach the enemy, inside our own area
-      const want = foe.col - TUNING.priest.smiteRange * b.dir(f);
-      const lo = Math.min(b.backCol(f.side), b.frontCol(f.side)), hi = Math.max(b.backCol(f.side), b.frontCol(f.side));
-      return [Math.max(lo, Math.min(hi, want)), row];
-    }
-    // Mage: keep distance from a Warrior hugging the border, otherwise hold the middle.
-    const threatened = foe.cls === 'warrior' && foe.col === b.frontCol(foe.side);
-    const col = threatened ? b.backCol(f.side) : b.frontCol(f.side) - b.dir(f);
-    return [col, row];
+    return classModule(f.cls).cpu.goal({ b, f, foe, row, range: this.style.range });
   }
 
-  /** Priest: the blessed panel worth standing on now (healing when hurt, the shield until the pool is full...). */
-  private bestBlessing(b: Battle, f: Fighter): [number, number] | null {
-    const shield = f.shields.find(s => s.kind === 'holy')?.hp ?? 0;
-    const worth: Record<BlessKind, number> = {
-      all: 5,
-      heal: f.maxHp - f.hp >= 300 ? 3 : 0.5,
-      shield: shield < TUNING.priest.shieldCap ? 2.5 : 0.5,
-      power: 2,
-      mana: f.res < TUNING.priest.manaCap ? 2 : 0.2,
-    };
-    let best: [number, number] | null = null, bestV = 0;
-    for (let c = 0; c < 6; c++) for (let r = 0; r < 3; r++) {
-      const p = b.panels[c][r];
-      if (p.bless <= 0 || p.owner !== f.side || !b.canStand(f, c, r) && !(f.col === c && f.row === r)) continue;
-      const v = worth[p.blessKind] - (Math.abs(c - f.col) + Math.abs(r - f.row)) * 0.2;
-      if (v > bestV) { bestV = v; best = [c, r]; }
-    }
-    return best;
-  }
 
   /** Up or down moves that are safe to take. */
   private sideSteps(b: Battle, f: Fighter): Dir[] {
@@ -218,31 +184,6 @@ export class Cpu {
     return safe[Math.floor(this.rand() * safe.length)][0];
   }
 
-  /** Rogue: spend the full Energy bar on a chain. Setup first, then a blink, then the finishers that want to be up close.
-   *  Ambush only comes with a Stealth card cast before it. */
-  private pickRogue(offer: string[], energy: number, cost: (i: number) => number, want: (i: number) => number): number[] {
-    const STEALTH = ['vanish', 'shadow_clone', 'smokescreen', 'nights_embrace'];
-    const RANK: Record<string, number> = {
-      vanish: 0, shadow_clone: 0, smokescreen: 0, nights_embrace: 0, cold_blood: 0, deadly_poison: 0, adrenaline_rush: 0, shadow_dance: 0,
-      pandemic: 0, death_mark: 0, poison_vial: 0, evasion: 0, riposte: 0, cloak_of_shadows: 0,
-      shadowstep: 1, ambush: 1, blade_flurry: 1, killing_spree: 1,
-    };
-    const chosen: number[] = [];
-    const take = (i: number): void => {
-      if (chosen.includes(i) || cost(i) > energy) return;
-      chosen.push(i);
-      energy -= cost(i);
-      if (offer[i] === 'pickpocket') energy += 1;
-    };
-    const idx = offer.map((_, i) => i);
-    const hide = idx.find(i => STEALTH.includes(offer[i]));
-    const ambush = idx.find(i => offer[i] === 'ambush');
-    if (hide !== undefined && ambush !== undefined && cost(hide) + cost(ambush) <= energy) { take(hide); take(ambush); }
-    for (const i of idx.filter(i => offer[i] !== 'ambush').sort((a, c) => want(c) - want(a))) take(i);
-    // finishers (Shiv, Kidney Shot, Envenom, Eviscerate...) go last, after the chain is set up
-    return chosen.sort((a, c) => (RANK[offer[a]] ?? 2) - (RANK[offer[c]] ?? 2));
-  }
-
   /** Choose spells from the offer, in cast order. */
   pick(b: Battle, f: Fighter): number[] {
     this.bind(b, f);
@@ -255,38 +196,6 @@ export class Cpu {
     const cost = (i: number): number => { const c = CARDS[offer[i]].cost; return c === 'all' ? Math.max(1, f.res) : c; };
     // how much this style wants a card: its cost, nudged by the style's taste for its role
     const want = (i: number): number => cost(i) + this.style.prefer[roleOf(offer[i])];
-    if (f.cls === 'rogue') return this.pickRogue(offer, f.res, cost, want);
-    if (f.cls !== 'warrior') {
-      // Energy and Mana are known up front (the Ranger will earn about 2 more while it stands still)
-      let mana = f.res + (f.cls === 'ranger' ? 2 : 0);
-      for (const i of idx) { const g = CARDS[offer[i]].gain; if (g?.res && offer[i] !== 'arcane_focus') mana += g.res; if (g?.refill) mana = Math.max(mana, 5); }
-      const chosen: number[] = [];
-      // Focus first (it pays for itself), then the most expensive things we can afford.
-      for (const i of idx.filter(i => offer[i] === 'arcane_focus')) { chosen.push(i); mana += 1; }
-      const rest = idx.filter(i => !chosen.includes(i)).sort((a, c) => want(c) - want(a));
-      for (const i of rest) if (cost(i) <= mana && want(i) > -1) { chosen.push(i); mana -= cost(i); }
-      // cast cheap control first, big damage last; the Ranger's core combo is Steady Focus, Hunter's Mark, Rapid Fire
-      // the Priest lays its fields first, then curses and DoTs, then damage
-      const FIRST: Record<string, number> = {
-        arcane_focus: -10, steady_focus: -9, hunters_mark: -8, rapid_fire: -7,
-        power_infusion: -10, holy_sanctum: -9, aegis_field: -8, sacred_ground: -8, sanctuary: -7, wellspring: -7, hallowed_ground: -6,
-        shadowform: -5, void_rift: -5, mind_sear: -5, desecrate: -5, shadow_word_pain: -4, devouring_plague: -4,
-      };
-      // a defensive style puts its protection up before anything else
-      const early = (i: number): number => (this.style.kind === 'defensive' && roleOf(offer[i]) === 'defense' ? -20 : 0) + (FIRST[offer[i]] ?? cost(i));
-      return chosen.sort((a, c) => early(a) - early(c));
-    }
-    // Warrior: builders first, then spenders we can expect to afford this turn.
-    let budget = f.res + 3;
-    const builders = idx.filter(i => cost(i) === 0 && want(i) > -1);
-    const spenders = idx.filter(i => cost(i) > 0).sort((a, c) => cost(a) - cost(c) || want(c) - want(a));
-    const chosen = [...builders];
-    // a big finisher is worth banking for: queue it last and keep only what still leaves room for it
-    const bigMin = this.style.bigMin;
-    const big = bigMin ? spenders.filter(i => cost(i) >= bigMin).pop() : undefined;
-    if (big !== undefined) budget -= cost(big);
-    for (const i of spenders) if (i !== big && cost(i) <= budget) { chosen.push(i); budget -= cost(i); }
-    if (big !== undefined) chosen.push(big);
-    return chosen;
+    return classModule(f.cls).cpu.pick({ offer, idx, res: f.res, cost, want, role: i => roleOf(offer[i]), style: this.style, gain: i => CARDS[offer[i]].gain });
   }
 }

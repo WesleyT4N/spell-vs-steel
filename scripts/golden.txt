@@ -1,5 +1,5 @@
 cards 097d90a1
-classes 348dbf39
+classes 7139c589
 decks 6b351d59
 tuning d60937b5
 warrior starter vs warrior starter seed 7000: 2973 frames, winner 1, hp 0/1100, turns 4, hash b1603c35

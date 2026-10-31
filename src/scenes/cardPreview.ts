@@ -4,6 +4,7 @@
 import { Battle, NO_INTENT, type Intent } from '../game/battle';
 import { drawBattle } from '../game/battleView';
 import { CARDS, type CardDef } from '../game/cards';
+import { CLASS_IDS } from '../game/classes';
 import type { ClassId } from '../art/sprites';
 import { W, H, P, type Ctx } from '../engine/gfx';
 import { withoutSfx } from '../engine/audio';
@@ -16,7 +17,8 @@ const LEAD = 0.45, MAX_RUN = 3.2, MIN_RUN = 1.1, HOLD = 0.5;
 const CROP_Y = 70, CROP_H = 88;
 
 /** Who stands in for the enemy: a class the caster doesn't share, so the two never look alike. */
-const dummyFor = (cls: ClassId): ClassId => (cls === 'warrior' ? 'mage' : 'warrior');
+/** The dummy in a spell's preview: the first other class in the roster. */
+const dummyFor = (cls: ClassId): ClassId => CLASS_IDS.find(c => c !== cls) ?? cls;
 
 export class CardPreview {
   private b: Battle | null = null;

@@ -538,7 +538,7 @@ export class BattleScene implements Scene {
     const { short, cost, dmg } = this.handPlan();
     const total = this.picks.reduce((a, i) => a + cost[i], 0);
     // Rage is earned in the fight and paid on cast, so a short Warrior card is "later", not "can't"
-    const builds = f.cls === 'warrior';
+    const builds = !!CLASS_INFO[f.cls].builds;
 
     // left: the card being read, with its element as a ribbon across the top
     const card = showSel() && offer[this.cursor] ? CARDS[offer[this.cursor]] : null;
@@ -627,14 +627,14 @@ export class BattleScene implements Scene {
     const plan = this.handPlan();
     drawCardDetail(ui, card, x + 14, y + clipH + 20, w - 28, h - clipH > 200 ? 2 : 1, plan.cost[i], plan.dmg[i]);
     const need = plan.short[i];
-    if (need > 0) drawText(ui, this.b.f[this.me].cls === 'warrior' ? `BUILD ${need} MORE ${resName(card)} IN THE FIGHT` : `NEED ${need} MORE ${resName(card)}`, x + 14, y + h - 20, this.b.f[this.me].cls === 'warrior' ? resInk(card) : RED_INK);
+    if (need > 0) drawText(ui, CLASS_INFO[this.b.f[this.me].cls].builds ? `BUILD ${need} MORE ${resName(card)} IN THE FIGHT` : `NEED ${need} MORE ${resName(card)}`, x + 14, y + h - 20, CLASS_INFO[this.b.f[this.me].cls].builds ? resInk(card) : RED_INK);
   }
 
   /** The Draw screen under the fight: timer and resource, the cast order, the hand and FIGHT. */
   private drawCustomBelow(ui: Ctx, tick: number, top: number, a: { x: number; w: number }): void {
     const b = this.b, f = b.f[this.me], offer = b.offer[this.me];
     const x0 = a.x + PAD, w = a.w - PAD * 2;
-    const { short, cost, dmg } = this.handPlan(), builds = f.cls === 'warrior';
+    const { short, cost, dmg } = this.handPlan(), builds = !!CLASS_INFO[f.cls].builds;
     // header: turn, a big timer, the resource
     win(ui, x0 - 8, top + 12, w + 16, 40, { burn: 3 });
     drawText(ui, `TURN ${b.turn}`, x0 + 4, top + 26, this.twoPlayer ? (this.me === 0 ? RED_INK : BLUE_INK) : INK, 2);
