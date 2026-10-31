@@ -19,6 +19,8 @@ export interface ClassModule {
   decks: ClassDecks;
   cpu: ClassCpu;
   lessons: ClassLessons;
+  /** What the dev build's Art Lab shows for the class. Plain data; the game itself never reads it. */
+  lab?: ClassLab;
 }
 
 /** Per-class labels and resource colors, shared by the HUD, cards and menus. */
@@ -125,6 +127,28 @@ export interface ClassLessons {
   ccLine: string;
   /** Resource topped up to this when the Draw lesson starts (a class that builds it in the fight). */
   drawRes?: number;
+}
+
+/** One spell the Art Lab plays on loop. */
+export interface LabSpell {
+  card: string;
+  /** The foe's column (default 3: in reach of melee from column 1). */
+  foeCol?: number;
+  /** Seconds before the loop restarts (default 2). */
+  loop?: number;
+  /** Caster's HP as a share of max, for spells that care (Last Stand). */
+  hp?: number;
+}
+/** A set of looks under review: fx kind -> effect id (src/fx EFFECTS), for battle fx and flying shots. */
+export interface LabLook { name: string; plays?: Record<string, string>; shots?: Record<string, string> }
+/** The class's Art Lab page: its spells, what renamed fx kinds were before, and drafts waiting for a pick. */
+export interface ClassLab {
+  spells: LabSpell[];
+  /** Foe column for the light and heavy attacks (default 3). */
+  basicsFoeCol?: number;
+  /** fx kinds that replaced an older one: new kind -> old kind (null: it had no effect), for the BEFORE look. */
+  was?: Record<string, string | null>;
+  drafts?: LabLook[];
 }
 
 export const CLASSES = new Registry<ClassModule>('class');

@@ -89,7 +89,7 @@ const room = new URLSearchParams(location.search).get('room');
 // the title is always the bottom of the scene stack: BACK from the first screen lands there
 setHome(() => new TitleScene());
 if (room) setScene(new OnlineScene(room)); else goHome();
-// dev builds can open a dev tool straight from the URL (#cards, #sandbox, #lab, #dev)
+// dev builds can open a dev tool straight from the URL (#cards, #sandbox, #lab, #art, #dev)
 if (DEV_TOOLS && !room && location.hash.length > 1) void import('./scenes/devMenu').then(m => m.devFromHash());
 
 const STEP = 1 / 60;
