@@ -444,7 +444,10 @@ export const screens: Record<string, () => void> = {
   'encyclopedia-card': () => { const e = new EncyclopediaScene(title, () => {}); e.cls = 'mage'; e.sel = e.reading = 4; setScene(e); run(0.5); },
   'balance-lab': () => setScene(new LabScene(title)),
   // Warrior's light attack, mid-swing
-  'art-lab': () => { setScene(new ArtLabScene(title, { tab: 'warrior' })); run(0.15); },
+  'art-lab': () => { setScene(new ArtLabScene(title, { tab: 'warrior', section: 'fx', zoom: 1 })); run(0.15); },
+  'art-lab-anims': () => { setScene(new ArtLabScene(title, { tab: 'rogue', section: 'anims', entry: 6, zoom: 3 })); run(0.35); },
+  'art-lab-sprites': () => { setScene(new ArtLabScene(title, { tab: 'mage', section: 'sprites' })); run(0.05); },
+  'art-lab-sounds': () => { setScene(new ArtLabScene(title, { tab: 'priest', section: 'sounds', entry: 7 })); run(0.6); },
   // every panel state on the first stage
   'art-lab-stages': () => { setScene(new ArtLabScene(title, { tab: 'stages', entry: 1 })); run(0.15); },
   // the Screens tab's list of every screen
