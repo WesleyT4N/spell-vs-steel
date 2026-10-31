@@ -132,7 +132,7 @@ export interface ClassLessons {
 /** One spell the Art Lab plays on loop. */
 export interface LabSpell {
   card: string;
-  /** The foe's column (default 3: in reach of melee from column 1). */
+  /** The foe's column (default 3 for melee classes, else 4). */
   foeCol?: number;
   /** Seconds before the loop restarts (default 2). */
   loop?: number;
@@ -141,10 +141,11 @@ export interface LabSpell {
 }
 /** A set of looks under review: fx kind -> effect id (src/fx EFFECTS), for battle fx and flying shots. */
 export interface LabLook { name: string; plays?: Record<string, string>; shots?: Record<string, string> }
-/** The class's Art Lab page: its spells, what renamed fx kinds were before, and drafts waiting for a pick. */
+/** The class's Art Lab page: its spells, what renamed fx kinds were before, and drafts waiting for a pick. Spells left
+ *  out of `spells` still show, after the listed ones, with default settings. */
 export interface ClassLab {
   spells: LabSpell[];
-  /** Foe column for the light and heavy attacks (default 3). */
+  /** Foe column for the light and heavy attacks (default as for spells). */
   basicsFoeCol?: number;
   /** fx kinds that replaced an older one: new kind -> old kind (null: it had no effect), for the BEFORE look. */
   was?: Record<string, string | null>;
