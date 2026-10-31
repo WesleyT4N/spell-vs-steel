@@ -10,13 +10,13 @@ export default {
     const T = TUNING.priest;
     f.lock = kind === 'light' ? T.lightLock : T.heavyLock;
     if (kind === 'light') {
-      b.flyingShot(f, 'spark', T.lightDamage, { basic: kind, element: 'holy' });
+      b.flyingShot(f, 'spark', T.lightDamage, { basic: kind, element: 'holy' }, false, 'sparkHit');
     } else {
       // Smite: a pillar of light on the enemy, in any row, when they're within smiteRange columns (and not stealthed);
       // otherwise it lands smiteRange panels ahead in our row and misses. The Priest can stay on its blessings and still hit.
       const near = !foe.dead && b.targetable(foe) && Math.abs(foe.col - f.col) <= T.smiteRange;
       const c = near ? foe.col : f.col + T.smiteRange * d, r = near ? foe.row : f.row;
-      b.addFx('holyPillar', f.side, c, r, 0.4);
+      b.addFx('smite', f.side, c, r, 0.4);
       b.strike(f, [[c, r]], T.heavyDamage, { basic: kind, element: 'holy', knockback: T.smiteKnock > 0 });
     }
   },

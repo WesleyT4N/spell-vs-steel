@@ -153,14 +153,6 @@ function shatterShards(x: number, y: number): void {
   emit(16, () => part(x + rnd(-9, 9), y - rnd(2, 21), { vx: rnd(-50, 50), vy: rnd(-60, 0), g: 200, life: rnd(0.3, 0.6), ramp: ['#fcfcfc', '#a4e4fc', '#3cbcfc', '#0058f8'], size: rnd(1, 2.5), box }));
   emit(5, () => part(x + rnd(-8, 8), y - rnd(2, 18), { vx: rnd(-6, 6), vy: rnd(-5, -1), life: rnd(0.6, 1), ramp: ['#a4e4fc', '#3cbcfc', '#0058f8'], size: rnd(2, 3), shrink: -0.2, dither: true, box }));
 }
-/** Holy light: a column of light standing on a panel, 24 tall. */
-function lightColumn(c: Ctx, x: number, y: number, p: number, w0 = 10): void {
-  const w = Math.max(2, Math.round(w0 * (1 - p * 0.6))), h = Math.round(24 * Math.min(1, p * 5));
-  for (let yy = 0; yy < h; yy += 2) P(c, HOLY[1 + ((yy >> 2) + Math.floor(p * 12)) % 3], x - w / 2, y - yy - 2, w, 2);
-  P(c, HOLY[3], x - 1, y - h, 2, h - 2);
-  if (p < 0.25) blob(c, '#fcfcfc', x, y - 4, 3);
-  glow(c, x, y - 8, 11, '248,216,120', 0.6 * (1 - p));
-}
 /** A rising green cross. */
 function cross(c: Ctx, x: number, y: number, col: string, s = 1): void {
   P(c, '#000000', x - 1 - s, y - 1, 3 + 2 * s, 3); P(c, '#000000', x - 1, y - 1 - s, 3, 3 + 2 * s);
@@ -179,19 +171,6 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
   const d = e.side === 0 ? 1 : -1;
   const ph = Math.floor(b.time * 24);
   switch (e.kind) {
-    case 'dagger': {
-      // the blade shoots out over the panels ahead and snaps back, with a glint at the tip
-      const reach = Number(e.data?.reach ?? 2);
-      const len = reach * PW * (p < 0.5 ? p * 2 : 1 - (p - 0.5) * 1.2);
-      const x0 = x + d * 6, by = y - 10, tip = x0 + d * len;
-      P(c, '#000000', Math.min(x0, tip), by - 2, Math.abs(tip - x0), 3);
-      P(c, '#7c7c7c', Math.min(x0, tip), by - 1, Math.abs(tip - x0), 1);
-      P(c, '#bcbcbc', Math.min(x0, tip) + 2, by - 1, Math.max(0, Math.abs(tip - x0) - 4), 1);
-      P(c, '#000000', tip - (d > 0 ? 4 : -1), by - 3, 4, 5); P(c, '#fcfcfc', tip - (d > 0 ? 3 : 0), by - 2, 3, 3);
-      if (p > 0.35 && p < 0.65) { glow(c, tip, by, 6, '252,252,252', 0.6); P(c, '#fcfcfc', tip - 3, by - 1, 7, 1); P(c, '#fcfcfc', tip, by - 4, 1, 7); }
-      if (once(e, 'sp', p > 0.45)) emit(4, () => spark(tip, by, STEEL.slice(1).reverse(), boxC(tip, by), 40));
-      break;
-    }
     case 'aimed': {
       const to = Number(e.data?.to ?? e.col);
       const x0 = x + d * 8, x1 = cellPx(to, e.row).x, by = y - 10;
@@ -278,27 +257,6 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
       }
       break;
     }
-    case 'holyPillar': {
-      lightColumn(c, x, y, p);
-      if (once(e, 'm')) emit(10, () => mote(x + rnd(-8, 8), y - rnd(0, 6), [HOLY[3], HOLY[2], HOLY[1]], boxF(x, y)));
-      break;
-    }
-    case 'holyNova': {
-      // a burst of light: a golden ring, rays and motes
-      const r = Math.min(11, 4 + p * 9);
-      ring(c, p < 0.4 ? '#fcfcfc' : HOLY[2], x, y - 10, r, r * 0.8);
-      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + p, r0 = r * 0.5; P(c, HOLY[3], x + Math.cos(a) * r0, y - 10 + Math.sin(a) * r0 * 0.8, 1, 2); }
-      glow(c, x, y - 10, 12, '248,216,120', 0.6 * (1 - p));
-      if (once(e, 'm')) emit(14, () => mote(x + rnd(-9, 9), y - rnd(0, 18), [HOLY[3], HOLY[2], HOLY[1]], boxF(x, y)));
-      break;
-    }
-    case 'shadowHit': {
-      // a shadow bolt landing: dark motes collapsing inward
-      const r = 14 * (1 - p);
-      for (let i = 0; i < 10; i++) { const ang = (i / 10) * Math.PI * 2; P(c, SHADOW[1 + (i % 3)], x + Math.cos(ang) * r, y - 10 + Math.sin(ang) * r * 0.7, 2, 2); }
-      glow(c, x, y - 10, 12, '152,120,248', 0.5 * (1 - p));
-      break;
-    }
     case 'healBurst': {
       // green crosses and light motes rising around the fighter
       for (let i = 0; i < 5; i++) {
@@ -309,38 +267,9 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
       if (once(e, 'm')) emit(10, () => mote(x + rnd(-9, 9), y - rnd(0, 12), ['#fcfcfc', '#b8f818', '#58d854'], boxF(x, y)));
       break;
     }
-    case 'stab': {
-      // a shadow X slash with a dark smear and purple sparks
-      const k = Math.min(1, p * 3), cx = x, cy = y - 11;
-      for (let i = 0; i < 8; i++) {
-        if (i / 7 > k) break;
-        P(c, '#000000', cx - 9 + i * 2.5 - 1, cy - 9 + i * 2.5 - 1, 4, 4);
-        P(c, SHADOW[2 + (i % 2)], cx - 9 + i * 2.5, cy - 9 + i * 2.5, 2, 2);
-        if (p > 0.15) { P(c, '#000000', cx + 9 - i * 2.5 - 1, cy - 9 + i * 2.5 - 1, 4, 3); P(c, SHADOW[1 + (i % 2)], cx + 9 - i * 2.5, cy - 9 + i * 2.5, 2, 1); }
-      }
-      if (once(e, 'sp', p > 0.2)) emit(7, () => spark(cx, cy, [SHADOW[3], SHADOW[2], SHADOW[1], SHADOW[0]], boxC(cx, cy), 55));
-      break;
-    }
     case 'smoke': {
       if (once(e, 's')) emit(16, () => smoke(x + rnd(-8, 8), y - rnd(0, 14), boxF(x, y), { vx: rnd(-14, 14), vy: rnd(-12, -2), size: rnd(3, 5), life: rnd(0.4, 0.8), ramp: ['#bcbcbc', '#7c7c7c', '#3c3c3c'] }));
       if (p < 0.3) { c.globalAlpha = 0.6; dblob(c, '#7c7c7c', x, y - 10, 10, ph); c.globalAlpha = 1; }
-      break;
-    }
-    case 'toxicPuff': {
-      // a sickly green cloud with bubbles popping out of it
-      if (once(e, 's')) emit(14, () => smoke(x + rnd(-8, 8), y - rnd(0, 12), boxF(x, y), { vx: rnd(-12, 12), vy: rnd(-10, -2), size: rnd(3, 5), life: rnd(0.4, 0.8), ramp: [TOX[2], TOX[1], TOX[0]] }));
-      if (Math.random() < 0.4) part(x + rnd(-8, 8), y - rnd(2, 10), { vy: rnd(-20, -8), life: 0.4, ramp: [TOX[3], TOX[2]], box: boxF(x, y) });
-      if (p < 0.4) { c.globalAlpha = 0.5; dblob(c, TOX[1], x, y - 8, 9, ph); c.globalAlpha = 1; }
-      break;
-    }
-    case 'lob': {
-      // a vial spinning on its arc, dripping as it goes
-      const to = Number(e.data?.to ?? e.col), x1 = cellPx(to, e.row).x;
-      const vx = x + (x1 - x) * p, vy = y - 12 - Math.sin(p * Math.PI) * 26, spin = Math.floor(b.time * 16) % 2;
-      const liquid = String(e.data?.color ?? TOX[2]);
-      P(c, '#000000', vx - 3, vy - 4, 7, 8); P(c, '#a4e4fc', vx - 2, vy - 3, 5, 6); P(c, liquid, vx - 2, vy - 1 + spin, 5, 3); P(c, '#fcfcfc', vx - 1, vy - 3, 1, 2);
-      P(c, '#503000', vx - 1, vy - 5 + spin, 3, 2);
-      if (Math.random() < 0.4) part(vx, vy + 3, { vy: 10, g: 120, life: 0.3, ramp: [liquid, TOX[1]], box: boxC(vx, vy) });
       break;
     }
     case 'trapPop': {
@@ -447,26 +376,8 @@ function impact(c: Ctx, e: Fx, x: number, y: number, p: number, d: number): void
   }
 }
 
-export function drawShot(c: Ctx, b: Battle, p: Projectile, x: number, y: number, dir: number): boolean {
-  const ph = Math.floor(b.time * 20) % 2;
+export function drawShot(c: Ctx, _b: Battle, p: Projectile, x: number, y: number, dir: number): boolean {
   const sx = X0 + (p.from ?? p.x) * PW + PW / 2, flown = Math.abs(x - sx);
-  if (p.kind === 'spark') {
-    // Holy Spark: a golden dart with a glittering tail, a warm flash at the hand
-    if (flown < 10) { glow(c, sx, y, 7, '248,216,120', 0.7 * (1 - flown / 10)); blob(c, HOLY[3], sx, y, 2); }
-    const len = Math.min(12, flown), tx = x - dir * len, xa = Math.round(Math.min(tx, x)), xb = Math.round(Math.max(tx, x));
-    P(c, '#000000', xa, y - 2, xb - xa, 5); P(c, HOLY[1], xa, y - 1, xb - xa, 3); P(c, HOLY[3], xa, y, xb - xa, 1);
-    for (let i = 0; i < 4; i++) P(c, HOLY[2], tx + (x - tx) * (i / 4), y + ((i * 7 + ph) % 5) - 2, 1, 1);
-    blob(c, '#000000', x, y, 3); blob(c, HOLY[2], x, y, 2); P(c, HOLY[3], x - 1, y - 1, 2, 2);
-    return true;
-  }
-  if (p.kind === 'knife') {
-    // Throwing Knife: a spinning blade with a grey speed trail
-    const spin = Math.floor(b.time * 30) % 4, dx = [3, 2, 0, -2][spin], dy = [0, -2, -3, -2][spin];
-    P(c, '#000000', x - Math.abs(dx) - 1, y - 3, Math.abs(dx) * 2 + 3, 6);
-    P(c, '#bcbcbc', x - dx, y - dy, 1, 1); P(c, '#fcfcfc', x + dx, y + dy, 1, 1); P(c, '#503000', x - dx, y - dy, 2, 2); P(c, '#fcfcfc', x, y, 1, 1);
-    for (let i = 1; i < 4; i++) if (i * 3 < flown) P(c, '#7c7c7c', x - dir * i * 3, y + (i & 1), 2, 1);
-    return true;
-  }
   if (p.kind === 'aimed') {
     // Aimed Shot: a heavy arrow with a long white streak and a crack of air at the bow
     if (flown < 12) ring(c, '#fcfcfc', sx, y, 3 + flown / 2, 2 + flown / 4);
