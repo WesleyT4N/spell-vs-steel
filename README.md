@@ -128,7 +128,7 @@ Thanks for wanting to help! Here's how to get going.
 - **Spells are data.** Each spell is one entry in its class's card file under `src/game/`, and every number worth tuning is in `src/game/tuning.ts`. A new spell also needs a 20×20 card icon in `src/art/cardIcons.ts`.
 - **Respect the pixel grid.** Fighters are 24×24 with their own animation frames. Never stretch sprites; pad them instead.
 - **Saves go through the save module** (`src/engine/save.ts`), never straight to `localStorage`.
-- **New screens get a screenshot test**: add them to `tests/screens/harness.ts`.
+- **New screens get a screenshot test**: add them to `src/dev/screens.ts`.
 - **New classes get tutorial lessons** and show up in every character select.
 - **Balance changes come with numbers.** `npm run sim` and `npm run balance` run thousands of CPU-vs-CPU matches; include the before and after win rates in your PR.
 

@@ -1,7 +1,7 @@
 // The save module: old localStorage keys carry over, files round-trip, damaged or newer saves are handled,
 // and the replay caps hold. Runs in Node on in-memory files. Usage: npx tsx tests/saves.ts
 import {
-  resetSaveForTests, getSave, setSave, flushSave, getReplays, setReplays, saveIsReadOnly, capReplays,
+  resetSaveForTests, getSave, setSave, flushSave, getReplays, setReplays, saveIsReadOnly, capReplays, pauseSaves, savesPaused,
   SAVE_VERSION, RECENT_REPLAYS, MAX_KEPT_REPLAYS, type Legacy, type StoredReplay,
 } from '../src/engine/save';
 import { customDecks, createCustom, saveCustom, renameCustom, cloneCustom, deleteCustom, MAX_CUSTOM_DECKS, DECK_NAME_MAX } from '../src/game/deck';
@@ -166,6 +166,16 @@ async function main(): Promise<void> {
   check('favorites', favoriteClass(pr) === 'warrior' && same(favoriteDeck(pr), { cls: 'warrior', deck: 'custom', n: 1 }), JSON.stringify(pr.decks));
   resetSaveForTests({ 'save.json': '{"game":"spell-vs-steel","v":1,"data":{"profile":{"classes":{"mage":{"w":-1,"l":2},"rogue":{"w":3,"l":4}},"decks":{"mage|starter":"lots"}}}}' });
   check('hand-edited profile checked', same(loadProfile(), { classes: { rogue: { w: 3, l: 4 } }, modes: {}, decks: {} }));
+
+  // ---- dev tools: pausing saves keeps playing on a copy in memory; storage keeps what it had ----
+  const pf = resetSaveForTests().files;
+  setSave('muted', true);
+  await flushSave();
+  check('pause: first call pauses', pauseSaves() && savesPaused() && !pauseSaves());
+  setSave('tutorialDone', true);
+  await flushSave();
+  check('pause: the game sees new changes', getSave('muted') && getSave('tutorialDone'));
+  check('pause: storage keeps the old save', pf['save.json'].includes('"muted":true') && pf['save.json'].includes('"tutorialDone":false'), pf['save.json'].slice(0, 120));
 
   console.log(failed ? `\n${failed} save check(s) failed` : '\nall save checks passed');
   process.exit(failed ? 1 : 0);

@@ -1,10 +1,11 @@
 // Art Lab: the one place to review how the game looks and sounds, built from the real game code. A tab per class
 // (its light and heavy attacks and every spell, in the shipped look, the look before the last pass, or a draft
 // waiting for a pick), a Stages tab (every registered stage, idle, with every panel state, or under a CPU fight),
-// then screens. Each class or stage folder brings its own lab
+// and a Screens tab that opens any screen of the game (src/dev/screens.ts, shared with the screen tests). Each class or stage folder brings its own lab
 // entries, so new content shows up here on its own. Controls live in a DOM panel: docked right, or along the
 // bottom in phone portrait.
-import { popScene, type Scene } from './scene';
+import { popScene, setScene, type Scene } from './scene';
+import { pauseSaves } from '../engine/save';
 import { CLASSES, classRules, type ClassLab, type LabLook, type LabSpell } from '../content/classes';
 import { Battle, NO_INTENT } from '../game/battle';
 import { drawBattle, getArena, useStage } from '../game/battleView';
@@ -26,11 +27,12 @@ import { h, btn, choice, check, reserveRight } from '../dev/dom';
 const SPEEDS: Array<[number, string]> = [[0.1, '0.1×'], [0.25, '¼×'], [0.5, '½×'], [1, '1×']];
 const STEP = 1 / 60;
 /** Tabs after the classes; filled in one at a time. */
-const LATER = ['SCREENS'];
-const STAGES_TAB = 'stages';
+const STAGES_TAB = 'stages', SCREENS_TAB = 'screens';
+/** Screen names from src/dev/screens.ts, loaded the first time the Screens tab opens. */
+let screenNames: string[] | null = null;
 
 /** One thing the lab plays on loop: a basic attack or a spell. */
-interface Entry { label: string; basic?: 'light' | 'heavy'; card?: string; foeCol: number; loop: number; hp?: number; scene?: StageScene }
+interface Entry { label: string; basic?: 'light' | 'heavy'; card?: string; foeCol: number; loop: number; hp?: number; scene?: StageScene; screen?: string }
 type StageScene = 'idle' | 'panels' | 'fight';
 const STAGE_ENTRIES: Entry[] = [
   { label: 'IDLE', scene: 'idle', foeCol: 4, loop: Infinity },
@@ -58,6 +60,15 @@ function entriesOf(cls: string): Entry[] {
     { label: `HEAVY: ${m.info.basics[1]}`, basic: 'heavy', foeCol: col, loop: 1.6 },
     ...[...listed, ...rest].map(s => ({ label: CARDS[s.card].name, card: s.card, foeCol: s.foeCol ?? near, loop: s.loop ?? 2, hp: s.hp })),
   ];
+}
+
+/** The corner button that leaves a previewed screen for the lab's Screens tab. */
+function backButton(name: string): void {
+  document.querySelector('.art-lab-back')?.remove();
+  const b = btn(`◀ ART LAB · ${name} · saves paused till reload`, () => { b.remove(); setScene(new ArtLabScene(popScene, { tab: SCREENS_TAB, entry: (screenNames ?? []).indexOf(name) })); }, 'primary');
+  b.className = 'art-lab-back';
+  b.style.cssText = 'position:fixed;left:6px;top:6px;z-index:40;font:11px ui-monospace,monospace;opacity:.85;color:#f8b800;background:#000;border:1px solid #f8b800;padding:4px 8px;cursor:pointer';
+  document.body.append(b);
 }
 
 const STAGE_ABOUT: Record<StageScene, string> = {
@@ -110,14 +121,23 @@ export class ArtLabScene implements Scene {
 
   /** `opts` opens on a tab (a class id or 'stages') and entry, e.g. for the screen tests. */
   constructor(private back: () => void = popScene, opts: { tab?: string; entry?: number } = {}) {
-    if (opts.tab) { saved.tab = opts.tab; saved.entry = opts.entry ?? 0; if (opts.tab !== STAGES_TAB) saved.cls = opts.tab as ClassId; }
+    if (opts.tab) { saved.tab = opts.tab; saved.entry = opts.entry ?? 0; if (CLASSES.has(opts.tab)) saved.cls = opts.tab as ClassId; }
     if (!CLASSES.has(saved.cls)) saved.cls = CLASSES.ids[0] as ClassId;
     if (!STAGES.has(saved.stage)) saved.stage = this.home;
     this.restart();
+    this.loadScreens();
   }
 
-  private get stages(): boolean { return saved.tab === STAGES_TAB; }
-  private tabs(): string[] { return [...CLASSES.ids, STAGES_TAB]; }
+  /** The Screens tab's list comes from src/dev/screens.ts, which is loaded only when wanted. */
+  private loadScreens(): void {
+    if (!this.screensTab || screenNames) return;
+    void import('../dev/screens').then(m => { screenNames = Object.keys(m.screens).filter(n => !n.startsWith('art-lab')); this.render(); });
+  }
+
+  /** The Stages and Screens tabs both play stage scenes on the canvas (Screens shows the stage idle behind its list). */
+  private get stages(): boolean { return saved.tab === STAGES_TAB || saved.tab === SCREENS_TAB; }
+  private get screensTab(): boolean { return saved.tab === SCREENS_TAB; }
+  private tabs(): string[] { return [...CLASSES.ids, STAGES_TAB, SCREENS_TAB]; }
 
   pad(): PadMode { return 'none'; }
 
@@ -144,12 +164,15 @@ export class ArtLabScene implements Scene {
   }
 
   // ---------- the loop ----------
-  private entries(): Entry[] { return this.stages ? STAGE_ENTRIES : entriesOf(saved.cls); }
+  private entries(): Entry[] {
+    if (this.screensTab) return (screenNames ?? []).map(n => ({ label: n.toUpperCase(), screen: n, scene: 'idle', foeCol: 4, loop: Infinity }));
+    return this.stages ? STAGE_ENTRIES : entriesOf(saved.cls);
+  }
 
   private restart(): void {
     const list = this.entries();
-    saved.entry = Math.min(saved.entry, list.length - 1);
-    const en = list[saved.entry];
+    saved.entry = Math.max(0, Math.min(saved.entry, list.length - 1));
+    const en: Entry = list[saved.entry] ?? STAGE_ENTRIES[0];
     this.cpus = null;
     if (en.scene) { this.restartStage(en.scene); return; }
     useStage(this.home);
@@ -206,12 +229,16 @@ export class ArtLabScene implements Scene {
   update(dt: number): void {
     if (this.leaving) { this.exit(); return; }
     if (wasPressed('back')) { this.leaving = true; return; }
-    const n = this.entries().length;
+    const n = Math.max(1, this.entries().length);
     if (navPressed('down', dt)) this.pick((saved.entry + 1) % n);
     if (navPressed('up', dt)) this.pick((saved.entry + n - 1) % n);
     if (navPressed('right', dt)) this.cycleLook(1);
     if (navPressed('left', dt)) this.cycleLook(-1);
-    if (wasPressed('confirm')) { unlockAudio(); this.restart(); }
+    if (wasPressed('confirm')) {
+      unlockAudio();
+      if (this.screensTab) { this.openScreen(); return; }
+      this.restart();
+    }
     if (wasPressed('lb') || wasPressed('rb')) {
       const ids = this.tabs(), i = ids.indexOf(saved.tab);
       this.setTab(ids[(i + (wasPressed('rb') ? 1 : ids.length - 1)) % ids.length]);
@@ -221,7 +248,7 @@ export class ArtLabScene implements Scene {
     const sdt = this.step ? STEP : dt * saved.speed;
     this.step = false;
     this.t += sdt;
-    const en = this.entries()[saved.entry];
+    const en = this.entries()[saved.entry] ?? STAGE_ENTRIES[0];
     if (this.t >= en.loop && saved.auto) this.restart();
     const b = this.b;
     b.gauge = 0;
@@ -237,8 +264,8 @@ export class ArtLabScene implements Scene {
   draw(c: Ctx, tick: number, ui: Ctx): void {
     if (this.stages) drawBattle(c, this.b, tick, 0, true);
     else withLook(this.b, saved.cls, saved.look, () => drawBattle(c, this.b, tick, 0, true));
-    const en = this.entries()[saved.entry];
-    const tag = [en.label, this.stages ? getArena().name : this.lookName(saved.look), saved.speed !== 1 ? `${saved.speed}X` : '', this.paused ? 'PAUSED' : ''].filter(Boolean).join('   ');
+    const en = this.entries()[saved.entry] ?? STAGE_ENTRIES[0];
+    const tag = [this.screensTab ? 'SCREENS' : en.label, this.stages ? getArena().name : this.lookName(saved.look), saved.speed !== 1 ? `${saved.speed}X` : '', this.paused ? 'PAUSED' : ''].filter(Boolean).join('   ');
     P(ui, '#000000', 0, UH - 16, UW, 16);
     drawTextCentered(ui, tag, UW / 2, UH - 12, this.paused ? '#f8b800' : '#fcfcfc', 1, false);
     drawTextCentered(ui, 'ART LAB', UW / 2, 6, '#f8b800', 1, true);
@@ -248,7 +275,31 @@ export class ArtLabScene implements Scene {
   private looks(): Look[] { return ['game', 'before', ...(labOf(saved.cls).drafts ?? []).map((_, i) => i)]; }
   private lookName(l: Look): string { return l === 'game' ? 'IN GAME' : l === 'before' ? 'BEFORE' : (labOf(saved.cls).drafts?.[l]?.name ?? '?').toUpperCase(); }
 
-  private pick(i: number): void { saved.entry = i; this.restart(); this.render(); }
+  private pick(i: number): void {
+    saved.entry = i;
+    if (this.screensTab) { this.render(); return; }
+    this.restart(); this.render();
+  }
+
+  /**
+   * Leave the lab and open the picked screen of the game, full window, with saves paused (some screens make decks).
+   * A button in the corner comes back to this tab.
+   */
+  private openScreen(): void {
+    const name = screenNames?.[saved.entry];
+    if (!name) return;
+    void import('../dev/screens').then(({ screens }) => {
+      pauseSaves();
+      window.removeEventListener('keydown', this.onKey);
+      window.removeEventListener('resize', this.onResize);
+      this.root.remove();
+      reserveRight(0);
+      useStage(this.home);
+      stopMusic();
+      screens[name]();
+      backButton(name);
+    });
+  }
   /** Left / right: the next look on a class tab, the next stage on the Stages tab. */
   private cycleLook(d: number): void {
     if (this.stages) {
@@ -262,7 +313,8 @@ export class ArtLabScene implements Scene {
   }
   private setTab(tab: string): void {
     saved.tab = tab; saved.entry = 0;
-    if (tab !== STAGES_TAB) {
+    this.loadScreens();
+    if (!this.stages) {
       saved.cls = tab as ClassId;
       if (!this.looks().includes(saved.look)) saved.look = 'game';
       playMusic(stageMusic(this.home));
@@ -308,31 +360,30 @@ export class ArtLabScene implements Scene {
     if (!this.body) return;
     const big = 'min-height:32px;';
     const tabs = h('div', { class: 'row' },
-      ...this.tabs().map(id => { const b = btn(id === STAGES_TAB ? 'STAGES' : CLASSES.get(id)!.info.name, () => this.setTab(id), id === saved.tab ? 'on' : ''); b.style.cssText = big; return b; }),
-      ...LATER.map(t => { const b = btn(t, () => {}); b.disabled = true; b.title = 'Coming next'; b.style.cssText = big; return b; }),
+      ...this.tabs().map(id => { const b = btn(CLASSES.get(id)?.info.name ?? id.toUpperCase(), () => this.setTab(id), id === saved.tab ? 'on' : ''); b.style.cssText = big; return b; }),
     );
     const looks = choice(this.looks().map(l => [String(l), this.lookName(l)] as [string, string]), String(saved.look), v => {
       saved.look = v === 'game' || v === 'before' ? v : Number(v); this.render();
     });
     const speed = choice(SPEEDS, saved.speed, v => { saved.speed = v; this.render(); });
     const list = h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:3px' },
-      ...this.entries().map((en, i) => { const b = btn(en.label, () => { unlockAudio(); this.pick(i); }, i === saved.entry ? 'on' : ''); b.style.cssText = `${big}text-align:left`; return b; }),
+      ...this.entries().map((en, i) => { const b = btn(en.label, () => { unlockAudio(); this.pick(i); if (this.screensTab) this.openScreen(); }, i === saved.entry ? 'on' : ''); b.style.cssText = `${big}text-align:left`; return b; }),
     );
-    const card = this.entries()[saved.entry].card;
+    const card = this.entries()[saved.entry]?.card;
     const drafts = labOf(saved.cls).drafts?.length ?? 0;
     const stageBtns = h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:3px' },
       ...STAGES.ids.map(id => { const b = btn(stageName(id), () => this.setStage(id), id === saved.stage ? 'on' : ''); b.style.cssText = `${big}text-align:left`; return b; }),
     );
-    const what = this.stages ? ['stage scene', 'stage'] : ['spell', 'look'];
+    const what = this.screensTab ? ['screen', 'stage'] : this.stages ? ['stage scene', 'stage'] : ['spell', 'look'];
     this.body.replaceChildren(
       h('div', { class: 'row', style: 'justify-content:space-between' }, h('h2', { style: 'margin:0' }, 'Art Lab'), btn('Exit (Esc)', () => { this.leaving = true; }, 'primary')),
       h('div', { class: 'muted' }, touchActive() ? 'Real game code. Tap what to play; it loops.' : `Real game code. ${k('up')}/${k('down')} ${what[0]} · ${k('left')}/${k('right')} ${what[1]} · ${k('attack')} replay · P pause · . step a frame · ${k('cast')} exit · Q/E or LB/RB tab · START pause.`),
       tabs,
-      ...(this.stages ? [h('h3', {}, 'Stage'), stageBtns] : [
+      ...(this.screensTab ? [] : this.stages ? [h('h3', {}, 'Stage'), stageBtns] : [
         h('h3', {}, 'Look'), looks.el,
         h('div', { class: 'muted' }, drafts ? `${drafts} draft${drafts > 1 ? 's' : ''} waiting for a pick.` : 'No drafts waiting. BEFORE shows the look the last pass replaced.'),
       ]),
-      h('h3', {}, 'Playback'),
+      ...(this.screensTab ? [] : [h('h3', {}, 'Playback'),
       h('div', { class: 'row' },
         btn('Replay', () => { unlockAudio(); this.restart(); }),
         btn(this.paused ? 'Resume (P)' : 'Pause (P)', () => this.togglePause(), this.paused ? 'on' : ''),
@@ -340,9 +391,9 @@ export class ArtLabScene implements Scene {
         check('Loop', saved.auto, v => { saved.auto = v; }),
         check('Sound', saved.sound, v => { saved.sound = v; unlockAudio(); this.restart(); }),
       ),
-      speed.el,
-      h('h3', {}, this.stages ? 'Scene' : 'Spell FX'),
-      h('div', { class: 'muted' }, this.stages ? STAGE_ABOUT[this.entries()[saved.entry].scene!] : card ? `${CARDS[card].name}: ${CARDS[card].short}` : ''),
+      speed.el]),
+      h('h3', {}, this.screensTab ? 'Screens' : this.stages ? 'Scene' : 'Spell FX'),
+      h('div', { class: 'muted' }, this.screensTab ? (screenNames ? 'Every screen of the game, set up the way the screen tests shoot it. Picking one opens it full window at this window\'s shape, with saves paused; ◀ ART LAB in the corner comes back.' : 'Loading…') : this.stages ? STAGE_ABOUT[this.entries()[saved.entry]?.scene ?? 'idle'] : card ? `${CARDS[card].name}: ${CARDS[card].short}` : ''),
       list,
     );
   }

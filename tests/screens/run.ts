@@ -1,4 +1,4 @@
-// Screen checks: opens every screen in tests/screens/harness.ts at every screen shape the game supports
+// Screen checks: opens every screen in src/dev/screens.ts at every screen shape the game supports
 // (4:3 to 21:9, wider than 21:9, phones in portrait and landscape) and saves a screenshot of each.
 // A shot fails when the page throws or logs an error, the game screen doesn't fill the window the way
 // fit() in src/main.ts promises, or the screen is blank. Pixels are compared separately (compare.ts),
@@ -30,7 +30,7 @@ export const PROFILES: Profile[] = [
   { name: 'phone-landscape', w: 844, h: 390, touch: true },
 ];
 /** Screens that dock DOM panels over or beside the canvas, so the canvas doesn't fill the window. */
-const DOM_PANELS = new Set(['balance-lab', 'art-lab', 'art-lab-stages']);
+const DOM_PANELS = new Set(['balance-lab', 'art-lab', 'art-lab-stages', 'art-lab-screens']);
 
 export interface Shot { screen: string; profile: string; file: string; problems: string[] }
 
