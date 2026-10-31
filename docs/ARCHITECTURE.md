@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at 14efe03 (2026-10-31).
+How the game is put together, one section per system. Describes `main` at 19e2052 (2026-10-31).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -8,6 +8,7 @@ The full version, with a drawn diagram per system, is the living doc: https://cl
 - [Sim and game loop](#sim-and-game-loop)
 - [Netcode](#netcode)
 - [Characters and cards](#characters-and-cards)
+- [Mods](#mods)
 - [Stages](#stages)
 - [Rendering and art pipeline](#rendering-and-art-pipeline)
 - [Audio](#audio)
@@ -199,6 +200,24 @@ Adding a class today touches: `content/classes/<id>/` (`cards.ts` listed in `gam
 A class folder's `index.ts` is its `ClassModule`: `{ id, info, rules, decks, cpu, lessons }`. `info` (`ClassInfo`) holds the name, resource and its colours, attack names, select-screen blurb and backdrop, and the `builds` / `melee` flags; the rest come from their own files. `decks.ts` holds the starter and one deck per Mythic (`game/deck.ts` reads them), `cpu.ts` the three playstyles, Hard's pick per matchup, how far the basics reach, where to stand and which spells to take from an offer (`game/ai.ts` asks `reach`, `taps`, `windup`, `stay`, `goal`, `pick`; shared building blocks `meleeGoal`, `rangedGoal`, `poolPick` live in `game/cpuKit.ts`), and `tutorial.ts` the class's tutorial lessons. The temperaments the styles start from live in `game/temperaments.ts`.
 
 A class's `rules.ts` is a `ClassRules` object the engine asks about that class: `startRes` / `startResMax`, `pool(f)` (cap and current max for Draw-screen cost planning), `basic(b, f, kind)` (light and heavy attacks), and optional hooks `onDraw`, `tick`, `onHurt`, `gainRage`, `gainRes`. `battle.ts` has no `cls === '…'` branches; it calls `classRules(f.cls)`. Rules keep no state of their own (it lives on the Fighter), so rollback and replays see everything. `game/shots.ts` holds `panOf` and the `basicShot` effect so class modules never import `battle.ts` (which imports the class registry).
+
+## Mods
+
+A mod is one JSON file of plain data in `mods/` (#103). Nothing in it runs as code or is put into HTML, and anything the format does not name is refused. Today a mod adds skins with their own drawn art; format detail in [MODDING.md](MODDING.md).
+
+```mermaid
+flowchart TD
+  F["mods/*.json<br/>bundled as text (import.meta.glob raw)"] --> P["parseMod · src/mods/format.ts<br/>strict whitelist"]
+  P -- bad file --> X["console warning, file skipped<br/>game still starts"]
+  P --> R["registerMod · src/mods/index.ts<br/>at boot, imported by main.ts"]
+  R --> A["addSkin · art/sprites.ts<br/>after the built-in colours"]
+  A --> D["getFrame / getPortrait / teamColor<br/>prefer Skin.art"]
+```
+
+- Format `spell-vs-steel-mod/1`: `id`, `name`, `author`, 1 to 16 `skins`. Each skin names a built-in `class`, a new `id`, a `palette` (letters `a`..`z` to `#rrggbb`, no gaps, `a` = outline), a `team` letter, `frames` at the class's 36x24 size (`idle0` required, missing ones fall back to it) and an optional 40x32 `portrait`. `__proto__`, unknown keys, HTML-ish names and files over 256 KB are refused.
+- `format.ts` is pure (no DOM, no game state); `tests/mods.ts` (in `npm test`) checks the shipped mods and 19 hostile files.
+- `Skin.art: SkinArt` (`pal`, `team`, `ax`, `frames`, `portrait`) sits beside the palette recolours; the menu still sprite is `idle0` trimmed. Shipped: `mods/wizard.json` (Mage) and `mods/druid.json` (Ranger).
+- Cosmetic and render-only: the sim never sees mods. Online, an opponent without the mod sees your default colour.
 
 ## Stages
 
@@ -436,7 +455,7 @@ flowchart LR
 | Dev: https://claude.ai/artifact/8xAkx41kQdJWmNQKZpBVJU | `npm run build` → `dist/artifact.html` |
 | Desktop app | `npm run desktop` to play, `npm run dist:win` / `dist:linux` to package; a `v*` tag builds both into a GitHub Release (`desktop.yml`). See [DESKTOP.md](DESKTOP.md) |
 
-Release: PR → Wes says "lgtm" → merge → rebuild from latest main → publish the main link and the dev link from the same commit. `DEV_TOOLS` (`src/flags.ts`) gates dev-only code; the dev menu is a dynamic import so prod ships none of it.
+Release: PR → CI green → merge → publish the dev link from latest main. The main (prod) link is published only from the latest GitHub release tag. `DEV_TOOLS` (`src/flags.ts`) gates dev-only code; the dev menu is a dynamic import so prod ships none of it.
 
 ## Testing and CI
 
@@ -476,4 +495,5 @@ New screens go in `src/dev/screens.ts` (shared by the screen tests and the Art L
 ## In flight
 
 - Modularize: stages are modules (#35); spells (#62), rules (#87), decks, CPU and lessons (#88), tuning and class info (#90, #91) sit in `src/content/classes/<id>/`; next art, animation and voices.
+- Mods: a MODS screen to load a user's mod file at runtime through the same `parseMod`; spells, stages and classes as mod content once they are pure data.
 - BN indicators (#32).
