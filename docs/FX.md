@@ -7,6 +7,9 @@ Hugo Duprez). Its core is vendored unchanged in `src/vendor/pixelfx/`.
   `rows`, `ink`) and `create(o)` returning `{ update(dt), draw(p) }`.
 - **`src/fx/index.ts`** maps battle fx kinds to effects (`PLAYS`). A kind with no entry keeps its hand-drawn case in
   `src/game/fxView.ts`.
+- **Flying shots** (projectiles) can play an effect too: register it in `SHOT_PLAYS` by `Projectile.kind`. Its
+  origin is the shot's center (x forward along the flight), its box 24x24 plus `panels - 1` panels behind for a trail,
+  and its clock the shot's flight time.
 - **`src/game/pfx.ts`** plays them. It is render-only: an effect is seeded from when and where its fx started, so a
   rollback resim draws the same picture. Never read or write battle state from an effect.
 - **Our style** (overrides pixelfx defaults):

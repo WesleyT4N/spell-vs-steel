@@ -1,6 +1,6 @@
 // Which battle fx play a pixelfx-method effect (see docs/FX.md). Any fx kind not registered here keeps its
 // hand-drawn version in src/game/fxView.ts.
-import { registerPfx, type PfxModule } from '../game/pfx';
+import { registerPfx, registerShotPfx, type PfxModule } from '../game/pfx';
 
 /** Every effect module, by id ("warrior/cleave-a"), for the labs and the contact-sheet tool. */
 export const EFFECTS: Record<string, PfxModule> = Object.fromEntries(
@@ -41,3 +41,8 @@ export const PLAYS: Record<string, string> = {
 };
 
 for (const [kind, id] of Object.entries(PLAYS)) registerPfx(kind, EFFECTS[id]);
+
+/** The effect each flying projectile kind plays (Projectile.kind); kinds not listed keep their hand-drawn shot. */
+export const SHOT_PLAYS: Record<string, string> = {};
+
+for (const [kind, id] of Object.entries(SHOT_PLAYS)) registerShotPfx(kind, EFFECTS[id]);

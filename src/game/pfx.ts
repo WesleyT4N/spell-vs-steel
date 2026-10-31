@@ -8,7 +8,7 @@ import { panelFoot, PW, FACE, LIP } from '../art/arena';
 /** Pixels between one row's feet and the next row's. */
 export const ROW = FACE + LIP;
 import type { Ctx } from '../engine/gfx';
-import type { Battle, Fx } from './battle';
+import type { Battle, Fx, Projectile } from './battle';
 import { team } from './teamColors';
 
 /** The painter pixelfx hands an effect (see src/vendor/pixelfx/painter.js). Loosely typed: the vendored core is JS. */
@@ -80,11 +80,17 @@ export function drawPfx(c: Ctx, b: Battle, e: Fx): boolean {
   if (tt > live.tt) { live.inst.update(tt - live.tt); live.tt = tt; }
   live.seen = frameNo;
 
+  blit(c, live.inst, meta, box, foot, flip);
+  return true;
+}
+
+/** Composite a live effect's frame onto the canvas: its box sits at `at` (mirrored when flipped). */
+function blit(c: Ctx, inst: Live['inst'], meta: PfxMeta, box: ReturnType<typeof boxOf>, at: { x: number; y: number }, flip: boolean): void {
   const w = box.x1 - box.x0, h = box.y1 - box.y0;
-  const ox = Math.round(flip ? foot.x - box.x1 : foot.x + box.x0), oy = Math.round(foot.y + box.y0);
+  const ox = Math.round(flip ? at.x - box.x1 : at.x + box.x0), oy = Math.round(at.y + box.y0);
   const frame = createFrame(w, h, ox, oy);
   clearFrame(frame);
-  live.inst.draw(frame, 'all');
+  inst.draw(frame, 'all');
   if (meta.ink) inkOutline(frame.color, w, h, hex(meta.ink));
   const img = new ImageData(w, h);
   composite(frame, img.data, null);
@@ -95,6 +101,43 @@ export function drawPfx(c: Ctx, b: Battle, e: Fx): boolean {
   cc.clearRect(0, 0, w, h);
   cc.putImageData(img, 0, 0);
   c.drawImage(canvas, 0, 0, w, h, ox, oy, w, h);
+}
+
+const shots = new Map<string, PfxModule>();
+/** Play `mod` for flying shots of this projectile kind. */
+export function registerShotPfx(kind: string, mod: PfxModule): void { shots.set(kind, mod); }
+export function unregisterShotPfx(kind: string): void { shots.delete(kind); }
+export const shotPfxFor = (kind: string): PfxModule | undefined => shots.get(kind);
+/**
+ * A shot's box: 24 x 24 centered on the shot, plus `panels - 1` panels behind it for a trail. The effect's origin is
+ * the shot's center, x forward along its flight.
+ */
+export const shotBoxOf = (m: PfxMeta): { x0: number; x1: number; y0: number; y1: number } =>
+  ({ x0: -BOX.half - ((m.panels ?? 1) - 1) * PW, x1: BOX.half, y0: -BOX.half, y1: BOX.half });
+
+/**
+ * Draw flying shot `p` at world (x, y), heading `dir` (1 right, -1 left), with its registered effect. False when none
+ * is registered. Its clock is the shot's own flight time, so a rollback resim draws the same picture.
+ */
+export function drawShotPfx(c: Ctx, b: Battle, p: Projectile, x: number, y: number, dir: number): boolean {
+  const mod = shots.get(p.kind);
+  if (!mod) return false;
+  const { meta } = mod, flip = dir < 0;
+  const h = p.homing;
+  const age = h ? h.p * h.dur : Math.abs((p.x - (p.from ?? p.x)) / (p.speed || 1));
+  const key = `shot|${p.kind}|${p.side}|${p.row}|${p.from ?? ''}|${p.speed}|${h ? `${h.sx},${h.sy}` : ''}`;
+  let map = lives.get(b);
+  if (!map) lives.set(b, map = new Map());
+  let live = map.get(key);
+  if (!live || age < live.tt) {
+    const inst = createFx(mod, { x: Math.round(x), y: Math.round(y), flip, team: team(p.side), seed: hash(...[...key].map(ch => ch.charCodeAt(0))) % 100000 });
+    map.set(key, live = { inst, tt: 0, seen: frameNo });
+  }
+  if (age > live.tt) { live.inst.update(age - live.tt); live.tt = age; }
+  live.seen = frameNo;
+  // the shot moves: keep the painter's origin on it
+  live.inst.options.x = Math.round(x); live.inst.options.y = Math.round(y);
+  blit(c, live.inst, meta, shotBoxOf(meta), { x, y }, flip);
   return true;
 }
 

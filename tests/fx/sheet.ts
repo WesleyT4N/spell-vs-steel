@@ -4,7 +4,7 @@
 import { W, H } from '../../src/engine/gfx';
 import { Battle, NO_INTENT } from '../../src/game/battle';
 import { drawBattle } from '../../src/game/battleView';
-import { boxOf, pfxFor, registerPfx, unregisterPfx, type PfxModule } from '../../src/game/pfx';
+import { boxOf, pfxFor, registerPfx, unregisterPfx, shotPfxFor, registerShotPfx, unregisterShotPfx, type PfxModule } from '../../src/game/pfx';
 import { EFFECTS } from '../../src/fx';
 import { panelFoot, PW, X0, Y0, FACE, LIP } from '../../src/art/arena';
 import { toList, starterDeck } from '../../src/game/deck';
@@ -15,7 +15,7 @@ export interface Row {
   cls: ClassId;
   /** 'light', 'heavy' or a card id. */
   attack: string;
-  /** Play these effect ids for these fx kinds in this row: { cleave: 'warrior/cleave-b' }. */
+  /** Play these effect ids for these fx kinds in this row: { cleave: 'warrior/cleave-b' }; "shot:<kind>" for a projectile kind. */
   use?: Record<string, string>;
   foe?: ClassId;
   /** The foe's column (3 to 5). */
@@ -53,8 +53,8 @@ job.rows.forEach((row, ri) => {
   const restore: Array<[string, PfxModule | undefined]> = [];
   for (const [kind, id] of Object.entries(row.use ?? {})) {
     if (!EFFECTS[id]) throw new Error(`no effect ${id}`);
-    restore.push([kind, pfxFor(kind)]);
-    registerPfx(kind, EFFECTS[id]);
+    restore.push([kind, kind.startsWith('shot:') ? shotPfxFor(kind.slice(5)) : pfxFor(kind)]);
+    if (kind.startsWith('shot:')) registerShotPfx(kind.slice(5), EFFECTS[id]); else registerPfx(kind, EFFECTS[id]);
   }
   const foe = row.foe ?? 'warrior';
   const b = new Battle({ cls: row.cls, deck: toList(starterDeck(row.cls)), name: 'A' }, { cls: foe, deck: toList(starterDeck(foe)), name: 'B' }, 7);
@@ -88,6 +88,9 @@ job.rows.forEach((row, ri) => {
     oc.fillStyle = '#e8dcc0'; oc.font = '11px monospace';
     oc.fillText(`${at.toFixed(2)}s`, x + 3, y + CROP.h * Z - 4);
   }
-  for (const [kind, mod] of restore) if (mod) registerPfx(kind, mod); else unregisterPfx(kind);
+  for (const [kind, mod] of restore) {
+    if (kind.startsWith('shot:')) { if (mod) registerShotPfx(kind.slice(5), mod); else unregisterShotPfx(kind.slice(5)); }
+    else if (mod) registerPfx(kind, mod); else unregisterPfx(kind);
+  }
 });
 (window as unknown as { done: string }).done = out.toDataURL();
