@@ -142,12 +142,6 @@ function crack(c: Ctx, x: number, y: number): void {
   P(c, '#000000', x - 7, y - 1, 5, 1); P(c, '#000000', x - 3, y, 6, 1); P(c, '#000000', x + 3, y - 1, 5, 1);
   P(c, '#000000', x - 1, y - 3, 1, 3); P(c, '#000000', x + 5, y + 1, 2, 1);
 }
-/** Frost: crystals and a snow burst around a point on the floor. */
-function snowBurst(e: Fx, x: number, y: number, n = 12, key = 'snow'): void {
-  if (!once(e, key)) return;
-  const box = boxF(x, y);
-  emit(n, () => part(x + rnd(-8, 8), y - rnd(0, 18), { vx: rnd(-30, 30), vy: rnd(-30, 10), drag: 0.95, life: rnd(0.4, 0.8), ramp: SNOW, box }));
-}
 function shatterShards(x: number, y: number): void {
   const box = boxF(x, y);
   emit(16, () => part(x + rnd(-9, 9), y - rnd(2, 21), { vx: rnd(-50, 50), vy: rnd(-60, 0), g: 200, life: rnd(0.3, 0.6), ramp: ['#fcfcfc', '#a4e4fc', '#3cbcfc', '#0058f8'], size: rnd(1, 2.5), box }));
@@ -171,22 +165,6 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
   const d = e.side === 0 ? 1 : -1;
   const ph = Math.floor(b.time * 24);
   switch (e.kind) {
-    case 'aimed': {
-      const to = Number(e.data?.to ?? e.col);
-      const x0 = x + d * 8, x1 = cellPx(to, e.row).x, by = y - 10;
-      const ramp = STEEL;
-      // a heavy arrow: a long streak, a crack of air at the bow and a shock ring where it lands
-      const q = Math.min(1, p * 2.5), head = x0 + (x1 - x0) * q;
-      P(c, '#000000', Math.min(x0, head), by - 2, Math.abs(head - x0), 4);
-      P(c, ramp[2], Math.min(x0, head), by - 1, Math.abs(head - x0), 2);
-      P(c, ramp[3], Math.min(x0, head), by - 1, Math.abs(head - x0), 1);
-      if (p < 0.2) { ring(c, '#fcfcfc', x0, by, 3 + p * 15, 2 + p * 8); }
-      if (q >= 1) {
-        ring(c, ramp[3], x1, by, Math.min(11, 3 + p * 9), Math.min(8, 2 + p * 6));
-        if (once(e, 'hit')) emit(8, () => spark(x1, by, STEEL.slice(1).reverse(), boxC(x1, by), 60));
-      }
-      break;
-    }
     case 'thrust': {
       // a long lunge: the spear streaks out with speed lines and a glint at the point
       const len = Number(e.data?.len ?? 3) * PW * Math.min(1, p * 3), x0 = x + d * 6, tip = x0 + d * len;
@@ -272,44 +250,10 @@ export function drawFx(c: Ctx, b: Battle, e: Fx): void {
       if (p < 0.3) { c.globalAlpha = 0.6; dblob(c, '#7c7c7c', x, y - 10, 10, ph); c.globalAlpha = 1; }
       break;
     }
-    case 'trapPop': {
-      // jaws snap shut, then the trap's payload bursts
-      const k = String(e.data?.kind ?? 'explode'), col = k === 'freeze' ? ICE : k === 'mine' ? TOX : FIRE;
-      const shut = Math.min(1, p * 5), gap = Math.round(5 * (1 - shut));
-      for (let i = 0; i < 5; i++) { P(c, '#bcbcbc', x - 8 + i * 4, y - 3 - gap, 2, 2); P(c, '#bcbcbc', x - 6 + i * 4, y - 1 + gap, 2, 2); }
-      P(c, '#000000', x - 9, y, 19, 1); P(c, '#7c7c7c', x - 9, y - 1, 19, 1);
-      if (k === 'freeze') { crystal(c, x - 5, y, Math.round(10 * Math.min(1, p * 3)), 2); crystal(c, x + 5, y, Math.round(12 * Math.min(1, p * 3)), 2); snowBurst(e, x, y, 12); }
-      else if (k === 'mine') { dust(e, x, y, 10); if (once(e, 'v')) emit(10, () => part(x + rnd(-4, 4), y - 4, { vx: rnd(-30, 30), vy: rnd(-50, -15), g: 140, life: 0.5, ramp: [TOX[2], TOX[1], TOX[0]], size: rnd(1, 2), box: boxF(x, y) })); }
-      else if (once(e, 'v')) emit(10, () => spark(x, y - 4, col, boxF(x, y), 50));
-      break;
-    }
-    case 'hawkDive': case 'bite': case 'claw': {
-      // raking slashes across the target (feathers for the hawk, a snap of jaws for the wolf)
-      const n = e.kind === 'claw' ? 4 : 3, k = Math.min(1, p * 3);
-      for (let i = 0; i < n; i++) for (let j = 0; j < 7; j++) if (j / 6 <= k) {
-        P(c, '#000000', x - 7 + i * 4 + j - 1, y - 18 + j * 2 - 1, 3, 3);
-        P(c, j > 4 ? '#fcfcfc' : '#bcbcbc', x - 7 + i * 4 + j, y - 18 + j * 2, 1, 2);
-      }
-      if (e.kind === 'bite' && p < 0.4) { const g = Math.round(6 * (1 - p / 0.4)); for (let i = 0; i < 4; i++) { P(c, '#fcfcfc', x - 6 + i * 4, y - 14 - g, 2, 3); P(c, '#fcfcfc', x - 4 + i * 4, y - 6 + g, 2, 3); } }
-      if (e.kind === 'hawkDive' && once(e, 'f')) emit(6, () => part(x + rnd(-6, 6), y - rnd(8, 18), { vx: rnd(-20, 20), vy: rnd(-10, 10), g: 25, drag: 0.92, life: rnd(0.5, 0.9), ramp: ['#f8d878', '#ac7c00', '#503000'], size: 2, shrink: 0.3, box: boxF(x, y) }));
-      if (once(e, 'sp', p > 0.2)) emit(5, () => spark(x, y - 12, ['#fcfcfc', '#bcbcbc'], boxF(x, y), 40));
-      break;
-    }
     case 'flare': {
       // a bright burst that purges the panel
       if (p < 0.5) { glow(c, x, y - 6, 11, '248,184,0', 0.6 * (1 - p * 2)); ring(c, HOLY[3], x, y - 4, 3 + p * 16, 2 + p * 6); }
       if (once(e, 'sp')) emit(10, () => spark(x, y - 6, [HOLY[3], FIRE[3], FIRE[2]], boxF(x, y), 55, { g: 40 }));
-      break;
-    }
-    case 'arrowRain': {
-      // three arrows plunge into the panel, kicking up dust
-      const fall = Math.min(1, p * 2);
-      for (let i = 0; i < 3; i++) {
-        const ax = x - 7 + i * 7, ay = y - 2 - 22 * (1 - fall) - i * 2;
-        P(c, '#000000', ax - 1, ay - 11, 3, 12); P(c, '#ac7c00', ax, ay - 10, 1, 8); P(c, '#fcfcfc', ax, ay - 2, 1, 2); P(c, '#fcfcfc', ax - 1, ay - 11, 3, 1);
-        if (fall < 1) P(c, '#7c7c7c', ax, ay - 16, 1, 4);
-      }
-      if (fall >= 1) dust(e, x, y, 8);
       break;
     }
     case 'laser': {
@@ -374,28 +318,6 @@ function impact(c: Ctx, e: Fx, x: number, y: number, p: number, d: number): void
     case 'arcane': case 'holy': emit(n, () => mote(sx + rnd(-6, 6), sy + rnd(-5, 5), hot, box, { vy: rnd(-30, -8), life: rnd(0.3, 0.55), size: rnd(1, 2) })); emit(Math.ceil(n / 2), () => spark(sx, sy, hot, box, speed)); break;
     default: emit(n, () => spark(sx, sy, ['#fcfcfc', '#f8d878', '#bcbcbc', '#7c7c7c'], box, speed + 15, { vx: d * rnd(20, 70), vy: rnd(-40, 15) }));
   }
-}
-
-export function drawShot(c: Ctx, _b: Battle, p: Projectile, x: number, y: number, dir: number): boolean {
-  const sx = X0 + (p.from ?? p.x) * PW + PW / 2, flown = Math.abs(x - sx);
-  if (p.kind === 'aimed') {
-    // Aimed Shot: a heavy arrow with a long white streak and a crack of air at the bow
-    if (flown < 12) ring(c, '#fcfcfc', sx, y, 3 + flown / 2, 2 + flown / 4);
-    const len = Math.min(20, flown), xa = Math.round(Math.min(x - dir * len, x)), w = Math.round(len);
-    P(c, '#000000', xa, y - 2, w, 4); P(c, STEEL[2], xa, y - 1, w, 2); P(c, STEEL[3], xa, y - 1, w, 1);
-    P(c, '#000000', x - (dir > 0 ? 1 : 3), y - 3, 4, 5); P(c, '#fcfcfc', x - (dir > 0 ? 0 : 2), y - 2, 3, 3);
-    return true;
-  }
-  if (p.kind === 'arrow' || p.kind === 'sting') {
-    P(c, '#000000', x - dir * 8 - (dir < 0 ? 11 : 0), y - 1, 12, 3);
-    P(c, '#ac7c00', x - dir * 7 - (dir < 0 ? 9 : 0), y, 10, 1);
-    P(c, p.kind === 'sting' ? TOX[2] : '#fcfcfc', x + dir * 2 - (dir < 0 ? 1 : 0), y - 1, 2, 3);
-    P(c, '#fcfcfc', x - dir * 8, y - 1, 2, 1); P(c, '#fcfcfc', x - dir * 8, y + 1, 2, 1);
-    P(c, '#7c7c7c', x - dir * 13, y, 3, 1); // air streak
-    if (p.kind === 'sting' && Math.random() < 0.4) part(x, y + 1, { vy: 15, g: 80, life: 0.25, ramp: [TOX[2], TOX[1]], box: boxC(x, y) });
-    return true;
-  }
-  return false;
 }
 
 // ---------- statuses on fighters ----------

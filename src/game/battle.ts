@@ -186,6 +186,8 @@ export interface Projectile {
   /** Panels per second, signed. */
   speed: number;
   kind: 'fireball' | 'hook' | 'gust' | 'missile' | 'reflected' | 'knife' | 'arrow' | 'orb' | 'spark' | 'beam' | 'aimed' | 'net' | 'wolf' | 'hawk' | 'hammer' | 'sting' | 'vial';
+  /** Render only: the pixelfx shot it plays when that isn't its kind's (a Multi-Shot arrow is still an 'arrow'). */
+  look?: string;
   /** Piercing shots fly through walls (hitting them) instead of stopping. */
   pierce?: boolean;
   hitWalls?: Wall[];
@@ -606,20 +608,21 @@ export class Battle {
         // the whole wire goes with it
         for (const o of this.traps) if (o.group === t.group) o.fired = true;
         v.st.stealth = 0;
-        this.addFx('trapPop', t.side, t.col, t.row, 0.5, { kind: 'mine' });
+        this.addFx('trapWire', t.side, t.col, t.row, 0.5, { kind: 'mine' });
         this.damage(v, 400, src, { spell: true, element: 'nature' });
         this.stun(v, TUNING.ranger.tripwireStun);
         this.text(v, 'TRIPWIRE', '#f8b800');
         continue;
       }
-      this.addFx('trapPop', t.side, t.col, t.row, 0.5, { kind: t.kind });
+      // each trap's own look (the blasts play theirs below); data.kind picks the trap's sound
+      if (t.kind === 'freeze' || t.kind === 'mine') this.addFx(t.kind === 'freeze' ? 'trapFreeze' : 'trapMine', t.side, t.col, t.row, 0.5, { kind: t.kind });
       if (t.kind === 'freeze') { this.damage(v, 200, src, { spell: true, element: 'frost' }); this.freeze(v, 2); }
       else if (t.kind === 'explode') {
         const cells: Array<[number, number]> = [[t.col, t.row], [t.col - 1, t.row], [t.col + 1, t.row], [t.col, t.row - 1], [t.col, t.row + 1]];
-        for (const [c, r] of cells) if (this.inGrid(c, r)) this.addFx('explode', t.side, c, r, 0.35);
+        for (const [c, r] of cells) if (this.inGrid(c, r)) this.addFx('trapExplode', t.side, c, r, 0.35);
         this.strike(src, cells, 900, { spell: true, element: 'fire' });
       } else if (t.kind === 'mine') { this.damage(v, 500, src, { spell: true, element: 'nature', knockback: true }); }
-      else { this.addFx('explode', t.side, t.col, t.row, 0.35); this.damage(v, 600, src, { spell: true, element: 'fire' }); }
+      else { this.addFx('trapBlast', t.side, t.col, t.row, 0.35); this.damage(v, 600, src, { spell: true, element: 'fire' }); }
     }
     this.traps = this.traps.filter(t => !t.fired);
   }
