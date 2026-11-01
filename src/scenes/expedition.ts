@@ -20,7 +20,7 @@ import {
 import { UW, P, screenRect, spread, vy, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, drawTextOutlined, textWidth, wrap } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
-import type { PadMode } from '../engine/touch';
+import { touchActive, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx } from '../engine/audio';
 import { win, plaque, banner, disc, PAPER, INK, INK2, TRIM, RED_INK, BLUE_INK, GOLD, FRAME, WAX } from './skin';
 import { actionBar, barTapped, bigButton, panel, tallArea, GAP, PAD, TAP } from './touchUi';
@@ -54,23 +54,50 @@ function runLine(run: ExpeditionRun): string {
 // ---------- map ----------
 
 /** Little pictures for map nodes: the pack's first monster, a campfire, a coin purse. */
-function drawNodeIcon(ui: Ctx, n: MapNode, cx: number, cy: number, lit: boolean, done: boolean, big: boolean): void {
-  const r = n.kind === 'boss' ? (big ? 26 : 20) : big ? 18 : 13;
-  disc(ui, cx, cy, r + 2, lit ? GOLD : FRAME);
-  disc(ui, cx, cy, r, done ? mix(PAPER, '#7c7c7c', 0.5) : n.kind === 'elite' ? '#f0c880' : n.kind === 'boss' ? '#fcb8a0' : PAPER);
+/** Pointer picking in a list of zones `id:i`. With a mouse, hovering moves the pick and a click acts on what it's on.
+ *  With a finger, the first tap only picks and a tap on the picked one acts, so a stray tap never commits.
+ *  Returns the index to act on, or -1. */
+function pointerPick(id: string, sel: number, pick: (i: number) => void): number {
+  const h = hot(id);
+  if (h < 0) return -1;
+  const finger = touchActive();
+  if (mouse.click) {
+    if (finger && h !== sel) { pick(h); sfx('move'); return -1; }
+    return h;
+  }
+  if (!finger && mouse.moved && h !== sel) { pick(h); sfx('move'); }
+  return -1;
+}
+
+/** Seconds a run screen waits before it takes input. */
+const SETTLE = 0.3;
+
+/** How a map node reads: one you can pick now, the one picked, one already walked, or one further up. */
+type NodeLook = 'open' | 'picked' | 'done' | 'later';
+
+/** One map node: a disc with the monster (or a campfire / coin purse) on it. `z` is the sprite scale. */
+function drawNodeIcon(ui: Ctx, n: MapNode, cx: number, cy: number, look: NodeLook, z: number, tick: number): void {
+  const r = (n.kind === 'boss' ? 20 : 12) * z + (look === 'picked' ? 2 : 0);
+  // elites wear a red ring so they read on the small map too
+  const ring = look === 'picked' ? (tick % 16 < 10 ? GOLD : '#fcfcfc') : look === 'open' ? GOLD : n.kind === 'elite' && look === 'later' ? '#d82800' : FRAME;
+  if (look === 'picked') disc(ui, cx, cy, r + 5, RED_INK);
+  disc(ui, cx, cy, r + 2, ring);
+  const face = n.kind === 'elite' ? '#f0c880' : n.kind === 'boss' ? '#fcb8a0' : PAPER;
+  disc(ui, cx, cy, r, look === 'done' ? mix(PAPER, '#7c7c7c', 0.5) : look === 'later' ? mix(face, '#5c4c30', 0.55) : face);
+  const tint = look === 'done' ? 'ghost' : 'none';
   if (n.pack.length) {
     const s = getMobSprite(n.pack[0]);
-    drawFighterSprite(ui, s, cx, cy + Math.round(s.h / 2) - 1, true, done ? 'ghost' : 'none');
+    drawFighterSprite(ui, s, cx, cy + Math.round((s.h * z) / 2) - z, true, tint, z);
   } else if (n.kind === 'rest') {
     // a campfire: logs and a flame
-    P(ui, INK, cx - 7, cy + 4, 14, 3);
-    P(ui, '#f83800', cx - 4, cy - 4, 8, 8); P(ui, '#f8b800', cx - 2, cy - 6, 4, 9); P(ui, '#fcfcfc', cx - 1, cy - 1, 2, 3);
+    P(ui, INK, cx - 7 * z, cy + 4 * z, 14 * z, 3 * z);
+    P(ui, '#f83800', cx - 4 * z, cy - 4 * z, 8 * z, 8 * z); P(ui, '#f8b800', cx - 2 * z, cy - 6 * z, 4 * z, 9 * z); P(ui, '#fcfcfc', cx - z, cy - z, 2 * z, 3 * z);
   } else if (n.kind === 'shop') {
     // a coin purse
-    P(ui, INK, cx - 6, cy - 3, 12, 10); P(ui, '#ac7c00', cx - 5, cy - 2, 10, 8); P(ui, INK, cx - 3, cy - 6, 6, 3);
-    P(ui, GOLD, cx - 2, cy + 1, 4, 3);
+    P(ui, INK, cx - 6 * z, cy - 3 * z, 12 * z, 10 * z); P(ui, '#ac7c00', cx - 5 * z, cy - 2 * z, 10 * z, 8 * z); P(ui, INK, cx - 3 * z, cy - 6 * z, 6 * z, 3 * z);
+    P(ui, GOLD, cx - 2 * z, cy + z, 4 * z, 3 * z);
   }
-  if (n.kind === 'elite') drawTextOutlined(ui, 'ELITE', cx - textWidth('ELITE') / 2, cy + r - 4, GOLD);
+  if (n.kind === 'elite' && z > 1) drawTextOutlined(ui, 'ELITE', cx - textWidth('ELITE') / 2, cy + r - 4, GOLD);
 }
 
 export class ExpeditionMapScene implements Scene {
@@ -87,7 +114,8 @@ export class ExpeditionMapScene implements Scene {
   pad(): PadMode { return 'none'; }
   tall(): boolean { return true; }
 
-  private get options(): MapNode[] { return choices(this.run); }
+  /** The nodes you can go to next, left to right, so left/right on the keys and pad move the way they look. */
+  private get options(): MapNode[] { return [...choices(this.run)].sort((a, b) => a.lane - b.lane); }
 
   private go(n: MapNode): void {
     const run = this.run;
@@ -104,6 +132,8 @@ export class ExpeditionMapScene implements Scene {
 
   update(dt: number): void {
     this.t += dt;
+    // a beat before taking input, so keys mashed in the fight (or on the screen before) don't pick anything
+    if (this.t < SETTLE) return;
     const opts = this.options;
     this.sel = Math.min(this.sel, opts.length - 1);
     if (this.quitting) { this.updateQuit(dt); return; }
@@ -112,19 +142,13 @@ export class ExpeditionMapScene implements Scene {
       if (barTapped('mid')) { sfx('select'); pushScene(new DeckScene(this.run, 'view')); return; }
       if (barTapped('primary')) { this.go(opts[this.sel]); return; }
     }
-    const h = hot('node');
-    if (h >= 0 && mouse.moved && h !== this.sel) { this.sel = h; sfx('move'); }
-    if (mouse.click && h >= 0) {
-      // phones tap to pick, then GO!; with a mouse a click on a node goes there
-      if (spread.tall && h !== this.sel) { this.sel = h; sfx('move'); return; }
-      this.go(opts[h]);
-      return;
-    }
+    const act = pointerPick('node', this.sel, i => { this.sel = i; });
+    if (act >= 0) { this.go(opts[act]); return; }
     if (!spread.tall && mouse.click && isHot('deck')) { sfx('select'); pushScene(new DeckScene(this.run, 'view')); return; }
     if (!spread.tall && mouse.click && isHot('quit')) { this.quitting = true; this.quitSel = 1; sfx('back'); return; }
     const n = opts.length;
-    if (navPressed('left', dt) || navPressed('up', dt)) { this.sel = (this.sel + n - 1) % n; sfx('move'); }
-    if (navPressed('right', dt) || navPressed('down', dt)) { this.sel = (this.sel + 1) % n; sfx('move'); }
+    if (navPressed('left', dt) && this.sel > 0) { this.sel--; sfx('move'); }
+    if (navPressed('right', dt) && this.sel < n - 1) { this.sel++; sfx('move'); }
     if (wasPressed('cast')) { sfx('select'); pushScene(new DeckScene(this.run, 'view')); return; }
     if (wasPressed('back') || wasPressed('pause') || mouse.rclick) { this.quitting = true; this.quitSel = 1; sfx('back'); return; }
     if (wasPressed('confirm') || wasPressed('attack')) this.go(opts[this.sel]);
@@ -165,7 +189,7 @@ export class ExpeditionMapScene implements Scene {
     this.smallButton(ui, 'quit', 'ABANDON RUN', lx + 6, by + 20, lw - 12);
 
     // the map
-    const top = vy(72), bottom = vy(282);
+    const top = vy(66), bottom = vy(286);
     this.drawMap(ui, tick, UW / 2, 70, top, bottom, false);
 
     // the chosen node, on the right
@@ -209,22 +233,30 @@ export class ExpeditionMapScene implements Scene {
     for (const n of run.map) for (const id of n.next) {
       const m = run.map[id], [x0, y0] = pos(n), [x1, y1] = pos(m);
       const walked = run.path.includes(n.id) && run.path.includes(m.id);
+      const toPick = n.id === run.at && opts.includes(m);
       const steps = Math.max(4, Math.round(Math.hypot(x1 - x0, y1 - y0) / 6));
       for (let i = 1; i < steps; i++) {
-        if (!walked && i % 2) continue;
+        if (!walked && !toPick && i % 2) continue;
         const x = x0 + ((x1 - x0) * i) / steps, y = y0 + ((y1 - y0) * i) / steps;
-        P(ui, walked ? RED_INK : mix(INK, PAPER, 0.35), Math.round(x) - 1, Math.round(y) - 1, 3, 3);
+        P(ui, walked ? RED_INK : toPick ? GOLD : mix(INK, PAPER, 0.35), Math.round(x) - 1, Math.round(y) - 1, 3, 3);
       }
     }
+    // big phone maps draw the sprites at 2x when the floors are tall enough
+    const z = big && step >= 72 && laneW >= 90 ? 2 : 1;
     for (const n of run.map) {
       const [x, y] = pos(n), i = opts.indexOf(n), can = i >= 0, now = i === this.sel;
       this.spots.set(n.id, [x, y]);
-      if (can) zone(`node:${i}`, x - 18, y - 18, 36, 36);
-      const done = run.path.includes(n.id);
-      const lit = can && (now ? tick % 10 < 7 : tick % 30 < 15);
-      drawNodeIcon(ui, n, x, y, lit, done && n.id !== run.at, big);
-      if (n.id === run.at) drawTextOutlined(ui, 'YOU', x - textWidth('YOU') / 2, y - (n.kind === 'boss' ? 34 : 26), '#fcfcfc');
-      if (now) drawTextOutlined(ui, '↓', x - 2, y - (n.kind === 'boss' ? 36 : 28) + (tick % 8 < 4 ? 0 : 2), GOLD);
+      // the whole lane cell is the tap / click target, not just the disc
+      if (can) zone(`node:${i}`, x - laneW / 2, y - step / 2, laneW, n.kind === 'boss' ? step * 1.4 : step);
+      const look: NodeLook = now ? 'picked' : can ? 'open' : run.path.includes(n.id) ? 'done' : 'later';
+      drawNodeIcon(ui, n, x, y, look, n.kind === 'boss' ? 1 : z, tick);
+    }
+    // labels last, so the floor above never covers them
+    // (the small desktop map has no room: there the red path and the picked ring say it)
+    if (z > 1) for (const n of run.map) {
+      const [x, y] = pos(n), r = (n.kind === 'boss' ? 20 : 12 * z) + 2;
+      if (n.id === run.at && n.kind !== 'elite') drawTextOutlined(ui, 'YOU', x - textWidth('YOU') / 2, y + r - 4, '#fcfcfc');
+      if (opts.indexOf(n) === this.sel) drawTextOutlined(ui, '↓', x - 2, y - r - 12 + (tick % 8 < 4 ? 0 : 2), GOLD);
     }
   }
 
@@ -336,14 +368,11 @@ export class RewardScene implements Scene {
 
   update(dt: number): void {
     this.t += dt;
+    // a beat before taking input, so keys mashed in the fight (or on the screen before) don't pick anything
+    if (this.t < SETTLE) return;
     if (spread.tall && mouse.click && barTapped('primary')) { this.take(this.sel); return; }
-    const h = hot('pick');
-    if (h >= 0 && mouse.moved && h !== this.sel) { this.sel = h; sfx('move'); }
-    if (mouse.click && h >= 0) {
-      if (spread.tall && h !== this.sel) { this.sel = h; sfx('move'); return; }
-      this.take(h);
-      return;
-    }
+    const act = pointerPick('pick', this.sel, i => { this.sel = i; });
+    if (act >= 0) { this.take(act); return; }
     if (navPressed('left', dt) || navPressed('up', dt)) { this.sel = (this.sel + this.count - 1) % this.count; sfx('move'); }
     if (navPressed('right', dt) || navPressed('down', dt)) { this.sel = (this.sel + 1) % this.count; sfx('move'); }
     if (wasPressed('confirm') || wasPressed('attack')) this.take(this.sel);
@@ -393,6 +422,7 @@ export class RewardScene implements Scene {
 // ---------- rest ----------
 
 export class RestScene implements Scene {
+  t = 0;
   sel = 0;
   constructor(private run: ExpeditionRun) {}
   enter(): void { playMusic('menu'); }
@@ -413,6 +443,9 @@ export class RestScene implements Scene {
   }
 
   update(dt: number): void {
+    this.t += dt;
+    // a beat before taking input, so keys mashed in the fight (or on the screen before) don't pick anything
+    if (this.t < SETTLE) return;
     if (spread.tall && mouse.click) { const h = hot('rest'); if (h >= 0) { this.choose(h); return; } }
     const clicked = listMouse('menu', this.sel, i => { this.sel = i; sfx('move'); });
     if (navPressed('up', dt) || navPressed('down', dt)) { this.sel = 1 - this.sel; sfx('move'); }
@@ -454,6 +487,7 @@ export class RestScene implements Scene {
 // ---------- shop ----------
 
 export class ShopScene implements Scene {
+  t = 0;
   sel = 0;
   items: ShopItem[];
   private removing: ShopItem | null = null;
@@ -487,15 +521,13 @@ export class ShopScene implements Scene {
   }
 
   update(dt: number): void {
+    this.t += dt;
+    // a beat before taking input, so keys mashed in the fight (or on the screen before) don't pick anything
+    if (this.t < SETTLE) return;
     if (spread.tall && mouse.click && barTapped('back')) { replaceScene(new ExpeditionMapScene(this.run)); return; }
     if (spread.tall && mouse.click && barTapped('primary')) { this.buy(this.sel); return; }
-    const h = hot('shop');
-    if (h >= 0 && mouse.moved && h !== this.sel) { this.sel = h; sfx('move'); }
-    if (mouse.click && h >= 0) {
-      if (spread.tall && h !== this.sel) { this.sel = h; sfx('move'); return; }
-      this.buy(h);
-      return;
-    }
+    const act = pointerPick('shop', this.sel, i => { this.sel = i; });
+    if (act >= 0) { this.buy(act); return; }
     if (navPressed('up', dt)) { this.sel = (this.sel + this.count - 1) % this.count; sfx('move'); }
     if (navPressed('down', dt)) { this.sel = (this.sel + 1) % this.count; sfx('move'); }
     if (wasPressed('back') || mouse.rclick) { sfx('back'); replaceScene(new ExpeditionMapScene(this.run)); return; }
@@ -570,13 +602,9 @@ export class DeckScene implements Scene {
     const ids = this.ids, n = ids.length;
     if (spread.tall && mouse.click && barTapped('back')) { sfx('back'); popScene(); return; }
     if (spread.tall && mouse.click && barTapped('primary') && this.mode === 'remove') { this.remove(ids[this.sel]); return; }
-    const h = hot('card');
-    if (h >= 0 && mouse.moved && h !== this.sel) { this.sel = h; sfx('move'); }
-    if (mouse.click && h >= 0) {
-      if (spread.tall || this.mode === 'view' || h !== this.sel) { this.sel = h; sfx('move'); return; }
-      this.remove(ids[h]);
-      return;
-    }
+    const act = pointerPick('card', this.sel, i => { this.sel = i; });
+    // viewing, a click only reads the card; removing, a click removes it (a finger taps twice: once to pick, once to remove)
+    if (act >= 0) { if (this.mode === 'remove') this.remove(ids[act]); else this.sel = act; return; }
     const cols = spread.tall ? 1 : 2;
     if (navPressed('up', dt)) { this.sel = (this.sel + n - cols) % n; sfx('move'); }
     if (navPressed('down', dt)) { this.sel = (this.sel + cols) % n; sfx('move'); }
@@ -630,13 +658,14 @@ export class DeckScene implements Scene {
       drawCardFace(ui, card, px + Math.round((pw - CARD_W) / 2), y0 + 8, { lit: true });
       drawCardDetail(ui, card, px + 8, y0 + CARD_H + 18, pw - 16, 1);
     }
-    hint(ui, this.mode === 'remove' ? `CLICK TWICE OR ${k('attack')}: REMOVE   ${k('cast')}: BACK` : `${k('cast')}: BACK`);
+    hint(ui, this.mode === 'remove' ? `${touchActive() ? 'TAP TWICE' : 'CLICK'} OR ${k('attack')}: REMOVE   ${k('cast')}: BACK` : `${k('cast')}: BACK`);
   }
 }
 
 // ---------- the end ----------
 
 export class RunOverScene implements Scene {
+  t = 0;
   sel = 0;
   constructor(private run: ExpeditionRun) {}
   enter(): void { stopMusic(); playMusic(this.run.over === 'won' ? 'victory' : 'menu'); }
@@ -651,6 +680,9 @@ export class RunOverScene implements Scene {
   }
 
   update(dt: number): void {
+    this.t += dt;
+    // a beat before taking input, so keys mashed in the fight (or on the screen before) don't pick anything
+    if (this.t < SETTLE) return;
     if (spread.tall && mouse.click) {
       if (barTapped('back')) { this.choose(1); return; }
       if (barTapped('primary')) { this.choose(0); return; }
