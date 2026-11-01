@@ -81,7 +81,12 @@ export function drawPfx(c: Ctx, b: Battle, e: Fx): boolean {
   if (!map) lives.set(b, map = new Map());
   const tt = Math.min(1, e.t / e.dur) * meta.duration;
   const sheet = (mod as { sheet?: Sheet }).sheet;
-  if (sheet) { const f = panelFoot(e.col, e.row); drawSheet(c, sheet, e.t >= e.dur ? -1 : sheetFrame(sheet, tt), f.x, f.y, flip); return true; }
+  if (sheet) {
+    const f = panelFoot(e.col, e.row), fr = e.t >= e.dur ? -1 : sheetFrame(sheet, tt), half = ((meta.rows ?? 1) - 1) / 2;
+    // column-wide: the same sheet on every row, back to front
+    for (let k = -half; k <= half; k++) drawSheet(c, sheet, fr, f.x, f.y + k * ROW, flip);
+    return true;
+  }
   const box = boxOf(meta), foot = panelFoot(e.col, e.row);
   let live = map.get(key);
   if (!live || tt < live.tt) {
