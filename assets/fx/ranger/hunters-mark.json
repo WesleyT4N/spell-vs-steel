@@ -1,0 +1,12 @@
+{
+  "name": "Hunter's Mark",
+  "desc": "A crimson target ring at the foe's feet.",
+  "fw": 40,
+  "fh": 20,
+  "n": 12,
+  "fps": 12.048,
+  "ax": 20,
+  "ay": 10,
+  "panels": 1,
+  "rows": 1
+}

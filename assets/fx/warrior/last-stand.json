@@ -1,0 +1,12 @@
+{
+  "name": "Last Stand",
+  "desc": "A crimson fire aura round the warrior.",
+  "fw": 42,
+  "fh": 61,
+  "n": 8,
+  "fps": 12.048,
+  "ax": 21,
+  "ay": 51,
+  "panels": 1,
+  "rows": 1
+}

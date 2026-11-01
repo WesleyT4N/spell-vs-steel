@@ -1,0 +1,12 @@
+{
+  "name": "Unbreakable",
+  "desc": "A gold hex dome over the warrior.",
+  "fw": 72,
+  "fh": 49,
+  "n": 16,
+  "fps": 12.048,
+  "ax": 36,
+  "ay": 42,
+  "panels": 1,
+  "rows": 1
+}

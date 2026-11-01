@@ -1,0 +1,12 @@
+{
+  "name": "Focus",
+  "desc": "Green up-arrows rising off the ranger.",
+  "fw": 44,
+  "fh": 50,
+  "n": 12,
+  "fps": 12.048,
+  "ax": 21,
+  "ay": 37,
+  "panels": 1,
+  "rows": 1
+}

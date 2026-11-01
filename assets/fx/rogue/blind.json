@@ -1,0 +1,12 @@
+{
+  "name": "Blind",
+  "desc": "A gray smoke puff in the foe's face.",
+  "fw": 49,
+  "fh": 48,
+  "n": 9,
+  "fps": 12.048,
+  "ax": 24,
+  "ay": 47,
+  "panels": 1,
+  "rows": 1
+}

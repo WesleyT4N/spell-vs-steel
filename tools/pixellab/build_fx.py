@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Bake PixelLab VFX exports into sheet effect modules (src/fx/hd/<class>/<name>.ts).
+"""Bake PixelLab VFX exports into sheet effects: assets/fx/<class>/<name>.png (the frames as one strip) and
+assets/fx/<class>/<name>.json (frame size and count, speed, origin, and how the game shows it).
 
 tools/pixellab/fx.json lists each effect:
   {"id": "mage/fireball-blast", "name": "...", "desc": "...", "url": "https://api.pixellab.ai/mcp/pixel-tools/<id>/<slug>",
@@ -13,7 +14,7 @@ ax/ay: the effect's origin in a frame (a hit's panel feet, a shot's center), in 
 Sources are cached in --cache (default art/pixellab/fx under the project files) so a rebuild needs no network.
 Usage: python3 tools/pixellab/build_fx.py [--only <id>] [--cache DIR]
 """
-import argparse, base64, io, json, os, sys, urllib.request
+import argparse, json, os, urllib.request
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -56,17 +57,14 @@ for e in cfg:
                 inner = all(fx0 <= xx < fx0 + fw and 0 <= yy < strip.height and solid[yy][xx]
                             for yy in range(y - k, y + k + 1) for xx in range(x - k, x + k + 1))
                 if inner: px[x, y] = (0, 0, 0, 0)
-    buf = io.BytesIO(); strip.save(buf, 'PNG', optimize=True)
     fps = e.get('fps') or round(1000 / frames[0]['duration'], 3)
-    url = 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
-    out = os.path.join(ROOT, 'src/fx/hd', e['id'] + '.ts')
+    out = os.path.join(ROOT, 'assets/fx', e['id'])
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    sheet = {'src': 'SRC', 'fw': fw, 'fh': fh, 'n': len(frames), 'fps': fps, 'ax': e['ax'], 'ay': e['ay']}
-    if e.get('loop'): sheet['loop'] = True
-    body = json.dumps(sheet).replace('"SRC"', 'SRC')
-    with open(out, 'w') as fo:
-        fo.write(f"// {e['name']}: {e['desc']}\n// PixelLab VFX export, baked by tools/pixellab/build_fx.py (edit tools/pixellab/fx.json, not this file).\n")
-        fo.write("import { sheetFx } from '../../sheet';\n\n")
-        fo.write(f"const SRC = '{url}';\n\n")
-        fo.write(f"export default sheetFx({json.dumps(e['name'])}, {json.dumps(e['desc'])}, {body}, {e.get('panels', 1)}, {e.get('rows', 1)});\n")
-    print(out, f'{fw}x{fh}x{len(frames)} @{fps}fps', len(buf.getvalue()), 'bytes')
+    strip.save(out + '.png', 'PNG', optimize=True)
+    meta = {'name': e['name'], 'desc': e['desc'], 'fw': fw, 'fh': fh, 'n': len(frames), 'fps': fps, 'ax': e['ax'], 'ay': e['ay']}
+    if e.get('loop'): meta['loop'] = True
+    meta['panels'] = e.get('panels', 1)
+    meta['rows'] = e.get('rows', 1)
+    with open(out + '.json', 'w') as fo:
+        fo.write(json.dumps(meta, indent=2) + '\n')
+    print(out, f'{fw}x{fh}x{len(frames)} @{fps}fps', os.path.getsize(out + '.png'), 'bytes')

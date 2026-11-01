@@ -1,0 +1,12 @@
+{
+  "name": "Execute",
+  "desc": "A crimson finishing chop that splits the ground.",
+  "fw": 42,
+  "fh": 61,
+  "n": 12,
+  "fps": 15.873,
+  "ax": 22,
+  "ay": 52,
+  "panels": 2,
+  "rows": 1
+}

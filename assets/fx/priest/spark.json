@@ -1,0 +1,13 @@
+{
+  "name": "Holy Spark",
+  "desc": "A golden orb with a tapered tail and sparkles.",
+  "fw": 54,
+  "fh": 25,
+  "n": 8,
+  "fps": 12.048,
+  "ax": 41,
+  "ay": 12,
+  "loop": true,
+  "panels": 1,
+  "rows": 1
+}

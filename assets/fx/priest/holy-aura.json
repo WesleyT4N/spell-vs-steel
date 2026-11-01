@@ -1,0 +1,12 @@
+{
+  "name": "Holy Aura",
+  "desc": "Gold radiance and light spikes round the priest.",
+  "fw": 37,
+  "fh": 50,
+  "n": 12,
+  "fps": 12.048,
+  "ax": 19,
+  "ay": 48,
+  "panels": 1,
+  "rows": 1
+}

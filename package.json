@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/artifact.mjs",
     "build:prod": "tsc --noEmit && vite build --mode prod && node scripts/artifact.mjs dist-prod",
+    "build:native": "tsc --noEmit && vite build --mode native",
     "sim": "tsx scripts/sim.ts",
     "balance": "tsx scripts/balance.ts",
     "typecheck": "tsc --noEmit && tsc -p tests --noEmit",
@@ -26,10 +27,10 @@
     "test": "tsx tests/saves.ts && tsx tests/mods.ts && tsx tests/matches.ts && tsx tests/scene-stack.ts && tsx tests/gamepad.ts && tsx tests/deckCode.ts && tsx tests/planCosts.ts && tsx tests/packKo.ts && tsx scripts/netcheck.ts && tsx scripts/combo-check.ts && tsx scripts/rollcheck.ts 25",
     "fx:sheet": "vite build --config tests/fx/vite.config.ts --logLevel warn && tsx tests/fx/run.ts",
     "test:screens": "vite build --config tests/screens/vite.config.ts && tsx tests/screens/run.ts",
-    "desktop": "npm run build:prod && electron .",
-    "dist:win": "npm run build:prod && electron-builder --win portable",
-    "dist:linux": "npm run build:prod && electron-builder --linux AppImage",
-    "android:sync": "npm run build:prod && cap sync android"
+    "desktop": "npm run build:native && electron .",
+    "dist:win": "npm run build:native && electron-builder --win portable",
+    "dist:linux": "npm run build:native && electron-builder --linux AppImage",
+    "android:sync": "npm run build:native && cap sync android"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.3",
@@ -61,7 +62,7 @@
     },
     "files": [
       "electron/**",
-      "dist-prod/index.html",
+      "dist-native/**",
       "package.json"
     ],
     "win": {

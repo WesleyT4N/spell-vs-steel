@@ -1,0 +1,12 @@
+{
+  "name": "Bite",
+  "desc": "Three steel claw rakes across the foe.",
+  "fw": 39,
+  "fh": 42,
+  "n": 7,
+  "fps": 15.873,
+  "ax": 17,
+  "ay": 47,
+  "panels": 1,
+  "rows": 1
+}

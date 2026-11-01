@@ -1,0 +1,12 @@
+{
+  "name": "Arcane Intellect",
+  "desc": "Glowing runes circle the Mage's head.",
+  "fw": 39,
+  "fh": 23,
+  "n": 12,
+  "fps": 12.048,
+  "ax": 19,
+  "ay": 50,
+  "panels": 1,
+  "rows": 1
+}

@@ -1,0 +1,12 @@
+{
+  "name": "Stab",
+  "desc": "A thin rising flick of steel on the panel ahead.",
+  "fw": 27,
+  "fh": 57,
+  "n": 5,
+  "fps": 12.048,
+  "ax": -60,
+  "ay": 50,
+  "panels": 2,
+  "rows": 1
+}

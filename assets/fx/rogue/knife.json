@@ -1,0 +1,13 @@
+{
+  "name": "Throwing Knife",
+  "desc": "A dagger spinning end over end.",
+  "fw": 27,
+  "fh": 26,
+  "n": 4,
+  "fps": 16,
+  "ax": 13,
+  "ay": 13,
+  "loop": true,
+  "panels": 1,
+  "rows": 1
+}

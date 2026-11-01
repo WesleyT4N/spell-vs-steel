@@ -11,3 +11,4 @@ test-results
 release
 *.keystore
 __pycache__/
+dist-native

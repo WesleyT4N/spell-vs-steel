@@ -1,0 +1,12 @@
+{
+  "name": "Power Word: Shield",
+  "desc": "A gold ward bubble round the priest.",
+  "fw": 35,
+  "fh": 35,
+  "n": 12,
+  "fps": 10,
+  "ax": 17,
+  "ay": 41,
+  "panels": 1,
+  "rows": 1
+}

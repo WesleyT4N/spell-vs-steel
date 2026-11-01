@@ -1,0 +1,12 @@
+{
+  "name": "Arcane Power",
+  "desc": "Pink arrows and motes rise round the Mage.",
+  "fw": 36,
+  "fh": 41,
+  "n": 12,
+  "fps": 12.048,
+  "ax": 17,
+  "ay": 53,
+  "panels": 1,
+  "rows": 1
+}

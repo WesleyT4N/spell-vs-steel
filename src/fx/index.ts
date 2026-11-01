@@ -2,16 +2,20 @@
 // hand-drawn version in src/game/fxView.ts.
 import { registerPfx, registerShotPfx, type PfxModule } from '../game/pfx';
 import { impact, none } from './hd/picks';
+import { sheetFx, type SheetFile } from './sheet';
 
 /** Every effect module, by id ("warrior/cleave-a"), for the labs and the contact-sheet tool. */
 export const EFFECTS: Record<string, PfxModule> = Object.fromEntries(
   Object.entries(import.meta.glob<{ default: PfxModule }>('./*/*.ts', { eager: true }))
     .filter(([, m]) => m.default).map(([path, m]) => [path.slice(2, -3), m.default]),
 );
-// PixelLab VFX sheets (src/fx/hd/<class>/<name>.ts, baked by tools/pixellab/build_fx.py), by id "hd/<class>/<name>"
+// PixelLab VFX sheets (assets/fx/<class>/<name>.png strips with their frame data in <name>.json, baked by
+// tools/pixellab/build_fx.py), by id "hd/<class>/<name>"
 Object.assign(EFFECTS, Object.fromEntries(
-  Object.entries(import.meta.glob<{ default: PfxModule }>('./hd/*/*.ts', { eager: true }))
-    .filter(([, m]) => m.default).map(([path, m]) => [path.slice(2, -3), m.default]),
+  Object.entries(import.meta.glob<SheetFile>('../../assets/fx/*/*.json', { eager: true, import: 'default' })).map(([path, f]) => {
+    const id = path.replace(/^.*assets\/fx\//, '').slice(0, -5), { name, desc, panels, rows, ...sheet } = f;
+    return [`hd/${id}`, sheetFx(name, desc, { ...sheet, src: `fx/${id}.png` }, panels, rows)];
+  }),
 ));
 
 /** The effect each fx kind plays in the game. */
@@ -177,7 +181,7 @@ Object.assign(PLAYS, {
 for (const [kind, id] of Object.entries(PLAYS)) registerPfx(kind, EFFECTS[id]);
 registerPfx('impact', impact);
 
-// PixelLab sheets for the basic attacks (src/fx/hd/, tools/pixellab/fx.json). A shot's own hit look is left to the
+// PixelLab sheets for the basic attacks (assets/fx/, tools/pixellab/fx.json). A shot's own hit look is left to the
 // element hit spark (impact), which now carries the hit at the fighters' pixel density.
 Object.assign(PLAYS, {
   cleave: 'hd/warrior/cleave',

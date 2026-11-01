@@ -1,0 +1,12 @@
+{
+  "name": "Shadow Aura",
+  "desc": "Violet shadow wisps rising round the rogue.",
+  "fw": 42,
+  "fh": 52,
+  "n": 16,
+  "fps": 12.048,
+  "ax": 21,
+  "ay": 40,
+  "panels": 1,
+  "rows": 1
+}

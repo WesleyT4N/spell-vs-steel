@@ -1,0 +1,12 @@
+{
+  "name": "Shield Slam",
+  "desc": "A steel hit star and a ring of stun stars.",
+  "fw": 49,
+  "fh": 45,
+  "n": 12,
+  "fps": 12.048,
+  "ax": 23,
+  "ay": 47,
+  "panels": 1,
+  "rows": 1
+}

@@ -1,0 +1,12 @@
+{
+  "name": "Evasion",
+  "desc": "Pale speed streaks rushing past the rogue.",
+  "fw": 54,
+  "fh": 26,
+  "n": 8,
+  "fps": 12.048,
+  "ax": 37,
+  "ay": 37,
+  "panels": 1,
+  "rows": 1
+}

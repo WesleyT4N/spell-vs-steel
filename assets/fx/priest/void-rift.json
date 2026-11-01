@@ -1,0 +1,12 @@
+{
+  "name": "Void Rift",
+  "desc": "A churning violet rift.",
+  "fw": 41,
+  "fh": 57,
+  "n": 12,
+  "fps": 12.048,
+  "ax": 20,
+  "ay": 52,
+  "panels": 1,
+  "rows": 1
+}

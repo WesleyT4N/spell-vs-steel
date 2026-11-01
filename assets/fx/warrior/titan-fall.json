@@ -1,0 +1,12 @@
+{
+  "name": "Titan Fall",
+  "desc": "A gold-steel beam slams down from the sky.",
+  "fw": 42,
+  "fh": 70,
+  "n": 10,
+  "fps": 10.989,
+  "ax": 21,
+  "ay": 59,
+  "panels": 1,
+  "rows": 1
+}

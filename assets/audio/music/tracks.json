@@ -1,0 +1,34 @@
+{
+  "menu": {
+    "loopStart": 2.60868,
+    "loopEnd": 44.34782
+  },
+  "victory": {
+    "loopStart": 4.28571,
+    "loopEnd": 21.42857
+  },
+  "stage_colosseum": {
+    "loopStart": 3.07692,
+    "loopEnd": 40
+  },
+  "stage_courtyard": {
+    "loopStart": 3.33333,
+    "loopEnd": 43.33333
+  },
+  "stage_archive": {
+    "loopStart": 3.63637,
+    "loopEnd": 47.27272
+  },
+  "stage_frostpeak": {
+    "loopStart": 3.2,
+    "loopEnd": 41.6
+  },
+  "stage_emberforge": {
+    "loopStart": 3.47825,
+    "loopEnd": 45.21739
+  },
+  "stage_elderwood": {
+    "loopStart": 3.2,
+    "loopEnd": 41.6
+  }
+}

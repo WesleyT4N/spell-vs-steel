@@ -1,0 +1,12 @@
+{
+  "name": "Vial Burst",
+  "desc": "A poison-green cloud bursts and drifts away.",
+  "fw": 44,
+  "fh": 47,
+  "n": 12,
+  "fps": 12.048,
+  "ax": 24,
+  "ay": 53,
+  "panels": 1,
+  "rows": 1
+}

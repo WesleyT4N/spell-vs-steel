@@ -1,10 +1,11 @@
-// Baked sprite-sheet effects: PixelLab VFX exports (tools/pixellab/build_fx.py) drawn at the fighters' pixel density
+// Baked sprite-sheet effects: PixelLab VFX exports (assets/fx/, tools/pixellab/build_fx.py) drawn at the fighters' pixel density
 // (2 sheet pixels per world pixel, see HD in engine/gfx). Render-only like every effect: the frame is a pure
 // function of the fx's age, so a rollback resim draws the same picture.
 import type { PfxModule } from '../game/pfx';
+import { assetImage, loadImages } from '../engine/assets';
 
 export interface Sheet {
-  /** The frames as a horizontal strip PNG data URL. */
+  /** The frames as a horizontal strip: a PNG under assets/ ("fx/mage/orb.png"). */
   src: string;
   /** One frame's size in sheet pixels. */
   fw: number; fh: number;
@@ -18,28 +19,23 @@ export interface Sheet {
 
 export type SheetModule = PfxModule & { sheet: Sheet };
 
+/** An effect's metadata file (assets/fx/<class>/<name>.json): the sheet's frame data plus how it is shown. */
+export type SheetFile = Omit<Sheet, 'src'> & { name: string; desc: string; panels: number; rows: number };
+
 /**
  * A sheet effect module. `panels` spans the box along the attacker's facing like any effect; `rows` 3 plays the sheet
  * on every row of the anchor's column (column-wide spells anchor on the middle row).
  */
 export function sheetFx(name: string, desc: string, sheet: Sheet, panels = 1, rows = 1): SheetModule {
-  image(sheet.src);   // start decoding now, so the first hit doesn't miss its frames
   return { meta: { name, desc, duration: sheet.n / sheet.fps, panels, rows }, sheet };
 }
 
-/** Resolves once every sheet made so far has decoded (tools and tests wait on it before drawing). */
-export const sheetsReady = (): Promise<unknown> => Promise.all([...imgs.values()].map(i => i.decode().catch(() => {})));
+/** Resolves once every sheet has decoded (tools and tests wait on it before drawing). */
+export const sheetsReady = (): Promise<unknown> => loadImages();
 
 /** Sheet pixels per world pixel. */
 export const SHEET_RES = 2;
 
-const imgs = new Map<string, HTMLImageElement>();
-function image(src: string): HTMLImageElement | null {
-  if (typeof Image === 'undefined') return null;
-  let img = imgs.get(src);
-  if (!img) { img = new Image(); img.src = src; imgs.set(src, img); }
-  return img.complete && img.naturalWidth ? img : null;
-}
 
 /** The frame playing `age` seconds in, or -1 once a one-shot has ended. */
 export function sheetFrame(s: Sheet, age: number): number {
@@ -50,7 +46,7 @@ export function sheetFrame(s: Sheet, age: number): number {
 
 /** Draw frame `f` of `s` with its origin at world (x, y), mirrored for a left-facing attacker. */
 export function drawSheet(c: CanvasRenderingContext2D, s: Sheet, f: number, x: number, y: number, flip: boolean): void {
-  const img = image(s.src);
+  const img = assetImage(s.src);
   if (!img || f < 0) return;
   const k = SHEET_RES, w = s.fw / k, h = s.fh / k;
   c.save();

@@ -1,0 +1,12 @@
+{
+  "name": "Spirit Bear",
+  "desc": "A big pale claw swipe.",
+  "fw": 48,
+  "fh": 49,
+  "n": 8,
+  "fps": 15.873,
+  "ax": 27,
+  "ay": 44,
+  "panels": 1,
+  "rows": 1
+}

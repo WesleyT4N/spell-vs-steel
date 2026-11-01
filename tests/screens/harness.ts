@@ -2,12 +2,15 @@
 // The screens themselves live in src/dev/screens.ts (the Art Lab opens them too); the runner (run.ts) shoots every
 // entry at every screen shape.
 import './frameClock';
-import '../../src/main';
+import * as game from '../../src/main';
 import { spread } from '../../src/engine/gfx';
 import { screens } from '../../src/dev/screens';
 
 declare global { interface Window { __test: unknown } }
-window.__test = {
+// published once the game is up, so the runner's wait for __test also waits for the art to decode
+// (a namespace import, so the base-branch comparison still builds against a main.ts from before `ready` existed)
+const ready = (game as { ready?: Promise<void> }).ready ?? Promise.resolve();
+void ready.then(() => { window.__test = {
   names: Object.keys(screens),
   /** True when the screen shown uses its full-height phone layout (it fills the whole window, not the top half). */
   tall: (): boolean => spread.tall,
@@ -16,4 +19,4 @@ window.__test = {
     if (!open) throw new Error(`no screen named ${name}`);
     open();
   },
-};
+}; });

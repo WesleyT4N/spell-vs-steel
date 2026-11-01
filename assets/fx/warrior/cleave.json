@@ -1,0 +1,12 @@
+{
+  "name": "Cleave",
+  "desc": "A crisp steel crescent swept across the target.",
+  "fw": 61,
+  "fh": 57,
+  "n": 8,
+  "fps": 15.873,
+  "ax": 24,
+  "ay": 50,
+  "panels": 2,
+  "rows": 1
+}

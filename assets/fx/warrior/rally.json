@@ -1,0 +1,12 @@
+{
+  "name": "Rally",
+  "desc": "A gold healing column with sparkles.",
+  "fw": 44,
+  "fh": 54,
+  "n": 12,
+  "fps": 12.048,
+  "ax": 22,
+  "ay": 43,
+  "panels": 1,
+  "rows": 1
+}

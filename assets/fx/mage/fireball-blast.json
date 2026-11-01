@@ -1,0 +1,12 @@
+{
+  "name": "Fireball Blast",
+  "desc": "A white-hot burst, a shock ring and a puff of smoke.",
+  "fw": 42,
+  "fh": 46,
+  "n": 9,
+  "fps": 12.048,
+  "ax": 21,
+  "ay": 45,
+  "panels": 1,
+  "rows": 1
+}

@@ -10,25 +10,18 @@ import elderwood from './elderwood';
 import crypt from './crypt';
 import { withBackdrop, type Backdrop } from './backdrop';
 import type { StageModule } from './registry';
-import colosseumArt from './art/colosseum';
-import courtyardArt from './art/courtyard';
-import archiveArt from './art/archive';
-import frostpeakArt from './art/frostpeak';
-import emberforgeArt from './art/emberforge';
-import elderwoodArt from './art/elderwood';
-import cryptArt from './art/crypt';
 
-// PixelLab backdrops (art/pixellab/stages-simple in the project files: raw/<id>.png panoramas grown into
-// masters by tools/pixellab/extend_stage.py). `foot` is the master row where the far wall meets the floor;
+// PixelLab backdrops (assets/stages/<id>.png; sources in art/pixellab/stages-simple in the project files: raw/<id>.png
+// panoramas grown into masters by tools/pixellab/extend_stage.py). `foot` is the master row where the far wall meets the floor;
 // it lands just above the top panel row.
 const ART: Record<string, { src: string; foot: number; fill: string }> = {
-  colosseum: { src: colosseumArt, foot: 436, fill: '#c8a070' },
-  courtyard: { src: courtyardArt, foot: 392, fill: '#a89c88' },
-  archive: { src: archiveArt, foot: 408, fill: '#4a3470' },
-  frostpeak: { src: frostpeakArt, foot: 414, fill: '#c8d4ec' },
-  emberforge: { src: emberforgeArt, foot: 421, fill: '#3a2420' },
-  elderwood: { src: elderwoodArt, foot: 445, fill: '#8a6a30' },
-  crypt: { src: cryptArt, foot: 379, fill: '#2c2c3a' },
+  colosseum: { src: 'stages/colosseum.png', foot: 436, fill: '#c8a070' },
+  courtyard: { src: 'stages/courtyard.png', foot: 392, fill: '#a89c88' },
+  archive: { src: 'stages/archive.png', foot: 408, fill: '#4a3470' },
+  frostpeak: { src: 'stages/frostpeak.png', foot: 414, fill: '#c8d4ec' },
+  emberforge: { src: 'stages/emberforge.png', foot: 421, fill: '#3a2420' },
+  elderwood: { src: 'stages/elderwood.png', foot: 445, fill: '#8a6a30' },
+  crypt: { src: 'stages/crypt.png', foot: 379, fill: '#2c2c3a' },
 };
 const painted = (m: StageModule): StageModule => {
   const a = ART[m.id];

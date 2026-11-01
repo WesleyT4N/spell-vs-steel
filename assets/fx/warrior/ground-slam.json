@@ -1,0 +1,12 @@
+{
+  "name": "Ground Slam",
+  "desc": "Rage-hot cracks and dust run down the column.",
+  "fw": 45,
+  "fh": 25,
+  "n": 10,
+  "fps": 12.048,
+  "ax": 22,
+  "ay": 15,
+  "panels": 1,
+  "rows": 3
+}

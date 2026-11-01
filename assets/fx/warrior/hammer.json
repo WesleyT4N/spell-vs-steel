@@ -1,0 +1,12 @@
+{
+  "name": "Hammer",
+  "desc": "A heavy steel overhead blow: flash, crack, debris.",
+  "fw": 42,
+  "fh": 61,
+  "n": 12,
+  "fps": 15.873,
+  "ax": 22,
+  "ay": 52,
+  "panels": 2,
+  "rows": 1
+}

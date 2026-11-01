@@ -1,7 +1,8 @@
 // Character voices and announcer lines: neural-TTS clips (scripts/voices/gen.py) decoded once, then played
-// through a short stone room. Each fighter says one line at a time, ranked by priority.
+// through a short stone room. Each fighter says one line at a time, ranked by priority. The clips are MP3s in
+// assets/audio/voice/<speaker>/<line>-<n>.mp3; a bank is "<speaker>:<line>" (ann is the announcer).
 import type { ClassId } from '../art/sprites';
-import { CLIPS } from './voiceClips';
+import { assetBytes, assetPaths } from './assets';
 
 /** grunt/hurt/hurtBig have no clips yet (TTS can't do them); those calls stay silent until recordings land. */
 export type VoiceKind = 'grunt' | 'cast' | 'castBig' | 'hurt' | 'hurtBig' | 'death' | 'win';
@@ -20,14 +21,14 @@ export function loadClips(c: BaseAudioContext): Promise<void> {
   bankCtx = c;
   bank.clear();
   const jobs: Array<Promise<void>> = [];
-  for (const [key, list] of Object.entries(CLIPS)) {
-    const bufs: AudioBuffer[] = [];
-    bank.set(key, bufs);
-    for (const b64 of list) {
-      const bin = atob(b64), bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      jobs.push(c.decodeAudioData(bytes.buffer).then(buf => { bufs.push(buf); }, () => { /* undecodable: skip */ }));
-    }
+  for (const path of assetPaths('audio/voice/')) {
+    const m = /^audio\/voice\/([^/]+)\/(.+)-\d+\.mp3$/.exec(path);
+    if (!m) continue;
+    const key = `${m[1]}:${m[2]}`;
+    let bufs = bank.get(key);
+    if (!bufs) bank.set(key, bufs = []);
+    const into = bufs;
+    jobs.push(assetBytes(path).then(b => b && c.decodeAudioData(b)).then(buf => { if (buf) into.push(buf); }, () => { /* undecodable: skip */ }));
   }
   return Promise.all(jobs).then(() => undefined);
 }

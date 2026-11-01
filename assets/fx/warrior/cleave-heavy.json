@@ -1,0 +1,12 @@
+{
+  "name": "Heavy Cleave",
+  "desc": "A rage-gold chop slams into the ground: flash, crack, debris.",
+  "fw": 42,
+  "fh": 61,
+  "n": 12,
+  "fps": 15.873,
+  "ax": 22,
+  "ay": 52,
+  "panels": 2,
+  "rows": 1
+}

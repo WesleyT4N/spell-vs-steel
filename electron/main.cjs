@@ -1,5 +1,6 @@
-// Desktop shell: one window around the player build (dist-prod/index.html). Saves land in Electron's
-// own storage for the app (localStorage under the user's app-data folder), so they survive updates.
+// Desktop shell: one window around the native player build (dist-native/: index.html with the game's script and
+// its art and audio as real files beside it, see vite.config.ts). Saves land in Electron's own storage for the app
+// (localStorage under the user's app-data folder), so they survive updates.
 // Online room codes go over PeerJS like any hosted build; the lobby, ranked and tournaments still need
 // the hosted page and say "not supported yet".
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
@@ -50,7 +51,7 @@ function createWindow() {
     if (/^https?:/.test(url)) shell.openExternal(url);
   });
 
-  win.loadFile(path.join(__dirname, '..', 'dist-prod', 'index.html'));
+  win.loadFile(path.join(__dirname, '..', 'dist-native', 'index.html'));
 }
 
 // title screen QUIT (the game saves before asking)
