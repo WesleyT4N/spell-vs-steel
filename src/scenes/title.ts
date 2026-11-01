@@ -327,7 +327,7 @@ export class TitleScene implements Scene {
     drawMenu(ui, ITEMS, this.sel, UW / 2, MENU_Y, tick, { width, gap, scale, grow: false });
     ui.restore();
     if (intro < INTRO) return;
-    drawTextOutlined(ui, DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2', 8, 8, '#fcfcfc');
+    drawTextOutlined(ui, DEV_TOOLS ? 'PROTOTYPE 0.3  DEV BUILD' : 'PROTOTYPE 0.3', 8, 8, '#fcfcfc');
     drawTextCentered(ui, 'DESIGNED BY WES   -   BUILT BY CLAUDE', UW / 2, versionY, '#fcfcfc');
     if (isMuted()) drawTextOutlined(ui, 'MUTED', 8, 22, '#fcfcfc');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   M: MUTE`);
@@ -352,7 +352,7 @@ export class TitleScene implements Scene {
       y += r.h + GAP;
     }
     ui.restore();
-    drawTextCentered(ui, DEV_TOOLS ? 'PROTOTYPE 0.2  DEV BUILD' : 'PROTOTYPE 0.2', UW / 2, y0 - 16, '#bcbcbc', 1, true);
+    drawTextCentered(ui, DEV_TOOLS ? 'PROTOTYPE 0.3  DEV BUILD' : 'PROTOTYPE 0.3', UW / 2, y0 - 16, '#bcbcbc', 1, true);
     if (isMuted()) drawText(ui, 'MUTED', a.x + 8, a.y + 8, '#7c7c7c');
   }
 }
