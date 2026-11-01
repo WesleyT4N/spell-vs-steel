@@ -50,13 +50,27 @@ export function loadImages(): Promise<void> {
 /** A decoded image asset (after loadImages), or null. */
 export const assetImage = (path: string): HTMLImageElement | null => images.get(path) ?? null;
 
+/** The bytes behind a URL. Data URLs (the one-file web build) are decoded in place rather than fetched, so a
+ *  page whose sandbox blocks fetch still reads them; real files are fetched. Throws when it can't be read. */
+export async function urlBytes(url: string): Promise<Uint8Array> {
+  if (url.startsWith('data:')) {
+    const comma = url.indexOf(',');
+    const head = url.slice(0, comma), body = url.slice(comma + 1);
+    if (head.endsWith(';base64')) return Uint8Array.from(atob(body), ch => ch.charCodeAt(0));
+    return new TextEncoder().encode(decodeURIComponent(body));
+  }
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${url}: ${r.status}`);
+  return new Uint8Array(await r.arrayBuffer());
+}
+
 /** An asset file's bytes (audio decodes these), or null when it is missing or can't be read. */
 export async function assetBytes(path: string): Promise<ArrayBuffer | null> {
   const url = urls.get(path);
   if (!url) return null;
   try {
-    const r = await fetch(url);
-    return r.ok ? await r.arrayBuffer() : null;
+    const b = await urlBytes(url);
+    return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
   } catch {
     return null;
   }
