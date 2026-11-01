@@ -1,6 +1,6 @@
-// Import panel for the MODS screen: a plain DOM overlay (a canvas can't open a file picker or take a paste). The
-// player picks a mod file (.json) or pastes its text; it goes through the same checks as every mod (src/mods/format.ts)
-// and a file that fails them is refused with the reason. A gamepad can't pick a file, so B closes it.
+// Import panel for the MODS screen: a plain DOM overlay (a canvas can't open a file picker). The player picks a mod
+// file (a .zip of mod.json and its PNGs, or an older .json mod); it goes through the same checks as every mod
+// (src/mods/format.ts) and a file that fails them is refused with the reason. A gamepad can't pick a file, so B closes it.
 import { importMod, type ModEntry } from '../mods';
 import { MAX_MOD_SIZE } from '../mods/format';
 
@@ -11,15 +11,13 @@ const CSS = `
   font: 13px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; box-sizing: border-box; }
 .svs-mod h2 { margin: 0; font-size: 14px; letter-spacing: .06em; color: #881400; }
 .svs-mod p { margin: 0; }
-.svs-mod textarea { min-height: 64px; width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: 12px;
-  background: #fff4e0; color: #301800; border: 2px solid #ac7c00; padding: 6px; }
 .svs-mod .row { display: flex; flex-wrap: wrap; gap: 6px; }
 .svs-mod button { font: inherit; cursor: pointer; background: #fff4e0; color: #503000; border: 2px solid #503000; padding: 6px 10px; min-height: 36px; }
 .svs-mod button.main { background: #881400; color: #fcfcfc; border-color: #501000; }
 .svs-mod .msg { min-height: 18px; font-weight: bold; }
 .svs-mod .bad { color: #a81000; }
 .svs-mod .pad { color: #7c5800; font-size: 12px; }
-@media (max-height: 480px) { .svs-mod .box { max-height: calc(100vh - 12px); padding: 8px; gap: 6px; } .svs-mod textarea { min-height: 44px; } }
+@media (max-height: 480px) { .svs-mod .box { max-height: calc(100vh - 12px); padding: 8px; gap: 6px; } }
 `;
 
 export interface ModPanelOpts {
@@ -41,40 +39,36 @@ export function openModPanel(o: ModPanelOpts): () => void {
   if (!document.getElementById('svs-mod-css')) document.head.append(el('style', { id: 'svs-mod-css', textContent: CSS }));
   const msg = el('p', { className: 'msg bad' });
   const say = (s: string): void => { msg.textContent = s; };
-  const text = el('textarea', { spellcheck: false, placeholder: 'Or paste the text of a mod file here' });
-  text.setAttribute('autocapitalize', 'off'); text.setAttribute('autocorrect', 'off');
 
-  const tryImport = (src: string): void => {
-    if (!src.trim()) { say('Pick a mod file or paste one first.'); return; }
-    const r = importMod(src);
+  const tryImport = async (bytes: Uint8Array): Promise<void> => {
+    say('Checking the mod...');
+    const r = await importMod(bytes);
+    if (!open) return;
     if (!r.ok) { say(`Not imported: ${r.error}.`); return; }
     close();
     o.onImport(r.entry);
   };
 
   // the file picker: the browser's own, which the desktop and Android builds also open
-  const file = el('input', { type: 'file', accept: '.json,application/json,text/plain' });
+  const file = el('input', { type: 'file', accept: '.zip,application/zip,.json,application/json' });
   file.style.display = 'none';
   file.onchange = () => {
     const f = file.files?.[0];
     file.value = '';
     if (!f) return;
     if (f.size > MAX_MOD_SIZE) { say(`Not imported: the file is larger than ${MAX_MOD_SIZE / 1024} KB.`); return; }
-    void f.text().then(tryImport, () => say('That file could not be read.'));
+    void f.arrayBuffer().then(b => tryImport(new Uint8Array(b)), () => say('That file could not be read.'));
   };
   const pick = el('button', { textContent: 'Choose a mod file', className: 'main' });
   pick.onclick = () => file.click();
-  const pasted = el('button', { textContent: 'Import pasted text' });
-  pasted.onclick = () => tryImport(text.value);
   const cancel = el('button', { textContent: 'Close' });
 
   const root = el('div', { className: 'svs-mod' },
     el('div', { className: 'box' },
       el('h2', { textContent: 'IMPORT A MOD' }),
-      el('p', { textContent: 'Mods are plain data files (.json): they add skins and never run code. A file that breaks the mod rules is refused.' }),
-      el('div', { className: 'row' }, pick), file,
-      text, msg,
-      el('div', { className: 'row' }, pasted, cancel),
+      el('p', { textContent: 'A mod is a .zip of plain data (a mod.json and PNG images): it adds skins and never runs code. A file that breaks the mod rules is refused.' }),
+      el('div', { className: 'row' }, pick, cancel), file,
+      msg,
       ...(o.pad ? [el('p', { className: 'pad', textContent: 'Gamepad: picking a file needs a mouse or touch. B closes.' })] : [])));
   // keep game keys and clicks from reaching the game while the panel is open
   for (const ev of ['keydown', 'pointerdown', 'mousedown', 'click', 'wheel', 'touchstart', 'contextmenu'] as const) {

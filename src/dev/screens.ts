@@ -28,14 +28,13 @@ import { buildLadder, type ArcadeRun } from '../game/arcade';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
 import { encodeDeckCode } from '../game/deckCode';
 import { PLAYABLE } from '../game/classes';
-import { SKINS, type ClassId } from '../art/sprites';
+import { SKINS, addSkin, type ClassId } from '../art/sprites';
 import { LobbyScene } from '../scenes/lobby';
 import { RankedScene } from '../scenes/ranked';
 import { ReplaysScene, ReplayScene } from '../scenes/replays';
 import { ProfileScene } from '../scenes/profile';
 import { ModsScene } from '../scenes/mods';
-import { MODS, setModOn, importMod } from '../mods';
-import wesMod from '../../mods/wes-skin.json?raw';
+import { MODS, setModOn } from '../mods';
 import { Battle, type Intent } from '../game/battle';
 import { Cpu } from '../game/ai';
 import { TapeWriter } from '../game/replay';
@@ -498,10 +497,9 @@ export const screens: Record<string, () => void> = {
   'select-mod-colors': () => { saveMatch({ ...loadMatch(), p1: 'mage', p1Skin: { ...loadMatch().p1Skin, mage: 'red' } }); setScene(new CharSelectScene(undefined, 1)); run(0.2); },
   // more mod skins than fit by name on the desktop panel
   'select-many-skins': () => {
-    const wes = JSON.parse(wesMod) as { skins: Array<Record<string, unknown>> };
-    for (const n of ['Archmage', 'Necromancer', 'Battlemage']) {
-      importMod(JSON.stringify({ ...wes, id: n.toLowerCase(), name: n, skins: wes.skins.map(s => ({ ...s, id: n.toLowerCase(), name: n })) }));
-    }
+    // three more copies of the shipped Wes skin under other names
+    const wes = MODS.find(e => e.id === 'wes-skin')?.mod?.skins[0];
+    for (const n of ['Archmage', 'Necromancer', 'Battlemage']) if (wes) addSkin('mage', { id: n.toLowerCase(), name: n, set: {}, art: wes.art });
     saveMatch({ ...loadMatch(), p1: 'mage', p1Skin: { ...loadMatch().p1Skin, mage: 'necromancer' } });
     setScene(new CharSelectScene(undefined, 1)); run(0.2);
   },

@@ -1,0 +1,36 @@
+{
+  "format": "spell-vs-steel-mod/3",
+  "id": "wes-skin",
+  "name": "Wes Skin",
+  "author": "Wes",
+  "skins": [
+    {
+      "class": "mage",
+      "id": "wes",
+      "name": "Wes",
+      "sheet": "wes.png",
+      "portrait": "wes-portrait.png",
+      "team": "#42357f",
+      "palette": [
+        "#0a0810",
+        "#f2ece6",
+        "#f1c8a6",
+        "#dcb39e",
+        "#cfccf5",
+        "#c39884",
+        "#73c8ed",
+        "#4099ba",
+        "#a67860",
+        "#957776",
+        "#896156",
+        "#566091",
+        "#654444",
+        "#42357f",
+        "#472f3f",
+        "#312666",
+        "#211854",
+        "#07050d"
+      ]
+    }
+  ]
+}
