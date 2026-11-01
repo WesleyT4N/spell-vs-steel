@@ -1056,5 +1056,75 @@
     "url": "https://api.pixellab.ai/mcp/pixel-tools/f682737b-4857-4f27-8e7f-6aed71752e66/svs-ranger-disengage",
     "ax": 26,
     "ay": 13
+  },
+  {
+    "id": "priest/heal",
+    "name": "Heal",
+    "desc": "A gold glow bursts and plus signs float up.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/82863fbf-28d1-4ac4-95df-57722bee8869/svs-priest-heal",
+    "ax": 18,
+    "ay": 66
+  },
+  {
+    "id": "priest/holy-beam",
+    "name": "Holy Beam",
+    "desc": "A gold pillar of light slams down.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/e1b6071d-588d-46a4-b4fb-b01eb2f15850/svs-priest-holy-beam",
+    "ax": 21,
+    "ay": 59,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ]
+  },
+  {
+    "id": "priest/holy-nova",
+    "name": "Holy Nova",
+    "desc": "A gold shockwave ring from the feet.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/b1676bdd-9aa1-474f-b791-32423b35bb74/svs-priest-holy-nova",
+    "ax": 36,
+    "ay": 16
+  },
+  {
+    "id": "priest/psychic-scream",
+    "name": "Psychic Scream",
+    "desc": "A violet shockwave ring from the feet.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/198e64ba-27d5-4606-bbfe-21d5702c9674/svs-priest-psychic-scream",
+    "ax": 36,
+    "ay": 16
+  },
+  {
+    "id": "priest/holy-aura",
+    "name": "Holy Aura",
+    "desc": "Gold radiance and light spikes round the priest.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/b1fabe7e-f637-47db-9baf-2fc11481535e/svs-priest-holy-aura",
+    "ax": 19,
+    "ay": 48,
+    "hollow": 2
+  },
+  {
+    "id": "priest/shield",
+    "name": "Power Word: Shield",
+    "desc": "A gold ward bubble round the priest.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/ca5bb657-c753-40fb-9053-dd972191924b/svs-priest-shield",
+    "ax": 17,
+    "ay": 41
+  },
+  {
+    "id": "priest/void-rift",
+    "name": "Void Rift",
+    "desc": "A churning violet rift.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/9f9663b5-6459-48dc-ade7-5315e29fffe1/svs-priest-void-rift",
+    "ax": 20,
+    "ay": 52,
+    "hollow": 3
   }
 ]

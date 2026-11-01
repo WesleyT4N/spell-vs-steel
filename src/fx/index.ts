@@ -285,6 +285,23 @@ const HD_SPELLS: Record<string, string> = {
   killShot: 'hd/impact/steel-l',
   disengage: 'hd/ranger/disengage',
   feignDeath: 'hd/rogue/blind',
+  // Priest (blessed panels, bolts, the holy wall and Shadow Word: Death keep their pixelfx versions)
+  flashHeal: 'hd/priest/heal',
+  prayer: 'hd/priest/heal',
+  hymnTick: 'hd/priest/heal',
+  holyFire: 'hd/priest/holy-beam',
+  wrath: 'hd/priest/holy-beam',
+  holyNova: 'hd/priest/holy-nova',
+  psychicScream: 'hd/priest/psychic-scream',
+  mindSear: 'hd/priest/psychic-scream',
+  powerInfusion: 'hd/priest/holy-aura',
+  sanctum: 'hd/priest/holy-aura',
+  pwShield: 'hd/priest/shield',
+  voidRift: 'hd/priest/void-rift',
+  swPain: 'hd/rogue/death-mark',
+  hex: 'hd/rogue/death-mark',
+  plague: 'hd/rogue/poison',
+  shadowform: 'hd/rogue/shadow-aura',
 };
 Object.assign(PLAYS, HD_SPELLS);
 for (const [k, id] of Object.entries(HD_SPELLS)) registerPfx(k, EFFECTS[id]);
