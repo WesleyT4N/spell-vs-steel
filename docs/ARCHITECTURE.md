@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at 4817ec6 (2026-11-01).
+How the game is put together, one section per system. Describes `main` at 07a41df (2026-11-01).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -263,6 +263,20 @@ flowchart LR
 ```
 
 - HD layers and 48px fighters (#110): `HD = 2` (`engine/gfx.ts`). `main.ts` makes both offscreen canvases `HD` times larger and multiplies every `setTransform` by `HD`, so scenes still draw in world (240×160) and UI (480×320) coordinates and only art that asks for it uses the extra pixels. All five classes draw from `src/art/pl/<class>.ts` (48px PixelLab frames on a 64×64 canvas plus select portraits, from `tools/pixellab/build_frames.py`); `getSprite` / `getFrame` give them `Sprite.res = 2` (`PL_RES`), and `drawFighterSprite` draws one sprite pixel as 1/res of a world pixel, so a fighter stands about 24 world pixels tall. Lookup order: a skin mod's `art`, then `PL`, then the older 24px sets (`res` 1). PixelLab skins hue-shift the main cloth colour family (`plPalette`); `letterIndex` reads a-z, A-Z and 0-9.
+- Spell and hit effects: the sim only records `Battle.addFx(kind, …)`; `game/fxView.ts` asks `drawPfx` (`game/pfx.ts`, shots `drawShotPfx`) first, and `src/fx/index.ts` decides what each kind plays:
+
+```mermaid
+flowchart TD
+  add["Battle.addFx(kind, col, row, dur, data)<br/>plain data, same on a rollback resim"] --> pfx["drawPfx · game/pfx.ts<br/>module registered for the kind"]
+  pfx -- "HD_SPELLS, impact" --> sheet["Baked sheet · src/fx/hd/&lt;class&gt;/&lt;name&gt;.ts<br/>drawSheet, 2 sheet px per world px"]
+  pfx -- "PLAYS, SHOT_PLAYS" --> pix["pixelfx module · src/fx/&lt;class&gt;/&lt;name&gt;.ts<br/>vendored pixelfx core"]
+  pfx -- "anything else" --> hand["hand-drawn fallback<br/>game/fxView.ts"]
+  build["tools/pixellab/fx.json → build_fx.py<br/>PixelLab VFX exports → PNG strips"] -- bakes --> sheet
+```
+
+  - Baked sheets (#112 hit sparks and basics, #113 every class's spells): `fx.json` gives each export's origin (`ax`/`ay`) and optional `frames`, `fps`, `loop`, `panels`, `rows: 3` (column spells, drawn on every row via `meta.rows`), `hollow: k` (auras keep the fighter visible). `src/fx/sheet.ts`: `sheetFx` wraps a strip, `sheetFrame(age)` picks the frame, `drawSheet` draws it, `sheetsReady()` lets tools and tests wait for decoding.
+  - `HD_SPELLS` maps many spell kinds onto one sheet per look. `impact` (`src/fx/hd/picks.ts`, a `pickFx`) picks the hit spark by element and tier, so shot hits register `none`.
+  - pixelfx modules (#99-#104) remain for kinds with no sheet yet and for the Art Lab's BEFORE view; see [FX.md](FX.md). All three paths are render-only: the frame is a pure function of the fx's age.
 - Fighters are never stretched in menus; spell effects keep a 24×24 footprint and take their element's colour.
 - Visual state never goes into the Battle, so rollback and the hash never see it. Hit feel (#34, #73): the hit pause and slow-mo are rules (`Battle.hitStop` / `stopT` / `slowmo`, by hit tier from `TUNING.hitStop` and `TUNING.slowmo`; presses made during a pause are buffered and played after it), so they stay in lockstep and rollback. `game/hitFeel.ts` is the render-only part: a directional screen kick, a 1 px shudder while a pause runs, element impact sparks and popping damage numbers, deduped so a rollback doesn't replay them.
 - Basic shots are real projectiles at a constant speed (`TUNING.<cls>.shotSpeed`, capped by `maxShotSpeed` 15; only Aimed Shot may pass it), so full-row heavies can be dodged. A shot lights its row in the shooter's team colour until it is gone.
