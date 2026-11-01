@@ -1,266 +1,856 @@
 [
- {
-  "id": "impact/steel-s",
-  "name": "Impact steel small",
-  "desc": "A steel hit star with sparks (light hits).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/6a8958f1-78ca-47bd-86f7-448abed680dc/svs-impact-steel-s",
-  "ax": 30,
-  "ay": 48
- },
- {
-  "id": "impact/fire-s",
-  "name": "Impact fire small",
-  "desc": "A fire hit star with sparks (light hits).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/2d734c82-fc40-4c81-8342-85b05aad25f3/svs-impact-fire-s",
-  "ax": 30,
-  "ay": 48
- },
- {
-  "id": "impact/frost-s",
-  "name": "Impact frost small",
-  "desc": "A frost hit star with sparks (light hits).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/b8991ad3-25d5-4ffa-9680-7f505891fe07/svs-impact-frost-s",
-  "ax": 30,
-  "ay": 48
- },
- {
-  "id": "impact/arcane-s",
-  "name": "Impact arcane small",
-  "desc": "A arcane hit star with sparks (light hits).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/1f43cc4f-6030-455d-ac36-944d50992230/svs-impact-arcane-s",
-  "ax": 30,
-  "ay": 48
- },
- {
-  "id": "impact/holy-s",
-  "name": "Impact holy small",
-  "desc": "A holy hit star with sparks (light hits).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/7e8bd12f-79c0-43e1-b36c-585e63d8e0d1/svs-impact-holy-s",
-  "ax": 30,
-  "ay": 48
- },
- {
-  "id": "impact/shadow-s",
-  "name": "Impact shadow small",
-  "desc": "A shadow hit star with sparks (light hits).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/734ee54a-212f-45e8-b46f-a9d94322422f/svs-impact-shadow-s",
-  "ax": 30,
-  "ay": 48
- },
- {
-  "id": "impact/poison-s",
-  "name": "Impact poison small",
-  "desc": "A poison hit star with sparks (light hits).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/a2166448-8e24-45c0-9569-6c47b9f1a266/svs-impact-poison-s",
-  "ax": 30,
-  "ay": 48
- },
- {
-  "id": "impact/nature-s",
-  "name": "Impact nature small",
-  "desc": "A nature hit star with sparks (light hits).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/64a77871-9dbd-4d21-8cb7-32cacb1783e9/svs-impact-nature-s",
-  "ax": 30,
-  "ay": 48
- },
- {
-  "id": "impact/steel-l",
-  "name": "Impact steel big",
-  "desc": "A steel hit star, flash ring and spark shower (big hits and KOs).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/2236b956-3df1-4b25-98cd-2a3e2672348c/svs-impact-steel-l",
-  "ax": 42,
-  "ay": 54
- },
- {
-  "id": "impact/fire-l",
-  "name": "Impact fire big",
-  "desc": "A fire hit star, flash ring and spark shower (big hits and KOs).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/82b34439-476d-4869-a046-6dc13566a89b/svs-impact-fire-l",
-  "ax": 42,
-  "ay": 54
- },
- {
-  "id": "impact/frost-l",
-  "name": "Impact frost big",
-  "desc": "A frost hit star, flash ring and spark shower (big hits and KOs).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/ff0d4bfd-5a26-48b0-9133-bc3d8cf55ad7/svs-impact-frost-l",
-  "ax": 42,
-  "ay": 54
- },
- {
-  "id": "impact/arcane-l",
-  "name": "Impact arcane big",
-  "desc": "A arcane hit star, flash ring and spark shower (big hits and KOs).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/691e1bdc-c276-409c-b23f-8f664be3a15d/svs-impact-arcane-l",
-  "ax": 42,
-  "ay": 54
- },
- {
-  "id": "impact/holy-l",
-  "name": "Impact holy big",
-  "desc": "A holy hit star, flash ring and spark shower (big hits and KOs).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/25287c12-6701-4b28-a73d-5c9358c16860/svs-impact-holy-l",
-  "ax": 42,
-  "ay": 54
- },
- {
-  "id": "impact/shadow-l",
-  "name": "Impact shadow big",
-  "desc": "A shadow hit star, flash ring and spark shower (big hits and KOs).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/3d9ff737-15fc-43b1-a358-632384023625/svs-impact-shadow-l",
-  "ax": 42,
-  "ay": 54
- },
- {
-  "id": "impact/poison-l",
-  "name": "Impact poison big",
-  "desc": "A poison hit star, flash ring and spark shower (big hits and KOs).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/faa4ac45-7ba0-493e-8eb3-34258baaf090/svs-impact-poison-l",
-  "ax": 42,
-  "ay": 54
- },
- {
-  "id": "impact/nature-l",
-  "name": "Impact nature big",
-  "desc": "A nature hit star, flash ring and spark shower (big hits and KOs).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/33fd6e66-4ab2-4546-b665-3b026962e901/svs-impact-nature-l",
-  "ax": 42,
-  "ay": 54
- },
- {
-  "id": "mage/orb",
-  "name": "Arcane Orb",
-  "desc": "A pink orb with a tapered tail and sparkles (the Mage's light shot).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/abf43e7a-871f-4768-8f19-4c1f9c971e23/svs-mage-orb",
-  "ax": 41,
-  "ay": 12,
-  "loop": true
- },
- {
-  "id": "mage/beam",
-  "name": "Arcane Comet",
-  "desc": "A big white-hot arcane orb with a long tail (the Mage's heavy shot).",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/957423a7-fe4a-439c-81ce-c520577d53a8/svs-mage-beam",
-  "ax": 79,
-  "ay": 17,
-  "loop": true
- },
- {
-  "id": "priest/spark",
-  "name": "Holy Spark",
-  "desc": "A golden orb with a tapered tail and sparkles.",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/f0f54410-9930-4d3c-b2fe-43eccdfd4cf6/svs-priest-spark",
-  "ax": 41,
-  "ay": 12,
-  "loop": true
- },
- {
-  "id": "ranger/arrow",
-  "name": "Arrow",
-  "desc": "A fletched arrow with a few air streaks.",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/aa2adfa8-51ca-4112-a277-9cfd2675bdc8/svs-ranger-arrow",
-  "ax": 60,
-  "ay": 20,
-  "loop": true
- },
- {
-  "id": "ranger/aimed",
-  "name": "Aimed Shot",
-  "desc": "An arrow tearing through the air in a rush of streaks.",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/1cf896cc-05ae-4c0e-936d-59d741027201/svs-ranger-aimed-shot",
-  "ax": 60,
-  "ay": 20,
-  "loop": true
- },
- {
-  "id": "rogue/knife",
-  "name": "Throwing Knife",
-  "desc": "A dagger spinning end over end.",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/dcbd148d-b57f-4e7b-bdd2-9e38efc42fa8/svs-rogue-knife",
-  "ax": 13,
-  "ay": 13,
-  "frames": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "fps": 16,
-  "loop": true
- },
- {
-  "id": "warrior/cleave",
-  "name": "Cleave",
-  "desc": "A crisp steel crescent swept across the target.",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/552ae48b-18f7-4d17-84c6-f5fbfabee65f/svs-warrior-cleave",
-  "ax": 24,
-  "ay": 50,
-  "frames": [
-   1,
-   2,
-   3,
-   4,
-   5,
-   6,
-   7,
-   8
-  ],
-  "panels": 2
- },
- {
-  "id": "warrior/cleave-heavy",
-  "name": "Heavy Cleave",
-  "desc": "A rage-gold chop slams into the ground: flash, crack, debris.",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/e84b8e9b-f945-4c2a-868e-edfd8a818aba/svs-warrior-heavy-cleave",
-  "ax": 22,
-  "ay": 52,
-  "frames": [
-   2,
-   3,
-   4,
-   5,
-   6,
-   7,
-   8,
-   9,
-   10,
-   11,
-   12,
-   13
-  ],
-  "panels": 2
- },
- {
-  "id": "rogue/stab",
-  "name": "Stab",
-  "desc": "A thin rising flick of steel on the panel ahead.",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/f397dfd9-b86e-479b-a218-2cde0a434015/svs-rogue-stab",
-  "ax": -60,
-  "ay": 50,
-  "frames": [
-   1,
-   2,
-   3,
-   4,
-   5
-  ],
-  "panels": 2
- },
- {
-  "id": "priest/smite",
-  "name": "Smite",
-  "desc": "A pillar of holy light slams down and rings out on the ground.",
-  "url": "https://api.pixellab.ai/mcp/pixel-tools/11382077-e359-42fa-8c01-381fa3347aa6/svs-priest-smite",
-  "ax": 20,
-  "ay": 56,
-  "frames": [
-   0,
-   1,
-   2,
-   3,
-   4,
-   5,
-   6
-  ]
- }
+  {
+    "id": "impact/steel-s",
+    "name": "Impact steel small",
+    "desc": "A steel hit star with sparks (light hits).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/6a8958f1-78ca-47bd-86f7-448abed680dc/svs-impact-steel-s",
+    "ax": 30,
+    "ay": 48
+  },
+  {
+    "id": "impact/fire-s",
+    "name": "Impact fire small",
+    "desc": "A fire hit star with sparks (light hits).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/2d734c82-fc40-4c81-8342-85b05aad25f3/svs-impact-fire-s",
+    "ax": 30,
+    "ay": 48
+  },
+  {
+    "id": "impact/frost-s",
+    "name": "Impact frost small",
+    "desc": "A frost hit star with sparks (light hits).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/b8991ad3-25d5-4ffa-9680-7f505891fe07/svs-impact-frost-s",
+    "ax": 30,
+    "ay": 48
+  },
+  {
+    "id": "impact/arcane-s",
+    "name": "Impact arcane small",
+    "desc": "A arcane hit star with sparks (light hits).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/1f43cc4f-6030-455d-ac36-944d50992230/svs-impact-arcane-s",
+    "ax": 30,
+    "ay": 48
+  },
+  {
+    "id": "impact/holy-s",
+    "name": "Impact holy small",
+    "desc": "A holy hit star with sparks (light hits).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/7e8bd12f-79c0-43e1-b36c-585e63d8e0d1/svs-impact-holy-s",
+    "ax": 30,
+    "ay": 48
+  },
+  {
+    "id": "impact/shadow-s",
+    "name": "Impact shadow small",
+    "desc": "A shadow hit star with sparks (light hits).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/734ee54a-212f-45e8-b46f-a9d94322422f/svs-impact-shadow-s",
+    "ax": 30,
+    "ay": 48
+  },
+  {
+    "id": "impact/poison-s",
+    "name": "Impact poison small",
+    "desc": "A poison hit star with sparks (light hits).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/a2166448-8e24-45c0-9569-6c47b9f1a266/svs-impact-poison-s",
+    "ax": 30,
+    "ay": 48
+  },
+  {
+    "id": "impact/nature-s",
+    "name": "Impact nature small",
+    "desc": "A nature hit star with sparks (light hits).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/64a77871-9dbd-4d21-8cb7-32cacb1783e9/svs-impact-nature-s",
+    "ax": 30,
+    "ay": 48
+  },
+  {
+    "id": "impact/steel-l",
+    "name": "Impact steel big",
+    "desc": "A steel hit star, flash ring and spark shower (big hits and KOs).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/2236b956-3df1-4b25-98cd-2a3e2672348c/svs-impact-steel-l",
+    "ax": 42,
+    "ay": 54
+  },
+  {
+    "id": "impact/fire-l",
+    "name": "Impact fire big",
+    "desc": "A fire hit star, flash ring and spark shower (big hits and KOs).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/82b34439-476d-4869-a046-6dc13566a89b/svs-impact-fire-l",
+    "ax": 42,
+    "ay": 54
+  },
+  {
+    "id": "impact/frost-l",
+    "name": "Impact frost big",
+    "desc": "A frost hit star, flash ring and spark shower (big hits and KOs).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/ff0d4bfd-5a26-48b0-9133-bc3d8cf55ad7/svs-impact-frost-l",
+    "ax": 42,
+    "ay": 54
+  },
+  {
+    "id": "impact/arcane-l",
+    "name": "Impact arcane big",
+    "desc": "A arcane hit star, flash ring and spark shower (big hits and KOs).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/691e1bdc-c276-409c-b23f-8f664be3a15d/svs-impact-arcane-l",
+    "ax": 42,
+    "ay": 54
+  },
+  {
+    "id": "impact/holy-l",
+    "name": "Impact holy big",
+    "desc": "A holy hit star, flash ring and spark shower (big hits and KOs).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/25287c12-6701-4b28-a73d-5c9358c16860/svs-impact-holy-l",
+    "ax": 42,
+    "ay": 54
+  },
+  {
+    "id": "impact/shadow-l",
+    "name": "Impact shadow big",
+    "desc": "A shadow hit star, flash ring and spark shower (big hits and KOs).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/3d9ff737-15fc-43b1-a358-632384023625/svs-impact-shadow-l",
+    "ax": 42,
+    "ay": 54
+  },
+  {
+    "id": "impact/poison-l",
+    "name": "Impact poison big",
+    "desc": "A poison hit star, flash ring and spark shower (big hits and KOs).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/faa4ac45-7ba0-493e-8eb3-34258baaf090/svs-impact-poison-l",
+    "ax": 42,
+    "ay": 54
+  },
+  {
+    "id": "impact/nature-l",
+    "name": "Impact nature big",
+    "desc": "A nature hit star, flash ring and spark shower (big hits and KOs).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/33fd6e66-4ab2-4546-b665-3b026962e901/svs-impact-nature-l",
+    "ax": 42,
+    "ay": 54
+  },
+  {
+    "id": "mage/orb",
+    "name": "Arcane Orb",
+    "desc": "A pink orb with a tapered tail and sparkles (the Mage's light shot).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/abf43e7a-871f-4768-8f19-4c1f9c971e23/svs-mage-orb",
+    "ax": 41,
+    "ay": 12,
+    "loop": true
+  },
+  {
+    "id": "mage/beam",
+    "name": "Arcane Comet",
+    "desc": "A big white-hot arcane orb with a long tail (the Mage's heavy shot).",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/957423a7-fe4a-439c-81ce-c520577d53a8/svs-mage-beam",
+    "ax": 79,
+    "ay": 17,
+    "loop": true
+  },
+  {
+    "id": "priest/spark",
+    "name": "Holy Spark",
+    "desc": "A golden orb with a tapered tail and sparkles.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/f0f54410-9930-4d3c-b2fe-43eccdfd4cf6/svs-priest-spark",
+    "ax": 41,
+    "ay": 12,
+    "loop": true
+  },
+  {
+    "id": "ranger/arrow",
+    "name": "Arrow",
+    "desc": "A fletched arrow with a few air streaks.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/aa2adfa8-51ca-4112-a277-9cfd2675bdc8/svs-ranger-arrow",
+    "ax": 60,
+    "ay": 20,
+    "loop": true
+  },
+  {
+    "id": "ranger/aimed",
+    "name": "Aimed Shot",
+    "desc": "An arrow tearing through the air in a rush of streaks.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/1cf896cc-05ae-4c0e-936d-59d741027201/svs-ranger-aimed-shot",
+    "ax": 60,
+    "ay": 20,
+    "loop": true
+  },
+  {
+    "id": "rogue/knife",
+    "name": "Throwing Knife",
+    "desc": "A dagger spinning end over end.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/dcbd148d-b57f-4e7b-bdd2-9e38efc42fa8/svs-rogue-knife",
+    "ax": 13,
+    "ay": 13,
+    "frames": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "fps": 16,
+    "loop": true
+  },
+  {
+    "id": "warrior/cleave",
+    "name": "Cleave",
+    "desc": "A crisp steel crescent swept across the target.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/552ae48b-18f7-4d17-84c6-f5fbfabee65f/svs-warrior-cleave",
+    "ax": 24,
+    "ay": 50,
+    "frames": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "panels": 2
+  },
+  {
+    "id": "warrior/cleave-heavy",
+    "name": "Heavy Cleave",
+    "desc": "A rage-gold chop slams into the ground: flash, crack, debris.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/e84b8e9b-f945-4c2a-868e-edfd8a818aba/svs-warrior-heavy-cleave",
+    "ax": 22,
+    "ay": 52,
+    "frames": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "panels": 2
+  },
+  {
+    "id": "rogue/stab",
+    "name": "Stab",
+    "desc": "A thin rising flick of steel on the panel ahead.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/f397dfd9-b86e-479b-a218-2cde0a434015/svs-rogue-stab",
+    "ax": -60,
+    "ay": 50,
+    "frames": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "panels": 2
+  },
+  {
+    "id": "priest/smite",
+    "name": "Smite",
+    "desc": "A pillar of holy light slams down and rings out on the ground.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/11382077-e359-42fa-8c01-381fa3347aa6/svs-priest-smite",
+    "ax": 20,
+    "ay": 56,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ]
+  },
+  {
+    "id": "mage/arcane-blast",
+    "name": "Arcane Blast",
+    "desc": "A shaft of arcane force slams down and rings out.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/3039268e-4e4b-4c01-9646-53e75af586f0/svs-mage-arcane-blast",
+    "ax": 20,
+    "ay": 49,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ]
+  },
+  {
+    "id": "mage/blink",
+    "name": "Blink",
+    "desc": "A tall rift of light narrows to a point where the Mage stood.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/89472881-a290-4795-84f6-0085b8887ca9/svs-mage-blink",
+    "ax": 16,
+    "ay": 40
+  },
+  {
+    "id": "mage/counterspell",
+    "name": "Counterspell",
+    "desc": "A ward ring flickers and bursts into shards.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/515af3d1-584e-4781-b99d-bdf69b6667ce/svs-mage-counterspell",
+    "ax": 22,
+    "ay": 43
+  },
+  {
+    "id": "mage/arcane-focus",
+    "name": "Arcane Focus",
+    "desc": "Motes swirl in and gather into a bright mote.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/e0407898-1daa-4ecb-b734-a4e44a9ad5d4/svs-mage-arcane-focus",
+    "ax": 18,
+    "ay": 42,
+    "frames": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ]
+  },
+  {
+    "id": "mage/arcane-barrier",
+    "name": "Arcane Barrier",
+    "desc": "A hexagon-cell ward closes round the Mage.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/9a00998b-6383-4479-ac93-784c70f55e97/svs-mage-arcane-barrier",
+    "ax": 27,
+    "ay": 51,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  {
+    "id": "mage/arcane-intellect",
+    "name": "Arcane Intellect",
+    "desc": "Glowing runes circle the Mage's head.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/454f18d6-322e-4a79-b8da-d8d068f95705/svs-mage-arcane-intellect",
+    "ax": 19,
+    "ay": 50,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ]
+  },
+  {
+    "id": "mage/arcane-power",
+    "name": "Arcane Power",
+    "desc": "Pink arrows and motes rise round the Mage.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/15423230-2b88-487f-b2a3-3f92ff9a4ae7/svs-mage-arcane-power",
+    "ax": 17,
+    "ay": 53,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ]
+  },
+  {
+    "id": "mage/evocation",
+    "name": "Evocation",
+    "desc": "A rune circle turns underfoot as motes pour into the Mage.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/5699f1d7-2ea6-4238-adb6-4f8ca056b882/svs-mage-evocation",
+    "ax": 28,
+    "ay": 50
+  },
+  {
+    "id": "mage/ascendance",
+    "name": "Ascendance",
+    "desc": "A pillar of arcane light bursts up, halos climbing the body.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/f8ba71c5-2b6b-4e8c-be21-ed64073cc3bd/svs-mage-ascendance",
+    "ax": 16,
+    "ay": 45,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ]
+  },
+  {
+    "id": "mage/fireball-blast",
+    "name": "Fireball Blast",
+    "desc": "A white-hot burst, a shock ring and a puff of smoke.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/9a512f70-99e7-4c93-805c-25aa13a1f183/svs-mage-fireball-blast",
+    "ax": 21,
+    "ay": 45,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ]
+  },
+  {
+    "id": "mage/flamestrike",
+    "name": "Flamestrike",
+    "desc": "A shaft of fire slams down, rings out and leaves embers.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/31aaed33-16b2-4e3d-963b-5c380a01b9c1/svs-mage-flamestrike",
+    "ax": 20,
+    "ay": 54,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ]
+  },
+  {
+    "id": "mage/comet",
+    "name": "Comet",
+    "desc": "A hard fire blast bursts on the panel.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/1229d20f-3bbd-4605-a957-4f965cbfeb4d/svs-mage-comet",
+    "ax": 21,
+    "ay": 45,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ]
+  },
+  {
+    "id": "mage/dragons-breath",
+    "name": "Dragon's Breath",
+    "desc": "A wall of flame roars on the panel.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/40cc7458-fe3f-49c0-ad97-37ce7b8fe44b/svs-mage-dragons-breath",
+    "ax": 17,
+    "ay": 23
+  },
+  {
+    "id": "mage/flame-tongue",
+    "name": "Flame Tongue",
+    "desc": "One big flame whips up off the burning panel.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/5df96204-2c5d-4eaf-8e90-a84cd4d48632/svs-mage-flame-tongue",
+    "ax": 13,
+    "ay": 28
+  },
+  {
+    "id": "mage/ignite",
+    "name": "Ignite",
+    "desc": "Glowing cracks race across the floor, embers rising.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/239c8e06-63fb-4934-a5c2-b47b07dc7f81/svs-mage-ignite",
+    "ax": 22,
+    "ay": 15,
+    "rows": 3,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ]
+  },
+  {
+    "id": "mage/frost-nova-zone",
+    "name": "Frost Nova (laid)",
+    "desc": "A frost rune turns on the floor.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/c6bd6469-79ae-4467-86c8-856de9db0cbb/svs-mage-frost-nova-zone",
+    "ax": 24,
+    "ay": 12
+  },
+  {
+    "id": "mage/ice-spikes",
+    "name": "Ice Spikes",
+    "desc": "Faceted ice spikes stab up out of the floor and sink back.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/62fab829-0e0f-4346-9d92-463961dca210/svs-mage-ice-spikes",
+    "ax": 19,
+    "ay": 34
+  },
+  {
+    "id": "mage/ice-spikes-big",
+    "name": "Great Ice Spikes",
+    "desc": "A crown of tall ice spikes heaves up and sinks back.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/7df17127-1d25-40c5-8790-d445dd74cb78/svs-mage-ice-spikes-big",
+    "ax": 24,
+    "ay": 44
+  },
+  {
+    "id": "mage/glacial-fortress",
+    "name": "Glacial Fortress",
+    "desc": "Tall ice spikes heave up on every panel of the column.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/7df17127-1d25-40c5-8790-d445dd74cb78/svs-mage-ice-spikes-big",
+    "ax": 24,
+    "ay": 44,
+    "rows": 3
+  },
+  {
+    "id": "mage/ice-shatter",
+    "name": "Ice Shatter",
+    "desc": "A cold flash and ring, then shards tumble.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/45421dab-52d7-438f-a166-b0f43fd71e1a/svs-mage-ice-shatter",
+    "ax": 17,
+    "ay": 40
+  },
+  {
+    "id": "mage/fireball",
+    "name": "Fireball",
+    "desc": "A boiling fireball with a comet tail and embers.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/ca72cd29-4132-4c1c-ac99-70e0f9d7232b/svs-mage-fireball",
+    "ax": 51,
+    "ay": 15,
+    "loop": true
+  },
+  {
+    "id": "mage/missile",
+    "name": "Arcane Missile",
+    "desc": "A small homing arcane orb with a tapered tail.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/78dd0025-d19a-4ae5-a0d6-5da9077c298f/svs-mage-arcane-missile",
+    "ax": 30,
+    "ay": 9,
+    "loop": true
+  },
+  {
+    "id": "mage/repulse",
+    "name": "Repulse",
+    "desc": "A crescent of force shedding wind flecks.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/aef9fb3b-208c-4cf9-956b-5c92bdb4b6a6/svs-mage-repulse",
+    "ax": 40,
+    "ay": 16,
+    "loop": true,
+    "frames": [
+      5,
+      6,
+      7,
+      8,
+      9
+    ]
+  },
+  {
+    "id": "warrior/avatar",
+    "name": "Avatar",
+    "desc": "A gold-steel pillar of light with rising halos and chevrons.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/bf6acb88-ee14-4234-a7d3-7a39ee0acd12/svs-warrior-avatar",
+    "ax": 16,
+    "ay": 45
+  },
+  {
+    "id": "warrior/berserk",
+    "name": "Berserk",
+    "desc": "A roaring rage-fire aura round the warrior.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/518c3e94-0c19-492c-a830-9cd722d7e087/svs-warrior-berserk",
+    "ax": 19,
+    "ay": 46,
+    "hollow": 4
+  },
+  {
+    "id": "warrior/execute",
+    "name": "Execute",
+    "desc": "A crimson finishing chop that splits the ground.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/654474b3-d9de-40ea-85a7-d2d38cb2f18f/svs-warrior-execute",
+    "ax": 22,
+    "ay": 52,
+    "frames": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "panels": 2
+  },
+  {
+    "id": "warrior/hammer",
+    "name": "Hammer",
+    "desc": "A heavy steel overhead blow: flash, crack, debris.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/4e748b7d-ceac-4e4b-9f4e-7a6813f27f6a/svs-warrior-hammer",
+    "ax": 22,
+    "ay": 52,
+    "frames": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "panels": 2
+  },
+  {
+    "id": "warrior/ground-slam",
+    "name": "Ground Slam",
+    "desc": "Rage-hot cracks and dust run down the column.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/b85493ac-61ed-4025-a21d-2fcee1cb156d/svs-warrior-ground-slam",
+    "ax": 22,
+    "ay": 15,
+    "rows": 3
+  },
+  {
+    "id": "warrior/guard-up",
+    "name": "Guard Up",
+    "desc": "A steel ward bubble round the warrior.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/9aed39f1-fee9-4a18-aa5f-d353571e711f/svs-warrior-guard",
+    "ax": 16,
+    "ay": 40
+  },
+  {
+    "id": "warrior/mortal",
+    "name": "Mortal Strike",
+    "desc": "A steel cross-cut with a burst of sparks.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/bbc45787-2106-4fcc-9f63-f02dc20b8c9e/svs-warrior-mortal",
+    "ax": 15,
+    "ay": 37,
+    "panels": 2
+  },
+  {
+    "id": "warrior/battle-shout",
+    "name": "Battle Shout",
+    "desc": "A steel shockwave ring rolls out from the feet.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/4bd40337-2e0a-45d1-a626-9810fe5c8eb7/svs-warrior-battle-shout",
+    "ax": 34,
+    "ay": 15
+  },
+  {
+    "id": "warrior/roar",
+    "name": "Roar",
+    "desc": "A rage-gold shockwave ring rolls out from the feet.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/43c9faeb-6034-4509-a5e7-5486f5799537/svs-warrior-roar",
+    "ax": 36,
+    "ay": 16
+  },
+  {
+    "id": "warrior/iron-skin",
+    "name": "Iron Skin",
+    "desc": "A steel pillar of light with rising halos.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/7ad27db9-7760-49b1-90d1-b45bd808202b/svs-warrior-iron-skin",
+    "ax": 17,
+    "ay": 49
+  },
+  {
+    "id": "warrior/last-stand",
+    "name": "Last Stand",
+    "desc": "A crimson fire aura round the warrior.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/77db86e2-f1c8-4ba8-8b2c-81cabf056f3c/svs-warrior-last-stand",
+    "ax": 21,
+    "ay": 51,
+    "hollow": 4
+  },
+  {
+    "id": "warrior/last-stand-blast",
+    "name": "Last Stand Blast",
+    "desc": "A crimson wall of fire on every row.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/e4792012-7c44-4497-83a6-849d7ce154a7/svs-warrior-last-stand-blast",
+    "ax": 24,
+    "ay": 30,
+    "rows": 3
+  },
+  {
+    "id": "warrior/leap-smash",
+    "name": "Leap Smash",
+    "desc": "A ring of dust puffs where the warrior lands.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/4cfa5b04-6432-4f3b-a6a5-faf4f9fcbd18/svs-warrior-leap-smash",
+    "ax": 27,
+    "ay": 18
+  },
+  {
+    "id": "warrior/rally",
+    "name": "Rally",
+    "desc": "A gold healing column with sparkles.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/c946bbc0-dc7b-45c5-80c1-fc3c1bb23e65/svs-warrior-rally",
+    "ax": 22,
+    "ay": 43,
+    "hollow": 3
+  },
+  {
+    "id": "warrior/rampage",
+    "name": "Rampage",
+    "desc": "A fast rage-gold swing across the target.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/8a0fa8ad-0d36-4e44-bb0f-88d519ff974d/svs-warrior-rampage",
+    "ax": 22,
+    "ay": 51
+  },
+  {
+    "id": "warrior/seismic",
+    "name": "Seismic",
+    "desc": "Stone spikes burst out of the panel.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/af408b98-9399-49e4-ac49-3385641fa9bb/svs-warrior-seismic",
+    "ax": 18,
+    "ay": 32
+  },
+  {
+    "id": "warrior/shatter",
+    "name": "Shatter",
+    "desc": "Gold cracks race down the column.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/2ba6c427-0d9e-490a-89a3-97734ff4ce29/svs-warrior-shatter",
+    "ax": 27,
+    "ay": 12,
+    "rows": 3,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ]
+  },
+  {
+    "id": "warrior/shield-slam",
+    "name": "Shield Slam",
+    "desc": "A steel hit star and a ring of stun stars.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/c8742497-fe58-49ce-891f-ca7921440472/svs-warrior-shield-slam",
+    "ax": 23,
+    "ay": 47
+  },
+  {
+    "id": "warrior/step-slash",
+    "name": "Step Slash",
+    "desc": "A long steel dash cut.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/bd2ee7bd-13c5-4a2c-aae6-d517c15bcbe2/svs-warrior-step-slash",
+    "ax": 47,
+    "ay": 40,
+    "panels": 2
+  },
+  {
+    "id": "warrior/thrust",
+    "name": "Thrust",
+    "desc": "A long steel spear streak.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/f4d1671b-d9e4-49a9-8b94-be4abb9b09f8/svs-warrior-thrust",
+    "ax": 6,
+    "ay": 34,
+    "panels": 4
+  },
+  {
+    "id": "warrior/titan-fall",
+    "name": "Titan Fall",
+    "desc": "A gold-steel beam slams down from the sky.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/0b601251-2725-4a3c-ad65-ae8e9614ed4e/svs-warrior-titan-fall",
+    "ax": 21,
+    "ay": 59,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ]
+  },
+  {
+    "id": "warrior/unbreakable",
+    "name": "Unbreakable",
+    "desc": "A gold hex dome over the warrior.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/08a8710f-53b2-46d2-a685-198539000521/svs-warrior-unbreakable",
+    "ax": 36,
+    "ay": 42
+  },
+  {
+    "id": "warrior/wall-rise",
+    "name": "Wall Rise",
+    "desc": "Earth chunks burst up and settle.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/eddb0c64-2d29-49e4-8a6a-c928af9e9d1c/svs-warrior-wall-rise",
+    "ax": 21,
+    "ay": 40
+  },
+  {
+    "id": "warrior/wide",
+    "name": "Wide Swing",
+    "desc": "The cleave crescent on every row of the column.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/552ae48b-18f7-4d17-84c6-f5fbfabee65f/svs-warrior-cleave",
+    "ax": 24,
+    "ay": 50,
+    "frames": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "rows": 3
+  }
 ]

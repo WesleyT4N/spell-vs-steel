@@ -18,10 +18,13 @@ export interface Sheet {
 
 export type SheetModule = PfxModule & { sheet: Sheet };
 
-/** A sheet effect module. `panels` spans the box along the attacker's facing like any effect. */
-export function sheetFx(name: string, desc: string, sheet: Sheet, panels = 1): SheetModule {
+/**
+ * A sheet effect module. `panels` spans the box along the attacker's facing like any effect; `rows` 3 plays the sheet
+ * on every row of the anchor's column (column-wide spells anchor on the middle row).
+ */
+export function sheetFx(name: string, desc: string, sheet: Sheet, panels = 1, rows = 1): SheetModule {
   image(sheet.src);   // start decoding now, so the first hit doesn't miss its frames
-  return { meta: { name, desc, duration: sheet.n / sheet.fps, panels }, sheet };
+  return { meta: { name, desc, duration: sheet.n / sheet.fps, panels, rows }, sheet };
 }
 
 /** Resolves once every sheet made so far has decoded (tools and tests wait on it before drawing). */

@@ -4,6 +4,8 @@
 tools/pixellab/fx.json lists each effect:
   {"id": "mage/fireball-blast", "name": "...", "desc": "...", "url": "https://api.pixellab.ai/mcp/pixel-tools/<id>/<slug>",
    "ax": 24, "ay": 48, "loop": false, "panels": 1, "frames": [0, 1, 2], "fps": 16}
+hollow (optional, k) clears everything more than k px inside the outline (auras over the fighter).
+rows (optional, 3) plays the sheet on every row of the column.
 frames (optional) picks and orders the export's frames (e.g. drop a wind-up so frame 0 is the hit frame);
 fps (optional) overrides the export's speed.
 url is the export's download folder plus file stem (the .png strip and .json frame list are fetched from it).
@@ -43,6 +45,17 @@ for e in cfg:
             c = px[x, y]
             if c[3] < 128: px[x, y] = (0, 0, 0, 0)
             elif c[3] < 255 and not e.get('soft'): px[x, y] = (c[0], c[1], c[2], 255)
+    # hollow: auras keep only a band k px wide inside their outline, so the fighter shows through the middle
+    k = e.get('hollow')
+    if k:
+        solid = [[px[x, y][3] > 0 for x in range(strip.width)] for y in range(strip.height)]
+        for y in range(strip.height):
+            for x in range(strip.width):
+                if not solid[y][x]: continue
+                fx0 = (x // fw) * fw
+                inner = all(fx0 <= xx < fx0 + fw and 0 <= yy < strip.height and solid[yy][xx]
+                            for yy in range(y - k, y + k + 1) for xx in range(x - k, x + k + 1))
+                if inner: px[x, y] = (0, 0, 0, 0)
     buf = io.BytesIO(); strip.save(buf, 'PNG', optimize=True)
     fps = e.get('fps') or round(1000 / frames[0]['duration'], 3)
     url = 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
@@ -55,5 +68,5 @@ for e in cfg:
         fo.write(f"// {e['name']}: {e['desc']}\n// PixelLab VFX export, baked by tools/pixellab/build_fx.py (edit tools/pixellab/fx.json, not this file).\n")
         fo.write("import { sheetFx } from '../../sheet';\n\n")
         fo.write(f"const SRC = '{url}';\n\n")
-        fo.write(f"export default sheetFx({json.dumps(e['name'])}, {json.dumps(e['desc'])}, {body}, {e.get('panels', 1)});\n")
+        fo.write(f"export default sheetFx({json.dumps(e['name'])}, {json.dumps(e['desc'])}, {body}, {e.get('panels', 1)}, {e.get('rows', 1)});\n")
     print(out, f'{fw}x{fh}x{len(frames)} @{fps}fps', len(buf.getvalue()), 'bytes')

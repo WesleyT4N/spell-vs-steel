@@ -188,6 +188,64 @@ Object.assign(PLAYS, {
 for (const k of ['cleave', 'cleaveHeavy', 'dagger', 'smite']) registerPfx(k, EFFECTS[PLAYS[k]]);
 for (const k of ['knifeHit', 'arrowHit', 'aimedHit', 'sparkHit']) registerPfx(k, none);
 
+// PixelLab sheets for spells, class by class (the pixelfx versions stay in src/fx/<class>/ for the labs)
+const HD_SPELLS: Record<string, string> = {
+  // Mage
+  arcaneHit: 'hd/mage/arcane-blast',
+  arcaneSurge: 'hd/mage/arcane-blast',
+  blink: 'hd/mage/blink',
+  counter: 'hd/mage/counterspell',
+  arcaneFocus: 'hd/mage/arcane-focus',
+  arcaneBarrier: 'hd/mage/arcane-barrier',
+  arcaneIntellect: 'hd/mage/arcane-intellect',
+  arcanePower: 'hd/mage/arcane-power',
+  evocation: 'hd/mage/evocation',
+  ascendance: 'hd/mage/ascendance',
+  fireballBlast: 'hd/mage/fireball-blast',
+  pillar: 'hd/mage/flamestrike',
+  meteorBlast: 'hd/mage/fireball-blast',
+  comet: 'hd/mage/comet',
+  dragonsBreath: 'hd/mage/dragons-breath',
+  inferno: 'hd/mage/flame-tongue',
+  scorch: 'hd/mage/flame-tongue',
+  ignite: 'hd/mage/ignite',
+  novaZone: 'hd/mage/frost-nova-zone',
+  nova: 'hd/mage/ice-spikes-big',
+  shard: 'hd/mage/ice-shatter',
+  deepFreeze: 'hd/mage/ice-spikes-big',
+  iceWall: 'hd/mage/ice-spikes',
+  iceBlock: 'hd/mage/ice-spikes',
+  glacialFortress: 'hd/mage/glacial-fortress',
+  // Warrior (banner and chainHookHit keep their pixelfx versions)
+  stepSlash: 'hd/warrior/step-slash',
+  thrust: 'hd/warrior/thrust',
+  leapSmash: 'hd/warrior/leap-smash',
+  execute: 'hd/warrior/execute',
+  hammer: 'hd/warrior/hammer',
+  shieldSlam: 'hd/warrior/shield-slam',
+  mortal: 'hd/warrior/mortal',
+  rampage: 'hd/warrior/rampage',
+  groundSlam: 'hd/warrior/ground-slam',
+  shatter: 'hd/warrior/shatter',
+  lastStandBlast: 'hd/warrior/last-stand-blast',
+  wide: 'hd/warrior/wide',
+  seismic: 'hd/warrior/seismic',
+  titanFall: 'hd/warrior/titan-fall',
+  battleShout: 'hd/warrior/battle-shout',
+  roar: 'hd/warrior/roar',
+  berserk: 'hd/warrior/berserk',
+  rally: 'hd/warrior/rally',
+  avatar: 'hd/warrior/avatar',
+  lastStand: 'hd/warrior/last-stand',
+  guardUp: 'hd/warrior/guard-up',
+  ironSkin: 'hd/warrior/iron-skin',
+  unbreakable: 'hd/warrior/unbreakable',
+  reflectUp: 'hd/warrior/guard-up',
+  wallRise: 'hd/warrior/wall-rise',
+};
+Object.assign(PLAYS, HD_SPELLS);
+for (const [k, id] of Object.entries(HD_SPELLS)) registerPfx(k, EFFECTS[id]);
+
 /** The effect each flying projectile kind plays (Projectile.kind); kinds not listed keep their hand-drawn shot. */
 export const SHOT_PLAYS: Record<string, string> = {
   hook: 'warrior/chain-hook',
@@ -223,5 +281,8 @@ Object.assign(SHOT_PLAYS, {
   arrow: 'hd/ranger/arrow',
   aimed: 'hd/ranger/aimed',
   knife: 'hd/rogue/knife',
+  fireball: 'hd/mage/fireball',
+  missile: 'hd/mage/missile',
+  gust: 'hd/mage/repulse',
 });
 for (const [kind, id] of Object.entries(SHOT_PLAYS)) registerShotPfx(kind, EFFECTS[id]);

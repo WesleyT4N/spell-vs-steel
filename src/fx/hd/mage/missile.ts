@@ -1,0 +1,7 @@
+// Arcane Missile: A small homing arcane orb with a tapered tail.
+// PixelLab VFX export, baked by tools/pixellab/build_fx.py (edit tools/pixellab/fx.json, not this file).
+import { sheetFx } from '../../sheet';
+
+const SRC = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAAATCAYAAADh/dRHAAADFklEQVR42u2boW7jQBCGf58m4OiBw5Eu0pGA4KIDAX2DvkIeIaAwwA8Q0FfoGxQEFBUXlETqScUBRws6kg+k44w3dmI7a3vtzk8sR4r20z//7G7sDWAymUwmk8lkMplMJtOXUNTFoD9GvxIA+PfxNwrNEGEThcwYIlsfFHr+du9b/Pz+2/I3tAlQjHv6uAcAXI1ugimyyyYKmTEktqJFJCS2PP9271sQkeWvAqebv1A8dLNXhivqwrjxcgoAeItfUiO7LHAemyhkxlDY3N3LKz1nGjgUNsufn9qGnL+8BeQUW6PQa6zS2XiO66Pi6iJPeNb4KqJ5XJ3j66LIVfwrw8fMiU+PXT/zGLvyTvMteJlp3K7qa/kLL39Ud3BmTu4ozgxepAzUH4Dm+2F5w8Dj/mN55tFU8U7pHN94OcVTfI+r0U1SJoRuoZk5AQD3s7L+TXgGvuWT/pVRnfCtsUoWvMQdxYWMp/wbo5p3TeSPb/nAeIF/XeZvt9qCiEp74zN/Zfq3r/mL6oZP3+ufPJlmVVCpCXM6CqfPVU4KK6u+5nqlZ0x4lhm3DT7tFxFF+l4z6mLSijKTnk8+aRD3WhQ+zVqnvr53MEPLH61oP5lY/hrPnzvWt7omAoBeQaTIYp6+5oH5ll7lxLQJz1ImHT6XrQ2mvPC5/rlsTTHm8biTitxLg8jVbdw2fBx6/mTys/w1nz93oqXaXySKZJu/wQPmuE6LnK4qn/6OMQU/7sEZnN1CX7C66dlc84mxUmDZOusQ6pVvjMMWOo9P9PlWqZbZbtHFvw0eMoxv8QsQI+PjOb5LdgdFK7Dcr4FkQwdGefAt9Z3wLPMz6JR/PprmK+fvEs+Gmj/3J3BV/4J5CdL1Q+gFL4+31gN7CN20n6G+BOlD/obwEqTt4zA+8hfUMRjfb4kuYdMGakZ0pL4cg6l6DKEtMXOS7mjsGIzlr+0JUAABOwjt279QD6KG4pvlb/j+FeXvXG+0Ds7MSR/+5hNiA8sOOfS/InW1k69aY8vf8PwzeW5kc8FkMplMJpPJZDKZTCaTydRz/QchmiyC8rdYYwAAAABJRU5ErkJggg==';
+
+export default sheetFx("Arcane Missile", "A small homing arcane orb with a tapered tail.", {"src": SRC, "fw": 40, "fh": 19, "n": 8, "fps": 12.048, "ax": 30, "ay": 9, "loop": true}, 1, 1);
