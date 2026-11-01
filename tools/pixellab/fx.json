@@ -981,5 +981,80 @@
       7,
       8
     ]
+  },
+  {
+    "id": "ranger/explosive",
+    "name": "Explosive Shot",
+    "desc": "A fire burst with lobed clouds and smoke.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/75747233-fdaf-4ac6-ae28-f1fab8a24b6c/svs-ranger-explosive-shot",
+    "ax": 24,
+    "ay": 53,
+    "hollow": 3
+  },
+  {
+    "id": "ranger/bite",
+    "name": "Bite",
+    "desc": "Three steel claw rakes across the foe.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/1ef76c87-b564-43d7-bd41-9f7379ef6493/svs-ranger-bite",
+    "ax": 17,
+    "ay": 47,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ]
+  },
+  {
+    "id": "ranger/hunters-mark",
+    "name": "Hunter's Mark",
+    "desc": "A crimson target ring at the foe's feet.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/2bba1974-15a8-43ca-bf04-748f296dd626/svs-ranger-hunters-mark",
+    "ax": 20,
+    "ay": 10
+  },
+  {
+    "id": "ranger/vines",
+    "name": "Vines",
+    "desc": "Green vines sprout and curl up the column.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/f6684756-5e09-4243-961f-5e34eb8d5a58/svs-ranger-vines",
+    "ax": 29,
+    "ay": 35,
+    "rows": 3
+  },
+  {
+    "id": "ranger/spirit-bear",
+    "name": "Spirit Bear",
+    "desc": "A big pale claw swipe.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/317ced7d-6542-4194-b1d1-eba762a4ff03/svs-ranger-spirit-bear",
+    "ax": 27,
+    "ay": 44
+  },
+  {
+    "id": "ranger/focus",
+    "name": "Focus",
+    "desc": "Green up-arrows rising off the ranger.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/4c050937-e945-4cda-97ae-ad838a92af43/svs-ranger-focus",
+    "ax": 21,
+    "ay": 37
+  },
+  {
+    "id": "ranger/kill-command",
+    "name": "Kill Command",
+    "desc": "A green shockwave ring from the feet.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/ec6e9adc-876f-4a62-820f-f8fab20857fb/svs-ranger-kill-command",
+    "ax": 36,
+    "ay": 16
+  },
+  {
+    "id": "ranger/disengage",
+    "name": "Disengage",
+    "desc": "Dust kicked out as the ranger leaps back.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/f682737b-4857-4f27-8e7f-6aed71752e66/svs-ranger-disengage",
+    "ax": 26,
+    "ay": 13
   }
 ]

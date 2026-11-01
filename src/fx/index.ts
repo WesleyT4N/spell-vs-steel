@@ -269,6 +269,22 @@ const HD_SPELLS: Record<string, string> = {
   adrenaline: 'hd/rogue/adrenaline',
   evasion: 'hd/rogue/evasion',
   deathMark: 'hd/rogue/death-mark',
+  // Ranger (the aim and charge effects, Arrow Rain, Barrage and the net keep their pixelfx versions)
+  explosiveShot: 'hd/ranger/explosive',
+  bite: 'hd/ranger/bite',
+  hawkStrikeHit: 'hd/ranger/bite',
+  huntersMark: 'hd/ranger/hunters-mark',
+  callOfTheWild: 'hd/ranger/vines',
+  huntersDomain: 'hd/ranger/vines',
+  spiritBear: 'hd/ranger/spirit-bear',
+  steadyFocus: 'hd/ranger/focus',
+  lightFooted: 'hd/ranger/focus',
+  rapidFire: 'hd/ranger/focus',
+  killCommand: 'hd/ranger/kill-command',
+  bestialWrath: 'hd/warrior/berserk',
+  killShot: 'hd/impact/steel-l',
+  disengage: 'hd/ranger/disengage',
+  feignDeath: 'hd/rogue/blind',
 };
 Object.assign(PLAYS, HD_SPELLS);
 for (const [k, id] of Object.entries(HD_SPELLS)) registerPfx(k, EFFECTS[id]);
