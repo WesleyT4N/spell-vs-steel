@@ -154,10 +154,15 @@ function artStill(art: SkinArt): { rows: string[]; ax: number } {
 }
 export const defaultSkin = (cls: ClassId): string => SKINS[cls][0].id;
 
-/** Mirror matches: when both pick the same class and color, the second player takes the next color. */
+/**
+ * Mirror matches: when both pick the same class and color, the second player takes the next color. A mod skin is a
+ * look someone chose on purpose, so both sides may wear it (the grid colors still tell them apart).
+ */
 export function mirrorSkin(cls: ClassId, mine: string, theirs: string): string {
-  const list = SKINS[cls], a = skinOf(cls, mine).id, b = skinOf(cls, theirs).id;
-  return a === b ? list[(list.findIndex(s => s.id === b) + 1) % list.length].id : b;
+  const b = skinOf(cls, theirs);
+  if (b.art || skinOf(cls, mine).id !== b.id) return b.id;
+  const colors = SKINS[cls].filter(s => !s.art);
+  return colors[(colors.findIndex(s => s.id === b.id) + 1) % colors.length].id;
 }
 
 /** Palette and pixel rows for a class in a skin (plus the mirror-match ALT recolor). */

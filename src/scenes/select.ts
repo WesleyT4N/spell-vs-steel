@@ -156,6 +156,16 @@ export class CharSelectScene implements Scene {
     sfx('move');
   }
 
+  /** A click on a side's skin picker while choosing that side's fighter: keep the fighter on show and go to its skin. */
+  private toSkinStep(s: 0 | 1): boolean {
+    if (s !== this.slot || (this.step !== 0 && this.step !== 2)) return false;
+    // the panel shows the hovered fighter, so that's the one being dressed
+    if (this.cur !== RANDOM) this.setClass(s, PLAYABLE[this.cur]);
+    this.cur = this.tileOf(this.slotClass(s));
+    this.step = (s === 0 ? 1 : 3) as Step;
+    return true;
+  }
+
   /** Lock in the hovered tile for the current slot and move on to its skin. */
   private pickTile(n: number): void {
     const cls = n === RANDOM ? PLAYABLE[Math.floor(Math.random() * PLAYABLE.length)] : PLAYABLE[n];
@@ -217,10 +227,12 @@ export class CharSelectScene implements Scene {
         return;
       }
       const tb = hot('tab');
-      if (tb >= 0) { this.setTab((tb >> 1) as 0 | 1, (tb & 1) as 0 | 1); this.sync(); return; }
+      if (tb >= 0) { this.toSkinStep((tb >> 1) as 0 | 1); this.setTab((tb >> 1) as 0 | 1, (tb & 1) as 0 | 1); this.sync(); return; }
       const si = hot('look'), csi = hot('clook');
       if (sw >= 0 || csw >= 0 || si >= 0 || csi >= 0) {
         const s: 0 | 1 = sw >= 0 || si >= 0 ? 0 : 1, cls = this.slotClass(s);
+        // still choosing that side's fighter: a pick here keeps the fighter on show and moves on to its skin
+        if (this.toSkinStep(s)) { this.setSkin(s, sw >= 0 || csw >= 0 ? SKINS[cls][sw >= 0 ? sw : csw].id : this.skinItems(s)[si >= 0 ? si : csi].id); sfx('select'); this.sync(); return; }
         // swatches number the class's skins; looks number the SKINS tab
         this.setSkin(s, sw >= 0 || csw >= 0 ? SKINS[cls][sw >= 0 ? sw : csw].id : this.skinItems(s)[si >= 0 ? si : csi].id);
         sfx('select');
