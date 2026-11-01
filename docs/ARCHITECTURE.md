@@ -1,10 +1,11 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at 07a41df (2026-11-01).
+How the game is put together, one section per system. Describes `main` at e334013 (2026-11-01).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
 - [Overview](#overview)
+- [Assets](#assets)
 - [Sim and game loop](#sim-and-game-loop)
 - [Netcode](#netcode)
 - [Characters and cards](#characters-and-cards)
@@ -65,6 +66,37 @@ flowchart LR
 | `scripts/` | `sim`, `netcheck`, `combo-check`, artifact packer, TTS voice generator |
 
 Platform decision (2026-10-26): stay on TypeScript; Steam through Electron, mobile through Capacitor; no consoles for now.
+
+## Assets
+
+Art and audio are real files under `assets/`, never written into the code (#127, #128, #129; #130 reads packed files in place). Tools and generators write the files, and the game reads them through one registry, `src/engine/assets.ts`. Detail in [ASSETS.md](ASSETS.md).
+
+```mermaid
+flowchart TD
+  files["assets/**/*.png, *.mp3<br/>written by tools and generators"] --> glob["src/assetUrls.ts<br/>Vite import.meta.glob ?url"]
+  meta["assets/**/*.json<br/>fx frames, palettes, loop points"] --> reg
+  glob --> reg["engine/assets.ts · the one registry<br/>assetUrl, assetData, assetImage, assetBytes"]
+  reg --> boot["main.ts ready<br/>loadImages() + modsReady"]
+  reg --> pal["Palette sprites<br/>indexed PNG + JSON, art/paletteImage.ts"]
+  reg -->|"web: build, build:prod"| one["one index.html<br/>data URLs, decoded in place (no fetch)"]
+  reg -->|"apps: build:native"| many["dist-native/<br/>index.html + assets as files"]
+```
+
+| Folder | Holds | Read by |
+| --- | --- | --- |
+| `assets/audio/music` | stage and menu tracks, loop points in `tracks.json` | `engine/musicTracks.ts`, `engine/audio.ts` |
+| `assets/audio/voice` | announcer and class voice lines | `engine/voice.ts`, `engine/announcer.ts` |
+| `assets/stages` | painted stage backdrops | `content/stages/index.ts` |
+| `assets/fx` | baked effect sheets (PNG strip + JSON frames) per class and `impact` | `src/fx/sheet.ts` |
+| `assets/fighters` | 48px PixelLab fighters, `-portrait` art, JSON palettes and frame lists | `art/pl/`, `art/paletteImage.ts` |
+| `assets/monsters` | Expedition monster sprites | `art/mobSprites.ts` |
+| `assets/cards` (+ `small/`) | 40px spell icons and their small versions | `art/cardIcons.ts` |
+| `assets/sprites`, `assets/ui` | pets, emblems, the pixel font | `art/paletteImage.ts`, `engine/font.ts` |
+| `mods/<id>/` | built-in mods (`mod.json` + PNGs) | `src/mods/boot.ts` |
+
+- Images are decoded once at boot: `ready` in `main.ts` waits on `loadImages()` and `modsReady` before the first scene draws. Audio is read on first play through `assetBytes` (web: data URL decoded in place; apps: fetched file).
+- Node (tests, balance tools) registers nothing, so art and audio quietly do nothing and the sim runs as before.
+- To add an asset, drop the file under the right folder (or let its generator write it) and look it up by path. Never paste base64 into a `.ts` file.
 
 ## Sim and game loop
 
@@ -204,24 +236,24 @@ A class's `rules.ts` is a `ClassRules` object the engine asks about that class: 
 
 ## Mods
 
-A mod is one JSON file of plain data (#103), shipped in `mods/` or imported by the player on the MODS screen. Nothing in it runs as code or is put into HTML, and anything the format does not name is refused. Today a mod adds skins with their own drawn art for the 48px HD fighters; format detail in [MODDING.md](MODDING.md).
+A mod is a zip of a `mod.json` manifest and PNGs (format `spell-vs-steel-mod/3`, #129), shipped as a folder in `mods/` or imported by the player on the MODS screen (#124). Nothing in it runs as code or is put into HTML, and anything the format does not name is refused. Today a mod adds skins with their own drawn art for the 48px HD fighters, shown under a SKINS tab on fighter select (#125); format detail in [MODDING.md](MODDING.md).
 
 ```mermaid
 flowchart TD
-  F["mods/*.json<br/>bundled as text (import.meta.glob raw)<br/>src/mods/boot.ts"] --> P["parseMod · src/mods/format.ts<br/>strict whitelist"]
-  I["MODS screen IMPORT<br/>file picker / paste · scenes/modPanel.ts"] --> P
-  S["save.json · mods section<br/>off ids + imported texts"] --> L
-  P -- bad file --> X["listed with its error<br/>game still starts"]
-  P --> L["loadMods / importMod / setModOn / removeMod<br/>src/mods/index.ts · MODS list"]
+  F["mods/&lt;id&gt;/ mod.json + PNGs<br/>import.meta.glob · src/mods/boot.ts"] --> R["readMod<br/>format.ts (strict whitelist) + files.ts (zip + PNG decoders, sizes capped)"]
+  I["MODS screen IMPORT<br/>.zip file picker · scenes/modPanel.ts"] --> R
+  S["save.json · mods section<br/>off ids + imported zips as base64"] --> L
+  R -- bad file --> X["listed with its error<br/>game still starts"]
+  R --> L["loadMods / importMod / setModOn / removeMod<br/>src/mods/index.ts · MODS list"]
   L -- on --> A["addSkin · art/sprites.ts<br/>after the built-in colours"]
   L -- off / deleted --> RM["removeSkin<br/>drops cached sprites"]
   A --> D["getFrame / getPortrait / teamColor<br/>prefer Skin.art"]
 ```
 
-- Format `spell-vs-steel-mod/2`: `id`, `name`, `author`, 1 to 16 `skins`. Each skin names a built-in `class`, a new `id`, a `palette` (letters `a`-`z`, `A`-`Z`, `0`-`9` to `#rrggbb`, no gaps, `a` = outline), a `team` letter, `frames` at the class's HD size from `src/art/pl/<class>.ts` (64 wide, `idle0` required, missing ones fall back to it) and an optional 40x32 `portrait`. `__proto__`, unknown keys, HTML-ish names, format 1 (old 24px art) and files over 512 KB are refused.
-- `format.ts` is pure (no DOM, no game state); `tests/mods.ts` (in `npm test`) checks the fixture, the shipped mods, 19 hostile files, and installing (on/off, import, delete, reload from the save).
-- Installed state lives in the save's `mods` section (`SavedMods`): ids switched off, and imported files as text (at most 12, about 1 MB). Built-in mods can be switched off, imported ones also deleted.
-- `Skin.art: SkinArt` (`pal`, `team`, `ax`, `res`, `frames`, `portrait`) sits beside the palette recolours; the menu still sprite is `idle0` trimmed. Shipped: `mods/wes-skin.json` (Mage: Wes) and `mods/hazel-druid-skin.json` (Ranger: Hazel Druid), built by `tools/pixellab/build_skin_mod.py` from PixelLab `transfer_outfit` frames of the class's own poses.
+- Format `/3`: `id`, `name`, `author`, `skins`; each skin names a built-in `class`, a new `id`, a `sheet` PNG (the class's frames side by side at its HD size, order from `assets/fighters/<class>.json`, `idle0` required), an optional `portrait` PNG, a `team` colour and an optional `palette` (otherwise collected from the art). Pixels must be solid palette colours. A zip is at most 512 KB and may hold only `mod.json` and the PNGs it names. Older `/2` JSON mods (palette-letter rows) still load; `/1` (24px art), `__proto__` and unknown keys are refused.
+- `format.ts` and `files.ts` are pure (no DOM, no game state); `tests/mods.ts` (in `npm test`) checks the fixtures, the shipped mods, hostile files, and installing (on/off, import, delete, reload from the save).
+- Installed state lives in the save's `mods` section (`SavedMods`): ids switched off, and imported zips as base64 (at most 12, `IMPORT_BUDGET` about 1 MB). Built-in mods can be switched off, imported ones also deleted.
+- `Skin.art: SkinArt` (`pal`, `team`, `ax`, `res`, `frames`, `portrait`) sits beside the palette recolours; the menu still sprite is `idle0` trimmed. Shipped: `mods/wes-skin/` (Mage: Wes) and `mods/hazel-druid-skin/` (Ranger: Hazel Druid), written by `tools/pixellab/build_skin_mod.py` from PixelLab `transfer_outfit` frames of the class's own poses.
 - Cosmetic and render-only: the sim never sees mods. Online, an opponent without the mod sees your default colour.
 
 ## Stages
@@ -255,27 +287,27 @@ Painted backdrops (#110): every stage draws a PixelLab panorama behind its panel
 
 ```mermaid
 flowchart LR
-  subgraph offline ["Offline (Python, project files)"]
-    ref["Reference sheet<br/>art/hi-res/sheet.png"] --> down["Downscale + clean<br/>24×24, 1px outline"]
-    down --> rig["Frame rig<br/>art/char-anims/rig/"]
+  subgraph offline ["Offline (PixelLab + Python tools)"]
+    ref["PixelLab exports<br/>project files art/"] --> tools["tools/pixellab/*.py"]
   end
-  rig --> gen["Generated TS<br/>hiresSprites.ts, fighterFrames.ts"]
-  gen --> recolor["getSprite / getFrame<br/>skin recolour, canvas per tint"]
+  tools --> files["assets/fighters, monsters, cards, sprites<br/>indexed PNG + JSON palette"]
+  files --> read["art/paletteImage.ts<br/>back to letter grids"]
+  read --> recolor["getSprite / getFrame<br/>skin recolour, canvas per tint"]
   recolor --> pose["fighterAnim.ts<br/>WeakMap, reads Battle"]
   pose --> draw["battleView + fxView"]
   draw --> compose["world 240×160 at 2× + UI 480×320<br/>2× HD backing store, nearest-neighbour"]
 ```
 
-- HD layers and 48px fighters (#110): `HD = 2` (`engine/gfx.ts`). `main.ts` makes both offscreen canvases `HD` times larger and multiplies every `setTransform` by `HD`, so scenes still draw in world (240×160) and UI (480×320) coordinates and only art that asks for it uses the extra pixels. All five classes draw from `src/art/pl/<class>.ts` (48px PixelLab frames on a 64×64 canvas plus select portraits, from `tools/pixellab/build_frames.py`); `getSprite` / `getFrame` give them `Sprite.res = 2` (`PL_RES`), and `drawFighterSprite` draws one sprite pixel as 1/res of a world pixel, so a fighter stands about 24 world pixels tall. Lookup order: a skin mod's `art`, then `PL`, then the older 24px sets (`res` 1). PixelLab skins hue-shift the main cloth colour family (`plPalette`); `letterIndex` reads a-z, A-Z and 0-9.
+- HD layers and 48px fighters (#110): `HD = 2` (`engine/gfx.ts`). `main.ts` makes both offscreen canvases `HD` times larger and multiplies every `setTransform` by `HD`, so scenes still draw in world (240×160) and UI (480×320) coordinates and only art that asks for it uses the extra pixels. All five classes draw from `assets/fighters/<class>.png` + `.json` (48px PixelLab frames on a 64×64 canvas plus `-portrait` select art, written by `tools/pixellab/build_frames.py` and read through `src/art/pl/` and `art/paletteImage.ts`, #128); `getSprite` / `getFrame` give them `Sprite.res = 2` (`PL_RES`), and `drawFighterSprite` draws one sprite pixel as 1/res of a world pixel, so a fighter stands about 24 world pixels tall. Lookup order: a skin mod's `art`, then `PL`, then the older 24px sets (`res` 1). PixelLab skins hue-shift the main cloth colour family (`plPalette`); `letterIndex` reads a-z, A-Z and 0-9.
 - Spell and hit effects: the sim only records `Battle.addFx(kind, …)`; `game/fxView.ts` asks `drawPfx` (`game/pfx.ts`, shots `drawShotPfx`) first, and `src/fx/index.ts` decides what each kind plays:
 
 ```mermaid
 flowchart TD
   add["Battle.addFx(kind, col, row, dur, data)<br/>plain data, same on a rollback resim"] --> pfx["drawPfx · game/pfx.ts<br/>module registered for the kind"]
-  pfx -- "HD_SPELLS, impact" --> sheet["Baked sheet · src/fx/hd/&lt;class&gt;/&lt;name&gt;.ts<br/>drawSheet, 2 sheet px per world px"]
+  pfx -- "HD_SPELLS, impact" --> sheet["Baked sheet · assets/fx/&lt;class&gt;/&lt;name&gt;.png + .json<br/>drawSheet, 2 sheet px per world px"]
   pfx -- "PLAYS, SHOT_PLAYS" --> pix["pixelfx module · src/fx/&lt;class&gt;/&lt;name&gt;.ts<br/>vendored pixelfx core"]
   pfx -- "anything else" --> hand["hand-drawn fallback<br/>game/fxView.ts"]
-  build["tools/pixellab/fx.json → build_fx.py<br/>PixelLab VFX exports → PNG strips"] -- bakes --> sheet
+  build["tools/pixellab/fx.json → build_fx.py<br/>PixelLab VFX exports → PNG strip + JSON"] -- bakes --> sheet
 ```
 
   - Baked sheets (#112 hit sparks and basics, #113 every class's spells): `fx.json` gives each export's origin (`ax`/`ay`) and optional `frames`, `fps`, `loop`, `panels`, `rows: 3` (column spells, drawn on every row via `meta.rows`), `hollow: k` (auras keep the fighter visible). `src/fx/sheet.ts`: `sheetFx` wraps a strip, `sheetFrame(age)` picks the frame, `drawSheet` draws it, `sheetsReady()` lets tools and tests wait for decoding.
@@ -291,7 +323,7 @@ flowchart TD
 
 ## Audio
 
-Effects are synthesized live in WebAudio. Music is an original sampled soundtrack (#40): `scripts/music/` renders a score DSL offline with a soundfont, and `engine/musicTracks.ts` holds the base64 MP3s. Voice clips are recorded TTS (`engine/voiceClips.ts`, from `scripts/voices/gen.py`).
+Effects are synthesized live in WebAudio. Music is an original sampled soundtrack (#40): `scripts/music/` renders a score DSL offline with a soundfont, and writes the MP3s plus `tracks.json` (loop points) to `assets/audio/music/`, which `engine/musicTracks.ts` reads. Voice clips are recorded TTS in `assets/audio/voice/<speaker>/<line>-<n>.mp3`, from `scripts/voices/gen.py` (#127).
 
 ```mermaid
 flowchart LR
@@ -498,14 +530,17 @@ flowchart LR
   src[src on latest main] --> tsc[tsc --noEmit] --> vite["vite build<br/>singlefile, inline assets"] --> page["scripts/artifact.mjs<br/>artifact.html"]
   page --> dev["Dev link<br/>npm run build, dev tools on"]
   page --> prod["Main link<br/>npm run build:prod, room + db + user capabilities"]
-  vite --> desk["Desktop (#59)<br/>Electron around dist-prod,<br/>portable .exe + AppImage"]
+  tsc --> native["vite build --mode native<br/>npm run build:native → dist-native/<br/>assets as real files, base ./"]
+  native --> desk["Electron .exe + AppImage<br/>Capacitor Android APK"]
 ```
 
 | Link | Build |
 | --- | --- |
 | Main (prod): https://claude.ai/artifact/1kBiHGD35b15oWBEWxcAcr | `npm run build:prod` → `dist-prod/artifact.html` |
 | Dev: https://claude.ai/artifact/8xAkx41kQdJWmNQKZpBVJU | `npm run build` → `dist/artifact.html` |
-| Desktop app | `npm run desktop` to play, `npm run dist:win` / `dist:linux` to package; a `v*` tag builds both into a GitHub Release (`desktop.yml`). See [DESKTOP.md](DESKTOP.md) |
+| Desktop and Android apps | `npm run build:native` → `dist-native/`; `npm run desktop` to play, `dist:win` / `dist:linux` / `android:sync` to package; Actions > Play-test builds puts them in a GitHub Release. See [DESKTOP.md](DESKTOP.md) |
+
+The web links stay one HTML file each: `vite-plugin-singlefile` packs every file under `assets/` in as a data URL, and `engine/assets.ts` decodes them in place rather than fetching, so a page that blocks `connect-src` still gets music, voices and the built-in mods (#130).
 
 Release: PR → CI green → merge → publish the dev link from latest main. The main (prod) link is published only from the latest GitHub release tag. `DEV_TOOLS` (`src/flags.ts`) gates dev-only code; the dev menu is a dynamic import so prod ships none of it.
 
