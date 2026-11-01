@@ -7,7 +7,7 @@ import { setScene, setHome, goHome, getScene, commitZones, hotZone, noteTouch, l
 import { TitleScene } from './scenes/title';
 import { OnlineScene } from './scenes/online';
 import { DEV_TOOLS } from './flags';
-import './mods';
+import './mods/boot';
 import { endTextFields } from './engine/textField';
 import { setDefaultSink } from './game/events';
 import { playBattleEvent } from './engine/battleAudio';

@@ -33,6 +33,8 @@ import { LobbyScene } from '../scenes/lobby';
 import { RankedScene } from '../scenes/ranked';
 import { ReplaysScene, ReplayScene } from '../scenes/replays';
 import { ProfileScene } from '../scenes/profile';
+import { ModsScene } from '../scenes/mods';
+import { MODS, setModOn } from '../mods';
 import { Battle, type Intent } from '../game/battle';
 import { Cpu } from '../game/ai';
 import { TapeWriter } from '../game/replay';
@@ -485,6 +487,16 @@ export const screens: Record<string, () => void> = {
   },
   'replays-empty': () => { const s = new ReplaysScene(); s.list = []; setScene(s); },
   'profile': () => setScene(fakeProfile(false)),
+  // MODS: the shipped Wizard and Druid skins, the Druid picked; then one switched off, and the import panel
+  'mods': () => { const m = new ModsScene(); m.cur = Math.max(0, MODS.findIndex(e => e.id === 'druid')); setScene(m); run(0.2); },
+  'mods-off': () => { setModOn('wizard', false); const m = new ModsScene(); setScene(m); run(0.2); },
+  'mods-import': () => { const m = new ModsScene(); setScene(m); (m as unknown as { openImport(): void }).openImport(); run(0.1); },
+  // the mod skins on the fighter select and in a fight
+  'select-mod-skin': () => { saveMatch({ ...loadMatch(), p1: 'mage', p1Skin: { ...loadMatch().p1Skin, mage: 'wizard' } }); setScene(new CharSelectScene(undefined, 1)); run(0.2); },
+  'battle-mod-skins': () => {
+    setScene(new BattleScene(match({ p1: 'mage', cpu: 'ranger', p1Skin: { ...loadMatch().p1Skin, mage: 'wizard' }, cpuSkin: { ...loadMatch().cpuSkin, ranger: 'druid' } })));
+    run(0.5); battle().b.endCustom([[], []]); run(1.2);
+  },
   'profile-empty': () => setScene(fakeProfile(true)),
   // watching a replay, and paused in slow motion
   'replay-watch': () => { setScene(new ReplayScene(recordedReplay())); run(8); },
@@ -506,7 +518,6 @@ export const screens: Record<string, () => void> = {
   'art-lab': () => { setScene(new ArtLabScene(title, { tab: 'warrior', section: 'fx', zoom: 1 })); run(0.15); },
   'art-lab-anims': () => { setScene(new ArtLabScene(title, { tab: 'rogue', section: 'anims', entry: 6, zoom: 3 })); run(0.35); },
   'art-lab-sprites': () => { setScene(new ArtLabScene(title, { tab: 'mage', section: 'sprites' })); run(0.05); },
-  // the example skin mods in the lab: the Wizard Mage's frames, the Druid Ranger animating
   'art-lab-sounds': () => { setScene(new ArtLabScene(title, { tab: 'priest', section: 'sounds', entry: 7 })); run(0.6); },
   // every panel state on the first stage
   'art-lab-stages': () => { setScene(new ArtLabScene(title, { tab: 'stages', entry: 1 })); run(0.15); },

@@ -204,20 +204,24 @@ A class's `rules.ts` is a `ClassRules` object the engine asks about that class: 
 
 ## Mods
 
-A mod is one JSON file of plain data in `mods/` (#103). Nothing in it runs as code or is put into HTML, and anything the format does not name is refused. Today a mod adds skins with their own drawn art; format detail in [MODDING.md](MODDING.md).
+A mod is one JSON file of plain data (#103), shipped in `mods/` or imported by the player on the MODS screen. Nothing in it runs as code or is put into HTML, and anything the format does not name is refused. Today a mod adds skins with their own drawn art for the 48px HD fighters; format detail in [MODDING.md](MODDING.md).
 
 ```mermaid
 flowchart TD
-  F["mods/*.json<br/>bundled as text (import.meta.glob raw)"] --> P["parseMod · src/mods/format.ts<br/>strict whitelist"]
-  P -- bad file --> X["console warning, file skipped<br/>game still starts"]
-  P --> R["registerMod · src/mods/index.ts<br/>at boot, imported by main.ts"]
-  R --> A["addSkin · art/sprites.ts<br/>after the built-in colours"]
+  F["mods/*.json<br/>bundled as text (import.meta.glob raw)<br/>src/mods/boot.ts"] --> P["parseMod · src/mods/format.ts<br/>strict whitelist"]
+  I["MODS screen IMPORT<br/>file picker / paste · scenes/modPanel.ts"] --> P
+  S["save.json · mods section<br/>off ids + imported texts"] --> L
+  P -- bad file --> X["listed with its error<br/>game still starts"]
+  P --> L["loadMods / importMod / setModOn / removeMod<br/>src/mods/index.ts · MODS list"]
+  L -- on --> A["addSkin · art/sprites.ts<br/>after the built-in colours"]
+  L -- off / deleted --> RM["removeSkin<br/>drops cached sprites"]
   A --> D["getFrame / getPortrait / teamColor<br/>prefer Skin.art"]
 ```
 
-- Format `spell-vs-steel-mod/1`: `id`, `name`, `author`, 1 to 16 `skins`. Each skin names a built-in `class`, a new `id`, a `palette` (letters `a`..`z` to `#rrggbb`, no gaps, `a` = outline), a `team` letter, `frames` at the class's 36x24 size (`idle0` required, missing ones fall back to it) and an optional 40x32 `portrait`. `__proto__`, unknown keys, HTML-ish names and files over 256 KB are refused.
-- `format.ts` is pure (no DOM, no game state); `tests/mods.ts` (in `npm test`) checks the fixture, any shipped mods and 19 hostile files.
-- `Skin.art: SkinArt` (`pal`, `team`, `ax`, `frames`, `portrait`) sits beside the palette recolours; the menu still sprite is `idle0` trimmed. No mods ship today; `tests/fixtures/skin-mod.json` is the known-good example the tests use.
+- Format `spell-vs-steel-mod/2`: `id`, `name`, `author`, 1 to 16 `skins`. Each skin names a built-in `class`, a new `id`, a `palette` (letters `a`-`z`, `A`-`Z`, `0`-`9` to `#rrggbb`, no gaps, `a` = outline), a `team` letter, `frames` at the class's HD size from `src/art/pl/<class>.ts` (64 wide, `idle0` required, missing ones fall back to it) and an optional 40x32 `portrait`. `__proto__`, unknown keys, HTML-ish names, format 1 (old 24px art) and files over 512 KB are refused.
+- `format.ts` is pure (no DOM, no game state); `tests/mods.ts` (in `npm test`) checks the fixture, the shipped mods, 19 hostile files, and installing (on/off, import, delete, reload from the save).
+- Installed state lives in the save's `mods` section (`SavedMods`): ids switched off, and imported files as text (at most 12, about 1 MB). Built-in mods can be switched off, imported ones also deleted.
+- `Skin.art: SkinArt` (`pal`, `team`, `ax`, `res`, `frames`, `portrait`) sits beside the palette recolours; the menu still sprite is `idle0` trimmed. Shipped: `mods/wizard.json` (Mage) and `mods/druid.json` (Ranger), built by `tools/pixellab/build_skin_mod.py` from PixelLab `transfer_outfit` frames of the class's own poses.
 - Cosmetic and render-only: the sim never sees mods. Online, an opponent without the mod sees your default colour.
 
 ## Stages

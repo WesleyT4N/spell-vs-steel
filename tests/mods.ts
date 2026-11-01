@@ -2,6 +2,9 @@
 // come back as errors instead of loading.
 import { readFileSync, readdirSync } from 'node:fs';
 import { parseMod, MAX_MOD_SIZE } from '../src/mods/format';
+import { loadMods, importMod, setModOn, removeMod, MODS } from '../src/mods';
+import { SKINS } from '../src/art/sprites';
+import { resetSaveForTests, getSave } from '../src/engine/save';
 
 let failed = 0;
 const check = (ok: boolean, what: string): void => { if (!ok) { failed++; console.error(`FAIL ${what}`); } };
@@ -41,6 +44,29 @@ bad('HTML in a name', m => { m.skins[0].name = '<b>x</b>'; });
 bad('a long name', m => { m.skins[0].name = 'A'.repeat(13); });
 bad('the same skin twice', m => { m.skins.push(m.skins[0]); });
 bad('a team letter outside the palette', m => { m.skins[0].team = 'z'; });
+
+// ---- installing: built-in and imported mods, switched on and off, kept in the save ----
+const wizard = readFileSync(new URL('../mods/wizard.json', dir), 'utf8');
+const druid = readFileSync(new URL('../mods/druid.json', dir), 'utf8');
+const has = (cls: string, id: string): boolean => SKINS[cls].some(s => s.id === id);
+resetSaveForTests();
+loadMods({ '../../mods/wizard.json': wizard });
+check(MODS.length === 1 && MODS[0].on && has('mage', 'wizard'), 'a built-in mod loads switched on');
+setModOn('wizard', false);
+check(!has('mage', 'wizard') && getSave('mods')?.off.includes('wizard') === true, 'switching a mod off takes its skins away and is kept');
+check(!importMod(wizard).ok, 'a mod with a built-in mod\'s id is refused');
+check(!importMod('{"format":"spell-vs-steel-mod/2"}').ok, 'a broken import is refused');
+const imp = importMod(druid);
+check(imp.ok && has('ranger', 'druid') && getSave('mods')?.imported.length === 1, 'an imported mod is switched on and kept');
+// start again from the save: the switched-off mod stays off, the import comes back
+loadMods({ '../../mods/wizard.json': wizard });
+check(MODS.length === 2 && !MODS[0].on && MODS[1].on && !has('mage', 'wizard') && has('ranger', 'druid'), 'the next start keeps both choices');
+setModOn('wizard', true);
+check(has('mage', 'wizard'), 'switching a mod back on adds its skins');
+check(removeMod('druid') && !has('ranger', 'druid') && getSave('mods')?.imported.length === 0, 'deleting an imported mod');
+check(!removeMod('wizard'), 'a built-in mod can only be switched off');
+loadMods({ '../../mods/wizard.json': wizard, '../../mods/zz.json': '{nope' });
+check(MODS.length === 2 && !!MODS[1].error && !MODS[1].on, 'a bad shipped file is listed with its error');
 
 if (failed) { console.error(`${failed} mod check(s) failed`); process.exit(1); }
 console.log(`mods: ${files.length} file(s) parse, hostile files refused`);
