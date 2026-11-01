@@ -119,7 +119,16 @@ export interface Fighter {
   pose: 'idle' | 'attack' | 'heavy' | 'cast' | 'hurt';
   poseT: number;
   dead: boolean;
+  /** Expedition monsters only: which monster this is and its pattern's state (plain numbers, so it snapshots). */
+  mob?: MobState;
 }
+
+/** A monster's pattern state. `t` counts down to its next action, `step` is where it is in its pattern. */
+export interface MobState { kind: string; t: number; step: number; phase: number; n: number; deadT: number; tier: number }
+
+/** What a monster does each frame it can act, and how it reacts to a hit. Registered by src/game/mobs.ts. */
+export interface MobBrain { tick(b: Battle, f: Fighter, dt: number): void; onHurt?(b: Battle, f: Fighter, amt: number): void }
+export const MOB_BRAINS = new Map<string, MobBrain>();
 
 export type StatusKey =
   | 'frozen' | 'stunned' | 'flinch' | 'iceBlock' | 'roared' | 'berserk' | 'avatar' | 'ascendance'
@@ -249,6 +258,8 @@ export class Battle {
   warns: Warn[] = [];
   traps: Trap[] = [];
   pets: Pet[] = [];
+  /** Expedition: the monster pack on the right side (f[1] is always one of them: the one your attacks aim at). */
+  mobs: Fighter[] = [];
   texts: FloatText[] = [];
   fx: Fx[] = [];
   timers: Timer[] = [];
@@ -335,11 +346,26 @@ export class Battle {
   }
 
   foe(f: Fighter): Fighter { return this.f[1 - f.side]; }
+  /** Every enemy of `side` that can be hit: the living monsters of a pack, else the other fighter. */
+  foes(side: Side): Fighter[] { return side === 0 && this.mobs.length ? this.mobs.filter(m => !m.dead) : [this.f[1 - side]]; }
+  /** Everyone on the field: both fighters, or the player and every monster. */
+  everyone(): Fighter[] { return this.mobs.length ? [this.f[0], ...this.mobs] : this.f; }
+  /**
+   * With a pack out, the monster your aimed spells and AI target: the nearest living one in your row, else the
+   * nearest row, front first.
+   */
+  retarget(): void {
+    const live = this.mobs.filter(m => !m.dead);
+    if (!live.length) return;
+    const me = this.f[0];
+    const score = (m: Fighter): number => Math.abs(m.row - me.row) * 10 + m.col;
+    this.f[1] = live.reduce((a, m) => (score(m) < score(a) ? m : a));
+  }
   dir(f: Fighter | Side): 1 | -1 { return (typeof f === 'number' ? f : f.side) === 0 ? 1 : -1; }
   inGrid(col: number, row: number): boolean { return col >= 0 && col < COLS && row >= 0 && row < ROWS; }
   panel(col: number, row: number): Panel | null { return this.inGrid(col, row) ? this.panels[col][row] : null; }
   wallAt(col: number, row: number): Wall | undefined { return this.walls.find(w => w.col === col && w.row === row); }
-  fighterAt(col: number, row: number): Fighter | undefined { return this.f.find(x => !x.dead && x.col === col && x.row === row); }
+  fighterAt(col: number, row: number): Fighter | undefined { return this.everyone().find(x => !x.dead && x.col === col && x.row === row); }
 
   /** The column of `side`'s area that borders the enemy (BN "front column"). */
   frontCol(side: Side): number {
@@ -378,6 +404,7 @@ export class Battle {
   emit(e: BattleEvent): void { this.sink?.(e); }
   sound(name: string, opts?: SoundOpts): void { this.sink?.({ type: 'sound', name, opts }); }
   voice(f: Fighter, kind: VoiceKind, element?: string, chance?: number): void {
+    if (f.mob) return;
     this.sink?.({ type: 'voice', cls: f.cls, kind, pan: panOf(f.col), side: f.side, element, chance });
   }
   addFx(kind: string, side: Side, col: number, row: number, dur: number, data?: Record<string, number | string>): void {
@@ -413,7 +440,7 @@ export class Battle {
       // uncast picks from last turn are discarded
       f.discard.push(...f.queue);
       f.queue = [];
-      classRules(f.cls).onDraw?.(this, f);
+      if (!f.mob) classRules(f.cls).onDraw?.(this, f);
       // the shield pool and Shadowform last one round
       f.shields = f.shields.filter(s => s.kind !== 'holy');
       f.st.shadowform = 0;
@@ -503,13 +530,15 @@ export class Battle {
 
     this.updatePanels(dt);
     this.updateWalls(dt);
-    for (const f of this.f) this.updateFighter(f, intents[f.side], dt);
+    if (this.mobs.length) this.retarget();
+    for (const f of this.everyone()) this.updateFighter(f, f.mob ? NO_INTENT : intents[f.side], dt);
     this.updateProjectiles(dt);
     this.updateTraps(dt);
     this.updatePets(dt);
     this.updateZones();
     this.combo.update(this, dt);
 
+    if (this.mobs.length) { this.packKo(); return; }
     // both fighters down on the same frame: a double K.O., the round is a draw (winner stays null)
     const double = !this.noKo && this.f.every(f => !f.dead && f.hp <= 0);
     for (const f of this.f) {
@@ -682,6 +711,30 @@ export class Battle {
     }
   }
 
+  /** Expedition K.O.s: each monster falls on its own; the fight ends when the player or the whole pack is down. */
+  private packKo(): void {
+    for (const m of this.mobs) if (m.mob && m.dead) m.mob.deadT += 1 / 60;
+    const me = this.f[0];
+    const end = (winner: Side, loser: Fighter): void => {
+      this.phase = 'ko';
+      this.koT = 0;
+      this.winner = winner;
+      this.cheer = 3;
+      this.sound('ko', { pan: panOf(loser.col) });
+      this.emit({ type: 'ko', side: loser.side });
+    };
+    if (!me.dead && me.hp <= 0) { me.dead = true; this.voice(me, 'death'); end(1, me); return; }
+    for (const m of this.mobs) {
+      if (m.dead || m.hp > 0) continue;
+      m.dead = true;
+      if (m.mob) m.mob.deadT = 0;
+      this.addFx('impact', 0, m.col, m.row, 0.42, { el: 'steel', tier: 3 });
+      this.sound('ko', { pan: panOf(m.col) });
+    }
+    if (this.mobs.every(m => m.dead)) end(0, this.f[1]);
+    else this.retarget();
+  }
+
   private updateFighter(f: Fighter, intent: Intent, dt: number): void {
     f.glacialCd = Math.max(0, f.glacialCd - dt);
     for (const k of STATUS_KEYS) {
@@ -704,13 +757,14 @@ export class Battle {
     if (f.dead) return;
     this.updatePoison(f, dt);
     this.updateDots(f, dt);
-    classRules(f.cls).tick?.(this, f, dt);
+    if (!f.mob) classRules(f.cls).tick?.(this, f, dt);
     f.lastCol = f.col; f.lastRow = f.row;
     // Smokescreen: stealthed while standing in your own smoke, even right after an attack
     const sp = this.panels[f.col][f.row];
     if (sp.smoke > 0 && sp.smokeSide === f.side && f.st.revealed <= 0 && f.st.hunted <= 0) f.st.stealth = Math.max(f.st.stealth, 0.1);
 
     const disabled = f.st.frozen > 0 || f.st.stunned > 0 || f.st.iceBlock > 0 || f.st.sleep > 0 || f.st.channel > 0;
+    if (f.mob) { if (!disabled && f.st.flinch <= 0) MOB_BRAINS.get(f.mob.kind)?.tick(this, f, dt); return; }
     if (disabled) { f.charging = false; f.charge = 0; f.moveBuf = null; return; }
     const busy = f.lock > 0 || f.st.flinch > 0;
 
@@ -811,6 +865,7 @@ export class Battle {
 
   // ---------- resources ----------
   gainRage(f: Fighter, amt: number, fromCard = false): void {
+    if (f.mob) return;
     classRules(f.cls).gainRage?.(this, f, amt, fromCard);
   }
 
@@ -907,8 +962,9 @@ export class Battle {
         if (broke) res.broke = true;
         if (w.kind === 'glacial' && att.glacialCd <= 0) { this.freeze(att, 2.5); att.glacialCd = 3; }
       }
-      if (!foe.dead && foe.col === c && foe.row === r && !res.fighter) {
-        const out = this.damage(foe, dmg, att, opts);
+      const hitFoe = this.mobs.length && att.side === 0 ? this.fighterAt(c, r) : foe;
+      if (hitFoe && hitFoe.side !== att.side && !hitFoe.dead && hitFoe.col === c && hitFoe.row === r && (!res.fighter || this.mobs.length)) {
+        const out = this.damage(hitFoe, dmg, att, opts);
         res.fighter = true;
         res.dealt = out.dealt;
         res.broke = res.broke || out.broke;
@@ -920,14 +976,15 @@ export class Battle {
 
   /** Hitscan down the attacker's row: the first enemy wall or fighter takes it (all of them when piercing). */
   rowShot(f: Fighter, dmg: number, opts: HitOpts, pierce = false): { col: number; hit: boolean } {
-    const d = this.dir(f), foe = this.foe(f);
+    const d = this.dir(f);
     let col = d > 0 ? COLS - 1 : 0, hit = false;
     for (let c = f.col + d; c >= 0 && c < COLS; c += d) {
       const w = this.wallAt(c, f.row);
       if (w && w.side !== f.side) { this.hitWall(w, dmg, f, opts); if (!pierce) { col = c; break; } }
-      if (foe.col === c && foe.row === f.row && !foe.dead) {
+      const t = this.foes(f.side).find(x => x.col === c && x.row === f.row && !x.dead);
+      if (t) {
         col = c;
-        hit = this.damage(foe, dmg, f, opts).dealt > 0;
+        hit = this.damage(t, dmg, f, opts).dealt > 0;
         break;
       }
     }
@@ -1214,7 +1271,8 @@ export class Battle {
     target.pose = 'hurt';
     target.poseT = 0.15;
     this.texts.push({ x: target.col, y: target.row, text: String(amt), color: HIT_TEXT[opts.element ?? 'steel'], t: 0 });
-    classRules(target.cls).onHurt?.(this, target, amt);
+    if (target.mob) MOB_BRAINS.get(target.mob.kind)?.onHurt?.(this, target, amt);
+    else classRules(target.cls).onHurt?.(this, target, amt);
     if (amt >= TUNING.flinchThreshold && !opts.noFlinch && target.st.noKnock <= 0 && target.st.avatar <= 0) {
       target.st.flinch = TUNING.flinchTime;
       target.charging = false;
@@ -1353,10 +1411,11 @@ export class Battle {
           this.runEffect(p.onHit, { t: null, w, col: c, p });
           break;
         }
-        if (!target.dead && target.col === c && target.row === p.row) {
-          if (target.st.reflect > 0 && p.reflectable) { this.reflect(p, target); break; }
+        const tgt = this.mobs.length ? this.foes(p.side as Side).find(x => x.col === c && x.row === p.row) : target;
+        if (tgt && !tgt.dead && tgt.col === c && tgt.row === p.row) {
+          if (tgt.st.reflect > 0 && p.reflectable) { this.reflect(p, tgt); break; }
           p.dead = true;
-          this.runEffect(p.onHit, { t: target, w: null, col: c, p });
+          this.runEffect(p.onHit, { t: tgt, w: null, col: c, p });
           break;
         }
       }
@@ -1454,6 +1513,16 @@ export function heavyChargeOf(f: Fighter): number {
 
 export interface FighterSpec { cls: ClassId; deck: string[]; name: string; skin?: string }
 
+
+/** A monster for the right side: a plain fighter (Warrior rules underneath, never used) with a monster's state. */
+export function makeMob(kind: string, name: string, hp: number, col: number, row: number, tier = 1): Fighter {
+  const f = makeFighter(1, { cls: 'warrior', deck: [], name }, false, () => 0);
+  f.mob = { kind, t: 1, step: 0, phase: 0, n: 0, deadT: 0, tier };
+  f.hp = f.maxHp = hp;
+  f.res = 0;
+  f.col = col; f.row = row;
+  return f;
+}
 
 function makeFighter(side: Side, spec: FighterSpec, alt: boolean, rand: () => number): Fighter {
   const { cls, deck, name } = spec;
