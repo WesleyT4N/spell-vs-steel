@@ -1,5 +1,5 @@
-// Expedition: the roguelike run. One act (the Forest) in the prototype: a seeded branching map of fights,
-// elites, rest stops and a shop, a boss on top, a spell deck drafted as you go, gold and relics.
+// Expedition: the roguelike run. Three acts (the Forest, the Crypt, the Volcano), each a seeded branching map of
+// fights, elites, rest stops and a shop with a boss on top; a spell deck drafted as you go, gold and relics.
 // A run lives in memory only (no saving mid-run yet).
 import { CARDS, MAX_COPIES, type CardDef } from './cards';
 import { starterDeck, deckSize, countRarity, toList, DECK_SIZE, MAX_LEGENDARIES, type DeckCounts } from './deck';
@@ -47,6 +47,8 @@ export interface ExpeditionRun {
   cls: ClassId;
   skin: string;
   seed: number;
+  /** 0 the Forest, 1 the Crypt, 2 the Volcano. */
+  act: number;
   map: MapNode[];
   /** The node you stand on (-1 before the first floor). */
   at: number;
@@ -85,17 +87,41 @@ export function expeditionStarter(cls: ClassId): DeckCounts {
 
 // ---------- the map ----------
 
-export const EARLY: string[][] = [['stumpkin'], ['wolf'], ['stumpkin', 'webspinner'], ['wolf', 'wolf'], ['stumpkin', 'stumpkin']];
-export const LATE: string[][] = [['stumpkin', 'webspinner', 'wolf'], ['barkguard', 'wisp'], ['barkguard', 'stumpkin', 'wisp'], ['wolf', 'wolf', 'webspinner'], ['webspinner', 'stumpkin', 'wisp']];
-export const ELITES: string[][] = [['alpha'], ['thornmother']];
+/** One act: its stage, its packs (early floors, later floors, elites) and its boss. */
+export interface Act { id: string; name: string; stage: string; early: string[][]; late: string[][]; elites: string[][]; boss: string }
+
+export const ACTS: Act[] = [
+  {
+    id: 'forest', name: 'THE FOREST', stage: 'elderwood', boss: 'oakheart',
+    early: [['stumpkin'], ['wolf'], ['stumpkin', 'webspinner'], ['wolf', 'wolf'], ['stumpkin', 'stumpkin']],
+    late: [['stumpkin', 'webspinner', 'wolf'], ['barkguard', 'wisp'], ['barkguard', 'stumpkin', 'wisp'], ['wolf', 'wolf', 'webspinner'], ['webspinner', 'stumpkin', 'wisp']],
+    elites: [['alpha'], ['thornmother']],
+  },
+  {
+    id: 'crypt', name: 'THE CRYPT', stage: 'crypt', boss: 'boneking',
+    early: [['skelarcher', 'rattler'], ['rattler', 'rattler'], ['ghoul', 'skelarcher'], ['ghoul', 'rattler'], ['skelarcher', 'skelarcher']],
+    late: [['ghoul', 'banshee', 'rattler'], ['gravebell', 'ghoul', 'skelarcher'], ['banshee', 'skelarcher', 'skelarcher'], ['gravebell', 'rattler', 'rattler'], ['banshee', 'ghoul', 'ghoul']],
+    elites: [['deathknight'], ['colossus']],
+  },
+  {
+    id: 'volcano', name: 'THE VOLCANO', stage: 'emberforge', boss: 'emberwyrm',
+    early: [['salamander', 'imp'], ['imp', 'imp'], ['salamander', 'emberbat'], ['golem'], ['emberbat', 'emberbat']],
+    late: [['golem', 'imp', 'shaman'], ['salamander', 'salamander', 'shaman'], ['emberbat', 'emberbat', 'imp'], ['golem', 'emberbat', 'imp'], ['shaman', 'salamander', 'imp']],
+    elites: [['drakerider'], ['titan']],
+  },
+];
+export const actOf = (run: ExpeditionRun): Act => ACTS[run.act] ?? ACTS[0];
+/** The Forest's packs (kept for the screens and the balance check). */
+export const EARLY = ACTS[0].early, LATE = ACTS[0].late, ELITES = ACTS[0].elites;
 const pick = <T>(list: T[], rand: () => number): T => list[Math.floor(rand() * list.length)];
 
 /**
  * Seven floors, three lanes, the boss above. Each node leads to the one straight above and sometimes a
  * neighbor; every node can be reached. Floor 1 is all fights, the floor under the boss all rest stops.
  */
-export function makeMap(seed: number): MapNode[] {
-  const rand = seeded(seed ^ 0x5eed);
+export function makeMap(seed: number, act = 0): MapNode[] {
+  const A = ACTS[act] ?? ACTS[0];
+  const rand = seeded((seed + act * 7919) ^ 0x5eed);
   const nodes: MapNode[] = [];
   const grid: MapNode[][] = [];
   let elites = 0, shop = false;
@@ -110,7 +136,7 @@ export function makeMap(seed: number): MapNode[] {
         else if (elites < 2 && fl >= 2 && r > 0.72) { kind = 'elite'; elites++; }
         else if (fl === 3 && r < 0.38) kind = 'rest';
       }
-      const pack = kind === 'fight' ? pick(fl < 3 ? EARLY : LATE, rand).slice() : kind === 'elite' ? pick(ELITES, rand).slice() : [];
+      const pack = kind === 'fight' ? pick(fl < 3 ? A.early : A.late, rand).slice() : kind === 'elite' ? pick(A.elites, rand).slice() : [];
       const n: MapNode = { id: nodes.length, floor: fl, lane, kind, next: [], pack };
       nodes.push(n);
       grid[fl].push(n);
@@ -118,8 +144,8 @@ export function makeMap(seed: number): MapNode[] {
   }
   // make sure the act has its shop and at least one elite
   if (!shop) { const n = grid[3][Math.floor(rand() * 3)]; n.kind = 'shop'; n.pack = []; }
-  if (!nodes.some(n => n.kind === 'elite')) { const n = grid[4][Math.floor(rand() * 3)]; n.kind = 'elite'; n.pack = pick(ELITES, rand).slice(); }
-  const boss: MapNode = { id: nodes.length, floor: BOSS_FLOOR, lane: 1, kind: 'boss', next: [], pack: ['oakheart'] };
+  if (!nodes.some(n => n.kind === 'elite')) { const n = grid[4][Math.floor(rand() * 3)]; n.kind = 'elite'; n.pack = pick(A.elites, rand).slice(); }
+  const boss: MapNode = { id: nodes.length, floor: BOSS_FLOOR, lane: 1, kind: 'boss', next: [], pack: [A.boss] };
   nodes.push(boss);
   for (let fl = 0; fl < FLOORS - 1; fl++) {
     for (const n of grid[fl]) {
@@ -141,13 +167,27 @@ export function choices(run: ExpeditionRun): MapNode[] {
 export function newRun(cls: ClassId, skin: string, seed = randomSeed()): ExpeditionRun {
   const maxHp = TUNING.hp[cls];
   return {
-    cls, skin, seed, map: makeMap(seed), at: -1, path: [],
+    cls, skin, seed, act: 0, map: makeMap(seed, 0), at: -1, path: [],
     hp: maxHp, maxHp, gold: 50, deck: expeditionStarter(cls), relics: [], removeCost: PRICE.remove,
     stats: { fights: 0, elites: 0, kills: 0, dealt: 0, taken: 0, secs: 0, floors: 0 },
     roll: seeded(seed ^ 0xa11),
     over: '',
   };
 }
+
+/** After an act's boss: the next act's map, and a full heal. False after the last act (the run is won). */
+export function nextAct(run: ExpeditionRun): boolean {
+  if (run.act >= ACTS.length - 1) return false;
+  run.act++;
+  run.map = makeMap(run.seed, run.act);
+  run.at = -1;
+  run.path = [];
+  run.hp = run.maxHp;
+  return true;
+}
+
+/** Floors in the whole run, and floors cleared so far (for the run-over stats). */
+export const RUN_FLOORS = ACTS.length * (BOSS_FLOOR + 1);
 
 // ---------- rewards ----------
 

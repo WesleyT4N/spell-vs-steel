@@ -21,7 +21,8 @@ import { LabScene } from '../scenes/lab';
 import { ArtLabScene } from '../scenes/artLab';
 import { ArcadeLadderScene, ArcadeClearScene } from '../scenes/arcade';
 import { ExpeditionMapScene, ExpeditionBattleScene, RewardScene, RestScene, ShopScene, DeckScene, RunOverScene } from '../scenes/expedition';
-import { newRun, addRelic, addSpell, makeFight, type ExpeditionRun } from '../game/expedition';
+import { newRun, addRelic, addSpell, makeFight, nextAct, type ExpeditionRun } from '../game/expedition';
+import { MOBS } from '../game/mobs';
 import { buildLadder, type ArcadeRun } from '../game/arcade';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
 import { encodeDeckCode } from '../game/deckCode';
@@ -58,8 +59,9 @@ const match = (over: Partial<MatchConfig> = {}): MatchConfig => ({ ...loadMatch(
 const battle = (): BattleScene => getScene() as BattleScene;
 
 /** An Expedition run as a mage, the same map every time; `floors` nodes walked up the middle lane. */
-function expRun(floors = 0): ExpeditionRun {
+function expRun(floors = 0, act = 0): ExpeditionRun {
   const r = newRun('mage', SKINS.mage[0].id, 4242);
+  for (let a = 0; a < act; a++) nextAct(r);
   for (let f = 0; f < floors; f++) {
     const n = r.map.find(x => x.floor === f && x.lane === 1)!;
     r.at = n.id; r.path.push(n.id); r.stats.floors = f + 1; r.stats.fights++;
@@ -68,8 +70,8 @@ function expRun(floors = 0): ExpeditionRun {
   return r;
 }
 /** An Expedition fight against `pack`, the Draw screen closed and a few seconds in. */
-function expFight(pack: string[], secs = 3): void {
-  const r = expRun(3), node = { ...r.map[r.at], kind: (pack[0] === 'oakheart' ? 'boss' : 'fight') as 'fight', pack };
+function expFight(pack: string[], secs = 3, act = 0): void {
+  const r = expRun(3, act), node = { ...r.map[r.at], kind: (MOBS[pack[0]].rank === 'boss' ? 'boss' : 'fight') as 'fight', pack };
   setScene(new ExpeditionBattleScene(r, node, makeFight(r, pack, 99)));
   run(0.5); battle().b.endCustom([[0, 1], []]); run(secs);
 }
@@ -418,6 +420,15 @@ export const screens: Record<string, () => void> = {
   'exp-fight': () => expFight(['stumpkin', 'webspinner', 'wisp']),
   'exp-fight-elite': () => expFight(['thornmother'], 4),
   'exp-fight-boss': () => expFight(['oakheart'], 4),
+  'exp-act2-intro': () => setScene(new ExpeditionMapScene(expRun(0, 1), true)),
+  'exp-act2-map': () => setScene(new ExpeditionMapScene(expRun(3, 1))),
+  'exp-act2-fight': () => expFight(['ghoul', 'banshee', 'skelarcher'], 3, 1),
+  'exp-act2-elite': () => expFight(['colossus'], 4, 1),
+  'exp-act2-boss': () => expFight(['boneking'], 5, 1),
+  'exp-act3-map': () => setScene(new ExpeditionMapScene(expRun(3, 2))),
+  'exp-act3-fight': () => expFight(['golem', 'shaman', 'imp'], 3, 2),
+  'exp-act3-elite': () => expFight(['titan'], 4, 2),
+  'exp-act3-boss': () => expFight(['emberwyrm'], 5, 2),
   // a fight won and a fight lost, played through to what comes after (the rewards, the end of the run)
   'exp-fight-won': () => { expFight(['stumpkin', 'wolf'], 1); for (const m of battle().b.mobs) m.hp = 0; run(6, () => !(getScene() instanceof ExpeditionBattleScene)); },
   'exp-fight-lost': () => { expFight(['stumpkin', 'wolf'], 1); battle().b.f[0].hp = 0; run(6, () => !(getScene() instanceof ExpeditionBattleScene)); },
@@ -428,7 +439,7 @@ export const screens: Record<string, () => void> = {
   'exp-deck': () => setScene(new DeckScene(expRun(3), 'view')),
   'exp-deck-remove': () => setScene(new DeckScene(expRun(3), 'remove')),
   'exp-over': () => { const r = expRun(3); r.over = 'dead'; r.stats.kills = 7; r.stats.secs = 213; r.stats.dealt = 18240; setScene(new RunOverScene(r)); },
-  'exp-won': () => { const r = expRun(3); r.over = 'won'; r.stats.floors = 8; r.stats.kills = 19; r.stats.secs = 812; setScene(new RunOverScene(r)); },
+  'exp-won': () => { const r = expRun(3, 2); r.over = 'won'; r.stats.floors = 24; r.stats.kills = 19; r.stats.secs = 812; setScene(new RunOverScene(r)); },
   'training': () => { setScene(new TrainingScene(match({ p1: 'rogue', cpu: 'warrior' }))); run(1); },
   // the training settings menu, paused mid-fight
   'training-menu': () => { setScene(new TrainingScene(match({ p1: 'rogue', cpu: 'warrior' }))); run(0.5); battle().b.endCustom([[], []]); run(1); battle().paused = true; run(0.1); },
