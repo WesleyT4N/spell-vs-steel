@@ -2,7 +2,7 @@
 // monster can act). Patterns follow Battle Network's viruses: one readable thing each, every hit telegraphed.
 // Delayed hits are plain-data effect records (src/content/effects.ts), so the battle state holds no functions.
 import { Battle, MOB_BRAINS, makeMob, COLS, ROWS, type Fighter, type MobBrain, type HitOpts } from './battle';
-import { effect, type ShotHit } from '../content/effects';
+import { effect, type EffectRec, type ShotHit } from '../content/effects';
 import type { Element } from './cards';
 
 export interface MobDef {
@@ -68,6 +68,12 @@ const mobShot = effect('mob.shot', (b, a: { dmg: number; root?: number; fx?: str
   if (out.dealt > 0 && a.root) b.root(h.t, a.root);
 });
 
+/** A second dash on another row (the Alpha Wolf's and the Drake Rider's), once the first pass has cleared. */
+const mobRun = effect('mob.run', (b, a: { m: Fighter; row: number; dmg: number; fx: string; el?: Element }) => {
+  if (a.m.dead || b.phase !== 'fight') return;
+  dash(b, a.m, a.row, 11, mobShot({ dmg: a.dmg, fx: a.fx, el: a.el }));
+});
+
 /** The Grave Bell's toll wearing off: the ally hits normally again. */
 const mobUnbuff = effect('mob.unbuff', (_b, a: { m: Fighter }) => { a.m.power = 1; });
 
@@ -117,6 +123,46 @@ function done(b: Battle, f: Fighter, base: number, spread?: number): void {
 /** Count down; true when it is time to act. */
 function ready(f: Fighter, dt: number): boolean { f.mob!.t -= dt; return f.mob!.t <= 0; }
 
+// ---------- moving the monster's sprite (dashes, leaps, dives) ----------
+// Purely visual offsets (dx/dy) run as plain-data anims, the way the Warrior's lunges are: the monster stays on its
+// panel in the rules, so hits, targeting and lockstep are untouched; only where its sprite is drawn changes.
+
+interface MobMove { m: Fighter; px: number; py: number; arc: number; out: number; hold: number; back: number }
+const PANEL_W = 38, PANEL_H = 19;
+const mobMoveOut = effect('mob.move.out', (_b, a: MobMove, p: number) => {
+  if (a.m.dead) { a.m.dx = 0; a.m.dy = 0; return; }
+  a.m.dx = a.px * p; a.m.dy = a.py * p - Math.sin(p * Math.PI) * a.arc;
+});
+const mobMoveBack = effect('mob.move.back', (_b, a: MobMove, p: number) => {
+  a.m.dx = a.px * (1 - p); a.m.dy = a.py * (1 - p) - Math.sin(p * Math.PI) * a.arc * 0.5;
+});
+/** Head home: hop back, or (back = 0) reappear on its own panel, like a Battle Network virus after a dash. */
+const mobMoveHome = effect('mob.move.home', (b, a: MobMove) => {
+  if (a.back > 0 && !a.m.dead) b.anim(a.back, mobMoveBack(a));
+  else { a.m.dx = 0; a.m.dy = 0; }
+});
+const mobMoveGo = effect('mob.move.go', (b, a: MobMove) => {
+  if (a.m.dead || b.phase !== 'fight') return;
+  b.anim(a.out, mobMoveOut(a));
+  b.later(a.out + a.hold, mobMoveHome(a));
+});
+/** After `delay`, move monster `f`'s sprite to panel (col, row) over `out`s, stay `hold`s, then come back over `back`s. */
+function mobMove(b: Battle, f: Fighter, delay: number, col: number, row: number, out: number, hold: number, back: number, arc = 0): void {
+  const a: MobMove = { m: f, px: (col - f.col) * PANEL_W, py: (row - f.row) * PANEL_H, arc, out, hold, back };
+  if (delay > 0) b.later(delay, mobMoveGo(a));
+  else b.runEffect(mobMoveGo(a), undefined);
+}
+/** Leap onto (col, row) so it lands as the `secs`-long warning there runs out, then hop home. */
+function leapAt(b: Battle, f: Fighter, secs: number, col: number, row: number, arc = 14, air = 0.25): void {
+  mobMove(b, f, Math.max(0, secs - air), col, row, Math.min(air, secs), 0.2, 0.25, arc);
+}
+/** A dash down `row`: the monster itself runs the row (the shot that does the damage is invisible and keeps pace). */
+function dash(b: Battle, f: Fighter, row: number, speed: number, onHit: EffectRec<ShotHit>): void {
+  b.shoot(f, { row, speed: -speed, kind: 'wolf', body: true, reflectable: false, onHit });
+  const end = -1.5; // off the left edge
+  mobMove(b, f, 0, end, row, (f.col - end) / speed, 0, 0);
+}
+
 // ---------- forest regulars ----------
 
 /** STUMPKIN: lines up with you, winds up, slams a root shockwave down the row (BN's Mettaur). */
@@ -145,7 +191,7 @@ const wolf: MobBrain = {
       b.warn(f, rowCells(f.row), 0.7);
       return;
     }
-    b.shoot(f, { speed: -10, kind: 'wolf', reflectable: false, onHit: mobShot({ dmg: 400 * m.tier, fx: 'bite' }) });
+    dash(b, f, f.row, 10, mobShot({ dmg: 400 * m.tier, fx: 'bite' }));
     done(b, f, 2.8);
   },
 };
@@ -243,13 +289,14 @@ const alpha: MobBrain = {
       // Pounce: your panel lights, then the wolf lands on it
       windUp(b, f, 0.6);
       b.warn(f, [[p.col, p.row]], 0.6, mobHit({ m: f, cells: [[p.col, p.row]], dmg: 500 * m.tier, fx: 'claw' }));
+      leapAt(b, f, 0.6, p.col + 1, p.row);
       m.step = 3;
       return;
     }
     if (m.step === 1 && m.n >= 2) {
-      b.shoot(f, { speed: -11, kind: 'wolf', reflectable: false, onHit: mobShot({ dmg: 450 * m.tier, fx: 'bite' }) });
-      const r2 = Math.floor(m.n / 10);
-      b.shoot(f, { row: r2, speed: -11, kind: 'wolf', reflectable: false, onHit: mobShot({ dmg: 450 * m.tier, fx: 'bite' }) });
+      // one wolf, two passes: down your row, then back around for the second row as its warning runs out
+      dash(b, f, f.row, 11, mobShot({ dmg: 450 * m.tier, fx: 'bite' }));
+      b.later(0.65, mobRun({ m: f, row: Math.floor(m.n / 10), dmg: 450 * m.tier, fx: 'bite' }));
       m.n = 2;
       done(b, f, 1.8);
       return;
@@ -393,6 +440,7 @@ const ghoul: MobBrain = {
     if (m.step === 0) {
       windUp(b, f, 0.75, 'HUNGRY');
       b.warn(f, [[p.col, p.row]], 0.75, mobHit({ m: f, cells: [[p.col, p.row]], dmg: 380 * m.tier, fx: 'claw', el: SHADOW_EL }));
+      leapAt(b, f, 0.75, p.col, p.row, 18);
       return;
     }
     towardRow(b, f, p.row);
@@ -453,6 +501,7 @@ const deathknight: MobBrain = {
       if (m.n === 2) {
         windUp(b, f, 0.8, 'REAP');
         b.warn(f, colCells(p.col), 0.8, mobHit({ m: f, cells: colCells(p.col), dmg: 550 * m.tier, fx: 'cleaveHeavy', el: SHADOW_EL }));
+        leapAt(b, f, 0.8, p.col + 1, 1, 10, 0.2);
         m.step = 3;
         return;
       }
@@ -601,6 +650,7 @@ const emberbat: MobBrain = {
       for (let c = 0; c < 3; c++) { const r = p.row + (c - p.col) * dir; if (r >= 0 && r < ROWS) cells.push([c, r]); }
       windUp(b, f, 0.7, 'SKREE');
       b.warn(f, cells, 0.7, mobHit({ m: f, cells, dmg: 350 * m.tier, fx: 'scorch', el: FIRE_EL }));
+      leapAt(b, f, 0.7, p.col, p.row, -6, 0.2);
       return;
     }
     towardRow(b, f, Math.floor(b.rand() * ROWS));
@@ -652,18 +702,13 @@ const drakerider: MobBrain = {
       return;
     }
     if (m.step === 1) {
-      b.shoot(f, { speed: -11, kind: 'wolf', reflectable: false, onHit: mobShot({ dmg: 500 * m.tier, fx: 'thrust', el: 'steel' }) });
-      b.later(0.5, mobLance({ m: f, row: m.phase }));
+      dash(b, f, f.row, 11, mobShot({ dmg: 500 * m.tier, fx: 'thrust', el: 'steel' }));
+      b.later(0.65, mobRun({ m: f, row: m.phase, dmg: 500 * m.tier, fx: 'thrust', el: 'steel' }));
     }
     done(b, f, 1.8);
   },
 };
 
-/** The rider's second pass, half a second later on another row. */
-const mobLance = effect('mob.lance', (b, a: { m: Fighter; row: number }) => {
-  if (a.m.dead || b.phase !== 'fight') return;
-  b.shoot(a.m, { row: a.row, speed: -11, kind: 'wolf', reflectable: false, onHit: mobShot({ dmg: 500 * a.m.mob!.tier, fx: 'thrust', el: 'steel' }) });
-});
 
 /** OBSIDIAN TITAN: never moves. Quakes on random panels, a shockwave, and an obsidian shell every 12s. */
 const titan: MobBrain = {
@@ -736,6 +781,7 @@ const emberwyrm: MobBrain = {
       // Dive: your panel and two more, marked
       const cells: Array<[number, number]> = [[p.col, p.row], ...randomCells(b, 2).filter(([c, r]) => c !== p.col || r !== p.row)];
       b.warn(f, cells, 1, mobHit({ m: f, cells, dmg: 550 * m.tier, fx: 'meteorBlast', el: FIRE_EL }));
+      leapAt(b, f, 1, p.col, p.row, 40, 0.4);
       b.text(f, 'DIVE', '#f8b800');
       done(b, f, 2);
       return;

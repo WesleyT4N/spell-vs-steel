@@ -284,7 +284,15 @@ function drawPet(c: Ctx, b: Battle, p: Pet, tick: number): void {
   if (p.kind === 'bear') return; // drawn as its wall
   const row = p.row ?? owner.row;
   const f = panelFoot(p.row === null ? owner.col : p.col, row);
-  const x = Math.round(f.x - d * (p.row === null ? 16 : 2) + Math.sin(b.time * 4 + row) * 2), y = Math.round(f.y);
+  let x = Math.round(f.x - d * (p.row === null ? 16 : 2) + Math.sin(b.time * 4 + row) * 2), y = Math.round(f.y);
+  // a bite: the wolf itself darts down the row to the enemy and trots back (its cooldown restarts on every bite)
+  const since = p.period - p.cd, OUT = 0.12, BACK = 0.22;
+  if (since >= 0 && since < OUT + BACK) {
+    const foe = fighterPos(b, b.foe(owner)), reach = foe.x - d * 12 - x;
+    const k = since < OUT ? since / OUT : 1 - (since - OUT) / BACK;
+    x = Math.round(x + reach * k);
+    y = Math.round(y - Math.sin(Math.min(1, since / OUT) * Math.PI) * 4);
+  }
   drawWolf(c, x, y, d, tick % 8 < 4);
 }
 
@@ -634,6 +642,7 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
 }
 
 function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
+  if (p.body) return; // a monster's dash: its own sprite is the one running down the row
   if (p.homing) {
     const t = b.f[p.homing.target];
     const s = panelFoot(p.homing.sx, p.homing.sy), e = fighterPos(b, t);
