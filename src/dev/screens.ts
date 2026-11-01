@@ -20,6 +20,8 @@ import { EncyclopediaScene } from '../scenes/encyclopedia';
 import { LabScene } from '../scenes/lab';
 import { ArtLabScene } from '../scenes/artLab';
 import { ArcadeLadderScene, ArcadeClearScene } from '../scenes/arcade';
+import { ExpeditionMapScene, ExpeditionBattleScene, RewardScene, RestScene, ShopScene, DeckScene, RunOverScene } from '../scenes/expedition';
+import { newRun, addRelic, addSpell, makeFight, type ExpeditionRun } from '../game/expedition';
 import { buildLadder, type ArcadeRun } from '../game/arcade';
 import { loadMatch, saveMatch, type MatchConfig } from '../game/match';
 import { encodeDeckCode } from '../game/deckCode';
@@ -54,6 +56,23 @@ export function run(seconds: number, until?: () => boolean): void {
 const title = (): void => setScene(new TitleScene());
 const match = (over: Partial<MatchConfig> = {}): MatchConfig => ({ ...loadMatch(), ...over });
 const battle = (): BattleScene => getScene() as BattleScene;
+
+/** An Expedition run as a mage, the same map every time; `floors` nodes walked up the middle lane. */
+function expRun(floors = 0): ExpeditionRun {
+  const r = newRun('mage', SKINS.mage[0].id, 4242);
+  for (let f = 0; f < floors; f++) {
+    const n = r.map.find(x => x.floor === f && x.lane === 1)!;
+    r.at = n.id; r.path.push(n.id); r.stats.floors = f + 1; r.stats.fights++;
+  }
+  if (floors > 2) { addRelic(r, 'whetstone'); addRelic(r, 'sapflask'); addSpell(r, 'flamestrike'); r.gold = 137; r.hp = Math.round(r.maxHp * 0.62); }
+  return r;
+}
+/** An Expedition fight against `pack`, the Draw screen closed and a few seconds in. */
+function expFight(pack: string[], secs = 3): void {
+  const r = expRun(3), node = { ...r.map[r.at], kind: (pack[0] === 'oakheart' ? 'boss' : 'fight') as 'fight', pack };
+  setScene(new ExpeditionBattleScene(r, node, makeFight(r, pack, 99)));
+  run(0.5); battle().b.endCustom([[0, 1], []]); run(secs);
+}
 
 /** An arcade run as a warrior, `at` fights won, with the same ladder every time. */
 function arcadeRun(at: number): ArcadeRun {
@@ -257,6 +276,7 @@ export const screens: Record<string, () => void> = {
     setScene(d);
   },
   'select-training': () => setScene(new CharSelectScene(undefined, 0, 'training')),
+  'select-expedition': () => setScene(new CharSelectScene(undefined, 0, 'expedition')),
   'select-tutorial': () => setScene(new CharSelectScene(undefined, 0, 'tutorial')),
   'stage-select': () => setScene(new StageSelectScene()),
   'online-lobby': () => setScene(new OnlineScene()),
@@ -390,6 +410,25 @@ export const screens: Record<string, () => void> = {
   'arcade-ladder': () => setScene(new ArcadeLadderScene(arcadeRun(2))),
   'arcade-ladder-boss': () => setScene(new ArcadeLadderScene(arcadeRun(4))),
   'arcade-clear': () => setScene(new ArcadeClearScene(arcadeRun(5))),
+  // Expedition: the map at the start and three floors in, the abandon prompt, fights, rewards, rest, shop, deck, the end
+  'exp-map': () => setScene(new ExpeditionMapScene(expRun())),
+  'exp-map-mid': () => setScene(new ExpeditionMapScene(expRun(3))),
+  'exp-map-quit': () => { const s = new ExpeditionMapScene(expRun(3)); s.quitting = true; setScene(s); },
+  'exp-draw': () => { const r = expRun(3); setScene(new ExpeditionBattleScene(r, r.map[r.at], makeFight(r, ['stumpkin', 'webspinner', 'wisp'], 99))); run(0.5); },
+  'exp-fight': () => expFight(['stumpkin', 'webspinner', 'wisp']),
+  'exp-fight-elite': () => expFight(['thornmother'], 4),
+  'exp-fight-boss': () => expFight(['oakheart'], 4),
+  // a fight won and a fight lost, played through to what comes after (the rewards, the end of the run)
+  'exp-fight-won': () => { expFight(['stumpkin', 'wolf'], 1); for (const m of battle().b.mobs) m.hp = 0; run(6, () => !(getScene() instanceof ExpeditionBattleScene)); },
+  'exp-fight-lost': () => { expFight(['stumpkin', 'wolf'], 1); battle().b.f[0].hp = 0; run(6, () => !(getScene() instanceof ExpeditionBattleScene)); },
+  'exp-reward': () => { const r = expRun(3); setScene(new RewardScene(r, r.map[r.at])); },
+  'exp-reward-elite': () => { const r = expRun(3); setScene(new RewardScene(r, { ...r.map[r.at], kind: 'elite', pack: ['alpha'] })); },
+  'exp-rest': () => setScene(new RestScene(expRun(3))),
+  'exp-shop': () => setScene(new ShopScene(expRun(3))),
+  'exp-deck': () => setScene(new DeckScene(expRun(3), 'view')),
+  'exp-deck-remove': () => setScene(new DeckScene(expRun(3), 'remove')),
+  'exp-over': () => { const r = expRun(3); r.over = 'dead'; r.stats.kills = 7; r.stats.secs = 213; r.stats.dealt = 18240; setScene(new RunOverScene(r)); },
+  'exp-won': () => { const r = expRun(3); r.over = 'won'; r.stats.floors = 8; r.stats.kills = 19; r.stats.secs = 812; setScene(new RunOverScene(r)); },
   'training': () => { setScene(new TrainingScene(match({ p1: 'rogue', cpu: 'warrior' }))); run(1); },
   // the training settings menu, paused mid-fight
   'training-menu': () => { setScene(new TrainingScene(match({ p1: 'rogue', cpu: 'warrior' }))); run(0.5); battle().b.endCustom([[], []]); run(1); battle().paused = true; run(0.1); },

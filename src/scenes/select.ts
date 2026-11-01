@@ -34,7 +34,7 @@ const frameW = (z: number): number => 40 * z + 4, frameH = (z: number): number =
 /** 0/1: picking the left side's fighter/skin, 2/3: the right side's (skipped online and in arcade). */
 type Step = 0 | 1 | 2 | 3;
 /** What the screen leads to: a match against the CPU, the tutorial, training mode, or an arcade run. */
-export type SelectMode = 'versus' | 'tutorial' | 'training' | 'arcade';
+export type SelectMode = 'versus' | 'tutorial' | 'training' | 'arcade' | 'expedition';
 
 // layout (UI pixels)
 const PX = [12, UW - 152], PY = 30, PW = 140, PH = 164;
@@ -69,7 +69,9 @@ export class CharSelectScene implements Scene {
   private get tutorial(): boolean { return this.mode === 'tutorial'; }
   private get training(): boolean { return this.mode === 'training'; }
   /** Arcade: you pick only your own fighter and deck; the ladder picks the rivals. */
-  private get arcade(): boolean { return this.mode === 'arcade'; }
+  private get arcade(): boolean { return this.mode === 'arcade' || this.mode === 'expedition'; }
+  /** Expedition: you pick your fighter; the run hands you its own starter spell deck, so there's no deck step. */
+  private get expedition(): boolean { return this.mode === 'expedition'; }
   /** Local Versus: both sides can be a player or the CPU. */
   private get local(): boolean { return this.mode === 'versus' && !this.net; }
   /** What a side is called on this screen. */
@@ -147,6 +149,7 @@ export class CharSelectScene implements Scene {
   private next(): void {
     saveMatch(this.m);
     sfx('select');
+    if (this.expedition) { const cls = this.m.p1, skin = this.mySkin(); void import('./expedition').then(m => m.startExpedition(cls, skin)); return; }
     pushScene(new DeckSelectScene(this.mode, this.net));
   }
 
@@ -268,10 +271,10 @@ export class CharSelectScene implements Scene {
     else this.drawSlot(ui, 1, showing(1), tick);
 
     // drawn after the slots so its rolled ends sit on top of them
-    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING MODE' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, vy(3));
+    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING MODE' : this.expedition ? 'EXPEDITION' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, vy(3));
 
     // where this screen sits in the steps before a fight, then VS and the matchup
-    if (!this.tutorial) stepTrail(ui, 0, UW / 2, this.py, { stack: true });
+    if (!this.tutorial && !this.expedition) stepTrail(ui, 0, UW / 2, this.py, { stack: true });
     vsSeal(ui, UW / 2, this.py + 60);
     const status = this.statusLine();
     if (status) drawTextCentered(ui, tick % 16 < 12 || !status.blink ? status.text : '', UW / 2, this.py + 100, status.color, 1);
@@ -321,7 +324,7 @@ export class CharSelectScene implements Scene {
           : `${keys} OR HOVER: CHOOSE   ${k('attack')} / CLICK A FIGHTER: PICK   ${k('cast')} / RIGHT-CLICK: BACK`);
   }
 
-  private get nextLabel(): string { return 'CHOOSE SPELL DECK →'; }
+  private get nextLabel(): string { return this.expedition ? 'START THE RUN →' : 'CHOOSE SPELL DECK →'; }
 
   private statusLine(): { text: string; color: string; blink: boolean } | null {
     const net = this.net;
@@ -393,6 +396,13 @@ export class CharSelectScene implements Scene {
   private drawLadder(ui: Ctx): void {
     const x = PX[1], cx = x + PW / 2;
     win(ui, x, this.py, PW, PH);
+    if (this.expedition) {
+      drawTextCentered(ui, 'THE FOREST', cx, this.py + 10, BLUE_INK, 1, false);
+      drawTextCentered(ui, '?', cx, this.py + 40, RED_INK, 3, false);
+      drawTextCentered(ui, 'A ROGUELIKE RUN', cx, this.py + 80, INK, 1, false);
+      ['FIGHT MONSTER PACKS', 'DRAFT SPELLS AS YOU GO', 'HP CARRIES OVER', 'ONE LOSS ENDS THE RUN', 'BEAT OLD OAKHEART'].forEach((l, i) => drawTextCentered(ui, l, cx, this.py + 96 + i * 10, TRIM, 1, false));
+      return;
+    }
     drawTextCentered(ui, 'THE LADDER', cx, this.py + 10, BLUE_INK, 1, false);
     PLAYABLE.forEach((cls, i) => drawFighterSprite(ui, getSprite(cls, SKINS[cls][0].id, false), x + 18 + i * 26, this.py + 52, true, 'none', 1));
     drawTextCentered(ui, '?', cx, this.py + 62, RED_INK, 3, false);
@@ -443,9 +453,9 @@ export class CharSelectScene implements Scene {
     const x0 = a.x + PAD, w = a.w - PAD * 2;
     const barTop = a.y + a.h - 84;
     let y = a.y + 12;
-    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, y);
+    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING' : this.expedition ? 'EXPEDITION' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, y);
     y += 40;
-    if (!this.tutorial) { stepTrail(ui, 0, UW / 2, y, { scale: 2 }); y += 22 + GAP; }
+    if (!this.tutorial && !this.expedition) { stepTrail(ui, 0, UW / 2, y, { scale: 2 }); y += 22 + GAP; }
 
     // laid out from the bar up: colors and the roster sit in the thumb zone; the two sides fill the rest
     const cols = 3, tw = Math.floor((w - GAP * (cols - 1)) / cols), th = 108;
@@ -473,6 +483,7 @@ export class CharSelectScene implements Scene {
     this.tallRects.panel = [[x0, y, pw, ph], [x0 + w - pw, y, pw, ph]];
     this.drawTallSlot(ui, 0, showing(0), x0, y, pw, ph, tick, z);
     if (this.tutorial) this.drawTallNote(ui, x0 + w - pw, y, pw, ph, 'OPPONENT', 'DUMMY', ['A TRAINING', 'DUMMY. ABOUT', '5 MINUTES OF', 'LESSONS'], BLUE_INK, z);
+    else if (this.expedition) this.drawTallNote(ui, x0 + w - pw, y, pw, ph, 'THE FOREST', 'ROGUELIKE', ['MONSTER PACKS', 'DRAFT SPELLS', 'HP CARRIES OVER', 'ONE LOSS ENDS IT'], BLUE_INK, z);
     else if (this.arcade) {
       const best = loadRecords()[this.m.p1];
       this.drawTallNote(ui, x0 + w - pw, y, pw, ph, 'THE LADDER', '4 RIVALS', ['+ YOUR SHADOW', 'EASY TO HARD', 'BEST OF 3', best ? `BEST ${clock(best.time)}` : 'NOT CLEARED'], BLUE_INK, z);

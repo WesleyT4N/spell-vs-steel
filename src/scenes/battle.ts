@@ -211,7 +211,8 @@ export class BattleScene implements Scene {
       if (wait > 0) window.setTimeout(() => announce('fight'), wait); else announce('fight');
     }
     if (ph === 'ko') announce('ko');
-    if (ph === 'over' && b.winner !== null) {
+    // a monster pack winning has no name to call
+    if (ph === 'over' && b.winner !== null && !b.f[b.winner].mob) {
       const w = b.f[b.winner], who = CLASS_INFO[w.cls].name;
       const perfect = w.hp >= w.maxHp;
       const call = (): void => announce(this.setOver && this.m.bestOf > 1 ? 'match' : 'wins', { who });

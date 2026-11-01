@@ -4,6 +4,7 @@ import { drawPanel, drawHole, drawStage, panelFoot, panelCenter, X0, Y0, PW, FAC
 import { getStage } from '../content/stages';
 import type { Stage } from '../art/arena';
 import { getSprite, getFrame, drawFighterSprite, drawFighterPosed, type Tint } from '../art/sprites';
+import { getMobSprite } from '../art/mobSprites';
 import type { FrameId } from '../art/fighterFrames';
 import { P, UW, UH, blob, frame, glow, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '../engine/font';
@@ -87,7 +88,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
   // entities, back row first
   for (let r = 0; r < 3; r++) {
     for (const w of b.walls) if (w.row === r) drawWall(c, w, b.time);
-    for (const f of b.f) if (f.row === r) drawFighter(c, b, f, tick, me);
+    for (const f of b.everyone()) if (f.row === r) { if (f.mob) drawMob(c, b, f, tick); else drawFighter(c, b, f, tick, me); }
   }
   for (const p of b.pets) drawPet(c, b, p, tick);
   for (const pr of b.projectiles) drawProjectile(c, b, pr);
@@ -483,6 +484,31 @@ function fighterPos(_b: Battle, f: Fighter): { x: number; y: number } {
   return { x: p.x + f.dx, y: p.y + f.dy };
 }
 
+/** An Expedition monster: its sprite with the hit, freeze and stun tints, a wind-up hop, and a fade when it falls. */
+function drawMob(c: Ctx, b: Battle, f: Fighter, tick: number): void {
+  const m = f.mob!, s = getMobSprite(m.kind);
+  const { x, y } = fighterPos(b, f);
+  if (f.dead) {
+    // a K.O.'d monster blinks out over half a second
+    if (m.deadT > 0.5 || tick % 2) return;
+    c.globalAlpha = 1 - m.deadT * 1.6;
+    drawFighterSprite(c, s, x, y + 2, true, 'flash');
+    c.globalAlpha = 1;
+    return;
+  }
+  const float = m.kind === 'wisp' ? Math.round(Math.sin(b.time * 3 + f.row) * 1.5) - 3 : 0;
+  const wind = f.pose === 'cast' ? (tick % 4 < 2 ? -2 : -1) : 0;
+  const lunge = f.pose === 'attack' ? -2 : 0;
+  P(c, '#000000', x - 6, y, 12, 1); P(c, '#000000', x - 5, y + 1, 10, 1);
+  const tint: Tint = f.flash > 0 ? 'flash' : f.st.frozen > 0 || f.st.iceBlock > 0 ? 'ice' : f.st.stunned > 0 && tick % 4 < 2 ? 'stun' : 'none';
+  drawFighterSprite(c, s, x + lunge, y + 2 + float + wind, true, tint);
+  if (f.st.frozen > 0) drawFrozen(c, b, f, s, x, y, true);
+  // shields (Bark Skin) as a pale ring
+  if (f.shields.some(sh => sh.hp > 0) && tick % 6 < 4) {
+    P(c, '#a4e4fc', x - 9, y - s.h + 4, 1, s.h - 6); P(c, '#a4e4fc', x + 8, y - s.h + 4, 1, s.h - 6);
+  }
+}
+
 function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): void {
   const s = getSprite(f.cls, f.skin, f.alt);
   // Shadow Clone: the decoy looks like the Rogue
@@ -652,9 +678,15 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0, sha
     const k = Math.min(1, t.t / 0.35), rise = 22 * (1 - (1 - k) * (1 - k)) + Math.max(0, t.t - 0.35) * 12;
     drawTextCentered(ui, t.text, pc.x * UI, (pc.y - 34) * UI - rise - (pop ? 4 : 0), pop ? '#fcfcfc' : t.color, scale);
   }
-  for (const f of b.f) drawFighterHud(ui, b, f, tick);
-  for (const f of b.f) drawChargeBar(ui, b, f, tick);
+  for (const f of b.f) { if (f.mob) drawPackHud(ui, b, tick); else drawFighterHud(ui, b, f, tick); }
+  for (const f of b.f) if (!f.mob) drawChargeBar(ui, b, f, tick);
   for (const f of b.f) drawCombo(ui, b, f);
+  // BN-style HP under every monster
+  for (const m of b.mobs) {
+    if (m.dead) continue;
+    const pc = panelFoot(m.col, m.row), hp = String(Math.max(0, Math.ceil(m.hp)));
+    drawTextOutlined(ui, hp, Math.round(pc.x * UI - textWidth(hp) / 2), (pc.y + 2) * UI, m === b.f[1] ? '#fcfcfc' : '#bcbcbc');
+  }
   // Draw gauge
   const gx = UW / 2 - 70, gw = 140;
   const full = b.gauge >= 1;
@@ -664,6 +696,20 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0, sha
   for (const e of b.fx) if (e.kind === 'castName') drawCastCallout(ui, e);
   if (shared) for (const f of b.f) drawNextSpell(ui, b, f, shared.cast[f.side], f.side === 1);
   else drawNextSpell(ui, b, b.f[me], k('cast'), me === 1);
+}
+
+/** The monster side's nameplate: every monster in the pack with its own HP bar, the targeted one marked. */
+function drawPackHud(ui: Ctx, b: Battle, tick: number): void {
+  const w = 132, x = UW - w - 8, rowH = 11, h = 14 + b.mobs.length * rowH;
+  win(ui, x, 4, w, h, { accent: team(1).mark, burn: 3 });
+  b.mobs.forEach((m, i) => {
+    const y = 9 + i * rowH, aimed = m === b.f[1] && !m.dead;
+    drawText(ui, (aimed && tick % 8 < 6 ? '>' : ' ') + m.name, x + 5, y, m.dead ? INK2 : INK);
+    const ratio = Math.max(0, m.hp / m.maxHp);
+    bar(ui, x + w - 46, y + 1, 40, 5, ratio, m.dead ? '#7c7c7c' : ratio < 0.3 ? '#f83800' : ratio < 0.6 ? '#f8b800' : '#58d854', true);
+  });
+  const f = b.f[1];
+  if (!f.dead) drawStatuses(ui, b, f, x + w, 8 + h, true);
 }
 
 function drawFighterHud(ui: Ctx, b: Battle, f: Fighter, tick: number): void {

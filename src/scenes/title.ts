@@ -23,10 +23,11 @@ import { platform } from '../platform';
 import { flushSave } from '../engine/save';
 
 // QUIT only in an app that can close itself (a web page can't)
-const ITEMS = ['ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'SPELL DECK BUILDER', 'PROFILE', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : []), ...(platform.lifecycle.canQuit ? ['QUIT'] : [])];
+const ITEMS = ['ARCADE MODE', 'EXPEDITION', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'SPELL DECK BUILDER', 'PROFILE', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : []), ...(platform.lifecycle.canQuit ? ['QUIT'] : [])];
 
-// eight rows (nine in dev builds) still clear the version line
-const MENU_Y = ITEMS.length > 8 ? 156 : ITEMS.length > 7 ? 162 : ITEMS.length > 6 ? 168 : 172, MENU_GAP = ITEMS.length > 8 ? 14 : ITEMS.length > 7 ? 15 : ITEMS.length > 6 ? 16 : 18;
+// nine rows (ten in dev builds and the desktop app, eleven in a dev desktop build) still clear the version line
+const MENU_Y = ITEMS.length > 10 ? 146 : ITEMS.length > 9 ? 150 : ITEMS.length > 8 ? 156 : ITEMS.length > 7 ? 162 : ITEMS.length > 6 ? 168 : 172;
+const MENU_GAP = ITEMS.length > 10 ? 12 : ITEMS.length > 9 ? 13 : ITEMS.length > 8 ? 14 : ITEMS.length > 7 ? 15 : ITEMS.length > 6 ? 16 : 18;
 // taller screens (phone portrait) have room under the stage: rows grow into it, with double-size text once they fit
 const MAX_GAP = 36, BIG_GAP = 24;
 
@@ -213,6 +214,7 @@ export class TitleScene implements Scene {
       sfx('select');
       const item = ITEMS[this.sel];
       if (item === 'ARCADE MODE') pushScene(new CharSelectScene(undefined, 0, 'arcade'));
+      if (item === 'EXPEDITION') pushScene(new CharSelectScene(undefined, 0, 'expedition'));
       if (item === 'VERSUS MODE') pushScene(new CharSelectScene());
       if (item === 'ONLINE MODE') pushScene(new OnlineScene());
       if (item === 'TRAINING MODE') pushScene(new CharSelectScene(undefined, 0, 'training'));
