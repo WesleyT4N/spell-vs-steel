@@ -66,12 +66,12 @@ function skin(v: unknown, where: string): ModSkin {
   const team = str(o.team, `${where}.team`, /^[a-zA-Z0-9]$/, 1);
   if (!letters.includes(team)) fail(`${where}.team: "${team}" is not in the palette`);
   // frames: the class's own HD frame size, idle0 required
-  const ref = base.frames.idle0!, w = ref[0].length, h = ref.length;
+  const w = base.w, h = base.h;
   const fIn = obj(o.frames, `${where}.frames`, ['idle0'], FRAME_IDS as string[]);
   const frames: SkinArt['frames'] = {};
   for (const f of FRAME_IDS) if (own(fIn, f)) frames[f] = rows(fIn[f], `${where}.frames.${f}`, w, h, letters);
   let portrait: string[] | undefined;
-  if (o.portrait !== undefined) portrait = rows(o.portrait, `${where}.portrait`, base.portrait[0].length, base.portrait.length, letters);
+  if (o.portrait !== undefined) portrait = rows(o.portrait, `${where}.portrait`, base.portraitW, base.portraitH, letters);
   return { cls, id, name, art: { pal, team, ax: base.ax, res: PL_RES, frames, portrait } };
 }
 

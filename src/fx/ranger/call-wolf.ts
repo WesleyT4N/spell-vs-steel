@@ -1,7 +1,7 @@
 // Call Wolf (the running wolf): the wolf sprite, unchanged, at a full sprint: dust kicks up off its paws and stays
 // behind, and green speed lines stream off its back.
 import type { PfxModule, Opts, Painter } from '../../game/pfx';
-import { drawPix, WOLF, WOLF_LEGS, WOLF_COL, K } from './lib';
+import { drawPix, smallSprite, K } from './lib';
 
 export const meta = { name: 'Call Wolf', desc: 'A sprinting wolf kicking up dust, with green speed lines.', duration: 3, panels: 2 };
 
@@ -20,7 +20,8 @@ export function draw(p: Painter, t: number, _o: Opts): void {
   for (const [y, len, c] of [[-2, 10, K.leaf3], [1, 14, K.leaf2], [4, 8, K.leaf3]] as const)
     for (let d = 0; d < Math.min(len, t * 120); d += 2) p.dot(-15 - d, y, c, 1 - d / len);
   // two px back so its nose and outline fit the box's front edge (the tail end sits in the trail panel)
-  drawPix(p, [...WOLF, ...WOLF_LEGS[Math.floor(t * 12) % 2]], WOLF_COL, -2, 9);
+  const wolf = smallSprite('wolf');
+  drawPix(p, wolf.frames[Math.floor(t * 12) % 2] ?? [], wolf.colors, -2, 9);
 }
 
 export default { meta, draw } satisfies PfxModule;

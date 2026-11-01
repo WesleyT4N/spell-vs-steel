@@ -3,6 +3,7 @@
 import { clamp, fit, hex } from '../../vendor/pixelfx/index.js';
 import { RAMPS } from '../palette';
 import type { Painter } from '../../game/pfx';
+import { smallSprite } from '../../art/paletteImage';
 
 /** Steel as color numbers, dark to bright: black, #3c3c3c, #7c7c7c, #bcbcbc, #fcfcfc. */
 export const STEEL = fit([...RAMPS.steel], 5);
@@ -39,21 +40,12 @@ export function ironChain(p: Painter, x0: number, x1: number, y: number, sag = 0
 
 /**
  * A fish hook seen side on, pointing forward: an eye at the back where the chain ties on, the shank, the bend,
- * and the barbed point curling back. (x, y) is the eye. `a` fades it.
+ * and the barbed point curling back (assets/sprites/hook.png). (x, y) is the eye. `a` fades it.
  */
-const HOOK = [
-  '......www...',
-  'llllllllllw.',
-  'gggggggg.llw',
-  '..........lw',
-  '....w.....gl',
-  '....lw...gl.',
-  '.....lgggl..',
-  '......ggg...',
-];
 export function hook(p: Painter, x: number, y: number, a = 1, back = false): void {
   // back: pointing the other way (toward -x), with (x, y) still the eye
-  p.sprite(HOOK, { o: '#7c7c7c', w: '#fcfcfc', l: '#bcbcbc', g: '#7c7c7c' }, Math.round(back ? x - 11 : x), Math.round(y) - 1, { a, flip: back });
+  const s = smallSprite('hook');
+  p.sprite(s.frames[0], s.colors, Math.round(back ? x - 11 : x), Math.round(y) - 1, { a, flip: back });
 }
 
 /**

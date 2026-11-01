@@ -21,9 +21,7 @@ TEAM_HINT = {'mage': (70, 60, 140), 'ranger': (70, 120, 70)}
 ROOT = os.path.join(os.path.dirname(__file__), '../..')
 
 def class_height(cls):
-  t = open(f'{ROOT}/src/art/pl/{cls}.ts').read()
-  m = re.search(r'\n    idle0: \[\n((?:      .*\n)+?)    \]', t)
-  return len(m.group(1).splitlines())
+  return json.load(open(f'{ROOT}/assets/fighters/{cls}.json'))['frameHeight']
 
 def main(src, prefix, cls, mod_id, mod_name, skin_id, skin_name, author=''):
   H = class_height(cls)

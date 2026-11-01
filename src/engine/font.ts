@@ -1,74 +1,29 @@
-// 5x7 bitmap font. Each glyph is 7 rows of 5 bits ('#' = ink). Advance is 6px, line height 8px.
-const G: Record<string, string> = {
-  A: '.###.|#...#|#...#|#####|#...#|#...#|#...#',
-  B: '####.|#...#|#...#|####.|#...#|#...#|####.',
-  C: '.###.|#...#|#....|#....|#....|#...#|.###.',
-  D: '####.|#...#|#...#|#...#|#...#|#...#|####.',
-  E: '#####|#....|#....|####.|#....|#....|#####',
-  F: '#####|#....|#....|####.|#....|#....|#....',
-  G: '.###.|#...#|#....|#.###|#...#|#...#|.####',
-  H: '#...#|#...#|#...#|#####|#...#|#...#|#...#',
-  I: '.###.|..#..|..#..|..#..|..#..|..#..|.###.',
-  J: '..###|...#.|...#.|...#.|...#.|#..#.|.##..',
-  K: '#...#|#..#.|#.#..|##...|#.#..|#..#.|#...#',
-  L: '#....|#....|#....|#....|#....|#....|#####',
-  M: '#...#|##.##|#.#.#|#.#.#|#...#|#...#|#...#',
-  N: '#...#|#...#|##..#|#.#.#|#..##|#...#|#...#',
-  O: '.###.|#...#|#...#|#...#|#...#|#...#|.###.',
-  P: '####.|#...#|#...#|####.|#....|#....|#....',
-  Q: '.###.|#...#|#...#|#...#|#.#.#|#..#.|.##.#',
-  R: '####.|#...#|#...#|####.|#.#..|#..#.|#...#',
-  S: '.####|#....|#....|.###.|....#|....#|####.',
-  T: '#####|..#..|..#..|..#..|..#..|..#..|..#..',
-  U: '#...#|#...#|#...#|#...#|#...#|#...#|.###.',
-  V: '#...#|#...#|#...#|#...#|#...#|.#.#.|..#..',
-  W: '#...#|#...#|#...#|#.#.#|#.#.#|#.#.#|.#.#.',
-  X: '#...#|#...#|.#.#.|..#..|.#.#.|#...#|#...#',
-  Y: '#...#|#...#|.#.#.|..#..|..#..|..#..|..#..',
-  Z: '#####|....#|...#.|..#..|.#...|#....|#####',
-  '0': '.###.|#...#|#..##|#.#.#|##..#|#...#|.###.',
-  '1': '..#..|.##..|..#..|..#..|..#..|..#..|.###.',
-  '2': '.###.|#...#|....#|...#.|..#..|.#...|#####',
-  '3': '####.|....#|....#|.###.|....#|....#|####.',
-  '4': '...#.|..##.|.#.#.|#..#.|#####|...#.|...#.',
-  '5': '#####|#....|####.|....#|....#|#...#|.###.',
-  '6': '.###.|#....|#....|####.|#...#|#...#|.###.',
-  '7': '#####|....#|...#.|..#..|.#...|.#...|.#...',
-  '8': '.###.|#...#|#...#|.###.|#...#|#...#|.###.',
-  '9': '.###.|#...#|#...#|.####|....#|....#|.###.',
-  '.': '.....|.....|.....|.....|.....|.##..|.##..',
-  ',': '.....|.....|.....|.....|.##..|..#..|.#...',
-  ':': '.....|.##..|.##..|.....|.##..|.##..|.....',
-  '!': '..#..|..#..|..#..|..#..|..#..|.....|..#..',
-  '?': '.###.|#...#|....#|...#.|..#..|.....|..#..',
-  '-': '.....|.....|.....|.###.|.....|.....|.....',
-  '+': '.....|..#..|..#..|#####|..#..|..#..|.....',
-  '/': '....#|....#|...#.|..#..|.#...|#....|#....',
-  '%': '##..#|##..#|...#.|..#..|.#...|#..##|#..##',
-  "'": '..#..|..#..|.#...|.....|.....|.....|.....',
-  '(': '...#.|..#..|.#...|.#...|.#...|..#..|...#.',
-  ')': '.#...|..#..|...#.|...#.|...#.|..#..|.#...',
-  '<': '...#.|..#..|.#...|#....|.#...|..#..|...#.',
-  '>': '.#...|..#..|...#.|....#|...#.|..#..|.#...',
-  '=': '.....|.....|#####|.....|#####|.....|.....',
-  '×': '.....|.....|#...#|.#.#.|..#..|.#.#.|#...#',
-  '*': '.....|#.#.#|.###.|#####|.###.|#.#.#|.....',
-  '#': '.#.#.|.#.#.|#####|.#.#.|#####|.#.#.|.#.#.',
-  // arrows used in menus and control hints
-  '↑': '..#..|.###.|#.#.#|..#..|..#..|..#..|..#..',
-  '↓': '..#..|..#..|..#..|..#..|#.#.#|.###.|..#..',
-  '→': '..#..|...#.|....#|#####|....#|...#.|..#..',
-  '←': '..#..|.#...|#....|#####|#....|.#...|..#..',
-  '●': '.....|.###.|#####|#####|#####|.###.|.....',
-  '○': '.....|.###.|#...#|#...#|#...#|.###.|.....',
-  ' ': '.....|.....|.....|.....|.....|.....|.....',
-};
+// 5x7 bitmap font: assets/ui/font.png holds every glyph side by side (5x7 cells, any opaque pixel is ink) in the
+// order assets/ui/font.json lists them. Advance is 6px, line height 8px.
+import font from '../../assets/ui/font.json';
+import { assetImage } from './assets';
 
-const BITS: Record<string, number[][]> = {};
-for (const [ch, s] of Object.entries(G)) BITS[ch] = s.split('|').map(r => [...r].map(c => (c === '#' ? 1 : 0)));
+const CHARS = [...font.chars];
+let bits: Record<string, number[][]> | null = null;
+/** Each glyph as 7 rows of 5 bits, read from the font image the first time text is drawn. */
+function glyphs(): Record<string, number[][]> {
+  if (bits) return bits;
+  const img = assetImage('ui/font.png');
+  if (!img) return {};
+  const cv = document.createElement('canvas');
+  cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+  const c = cv.getContext('2d', { willReadFrequently: true })!;
+  c.drawImage(img, 0, 0);
+  const d = c.getImageData(0, 0, cv.width, cv.height).data, gw = font.glyphWidth, gh = font.glyphHeight;
+  bits = {};
+  CHARS.forEach((ch, i) => {
+    bits![ch] = Array.from({ length: gh }, (_, y) => Array.from({ length: gw }, (_, x) => (d[(y * cv.width + i * gw + x) * 4 + 3] >= 128 ? 1 : 0)));
+  });
+  return bits;
+}
 
 /** The font can draw this character (lowercase counts as uppercase). */
-export const hasGlyph = (ch: string): boolean => !!BITS[ch.toUpperCase()];
+export const hasGlyph = (ch: string): boolean => CHARS.includes(ch.toUpperCase());
 
 export const CHAR_W = 6;
 export const LINE_H = 8;
@@ -88,7 +43,7 @@ function tile(ch: string, color: string, scale: number, outline: string | null):
   const key = `${ch}|${color}|${scale}|${outline ?? ''}`;
   let t = tiles.get(key);
   if (!t) {
-    const g = BITS[ch] ?? BITS['?'], pad = outline ? 1 : 0;
+    const g = glyphs()[ch] ?? glyphs()['?'], pad = outline ? 1 : 0;
     t = document.createElement('canvas');
     t.width = 5 * scale + 2 * pad; t.height = 7 * scale + 2 * pad;
     const c = t.getContext('2d')!;
@@ -112,8 +67,8 @@ export function drawText(c: CanvasRenderingContext2D, s: string, x: number, y: n
   for (const raw of s) {
     const ch = raw.toUpperCase();
     if (ch !== ' ') {
-      if (fast) c.drawImage(tile(BITS[ch] ? ch : '?', color, scale, null), cx, cy);
-      else fillGlyph(c, BITS[ch] ?? BITS['?'], cx, cy, scale);
+      if (fast) c.drawImage(tile(glyphs()[ch] ? ch : '?', color, scale, null), cx, cy);
+      else fillGlyph(c, glyphs()[ch] ?? glyphs()['?'], cx, cy, scale);
     }
     cx += CHAR_W * scale;
   }
@@ -132,7 +87,7 @@ export function drawTextOutlined(c: CanvasRenderingContext2D, s: string, x: numb
   for (const raw of s) {
     const ch = raw.toUpperCase();
     // neighbours' outlines only reach the blank column between letters, so letter-at-a-time matches all-outlines-first
-    if (ch !== ' ') c.drawImage(tile(BITS[ch] ? ch : '?', color, scale, outline), cx - 1, cy - 1);
+    if (ch !== ' ') c.drawImage(tile(glyphs()[ch] ? ch : '?', color, scale, outline), cx - 1, cy - 1);
     cx += CHAR_W * scale;
   }
 }

@@ -1,0 +1,17 @@
+{
+  "frameWidth": 9,
+  "colors": {
+    "#": "#fcfcfc"
+  },
+  "names": [
+    "shield",
+    "steel",
+    "fire",
+    "frost",
+    "arcane",
+    "shadow",
+    "poison",
+    "nature",
+    "holy"
+  ]
+}
