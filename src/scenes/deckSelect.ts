@@ -8,7 +8,7 @@ import { CLASS_INFO } from '../game/classes';
 import { getArena, useStage } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getPortrait, teamColor, skinOf, mirrorSkin, type ClassId } from '../art/sprites';
-import { cardIconCanvas, ICON_SIZE } from '../art/cardIcons';
+import { drawIconAt, ICON_SIZE } from '../art/cardIcons';
 import { P, UW, screenRect, fillScreen, vy, vspan, spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { win, banner, stepTrail, plaque, GOLD, FRAME, INK, INK2, TRIM, PAPER, PAPER2, RED_INK, BLUE_INK, BURN } from './skin';
@@ -354,8 +354,7 @@ export class DeckSelectScene implements Scene {
   }
 
   private cardIcon(ui: Ctx, id: string, x: number, y: number, z: number): void {
-    const img = cardIconCanvas(id);
-    if (img) ui.drawImage(img, x, y, ICON_SIZE * z, ICON_SIZE * z);
+    drawIconAt(ui, id, x, y, z);
   }
 
   /** A deck's badge: its Mythic, or a ? for RANDOM and an empty slot for a deck without one. */
