@@ -183,20 +183,36 @@ function css([h, s, l]: [number, number, number]): string {
   return '#' + [r, g, b].map(v => Math.round(Math.min(1, Math.max(0, v + m)) * 255).toString(16).padStart(2, '0')).join('');
 }
 const plPals = new Map<string, string[]>();
+const hueGap = (a: number, b: number): number => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+/** The color each built-in skin name stands for, as the PixelLab skin target (the NES mid step). */
+const SKIN_HUE: Record<string, string> = {
+  red: '#d82800', blue: '#0058f8', green: '#00a800', yellow: '#f8b800',
+  purple: '#6844fc', pink: '#f878f8', black: '#3c3c3c', white: '#fcfcfc',
+};
 function plPalette(cls: ClassId, skinId: string): string[] {
   const pl = PL[cls], skin = skinOf(cls, skinId).id, key = `${cls}:${skin}`;
   let pal = plPals.get(key);
   if (pal) return pal;
   pal = pl.pal.slice();
-  const h = HIRES[cls], li = h.team.charCodeAt(0) - 97, from = h.pal[li], to = h.skins[skin]?.[h.team];
-  if (skin !== defaultSkin(cls) && to && to !== from) {
-    const [h0, s0, l0] = hsl(from), [h1, s1, l1] = hsl(to), [th, ts] = hsl(pl.pal[letterIndex(pl.team)]);
-    const near = (a: number, b: number): boolean => Math.min(Math.abs(a - b), 360 - Math.abs(a - b)) < 32;
+  const [th, ts, tl] = hsl(pl.pal[letterIndex(pl.team)]);
+  // a skin recolors the art's team color family to its named color; the art keeps its own colors when it already
+  // wears that hue, and the default skin also keeps them when it is black or white
+  let to: string | undefined = SKIN_HUE[skin];
+  // a black or white default (the Priest's robe) is worn as the robe: color skins also tint its light grays
+  const def = SKIN_HUE[defaultSkin(cls)], robe = !!def && hsl(def)[1] < 0.16 && !!to && skin !== defaultSkin(cls);
+  if (to && !robe) {
+    const [h1, s1] = hsl(to);
+    if (s1 >= 0.16 ? hueGap(h1, th) < 24 : skin === defaultSkin(cls)) to = undefined;
+  }
+  if (to && ts >= 0.16) {
+    // recolor the art's team color family (colors within 32 degrees of it) so its team color lands on the target
+    const [h1, s1, l1] = hsl(to), gray = s1 < 0.16;
     pal = pal.map((c, i) => {
       const [ch, cs, cl] = hsl(c);
-      if (i === 0 || cs < 0.16 || ts < 0.16 || !near(ch, th)) return c;
-      // grays and near-grays of the target keep their lightness; colors take the target's hue and saturation shift
-      return css([(ch + h1 - h0 + 360) % 360, Math.min(1, cs * (s0 > 0.05 ? s1 / s0 : 1)), Math.min(0.95, Math.max(0.04, cl + (l1 - l0) * 0.7))]);
+      if (robe && i && cs < 0.16 && cl > 0.55) return gray ? css([0, 0, cl * 0.42]) : css([h1, 0.45, cl * 0.92]);
+      if (i === 0 || cs < 0.16 || hueGap(ch, th) >= 32) return c;
+      const l = Math.min(0.95, Math.max(0.04, cl + (l1 - tl) * 0.8));
+      return gray ? css([ch, cs * 0.12, l]) : css([(ch + h1 - th + 360) % 360, Math.min(1, cs * s1 / ts), l]);
     });
   }
   plPals.set(key, pal);
