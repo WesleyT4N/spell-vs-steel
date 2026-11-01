@@ -1,0 +1,12 @@
+{
+  "name": "Impact fire big",
+  "desc": "A fire hit star, flash ring and spark shower (big hits and KOs).",
+  "fw": 72,
+  "fh": 64,
+  "n": 6,
+  "fps": 17.857,
+  "ax": 42,
+  "ay": 54,
+  "panels": 1,
+  "rows": 1
+}

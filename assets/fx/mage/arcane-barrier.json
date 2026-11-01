@@ -1,0 +1,12 @@
+{
+  "name": "Arcane Barrier",
+  "desc": "A hexagon-cell ward closes round the Mage.",
+  "fw": 54,
+  "fh": 54,
+  "n": 6,
+  "fps": 12.048,
+  "ax": 27,
+  "ay": 51,
+  "panels": 1,
+  "rows": 1
+}

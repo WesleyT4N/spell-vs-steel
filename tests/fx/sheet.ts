@@ -1,6 +1,7 @@
 // Contact sheets of battle effects on the real renderer: each row fires one attack or spell in a fresh battle and
 // draws evenly spaced frames of it, zoomed, with the effect's box marked. tests/fx/run.ts drives it; the job comes
 // in the URL hash as JSON (see Job).
+import '../../src/assetUrls';
 import { W, H, HD } from '../../src/engine/gfx';
 import { sheetsReady } from '../../src/fx/sheet';
 import { Battle, NO_INTENT } from '../../src/game/battle';

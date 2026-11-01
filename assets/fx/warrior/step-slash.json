@@ -1,0 +1,12 @@
+{
+  "name": "Step Slash",
+  "desc": "A long steel dash cut.",
+  "fw": 96,
+  "fh": 30,
+  "n": 9,
+  "fps": 15.873,
+  "ax": 47,
+  "ay": 40,
+  "panels": 2,
+  "rows": 1
+}

@@ -1,0 +1,12 @@
+{
+  "name": "Frost Nova (laid)",
+  "desc": "A frost rune turns on the floor.",
+  "fw": 48,
+  "fh": 24,
+  "n": 12,
+  "fps": 12.048,
+  "ax": 24,
+  "ay": 12,
+  "panels": 1,
+  "rows": 1
+}

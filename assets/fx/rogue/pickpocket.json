@@ -1,0 +1,12 @@
+{
+  "name": "Pickpocket",
+  "desc": "Gold coins pop out of the foe.",
+  "fw": 54,
+  "fh": 54,
+  "n": 14,
+  "fps": 14.925,
+  "ax": 23,
+  "ay": 46,
+  "panels": 1,
+  "rows": 1
+}

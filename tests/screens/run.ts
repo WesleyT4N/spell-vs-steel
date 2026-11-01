@@ -123,6 +123,7 @@ async function main(): Promise<void> {
   // read the screen list from the harness itself
   const probe = await browser.newPage();
   await probe.goto(pathToFileURL(harness).href);
+  await probe.waitForFunction(() => 'names' in ((window as unknown as { __test?: object }).__test ?? {}));
   const names = (await probe.evaluate(() => (window as unknown as { __test: { names: string[] } }).__test.names)).filter(n => !onlyScreens || onlyScreens.includes(n));
   await probe.close();
   const profiles = PROFILES.filter(p => !onlyProfiles || onlyProfiles.includes(p.name));

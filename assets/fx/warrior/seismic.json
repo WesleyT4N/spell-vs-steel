@@ -1,0 +1,12 @@
+{
+  "name": "Seismic",
+  "desc": "Stone spikes burst out of the panel.",
+  "fw": 35,
+  "fh": 40,
+  "n": 8,
+  "fps": 8,
+  "ax": 18,
+  "ay": 32,
+  "panels": 1,
+  "rows": 1
+}

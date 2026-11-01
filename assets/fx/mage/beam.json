@@ -1,0 +1,13 @@
+{
+  "name": "Arcane Comet",
+  "desc": "A big white-hot arcane orb with a long tail (the Mage's heavy shot).",
+  "fw": 97,
+  "fh": 35,
+  "n": 8,
+  "fps": 12.048,
+  "ax": 79,
+  "ay": 17,
+  "loop": true,
+  "panels": 1,
+  "rows": 1
+}

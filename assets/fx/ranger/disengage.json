@@ -1,0 +1,12 @@
+{
+  "name": "Disengage",
+  "desc": "Dust kicked out as the ranger leaps back.",
+  "fw": 53,
+  "fh": 29,
+  "n": 8,
+  "fps": 14.085,
+  "ax": 26,
+  "ay": 13,
+  "panels": 1,
+  "rows": 1
+}

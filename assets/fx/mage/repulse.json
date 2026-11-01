@@ -1,0 +1,13 @@
+{
+  "name": "Repulse",
+  "desc": "A crescent of force shedding wind flecks.",
+  "fw": 58,
+  "fh": 32,
+  "n": 5,
+  "fps": 15.873,
+  "ax": 40,
+  "ay": 16,
+  "loop": true,
+  "panels": 1,
+  "rows": 1
+}

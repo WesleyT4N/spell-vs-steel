@@ -1,0 +1,12 @@
+{
+  "name": "Ignite",
+  "desc": "Glowing cracks race across the floor, embers rising.",
+  "fw": 45,
+  "fh": 25,
+  "n": 11,
+  "fps": 12.048,
+  "ax": 22,
+  "ay": 15,
+  "panels": 1,
+  "rows": 3
+}

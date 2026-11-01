@@ -3,12 +3,13 @@
 import type { Stage } from '../../art/arena';
 import { XL, XR, YT, YB } from '../../art/ink';
 import { W, type Ctx } from '../../engine/gfx';
+import { assetImage } from '../../engine/assets';
 
 /** Image pixels per world pixel. */
 const K = 2;
 
 export interface Backdrop {
-  /** The panorama as a data URL (src/content/stages/art/<id>.ts, from tools/pixellab/build_stages.py). */
+  /** The panorama's file under assets/ (stages/<id>.png, from tools/pixellab/build_stages.py). */
   src: string;
   /** World y of the panorama's top row; pick it so the far wall's foot sits above the top panel row (y 98). */
   top: number;
@@ -29,10 +30,9 @@ function flipBand(c: Ctx, img: HTMLImageElement, sy: number, x: number, y: numbe
 /** `st` with its scenery swapped for a painted backdrop. Rows past the image's top and bottom edges repeat them. */
 export function withBackdrop(st: Stage, b: Backdrop): Stage {
   if (typeof Image === 'undefined') return st;   // headless (sims and tests) never draws
-  const img = new Image();
-  img.src = b.src;
   const draw = (c: Ctx): void => {
-    if (!img.complete || !img.naturalWidth) { c.fillStyle = b.fill; c.fillRect(XL, YT, XR - XL, YB - YT); return; }
+    const img = assetImage(b.src);
+    if (!img) { c.fillStyle = b.fill; c.fillRect(XL, YT, XR - XL, YB - YT); return; }
     const w = img.naturalWidth / K, h = img.naturalHeight / K, x = Math.round((W - w) / 2), y = b.top;
     c.drawImage(img, x, y, w, h);
     // past the edges the outer band repeats, mirrored each time so it never seams (floor below, sky above)

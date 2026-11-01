@@ -1,0 +1,12 @@
+{
+  "name": "Poison",
+  "desc": "Green poison bubbles rising and popping.",
+  "fw": 33,
+  "fh": 44,
+  "n": 16,
+  "fps": 12.048,
+  "ax": 14,
+  "ay": 50,
+  "panels": 1,
+  "rows": 1
+}

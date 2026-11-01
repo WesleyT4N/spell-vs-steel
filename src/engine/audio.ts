@@ -4,7 +4,8 @@ import { playReal, type RealOpts } from './sfxReal';
 import { playVoice, loadClips, type VoiceKind } from './voice';
 import { playCall, type Call } from './announcer';
 import type { ClassId } from '../art/sprites';
-import { TRACKS, type TrackId } from './musicTracks';
+import { TRACKS, trackFile, type TrackId } from './musicTracks';
+import { assetBytes } from './assets';
 
 let ctx: AudioContext | null = null;
 let master: GainNode, sfxBus: GainNode, stingBus: GainNode, voiceBus: GainNode, annBus: GainNode, realBus: GainNode, musicBus: GainNode;
@@ -192,13 +193,13 @@ export function announce(call: Call, args?: { n?: number; who?: string }): void 
 export function sfxFx(kind: string, o?: RealOpts): void { sfx('fx:' + kind, o); }
 
 // ---------- music ----------
-// Pre-rendered, sample-based tracks (scripts/music) shipped as looping MP3s. Each one decodes on first use.
+// Pre-rendered, sample-based tracks (scripts/music) shipped as looping MP3s in assets/audio/music/. Each one loads
+// and decodes on first use.
 const decoded = new Map<TrackId, Promise<AudioBuffer | null>>();
 function loadTrack(c: AudioContext, id: TrackId): Promise<AudioBuffer | null> {
   let p = decoded.get(id);
   if (!p) {
-    const bytes = Uint8Array.from(atob(TRACKS[id].mp3), ch => ch.charCodeAt(0));
-    p = c.decodeAudioData(bytes.buffer).catch(() => null);
+    p = assetBytes(trackFile(id)).then(b => b ? c.decodeAudioData(b) : null).catch(() => null);
     decoded.set(id, p);
   }
   return p;

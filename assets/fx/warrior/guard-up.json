@@ -1,0 +1,12 @@
+{
+  "name": "Guard Up",
+  "desc": "A steel ward bubble round the warrior.",
+  "fw": 33,
+  "fh": 33,
+  "n": 12,
+  "fps": 10,
+  "ax": 16,
+  "ay": 40,
+  "panels": 1,
+  "rows": 1
+}

@@ -1,0 +1,12 @@
+{
+  "name": "Counterspell",
+  "desc": "A ward ring flickers and bursts into shards.",
+  "fw": 41,
+  "fh": 55,
+  "n": 12,
+  "fps": 12.048,
+  "ax": 22,
+  "ay": 43,
+  "panels": 1,
+  "rows": 1
+}

@@ -30,6 +30,8 @@ jobs:
         run: npm run build
       - name: Player build
         run: npm run build:prod
+      - name: Native build (desktop and Android, asset files beside the page)
+        run: npm run build:native
       - name: Saves and migrations
         run: npx tsx tests/saves.ts
       - name: CPU vs CPU matches, every class pair

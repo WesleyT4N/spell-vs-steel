@@ -1,0 +1,12 @@
+{
+  "name": "Shadow Poof",
+  "desc": "A violet smoke poof: vanish and reappear.",
+  "fw": 53,
+  "fh": 43,
+  "n": 10,
+  "fps": 12.048,
+  "ax": 28,
+  "ay": 50,
+  "panels": 1,
+  "rows": 1
+}

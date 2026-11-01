@@ -1,0 +1,12 @@
+{
+  "name": "Dragon's Breath",
+  "desc": "A wall of flame roars on the panel.",
+  "fw": 34,
+  "fh": 25,
+  "n": 8,
+  "fps": 12.048,
+  "ax": 17,
+  "ay": 23,
+  "panels": 1,
+  "rows": 1
+}

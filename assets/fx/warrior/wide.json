@@ -1,0 +1,12 @@
+{
+  "name": "Wide Swing",
+  "desc": "The cleave crescent on every row of the column.",
+  "fw": 61,
+  "fh": 57,
+  "n": 8,
+  "fps": 15.873,
+  "ax": 24,
+  "ay": 50,
+  "panels": 1,
+  "rows": 3
+}

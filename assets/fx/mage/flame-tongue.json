@@ -1,0 +1,12 @@
+{
+  "name": "Flame Tongue",
+  "desc": "One big flame whips up off the burning panel.",
+  "fw": 25,
+  "fh": 30,
+  "n": 8,
+  "fps": 12.048,
+  "ax": 13,
+  "ay": 28,
+  "panels": 1,
+  "rows": 1
+}

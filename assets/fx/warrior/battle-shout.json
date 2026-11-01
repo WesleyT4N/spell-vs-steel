@@ -1,0 +1,12 @@
+{
+  "name": "Battle Shout",
+  "desc": "A steel shockwave ring rolls out from the feet.",
+  "fw": 68,
+  "fh": 30,
+  "n": 8,
+  "fps": 14.085,
+  "ax": 34,
+  "ay": 15,
+  "panels": 1,
+  "rows": 1
+}

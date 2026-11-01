@@ -1,0 +1,12 @@
+{
+  "name": "Eviscerate",
+  "desc": "A crimson X cut with a glint and sparks.",
+  "fw": 36,
+  "fh": 43,
+  "n": 10,
+  "fps": 15.873,
+  "ax": 17,
+  "ay": 40,
+  "panels": 1,
+  "rows": 1
+}

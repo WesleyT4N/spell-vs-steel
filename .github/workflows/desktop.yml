@@ -36,8 +36,8 @@ jobs:
       - name: Version from the tag
         if: env.TAG != ''
         run: npm version --no-git-tag-version --allow-same-version "${TAG#v}"
-      - name: Player build
-        run: npm run build:prod
+      - name: Player build (asset files beside the page)
+        run: npm run build:native
       # electron-builder makes the Windows portable .exe on Linux without Wine (no signing)
       - name: Package
         run: npx electron-builder --win portable --linux AppImage --publish never
@@ -64,8 +64,8 @@ jobs:
           java-version: 21
           cache: gradle
       - run: npm ci
-      - name: Player build
-        run: npm run build:prod
+      - name: Player build (asset files beside the page)
+        run: npm run build:native
       - name: Copy the game into the Android project
         run: npx cap sync android
       # the runner image has the Android SDK; the APK is signed with the play-test key from the repo secrets

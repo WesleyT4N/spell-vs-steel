@@ -1,0 +1,12 @@
+{
+  "name": "Last Stand Blast",
+  "desc": "A crimson wall of fire on every row.",
+  "fw": 48,
+  "fh": 35,
+  "n": 8,
+  "fps": 12.048,
+  "ax": 24,
+  "ay": 30,
+  "panels": 1,
+  "rows": 3
+}

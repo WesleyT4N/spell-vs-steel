@@ -1,0 +1,12 @@
+{
+  "name": "Ice Shatter",
+  "desc": "A cold flash and ring, then shards tumble.",
+  "fw": 33,
+  "fh": 43,
+  "n": 10,
+  "fps": 12.048,
+  "ax": 17,
+  "ay": 40,
+  "panels": 1,
+  "rows": 1
+}

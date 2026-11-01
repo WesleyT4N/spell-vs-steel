@@ -1,0 +1,12 @@
+{
+  "name": "Heal",
+  "desc": "A gold glow bursts and plus signs float up.",
+  "fw": 36,
+  "fh": 60,
+  "n": 14,
+  "fps": 14.085,
+  "ax": 18,
+  "ay": 66,
+  "panels": 1,
+  "rows": 1
+}

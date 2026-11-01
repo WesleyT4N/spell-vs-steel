@@ -1,7 +1,9 @@
 # Desktop and Android builds
 
 The game ships to PCs as an Electron app, and to Android phones as a Capacitor app, both wrapped around
-the player build (`dist-prod/index.html`).
+the native player build (`npm run build:native` → `dist-native/`): `index.html` with the game's script and its
+art and audio as real files beside it, loaded by relative path. (The web links use the one-file `dist-prod`
+build instead, with every asset packed into the page; see [ASSETS.md](ASSETS.md).)
 
 | Command | What it does |
 | --- | --- |
@@ -11,7 +13,7 @@ the player build (`dist-prod/index.html`).
 
 Both package commands work from Linux; no Wine is needed because nothing is signed.
 
-`npm run android:sync` copies the player build into `android/`; then `cd android && ./gradlew assembleDebug`
+`npm run android:sync` copies the native player build into `android/`; then `cd android && ./gradlew assembleDebug`
 (needs the Android SDK, or open `android/` in Android Studio).
 
 ## Sharing a build

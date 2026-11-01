@@ -1,0 +1,12 @@
+{
+  "name": "Rampage",
+  "desc": "A fast rage-gold swing across the target.",
+  "fw": 49,
+  "fh": 45,
+  "n": 9,
+  "fps": 15.873,
+  "ax": 22,
+  "ay": 51,
+  "panels": 1,
+  "rows": 1
+}

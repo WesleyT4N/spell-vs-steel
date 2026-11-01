@@ -1,0 +1,13 @@
+{
+  "name": "Fireball",
+  "desc": "A boiling fireball with a comet tail and embers.",
+  "fw": 67,
+  "fh": 31,
+  "n": 8,
+  "fps": 12.048,
+  "ax": 51,
+  "ay": 15,
+  "loop": true,
+  "panels": 1,
+  "rows": 1
+}

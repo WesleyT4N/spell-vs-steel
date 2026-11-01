@@ -1,0 +1,12 @@
+{
+  "name": "Ice Spikes",
+  "desc": "Faceted ice spikes stab up out of the floor and sink back.",
+  "fw": 35,
+  "fh": 38,
+  "n": 14,
+  "fps": 14.085,
+  "ax": 19,
+  "ay": 34,
+  "panels": 1,
+  "rows": 1
+}

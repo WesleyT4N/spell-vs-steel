@@ -1,0 +1,13 @@
+{
+  "name": "Arcane Missile",
+  "desc": "A small homing arcane orb with a tapered tail.",
+  "fw": 40,
+  "fh": 19,
+  "n": 8,
+  "fps": 12.048,
+  "ax": 30,
+  "ay": 9,
+  "loop": true,
+  "panels": 1,
+  "rows": 1
+}

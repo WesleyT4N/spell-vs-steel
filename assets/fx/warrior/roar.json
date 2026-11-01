@@ -1,0 +1,12 @@
+{
+  "name": "Roar",
+  "desc": "A rage-gold shockwave ring rolls out from the feet.",
+  "fw": 72,
+  "fh": 32,
+  "n": 8,
+  "fps": 14.085,
+  "ax": 36,
+  "ay": 16,
+  "panels": 1,
+  "rows": 1
+}

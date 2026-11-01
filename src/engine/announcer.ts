@@ -1,4 +1,4 @@
-// Fighting-game announcer: recorded lines (voiceClips, from scripts/voices) over synthesized stingers
+// Fighting-game announcer: recorded lines (assets/audio/voice, from scripts/voices) over synthesized stingers
 // (drum hits, a crash, a crowd roar) in a big stone hall.
 import { playAnnouncerLine } from './voice';
 

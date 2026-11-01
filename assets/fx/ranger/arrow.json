@@ -1,0 +1,13 @@
+{
+  "name": "Arrow",
+  "desc": "A fletched arrow with a few air streaks.",
+  "fw": 86,
+  "fh": 39,
+  "n": 12,
+  "fps": 12.048,
+  "ax": 60,
+  "ay": 20,
+  "loop": true,
+  "panels": 1,
+  "rows": 1
+}

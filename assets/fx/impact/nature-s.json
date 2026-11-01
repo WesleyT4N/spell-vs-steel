@@ -1,0 +1,12 @@
+{
+  "name": "Impact nature small",
+  "desc": "A nature hit star with sparks (light hits).",
+  "fw": 48,
+  "fh": 54,
+  "n": 6,
+  "fps": 17.857,
+  "ax": 30,
+  "ay": 48,
+  "panels": 1,
+  "rows": 1
+}

@@ -1,0 +1,12 @@
+{
+  "name": "Mortal Strike",
+  "desc": "A steel cross-cut with a burst of sparks.",
+  "fw": 31,
+  "fh": 36,
+  "n": 12,
+  "fps": 15.873,
+  "ax": 15,
+  "ay": 37,
+  "panels": 2,
+  "rows": 1
+}

@@ -1,3 +1,4 @@
+import './assetUrls';
 import { W, H, UW, UH, HD, P, view, setView, viewSize, splitLift, screenRect, spread, MIN_ASPECT, PORTRAIT_MIN_ASPECT, TALL_MIN_ASPECT } from './engine/gfx';
 import { drawTextCentered } from './engine/font';
 import { initInput, endFrame, wasPressed, page, pollInput, releaseAll } from './engine/input';
@@ -11,6 +12,7 @@ import './mods/boot';
 import { endTextFields } from './engine/textField';
 import { setDefaultSink } from './game/events';
 import { playBattleEvent } from './engine/battleAudio';
+import { loadImages } from './engine/assets';
 import { touchActive, onTouchChange, layout as layoutPad, syncPad, touchText, viewport } from './engine/touch';
 
 // The game screen is the sharp UI resolution. The world draws at 240×160 offscreen and is scaled up 2×
@@ -85,13 +87,6 @@ window.addEventListener('keydown', () => { page.engaged = true; });
 // in the background: let go of held keys, hush the audio and let the screen pause itself (single-player fights do)
 platform.lifecycle.onHide(() => { releaseAll(); setAudioSuspended(true); getScene()?.suspend?.(); });
 platform.lifecycle.onShow(() => setAudioSuspended(false));
-// a shared online link (?room=CODE) goes straight to joining that room
-const room = new URLSearchParams(location.search).get('room');
-// the title is always the bottom of the scene stack: BACK from the first screen lands there
-setHome(() => new TitleScene());
-if (room) setScene(new OnlineScene(room)); else goHome();
-// dev builds can open a dev tool straight from the URL (#cards, #sandbox, #lab, #art, #dev)
-if (DEV_TOOLS && !room && location.hash.length > 1) void import('./scenes/devMenu').then(m => m.devFromHash());
 
 const STEP = 1 / 60;
 let acc = 0;
@@ -151,7 +146,18 @@ function frame(now: number): void {
   canvas.style.cursor = hotZone() ? 'pointer' : 'default';
   requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+// The game starts once every image asset has decoded (see engine/assets.ts), so no screen ever draws without its art.
+/** Resolves when the first screen is up (the screen tests wait on it). */
+export const ready: Promise<void> = loadImages().then(() => {
+  // a shared online link (?room=CODE) goes straight to joining that room
+  const room = new URLSearchParams(location.search).get('room');
+  // the title is always the bottom of the scene stack: BACK from the first screen lands there
+  setHome(() => new TitleScene());
+  if (room) setScene(new OnlineScene(room)); else goHome();
+  // dev builds can open a dev tool straight from the URL (#cards, #sandbox, #lab, #art, #dev)
+  if (DEV_TOOLS && !room && location.hash.length > 1) void import('./scenes/devMenu').then(m => m.devFromHash());
+  requestAnimationFrame(frame);
+});
 
 // Debug hook for automated playtests.
 (window as unknown as { __svs: unknown }).__svs = { getScene, zones: liveZones, view };

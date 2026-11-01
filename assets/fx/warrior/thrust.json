@@ -1,0 +1,12 @@
+{
+  "name": "Thrust",
+  "desc": "A long steel spear streak.",
+  "fw": 116,
+  "fh": 20,
+  "n": 7,
+  "fps": 15.873,
+  "ax": 6,
+  "ay": 34,
+  "panels": 4,
+  "rows": 1
+}
