@@ -10,6 +10,7 @@ export const ROW = FACE + LIP;
 import type { Ctx } from '../engine/gfx';
 import type { Battle, Fx, Projectile } from './battle';
 import { team } from './teamColors';
+import { drawSheet, sheetFrame, type Sheet, type PickModule } from '../fx/sheet';
 
 /** The painter pixelfx hands an effect (see src/vendor/pixelfx/painter.js). Loosely typed: the vendored core is JS. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,11 +67,21 @@ export function drawPfx(c: Ctx, b: Battle, e: Fx): boolean {
   const mod = registry.get(e.kind);
   if (!mod) return false;
   const { meta } = mod, flip = e.side === 1;
+  const pick = (mod as Partial<PickModule>).pick;
+  if (pick) {
+    const s = pick(e.data ?? {});
+    if (!s) return false;
+    const f = panelFoot(e.col, e.row);
+    drawSheet(c, s, e.t >= e.dur ? -1 : sheetFrame(s, Math.min(1, e.t / e.dur) * (s.n / s.fps)), f.x, f.y, flip);
+    return true;
+  }
   // keyed by when and where the fx started, not by object: a rollback resimulates the same hit as a new fx
   const key = `${e.kind}|${(b.time - e.t).toFixed(3)}|${e.side}|${e.col}|${e.row}`;
   let map = lives.get(b);
   if (!map) lives.set(b, map = new Map());
   const tt = Math.min(1, e.t / e.dur) * meta.duration;
+  const sheet = (mod as { sheet?: Sheet }).sheet;
+  if (sheet) { const f = panelFoot(e.col, e.row); drawSheet(c, sheet, e.t >= e.dur ? -1 : sheetFrame(sheet, tt), f.x, f.y, flip); return true; }
   const box = boxOf(meta), foot = panelFoot(e.col, e.row);
   let live = map.get(key);
   if (!live || tt < live.tt) {
@@ -126,6 +137,8 @@ export function drawShotPfx(c: Ctx, b: Battle, p: Projectile, x: number, y: numb
   const { meta } = mod, flip = dir < 0;
   const h = p.homing;
   const age = h ? h.p * h.dur : Math.abs((p.x - (p.from ?? p.x)) / (p.speed || 1));
+  const sheet = (mod as { sheet?: Sheet }).sheet;
+  if (sheet) { drawSheet(c, sheet, sheetFrame({ ...sheet, loop: true }, age), x, y, flip); return true; }
   const key = `shot|${p.kind}|${p.side}|${p.row}|${p.from ?? ''}|${p.speed}|${h ? `${h.sx},${h.sy}` : ''}`;
   let map = lives.get(b);
   if (!map) lives.set(b, map = new Map());
