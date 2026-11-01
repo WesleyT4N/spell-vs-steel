@@ -10,3 +10,5 @@ dist-fx
 test-results
 release
 *.keystore
+dist-lowpoly
+dist-test-lowpoly

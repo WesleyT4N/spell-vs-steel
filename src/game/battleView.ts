@@ -24,6 +24,9 @@ import { endPfxFrame, drawShotPfx } from './pfx';
 import '../fx';
 import { isHome, setHome, team } from './teamColors';
 import { FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawBurn, drawFrozen, drawFx, drawParticles, useParticles } from './fxView';
+import { LOWPOLY } from '../flags';
+import { drawBattle3D, panel3d } from '../lowpoly/battle3d';
+import type { Look } from './fighterAnim';
 
 /** Whose hidden things (traps, a stealthed fighter) are visible: one side's, or everything in the dev sandbox. */
 export type Viewer = Side | 'all';
@@ -43,7 +46,9 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
   const kick = kickOffset(b, hitStop);
   if (b.shake > 0) c.translate(Math.round((Math.random() - 0.5) * 4 * Math.min(1, b.shake * 4)), Math.round((Math.random() - 0.5) * 3 * Math.min(1, b.shake * 4)));
   if (kick.x || kick.y) c.translate(kick.x, kick.y);
-  drawStage(c, a, tick, b.cheer);
+  // the low-poly build draws the stage, panels and every body in 3D (src/lowpoly/), then the 2D overlays on top
+  const lp = LOWPOLY && lp3d.ok;
+  if (!lp) drawStage(c, a, tick, b.cheer);
 
   // panels (with the rows flying shots are about to cross lit up)
   const shots = shotPaths(b);
@@ -51,7 +56,9 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
     const p = b.panels[col][r];
     const holeAge = since(b, 'hole', col, r, p.hole > 0), crackAge = since(b, 'crack', col, r, p.cracked && p.hole <= 0);
     // a broken panel blinks back in over its last 0.8s, like BN
-    if (p.hole > 0 && !(p.hole < 0.8 && Math.floor(p.hole * 10) % 2 === 0)) { drawHole(c, col, r, isHome(p.owner), a, holeAge); continue; }
+    const gone = p.hole > 0 && !(p.hole < 0.8 && Math.floor(p.hole * 10) % 2 === 0);
+    if (gone && lp) { panel3d(col, r, { hole: true, state: 'clean', mine: isHome(p.owner) }); continue; }
+    if (gone) { drawHole(c, col, r, isHome(p.owner), a, holeAge); continue; }
     const state: PanelState = p.hole > 0 ? 'clean' : p.burn > 0 ? 'burning' : p.cracked ? 'cracked' : 'clean';
     const tint: PanelTint | undefined = p.hole > 0 ? undefined : p.burn > 0 ? 'fire' : p.toxic > 0 ? 'poison' : p.curse > 0 ? 'shadow' : p.bless > 0 ? 'holy' : undefined;
     const mark = b.marks.find(m => m.col === col && m.row === r);
@@ -64,7 +71,17 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
         if (f.st.frostNova > 0 && !f.frostNovaUsed && p.owner !== f.side && Math.abs(col - f.col) <= TUNING.frostNovaRange) hl = '#a4e4fc';
       }
     }
-    drawPanel(c, col, r, state, tick, isHome(p.owner), hl, a, { crackAge, tint, time: b.time });
+    if (lp) panel3d(col, r, { hole: false, state, tint, mine: isHome(p.owner), hl });
+    else drawPanel(c, col, r, state, tick, isHome(p.owner), hl, a, { crackAge, tint, time: b.time });
+  }
+  if (lp) {
+    // every fighter's animation state, worked out once and shared by the 3D bodies and their 2D overlays
+    lp3d.looks.clear();
+    for (const f of b.f) {
+      const held = f.st.frozen > 0 || f.st.iceBlock > 0 || f.st.stunned > 0 || f.st.sleep > 0;
+      lp3d.looks.set(f, lookOf(b, f, observe(b, f), held));
+    }
+    lp3d.ok = drawBattle3D(c, b, a, me, lp3d.looks);
   }
   // Frost Nova / Glacial zones get a frosty tint on the trigger columns
   for (const f of b.f) {
@@ -90,7 +107,7 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
     for (const w of b.walls) if (w.row === r) drawWall(c, w, b.time);
     for (const f of b.everyone()) if (f.row === r) { if (f.mob) drawMob(c, b, f, tick); else drawFighter(c, b, f, tick, me); }
   }
-  for (const p of b.pets) drawPet(c, b, p, tick);
+  if (!lp) for (const p of b.pets) drawPet(c, b, p, tick);
   for (const pr of b.projectiles) drawProjectile(c, b, pr);
   for (const w of b.warns) if (w.kind === 'reticle') drawReticle(c, w, b.time);
   for (const e of b.fx) drawFx(c, b, e);
@@ -99,6 +116,9 @@ export function drawBattle(c: Ctx, b: Battle, tick: number, me: Viewer = 0, hitS
   noteImpacts(b);
   endPfxFrame(b);
 }
+
+/** The low-poly build's 3D pass: whether WebGL works here, and this frame's fighter looks. */
+const lp3d = { ok: true, looks: new Map<Fighter, Look>() };
 
 /** When each panel's crack and hole appeared, in battle time: view-only, for the crack-in and crumble animations. */
 const panelT = new WeakMap<Battle, Record<'crack' | 'hole', number[]>>();
@@ -352,7 +372,8 @@ function drawWall(c: Ctx, w: Wall, time: number): void {
   const cx = Math.round(f.x), base = Math.round(f.y + 1);
   const pct = Math.max(0, w.hp / w.maxHp);
   let top: number;
-  if (w.kind === 'stone') top = drawTowerShield(c, w, cx, base, pct);
+  if (LOWPOLY && lp3d.ok) top = base - (w.kind === 'glacial' ? 32 : w.kind === 'bear' ? 30 : 26);
+  else if (w.kind === 'stone') top = drawTowerShield(c, w, cx, base, pct);
   else if (w.kind === 'ice') top = drawIceShards(c, w, cx, base, pct, time);
   else if (w.kind === 'holy') top = drawLightWall(c, cx, base, time);
   else if (w.kind === 'bear') top = drawBear(c, w, cx, base, time);
@@ -488,12 +509,17 @@ function fighterPos(_b: Battle, f: Fighter): { x: number; y: number } {
 function drawMob(c: Ctx, b: Battle, f: Fighter, tick: number): void {
   const m = f.mob!, s = getMobSprite(m.kind);
   const { x, y } = fighterPos(b, f);
+  if (LOWPOLY && lp3d.ok && f.dead) return;
   if (f.dead) {
     // a K.O.'d monster blinks out over half a second
     if (m.deadT > 0.5 || tick % 2) return;
     c.globalAlpha = 1 - m.deadT * 1.6;
     drawFighterSprite(c, s, x, y + 2, true, 'flash');
     c.globalAlpha = 1;
+    return;
+  }
+  if (LOWPOLY && lp3d.ok) {
+    if (f.shields.some(sh => sh.hp > 0) && tick % 6 < 4) { P(c, '#a4e4fc', x - 9, y - s.h + 4, 1, s.h - 6); P(c, '#a4e4fc', x + 8, y - s.h + 4, 1, s.h - 6); }
     return;
   }
   const float = m.kind === 'wisp' ? Math.round(Math.sin(b.time * 3 + f.row) * 1.5) - 3 : 0;
@@ -511,13 +537,15 @@ function drawMob(c: Ctx, b: Battle, f: Fighter, tick: number): void {
 
 function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): void {
   const s = getSprite(f.cls, f.skin, f.alt);
+  const lp = LOWPOLY && lp3d.ok;
   // Shadow Clone: the decoy looks like the Rogue
-  if (f.st.decoy > 0 && !f.dead) {
+  if (f.st.decoy > 0 && !f.dead && !lp) {
     const dp = fighterPos(b, { ...f, col: f.decoyCol, row: f.decoyRow, dx: 0, dy: 0 });
     c.globalAlpha = me === 'all' || me === f.side ? 0.6 : 1; drawFighterSprite(c, s, dp.x, dp.y + 2, f.side === 1, 'none'); c.globalAlpha = 1;
   }
   // Stealth: a transparent shimmer with an outline (the owner sees it a little clearer)
   if (f.st.stealth > 0 && !f.dead) {
+    if (lp) return;
     const { x, y } = fighterPos(b, f);
     const mine = me === 'all' || me === f.side;
     c.globalAlpha = mine ? 0.45 : 0.16 + (tick % 6 < 3 ? 0.08 : 0);
@@ -528,15 +556,16 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
   const { x, y } = fighterPos(b, f);
   const flip = f.side === 1;
   const held = f.st.frozen > 0 || f.st.iceBlock > 0 || f.st.stunned > 0 || f.st.sleep > 0;
-  const as = observe(b, f), look = lookOf(b, f, as, held);
+  const as = observe(b, f), look = (lp && lp3d.looks.get(f)) || lookOf(b, f, as, held);
   // heavy: a short wind-back, then a deep lunge into the swing (the frames draw the swing itself)
   const lean = f.pose === 'attack' ? 1 : f.pose === 'heavy' ? (f.poseT > 0.26 ? -1 : 2) : 0;
   const fx = Math.round(x + lean * b.dir(f) + look.ox), fy = Math.round(y + look.oy);
   const fs = getFrame(f.cls, f.skin, f.alt, look.frame);
   const ghost = (gx: number, gy: number, fr: FrameId): void => drawFighterPosed(c, getFrame(f.cls, f.skin, f.alt, fr), gx, gy + 2, flip, 'ghost');
-  drawUnder(c, b, f, as, fs, x, y, flip, ghost);
+  if (!lp) drawUnder(c, b, f, as, fs, x, y, flip, ghost);
   // shadow (stays on the floor while the fighter hops; gone once they've left the field)
-  if (!(f.dead && look.hide)) { P(c, '#000000', fx - 5, y, 10, 1); P(c, '#000000', fx - 4, y + 1, 8, 1); }
+  if (!(f.dead && look.hide) && !lp) { P(c, '#000000', fx - 5, y, 10, 1); P(c, '#000000', fx - 4, y + 1, 8, 1); }
+  if (f.dead && lp) return;
   if (f.dead) {
     if (!look.hide) {
       c.globalAlpha = look.alpha;
@@ -573,15 +602,17 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
   let tint: Tint = 'none';
   if (f.flash > 0 || (ready && tick % 4 === 0)) tint = 'flash';
   else if ((f.st.stunned > 0 || f.st.sleep > 0) && tick % 2) tint = 'stun';
-  drawFighterPosed(c, fs, fx, fy + 2, flip, tint, look.pose);
-  drawOver(c, b, f, as, fs, look, fx, fy, flip);
+  if (!lp) {
+    drawFighterPosed(c, fs, fx, fy + 2, flip, tint, look.pose);
+    drawOver(c, b, f, as, fs, look, fx, fy, flip);
+  }
 
   // transform glows
   if (f.st.avatar > 0 || f.st.ascendance > 0) {
     const col = f.st.avatar > 0 ? '#f8b800' : '#f878f8';
     for (let i = 0; i < 4; i++) P(c, col, fx - 8 + ((tick * 3 + i * 5) % 16), y - 4 - ((tick * 2 + i * 7) % 20), 1, 2);
   }
-  drawFrozen(c, b, f, fs, fx, y, flip);
+  if (!lp) drawFrozen(c, b, f, fs, fx, y, flip);
   // shields
   for (const sh of f.shields) {
     if (sh.hp <= 0) continue;
@@ -612,7 +643,7 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
   }
   if (f.dots.length) for (let i = 0; i < f.dots.length * 2; i++) { const t = (b.time * 1.2 + i / (f.dots.length * 2)) % 1; P(c, t > 0.7 ? SHADOW[1] : SHADOW[2], fx - 6 + i * 4, y - 8 - Math.floor(t * 14), 2, 2); }
   if (f.st.channel > 0) for (let i = 0; i < 4; i++) P(c, HOLY[2 + (i % 2)], fx - 8 + ((tick * 3 + i * 5) % 16), y - 4 - ((tick * 2 + i * 7) % 20), 1, 2);
-  if (f.st.untargetable > 0 && tick % 2) { c.globalAlpha = 0.5; drawFighterSprite(c, s, fx, y + 2, flip, 'ghost'); c.globalAlpha = 1; }
+  if (f.st.untargetable > 0 && tick % 2 && !lp) { c.globalAlpha = 0.5; drawFighterSprite(c, s, fx, y + 2, flip, 'ghost'); c.globalAlpha = 1; }
   if (f.st.deathMark > 0 && tick % 8 < 5) drawText(c, '×', fx - 2, y - s.h - 16, '#9878f8');
   if (f.st.hunted > 0 && tick % 8 < 5) { P(c, '#f83800', fx - 1, y - s.h - 14, 3, 1); P(c, '#f83800', fx, y - s.h - 15, 1, 3); }
 

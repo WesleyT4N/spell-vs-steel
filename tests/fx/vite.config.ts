@@ -8,6 +8,7 @@ export default defineConfig({
   root,
   plugins: [viteSingleFile()],
   define: { __DEV_TOOLS__: 'false' },
+  resolve: { alias: [{ find: /^\.\.\/lowpoly\/battle3d$/, replacement: fileURLToPath(new URL('../../src/lowpoly/stub.ts', import.meta.url)) }] },
   build: {
     outDir: 'dist-fx',
     emptyOutDir: true,
