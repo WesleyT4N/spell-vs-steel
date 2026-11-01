@@ -59,8 +59,10 @@ export interface SkinArt {
   pal: string[];
   /** Palette letter of the main cloth color (HUD ribbons, swatches). */
   team: string;
-  /** Column of the feet in the frames. */
+  /** Column of the feet in the frames, in sprite pixels. */
   ax: number;
+  /** Sprite pixels per world pixel (2 for the 48px HD fighters). */
+  res: number;
   /** Animation frames, the same ids and size as the class's own; idle0 is required, missing ones fall back to it. */
   frames: Partial<Record<FrameId, string[]>>;
   /** Character select bust, the same size as the class's own portrait. */
@@ -128,6 +130,18 @@ export function addSkin(cls: ClassId, skin: Skin): boolean {
   const list = SKINS[cls];
   if (!list || list.some(s => s.id === skin.id)) return false;
   list.push(skin);
+  return true;
+}
+
+/** Take a mod skin off a class again (a mod switched off or deleted). Built-in skins stay. */
+export function removeSkin(cls: ClassId, id: string): boolean {
+  const list = SKINS[cls], i = list ? list.findIndex(s => s.id === id && s.art) : -1;
+  if (i < 0) return false;
+  list.splice(i, 1);
+  // drop everything drawn from it, so a skin of the same id added later is drawn fresh
+  for (const m of [cache, frameCache, portraitCache] as Array<Map<string, unknown>>) {
+    for (const k of [...m.keys()]) if (k === `${cls}:${id}` || k.startsWith(`${cls}:${id}:`)) m.delete(k);
+  }
   return true;
 }
 
@@ -272,7 +286,7 @@ export function getSprite(cls: ClassId, skin: string, alt: boolean): Sprite {
     for (const t of tints) img[t] = bake({ rows }, pal, t);
     const art = skinOf(cls, skin).art, pl = !art && PL[cls];
     const ax = art ? artStill(art).ax : pl ? pl.ax : USE_HIRES ? HIRES[cls].ax : def.ax;
-    const res = pl ? PL_RES : RES;
+    const res = art ? art.res : pl ? PL_RES : RES;
     s = { w: rows[0].length / res, h: rows.length / res, ax: ax / res, res, img };
     cache.set(key, s);
   }
@@ -290,7 +304,7 @@ export function getFrame(cls: ClassId, skin: string, alt: boolean, frame: FrameI
     const { pal } = skinned(cls, skin, alt), rows = set.frames[id]!;
     const img = {} as Record<Tint, HTMLCanvasElement>;
     for (const t of ['none', 'flash', 'ice', 'stun', 'ghost'] as Tint[]) img[t] = bake({ rows }, pal, t);
-    const res = pl ? PL_RES : 1;
+    const res = art ? art.res : pl ? PL_RES : 1;
     s = { w: rows[0].length / res, h: rows.length / res, ax: set.ax / res, res, img };
     frameCache.set(key, s);
   }
@@ -392,7 +406,7 @@ export function spriteRows(s: Sprite): Array<Array<[number, string]>> {
 export function teamColor(cls: ClassId, skin: string, alt: boolean): string {
   // the tabard (Warrior h), robe (Mage c) or the mid tint tone (c) of the Classic set
   const art = skinOf(cls, skin).art;
-  if (art) return art.pal[art.team.charCodeAt(0) - 97];
+  if (art) return art.pal[letterIndex(art.team)];
   if (PL[cls]) return skinned(cls, skin, alt).pal[letterIndex(PL[cls].team)];
   if (USE_HIRES) return skinned(cls, skin, alt).pal[HIRES[cls].team.charCodeAt(0) - 97];
   return skinned(cls, skin, alt).pal[cls === 'warrior' ? 7 : 2];

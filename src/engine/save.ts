@@ -40,7 +40,12 @@ export interface SaveData {
   touch: Obj | null;
   /** Sets won and lost by class and mode, and spell decks played (see Profile in game/profile.ts). */
   profile: Obj | null;
+  /** Mods switched off by id, and the mod files the player imported (see src/mods). */
+  mods: SavedMods | null;
 }
+
+/** The MODS screen's section: ids of mods switched off, and imported mod files as their text. */
+export interface SavedMods { off: string[]; imported: Array<{ id: string; text: string }> }
 
 /** One of the player's own spell decks: an id unique within its class, a name, and card id -> copies. */
 export interface SavedDeck { id: string; name: string; cards: Record<string, number> }
@@ -62,7 +67,7 @@ interface Envelope { game: string; v: number; data: unknown }
 
 const defaults = (): SaveData => ({
   keys: {}, p2keys: {}, pads: null, audio: {}, muted: false, decks: {}, match: null, training: null,
-  tutorialDone: false, arcade: {}, rating: null, rankedPending: null, labScript: null, touch: null, profile: null,
+  tutorialDone: false, arcade: {}, rating: null, rankedPending: null, labScript: null, touch: null, profile: null, mods: null,
 });
 
 /** MIGRATIONS[n] turns a version n-1 save into version n. Never edit a shipped entry; add the next one. */
@@ -132,6 +137,11 @@ function normalize(raw: Obj): SaveData {
     labScript: typeof r.labScript === 'string' ? r.labScript : null,
     touch: objOr(r.touch, d.touch),
     profile: objOr(r.profile, d.profile),
+    mods: isObj(r.mods) ? {
+      off: Array.isArray(r.mods.off) ? r.mods.off.filter((x): x is string => typeof x === 'string') : [],
+      imported: Array.isArray(r.mods.imported) ? r.mods.imported.map(clean)
+        .filter(m => typeof m.id === 'string' && typeof m.text === 'string').map(m => ({ id: m.id as string, text: m.text as string })) : [],
+    } : null,
   };
 }
 
