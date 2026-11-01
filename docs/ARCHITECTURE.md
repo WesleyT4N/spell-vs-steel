@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at 19e2052 (2026-10-31).
+How the game is put together, one section per system. Describes `main` at 4817ec6 (2026-11-01).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -13,6 +13,7 @@ The full version, with a drawn diagram per system, is the living doc: https://cl
 - [Rendering and art pipeline](#rendering-and-art-pipeline)
 - [Audio](#audio)
 - [UI and screens](#ui-and-screens)
+- [Expedition mode](#expedition-mode)
 - [Input and platform](#input-and-platform)
 - [CPU AI and styles](#cpu-ai-and-styles)
 - [Balance tooling](#balance-tooling)
@@ -244,6 +245,8 @@ flowchart BT
 
 Each stage is a module in `content/stages/`, registered in `content/stages/index.ts` (order = stage select and online vote order; new stages go at the end). `StageDef` (`content/stages/inked.ts`) = id, battle `music` (a track id from `engine/musicTracks.ts`), name, tag, `PanelLook`, panel `tex()`, up to four layer painters; `inkedStage(def)` wraps one as a `StageModule`. `getStage(id)` builds and caches; `stageMusic(id)` gives the battle theme (Colosseum theme if none); `STAGE_IDS` feeds stage select. `art/ink.ts` is the Inked toolkit. Online, both players vote; a tie wins, otherwise a seeded coin flip.
 
+Painted backdrops (#110): every stage draws a PixelLab panorama behind its panels in place of the Inked scenery (panels, name and music stay). `content/stages/art/<id>.ts` holds each as a PNG data URL (792×336, 2 image pixels per world pixel; `tools/pixellab/build_stages.py`). `content/stages/index.ts` wraps each module with `painted(m)` → `withBackdrop(stage, {src, top, fill})` (`content/stages/backdrop.ts`); `top` puts the far wall's foot just above the top panel row, the outer 24-row bands repeat mirrored on taller or wider screens, `fill` shows while the image decodes, and headless runs skip it. `registerExtraStage` adds stages a mode uses for its own fights (Expedition's `crypt`): drawable by id, but outside stage select, random picks and online votes.
+
 ## Rendering and art pipeline
 
 ```mermaid
@@ -256,10 +259,11 @@ flowchart LR
   gen --> recolor["getSprite / getFrame<br/>skin recolour, canvas per tint"]
   recolor --> pose["fighterAnim.ts<br/>WeakMap, reads Battle"]
   pose --> draw["battleView + fxView"]
-  draw --> compose["world 240×160 at 2× + UI 480×320<br/>nearest-neighbour"]
+  draw --> compose["world 240×160 at 2× + UI 480×320<br/>2× HD backing store, nearest-neighbour"]
 ```
 
-- Fighters stay 24×24 and are never stretched in menus; spell effects keep a 24×24 footprint and take their element's colour.
+- HD layers and 48px fighters (#110): `HD = 2` (`engine/gfx.ts`). `main.ts` makes both offscreen canvases `HD` times larger and multiplies every `setTransform` by `HD`, so scenes still draw in world (240×160) and UI (480×320) coordinates and only art that asks for it uses the extra pixels. All five classes draw from `src/art/pl/<class>.ts` (48px PixelLab frames on a 64×64 canvas plus select portraits, from `tools/pixellab/build_frames.py`); `getSprite` / `getFrame` give them `Sprite.res = 2` (`PL_RES`), and `drawFighterSprite` draws one sprite pixel as 1/res of a world pixel, so a fighter stands about 24 world pixels tall. Lookup order: a skin mod's `art`, then `PL`, then the older 24px sets (`res` 1). PixelLab skins hue-shift the main cloth colour family (`plPalette`); `letterIndex` reads a-z, A-Z and 0-9.
+- Fighters are never stretched in menus; spell effects keep a 24×24 footprint and take their element's colour.
 - Visual state never goes into the Battle, so rollback and the hash never see it. Hit feel (#34, #73): the hit pause and slow-mo are rules (`Battle.hitStop` / `stopT` / `slowmo`, by hit tier from `TUNING.hitStop` and `TUNING.slowmo`; presses made during a pause are buffered and played after it), so they stay in lockstep and rollback. `game/hitFeel.ts` is the render-only part: a directional screen kick, a 1 px shudder while a pause runs, element impact sparks and popping damage numbers, deduped so a rollback doesn't replay them.
 - Basic shots are real projectiles at a constant speed (`TUNING.<cls>.shotSpeed`, capped by `maxShotSpeed` 15; only Aimed Shot may pass it), so full-row heavies can be dodged. A shot lights its row in the shooter's team colour until it is gone.
 - Team colours (#75, `game/teamColors.ts`, view-only): `team(side)` makes the watching player blue and the opponent red for panel rims and faces, telegraphs, reticles, shot paths and HUD ribbons. P1 is "you" in local 2P and CPU vs CPU.
@@ -313,6 +317,7 @@ Scenes never import `TitleScene`; `main.ts` registers it with `setHome`. Screens
 ```mermaid
 flowchart LR
   title[Title menu]
+  title -- EXPEDITION --> cs5[Fighter select] --> em["Act map<br/>(the run's own deck)"] --> eb[Expedition fight]
   title -- ARCADE --> cs0[Fighter select] --> dk0[Spell deck select] --> ar["Arcade ladder<br/>4 rivals at 60-90% power<br/>+ Shadow Self boss"] --> bs
   title -- VERSUS --> cs1[Fighter select] --> dk1[Spell deck select] --> ss1[Stage select] --> bs[BattleScene]
   title -- ONLINE --> om["Online menu<br/>LOBBY, RANKED MATCH, TOURNAMENT,<br/>MATCH, CREATE/JOIN ROOM"] --> cs2[Fighter select] --> dk2["Spell deck select<br/>both lock in"] --> ss2[Stage vote] --> ob[OnlineBattleScene]
@@ -344,6 +349,34 @@ flowchart TB
 - `engine/input.ts` exports `gesture` (swipe, start, delta, held, fling); a swipe in from the left edge presses `PadBack`.
 - `scenes/touchUi.ts` is the touch kit: `bigButton`, `actionBar`, `tabs`, `swipeIn` / `flickIn`, `dots`, `Scroller`, `rowList` (scrolling panel of big rows), `panel`, `sheet`, `tallArea` (safe-area insets from `touch.ts` `safeInsets()`).
 - Touch settings (pad size S/M/L, left-handed, vibration) live in `engine/touch.ts` and save in the `touch` section of `save.json` (#63, old `svs:touch` imported once); `layout()` applies them.
+
+## Expedition mode
+
+The roguelike single-player mode (#107-#109), top of the title menu: three acts (the Forest, the Crypt, the Volcano), each a seeded branching map with a boss on top, a spell deck drafted as you go, gold and relics. A run lives in memory only.
+
+```mermaid
+flowchart LR
+  sel[Fighter select] --> nr["newRun(cls, skin, seed)<br/>10-spell starter, 50 gold"] --> map["ExpeditionMapScene<br/>7 floors × 3 lanes + boss<br/>makeMap(seed, act)"]
+  map --> shop["Shop<br/>spells, relics, removal"] --> map
+  map --> rest["Rest stop<br/>heal 30% or remove a spell"] --> map
+  map --> fight["Fight / elite / boss<br/>ExpeditionBattleScene"]
+  fight -- lose --> over[Run over]
+  fight -- win --> rew["Reward<br/>spell, gold; elite relic"] --> map
+  rew -- boss beaten --> next["nextAct<br/>new map, full heal; act 3 wins"] --> map
+```
+
+| File | Job |
+| --- | --- |
+| `game/expedition.ts` | The run as plain data (`ExpeditionRun`): `ACTS`, `makeMap`, `choices`, rewards, relics, shop stock, `makeFight` |
+| `game/mobs.ts` | `MOBS` (HP, start column, rank, blurb) and each monster's brain in `MOB_BRAINS`; `setupPack` puts a pack on the field |
+| `scenes/expedition.ts` | Map, fight, reward, rest, shop, deck and run-over screens, each with a phone portrait layout |
+| `art/mobArt.ts`, `art/mobSprites.ts` | Monster sprites (24×24, bosses 40×40), baked per tint like the fighters |
+| `content/stages/crypt.ts` | The Crypt stage (`registerExtraStage`) |
+| `scripts/expedition-check.ts` | Balance check for packs and bosses |
+
+- `makeFight` builds a normal `Battle` with the run's class, deck and HP; `setupPack` takes the right-hand fighter off the field and places up to three monsters (`b.mobs`, `b.f[1]` = the first). With mobs, `foes()`, `everyone()` and `retarget()` widen targeting and `packKo()` ends the fight when the pack is down.
+- A monster is a `Fighter` with a plain-data `mob: MobState`; its brain (`MOB_BRAINS.get(kind).tick`, Battle Network virus style, every hit telegraphed) lives outside the state, and delayed hits are effect records (`mob.hit` etc.), so rollcheck rules still hold.
+- In-battle relics (+10% damage, 400 shield, +2 resource) apply in `makeFight`. The map rolls from `seeded(seed + act)`, rewards and shops from `run.roll`, so a map plays the same whatever you buy.
 
 ## CPU AI and styles
 
@@ -496,4 +529,5 @@ New screens go in `src/dev/screens.ts` (shared by the screen tests and the Art L
 
 - Modularize: stages are modules (#35); spells (#62), rules (#87), decks, CPU and lessons (#88), tuning and class info (#90, #91) sit in `src/content/classes/<id>/`; next art, animation and voices.
 - Mods: a MODS screen to load a user's mod file at runtime through the same `parseMod`; spells, stages and classes as mod content once they are pure data.
+- Expedition: saving a run mid-way; Expedition in the profile.
 - BN indicators (#32).
