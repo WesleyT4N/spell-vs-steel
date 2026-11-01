@@ -1,6 +1,6 @@
 // The Parchment UI skin: aged scroll windows, brown ink, red wax and ribbons.
 // Every menu, card and HUD plate is built from these parts, so they draw at any size and layout.
-import { P, UW, dith, hash, mix, screenRect, view, plain, piece, type Ctx } from '../engine/gfx';
+import { P, UW, HD, dith, hash, mix, screenRect, view, plain, piece, type Ctx } from '../engine/gfx';
 import { drawText, textWidth } from '../engine/font';
 
 /** Paper and ink colors. Text on parchment uses the inks; text over the arena keeps the bright colors. */
@@ -153,7 +153,7 @@ export function footer(c: Ctx, text: string): void {
 /** Warm sepia wash for overlays (pause, results, the Draw screen), instead of a black dim. */
 export function sepia(c: Ctx, a = 0.5): void {
   c.fillStyle = `rgba(40,20,0,${a})`;
-  c.fillRect(...screenRect(c.canvas.width / view.w));
+  c.fillRect(...screenRect(c.canvas.width / view.w / HD));
 }
 
 /** The big VS between two fighters: a red wax seal. */

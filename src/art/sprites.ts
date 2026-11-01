@@ -4,6 +4,7 @@ import type { Ctx } from '../engine/gfx';
 import { HIRES } from './hiresSprites';
 import { FRAMES, type FrameId, type FrameSet } from './fighterFrames';
 import { PORTRAITS } from './portraits';
+import { PL, PL_RES } from './pl';
 
 /** Draw the 24px fighters from the reference sheet (art/hi-res) instead of the ~18px Cartridge sprites. */
 export const USE_HIRES = true;
@@ -149,6 +150,8 @@ export function mirrorSkin(cls: ClassId, mine: string, theirs: string): string {
 function skinned(cls: ClassId, skinId: string, alt: boolean): { pal: string[]; rows: string[] } {
   const art = skinOf(cls, skinId).art;
   if (art) return { pal: art.pal, rows: artStill(art).rows };
+  const pl = PL[cls];
+  if (pl) return { pal: plPalette(cls, skinId), rows: pl.frames.idle0! };
   if (USE_HIRES) {
     const h = HIRES[cls], pal = h.pal.slice();
     for (const [ch, col] of Object.entries(h.skins[skinOf(cls, skinId).id] ?? {})) pal[ch.charCodeAt(0) - 97] = col;
@@ -161,6 +164,43 @@ function skinned(cls: ClassId, skinId: string, alt: boolean): { pal: string[]; r
   const rows = def.rows.map(r => r.split(''));
   for (const [x, y, ch] of skin.px ?? []) if (rows[y][x] !== '.' && rows[y][x] !== 'a') rows[y][x] = ch;
   return { pal, rows: rows.map(r => r.join('')) };
+}
+
+// ---------- PixelLab fighter skins ----------
+// The PixelLab art has its own palette, so a skin is a hue shift of the main cloth/armor color family: the
+// skin's color (the same skin on the 24px set, at its team letter) against that set's default sets the shift.
+const hex = (c: string): [number, number, number] => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)) as [number, number, number];
+function hsl(c: string): [number, number, number] {
+  const [r, g, b] = hex(c).map(v => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+  if (!d) return [0, 0, l];
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, s, l];
+}
+function css([h, s, l]: [number, number, number]): string {
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return '#' + [r, g, b].map(v => Math.round(Math.min(1, Math.max(0, v + m)) * 255).toString(16).padStart(2, '0')).join('');
+}
+const plPals = new Map<string, string[]>();
+function plPalette(cls: ClassId, skinId: string): string[] {
+  const pl = PL[cls], skin = skinOf(cls, skinId).id, key = `${cls}:${skin}`;
+  let pal = plPals.get(key);
+  if (pal) return pal;
+  pal = pl.pal.slice();
+  const h = HIRES[cls], li = h.team.charCodeAt(0) - 97, from = h.pal[li], to = h.skins[skin]?.[h.team];
+  if (skin !== defaultSkin(cls) && to && to !== from) {
+    const [h0, s0, l0] = hsl(from), [h1, s1, l1] = hsl(to), [th, ts] = hsl(pl.pal[letterIndex(pl.team)]);
+    const near = (a: number, b: number): boolean => Math.min(Math.abs(a - b), 360 - Math.abs(a - b)) < 32;
+    pal = pal.map((c, i) => {
+      const [ch, cs, cl] = hsl(c);
+      if (i === 0 || cs < 0.16 || ts < 0.16 || !near(ch, th)) return c;
+      // grays and near-grays of the target keep their lightness; colors take the target's hue and saturation shift
+      return css([(ch + h1 - h0 + 360) % 360, Math.min(1, cs * (s0 > 0.05 ? s1 / s0 : 1)), Math.min(0.95, Math.max(0.04, cl + (l1 - l0) * 0.7))]);
+    });
+  }
+  plPals.set(key, pal);
+  return pal;
 }
 
 // Alternate palettes for mirror matches (the CPU's copy). Keys are palette indices to replace.
@@ -177,6 +217,12 @@ export interface Sprite { w: number; h: number; ax: number; res: number; img: Re
 
 const cache = new Map<string, Sprite>();
 
+/** Palette index of a pixel letter: a-z are 0-25, A-Z 26-51, 0-9 52-61 (the 24px art only uses a-z). */
+const letterIndex = (ch: string): number => {
+  const k = ch.charCodeAt(0);
+  return k >= 97 ? k - 97 : k >= 65 ? k - 39 : k + 4;
+};
+
 function bake(def: { rows: string[] }, pal: string[], tint: Tint): HTMLCanvasElement {
   const w = def.rows[0].length, h = def.rows.length;
   const cv = document.createElement('canvas');
@@ -186,7 +232,7 @@ function bake(def: { rows: string[] }, pal: string[], tint: Tint): HTMLCanvasEle
     for (let i = 0; i < w; i++) {
       const ch = row[i];
       if (ch === '.') continue;
-      const idx = ch.charCodeAt(0) - 97;
+      const idx = letterIndex(ch);
       let col = pal[idx];
       if (tint === 'flash') col = idx === 0 ? '#000000' : '#fcfcfc';
       if (tint === 'ice') col = idx === 0 ? '#0058f8' : ['#fcfcfc', '#a4e4fc', '#3cbcfc'][(i + j + idx) % 3];
@@ -208,9 +254,10 @@ export function getSprite(cls: ClassId, skin: string, alt: boolean): Sprite {
     const tints: Tint[] = ['none', 'flash', 'ice', 'stun', 'ghost'];
     const img = {} as Record<Tint, HTMLCanvasElement>;
     for (const t of tints) img[t] = bake({ rows }, pal, t);
-    const art = skinOf(cls, skin).art;
-    const ax = art ? artStill(art).ax : USE_HIRES ? HIRES[cls].ax : def.ax;
-    s = { w: rows[0].length / RES, h: rows.length / RES, ax: ax / RES, res: RES, img };
+    const art = skinOf(cls, skin).art, pl = !art && PL[cls];
+    const ax = art ? artStill(art).ax : pl ? pl.ax : USE_HIRES ? HIRES[cls].ax : def.ax;
+    const res = pl ? PL_RES : RES;
+    s = { w: rows[0].length / res, h: rows.length / res, ax: ax / res, res, img };
     cache.set(key, s);
   }
   return s;
@@ -219,14 +266,16 @@ export function getSprite(cls: ClassId, skin: string, alt: boolean): Sprite {
 const frameCache = new Map<string, Sprite>();
 /** One animation frame of a fighter (art/fighterFrames.ts) in a skin. Falls back to the idle frame. */
 export function getFrame(cls: ClassId, skin: string, alt: boolean, frame: FrameId): Sprite {
-  const set: FrameSet = skinOf(cls, skin).art ?? FRAMES[cls], id = set.frames[frame] ? frame : 'idle0';
+  const art = skinOf(cls, skin).art, pl = !art ? PL[cls] : undefined;
+  const set: FrameSet = art ?? pl ?? FRAMES[cls], id = set.frames[frame] ? frame : 'idle0';
   const key = `${cls}:${skin}${alt ? ':alt' : ''}:${id}`;
   let s = frameCache.get(key);
   if (!s) {
     const { pal } = skinned(cls, skin, alt), rows = set.frames[id]!;
     const img = {} as Record<Tint, HTMLCanvasElement>;
     for (const t of ['none', 'flash', 'ice', 'stun', 'ghost'] as Tint[]) img[t] = bake({ rows }, pal, t);
-    s = { w: rows[0].length, h: rows.length, ax: set.ax, res: 1, img };
+    const res = pl ? PL_RES : 1;
+    s = { w: rows[0].length / res, h: rows.length / res, ax: set.ax / res, res, img };
     frameCache.set(key, s);
   }
   return s;
@@ -241,7 +290,7 @@ export function getPortrait(cls: ClassId, skin: string): HTMLCanvasElement {
     const art = skinOf(cls, skin).art;
     // an art skin without its own portrait shows the class's default one
     img = art && !art.portrait ? getPortrait(cls, defaultSkin(cls))
-      : bake({ rows: art?.portrait ?? PORTRAITS[cls] }, skinned(cls, skin, false).pal, 'none');
+      : bake({ rows: art?.portrait ?? (PL[cls] && !art ? PL[cls].portrait : PORTRAITS[cls]) }, skinned(cls, skin, false).pal, 'none');
     portraitCache.set(key, img);
   }
   return img;
@@ -328,6 +377,7 @@ export function teamColor(cls: ClassId, skin: string, alt: boolean): string {
   // the tabard (Warrior h), robe (Mage c) or the mid tint tone (c) of the Classic set
   const art = skinOf(cls, skin).art;
   if (art) return art.pal[art.team.charCodeAt(0) - 97];
+  if (PL[cls]) return skinned(cls, skin, alt).pal[letterIndex(PL[cls].team)];
   if (USE_HIRES) return skinned(cls, skin, alt).pal[HIRES[cls].team.charCodeAt(0) - 97];
   return skinned(cls, skin, alt).pal[cls === 'warrior' ? 7 : 2];
 }

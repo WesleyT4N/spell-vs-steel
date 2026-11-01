@@ -1,6 +1,6 @@
 // The panel grid every stage shares and the Stage interface. Stages are drawn "Inked" like the 24px fighters:
 // outlined pieces, flat cel shading, no dithering (toolkit in ink.ts). Each stage is a module in src/content/stages/.
-import { P, view, rng, mix, plain, piece, type Ctx } from '../engine/gfx';
+import { P, HD, view, rng, mix, plain, piece, type Ctx } from '../engine/gfx';
 import { MX, MY, LIFT, BW, BH, XL, YT } from './ink';
 import { YOU, FOE } from '../game/teamColors';
 
@@ -46,11 +46,12 @@ let painted: { st: Stage; t: number; cheer: boolean } | null = null;
 export function drawStage(c: Ctx, st: Stage, t: number, cheer = 0): void {
   const { w, h, ox, oy } = view;
   if (!big) {
+    // at the screen's HD backing density, so PixelLab backdrops keep their half-pixel detail
     const o = document.createElement('canvas');
-    o.width = BW; o.height = BH;
+    o.width = BW * HD; o.height = BH * HD;
     big = o.getContext('2d')!;
     big.imageSmoothingEnabled = false;
-    big.translate(MX, MY);
+    big.setTransform(HD, 0, 0, HD, MX * HD, MY * HD);
   }
   if (!painted || painted.st !== st || painted.t !== t || painted.cheer !== cheer > 0) {
     big.clearRect(XL, YT, BW, BH);
@@ -58,13 +59,14 @@ export function drawStage(c: Ctx, st: Stage, t: number, cheer = 0): void {
     painted = { st, t, cheer: cheer > 0 };
   }
   const sx = Math.max(0, MX - ox), sy = Math.max(0, MY - oy), cw = Math.min(w, BW - sx), ch = Math.min(h, BH - LIFT - sy);
-  c.drawImage(big.canvas, sx, sy + LIFT, cw, ch, sx - MX, sy - MY, cw, ch);
+  const k = HD;
+  c.drawImage(big.canvas, sx * k, (sy + LIFT) * k, cw * k, ch * k, sx - MX, sy - MY, cw, ch);
   // full-height phone screens are taller than the painted stage: its top row of sky and bottom row of floor
   // carry on to the screen edges
   const top = sy - MY, gapT = top + oy;
-  if (gapT > 0) c.drawImage(big.canvas, sx, sy + LIFT, cw, 1, sx - MX, -oy, cw, gapT);
+  if (gapT > 0) c.drawImage(big.canvas, sx * k, (sy + LIFT) * k, cw * k, 1, sx - MX, -oy, cw, gapT);
   const bot = top + ch, gapB = h - oy - bot;
-  if (gapB > 0) c.drawImage(big.canvas, sx, sy + LIFT + ch - 1, cw, 1, sx - MX, bot, cw, gapB);
+  if (gapB > 0) c.drawImage(big.canvas, sx * k, (sy + LIFT + ch) * k - 1, cw * k, 1, sx - MX, bot, cw, gapB);
 }
 
 /** Pale stone face: one seam with a lit edge and two chips. */

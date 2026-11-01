@@ -1,6 +1,7 @@
 // The Art Lab's Sprites section: a class's drawn frames, tints, portrait and spell icons at whole-pixel zoom, in any
 // skin, drawn straight from the game's sprite code (art/sprites.ts, art/fighterFrames.ts, art/cardIcons.ts).
 import { FRAMES, type FrameId } from '../art/fighterFrames';
+import { PL } from '../art/pl';
 import { getFrame, getPortrait, drawFighterSprite, type ClassId, type Sprite, type Tint } from '../art/sprites';
 import { cardIconCanvas, ICON_SIZE } from '../art/cardIcons';
 import { cardsFor } from '../game/cards';
@@ -16,7 +17,7 @@ export function spriteViews(cls: ClassId): Array<[SpriteView, string]> {
 }
 
 export const SPRITE_ABOUT: Record<string, string> = {
-  sheet: 'Every drawn frame of the class sheet, in this skin. Frames are 36×24 with the feet on the bottom row; the 24×24 body box is outlined when the grid is on.',
+  sheet: 'Every drawn frame of the class sheet, in this skin. The 48px PixelLab frames are 64 wide with the feet on the bottom row (2 sprite pixels per world pixel).',
   tints: 'The frame as the game tints it: hit flash, frozen, stunned and the ghost trail.',
   portrait: 'The character select bust portrait.',
   icons: 'Every spell icon of the class, 20×20.',
@@ -48,8 +49,9 @@ function grid(c: Ctx, x: number, y: number, w: number, h: number, z: number, box
 function frameAt(c: Ctx, s: Sprite, x: number, y: number, z: number, tint: Tint, showGrid: boolean): void {
   const w = s.img.none.width, h = s.img.none.height;
   backing(c, x, y, w * z, h * z, z * 2);
-  drawFighterSprite(c, s, x + s.ax * z, y + h * z, false, tint, z);
-  if (showGrid) grid(c, x, y, w, h, z, { ax: s.ax });
+  // z is screen pixels per sprite pixel (the 48px fighters have 2 sprite pixels per world pixel)
+  drawFighterSprite(c, s, x + s.ax * s.res * z, y + h * z, false, tint, z * s.res);
+  if (showGrid) grid(c, x, y, w, h, z, s.res === 1 ? { ax: s.ax } : undefined);
 }
 
 /** Draw the picked sprite view on the UI layer (480×320 coordinates). */
@@ -58,23 +60,24 @@ export function drawSprites(ui: Ctx, cls: ClassId, skin: string, alt: boolean, v
   const label = (t: string, x: number, y: number): void => drawTextCentered(ui, t, x, y, LABEL, 1, false);
   if (view === 'sheet') {
     // as big as every frame fits, whole pixels only
-    const ids = Object.keys(FRAMES[cls].frames) as FrameId[], gap = 8, top = 26, foot = 18, lab = 14;
+    const ids = Object.keys((PL[cls] ?? FRAMES[cls]).frames) as FrameId[], gap = 8, top = 26, foot = 18, lab = 14;
+    const one = getFrame(cls, skin, alt, 'idle0').img.none, FW = one.width, FH = one.height;
     let z = 4, cols = 1;
     for (; z > 1; z--) {
-      cols = Math.max(1, Math.floor((UW - 8 + gap) / (36 * z + gap)));
-      if (Math.ceil(ids.length / cols) * (24 * z + lab) <= UH - top - foot) break;
+      cols = Math.max(1, Math.floor((UW - 8 + gap) / (FW * z + gap)));
+      if (Math.ceil(ids.length / cols) * (FH * z + lab) <= UH - top - foot) break;
     }
-    cols = Math.max(1, Math.floor((UW - 8 + gap) / (36 * z + gap)));
-    const fw = 36 * z, x0 = Math.round((UW - (cols * fw + (cols - 1) * gap)) / 2);
+    cols = Math.max(1, Math.floor((UW - 8 + gap) / (FW * z + gap)));
+    const fw = FW * z, x0 = Math.round((UW - (cols * fw + (cols - 1) * gap)) / 2);
     ids.forEach((id, i) => {
-      const x = x0 + (i % cols) * (fw + gap), y = top + Math.floor(i / cols) * (24 * z + lab);
+      const x = x0 + (i % cols) * (fw + gap), y = top + Math.floor(i / cols) * (FH * z + lab);
       frameAt(ui, getFrame(cls, skin, alt, id), x, y, z, 'none', showGrid);
-      label(id.toUpperCase(), x + fw / 2, y + 24 * z + 3);
+      label(id.toUpperCase(), x + fw / 2, y + FH * z + 3);
     });
     return;
   }
   if (view === 'tints') {
-    const tints: Tint[] = ['none', 'flash', 'ice', 'stun', 'ghost'], z = 2, fw = 36 * z, gap = 14;
+    const tints: Tint[] = ['none', 'flash', 'ice', 'stun', 'ghost'], z = PL[cls] ? 1 : 2, fw = getFrame(cls, skin, alt, 'idle0').img.none.width * z, gap = 14;
     const x0 = Math.round((UW - (tints.length * fw + (tints.length - 1) * gap)) / 2);
     for (const [r, id] of (['idle0', 'hit'] as FrameId[]).entries()) {
       tints.forEach((t, i) => {

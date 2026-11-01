@@ -1,4 +1,4 @@
-import { W, H, UW, UH, P, view, setView, viewSize, splitLift, screenRect, spread, MIN_ASPECT, PORTRAIT_MIN_ASPECT, TALL_MIN_ASPECT } from './engine/gfx';
+import { W, H, UW, UH, HD, P, view, setView, viewSize, splitLift, screenRect, spread, MIN_ASPECT, PORTRAIT_MIN_ASPECT, TALL_MIN_ASPECT } from './engine/gfx';
 import { drawTextCentered } from './engine/font';
 import { initInput, endFrame, wasPressed, page, pollInput, releaseAll } from './engine/input';
 import { toggleMute, setAudioSuspended } from './engine/audio';
@@ -26,8 +26,8 @@ const offscreen = (w: number, h: number): CanvasRenderingContext2D => {
   x.imageSmoothingEnabled = false;
   return x;
 };
-const world = offscreen(W, H);
-const ui = offscreen(UW, UH);
+const world = offscreen(W * HD, H * HD);
+const ui = offscreen(UW * HD, UH * HD);
 
 // The screen takes the window's shape (between 4:3 and 21:9) and shows more of the stage instead of
 // black bars. The canvas backing store matches the real screen pixels and every blit is
@@ -44,8 +44,8 @@ function fit(): void {
   const bw = vw - Number(document.body.dataset.reserveRight ?? 0);
   const bh = portrait && !tall ? vh * 0.5 : vh;
   if (setView(bw / bh, tall ? TALL_MIN_ASPECT : portrait ? PORTRAIT_MIN_ASPECT : MIN_ASPECT)) {
-    world.canvas.width = view.w; world.canvas.height = view.h;
-    ui.canvas.width = view.w * 2; ui.canvas.height = view.h * 2;
+    world.canvas.width = view.w * HD; world.canvas.height = view.h * HD;
+    ui.canvas.width = view.w * 2 * HD; ui.canvas.height = view.h * 2 * HD;
     world.imageSmoothingEnabled = ui.imageSmoothingEnabled = false; // resizing resets context state
   }
   // menus spread into the spare height in portrait, at most 1.5x and clear of the footer strip
@@ -115,26 +115,26 @@ function frame(now: number): void {
     if (tickAcc >= 1 / 8) { tickAcc -= 1 / 8; tick++; }
   }
   // scenes draw in W×H / UW×UH coordinates, centered on the screen; margins start black
-  world.setTransform(1, 0, 0, 1, 0, 0);
+  world.setTransform(HD, 0, 0, HD, 0, 0);
   world.fillStyle = '#000000';
   world.fillRect(0, 0, view.w, view.h);
-  ui.setTransform(1, 0, 0, 1, 0, 0);
+  ui.setTransform(HD, 0, 0, HD, 0, 0);
   ui.clearRect(0, 0, view.w * 2, view.h * 2);
-  world.setTransform(1, 0, 0, 1, view.ox, view.oy);
-  ui.setTransform(1, 0, 0, 1, view.ox * 2, view.oy * 2);
+  world.setTransform(HD, 0, 0, HD, view.ox * HD, view.oy * HD);
+  ui.setTransform(HD, 0, 0, HD, view.ox * 2 * HD, view.oy * 2 * HD);
   const scene = getScene();
   if (spread.tall && scene?.split?.()) {
     // the game draws in the top part as if the screen were that size; its zones move to full-screen coordinates
     const lift = splitLift(), full = { h: view.h, oy: view.oy };
     Object.assign(view, { h: spread.halfH, oy: full.oy - lift });
-    world.setTransform(1, 0, 0, 1, view.ox, view.oy);
-    ui.setTransform(1, 0, 0, 1, view.ox * 2, view.oy * 2);
+    world.setTransform(HD, 0, 0, HD, view.ox * HD, view.oy * HD);
+    ui.setTransform(HD, 0, 0, HD, view.ox * 2 * HD, view.oy * 2 * HD);
     shiftZones(-lift * 2);
     scene.draw(world, tick, ui);
     shiftZones(0);
     Object.assign(view, full);
-    world.setTransform(1, 0, 0, 1, view.ox, view.oy);
-    ui.setTransform(1, 0, 0, 1, view.ox * 2, view.oy * 2);
+    world.setTransform(HD, 0, 0, HD, view.ox * HD, view.oy * HD);
+    ui.setTransform(HD, 0, 0, HD, view.ox * 2 * HD, view.oy * 2 * HD);
     scene.drawBelow?.(ui, tick);
   } else scene?.draw(world, tick, ui);
   if (!page.engaged) {
