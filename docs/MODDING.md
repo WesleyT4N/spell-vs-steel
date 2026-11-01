@@ -14,7 +14,7 @@ stages, classes) will use the same file and the same rules as they become data.
   other, switched on, and kept in the save until it is **deleted**. Up to 12 imported mods, about 1 MB in all.
 - **With the build:** files in the repo's `mods/` folder ship with the game. They can be switched off, not deleted.
 
-A mod skin shows up as an extra color swatch after the built-in ones on the fighter select, and in the Art Lab.
+A mod skin shows up on the fighter select under a SKINS tab next to COLORS (the tabs only appear for a class that has mod skins; Q/E or LB/RB switch them), and in the Art Lab.
 
 ## The shipped mods
 
@@ -55,7 +55,7 @@ the class's own game frames so every pose lines up with the built-in art, then
 | `skins[].id` | Lowercase id, unique within the class (a built-in color id is refused). |
 | `skins[].name` | Up to 12 characters, shown in menus. |
 | `skins[].palette` | Letter to `#rrggbb`, in the order `a`-`z`, `A`-`Z`, `0`-`9` with no gaps (up to 62). `a` is the outline. |
-| `skins[].team` | The palette letter of the main cloth color: HUD ribbons and the color swatch use it. |
+| `skins[].team` | The palette letter of the main cloth color: HUD ribbons and the fighter select use it. |
 | `skins[].frames` | Pixel rows per animation frame. `idle0` is required; any frame left out shows `idle0`. |
 | `skins[].portrait` | Optional character select bust (40 by 32). Left out, the class's default portrait shows. |
 
