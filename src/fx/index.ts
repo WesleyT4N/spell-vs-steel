@@ -1,12 +1,18 @@
 // Which battle fx play a pixelfx-method effect (see docs/FX.md). Any fx kind not registered here keeps its
 // hand-drawn version in src/game/fxView.ts.
 import { registerPfx, registerShotPfx, type PfxModule } from '../game/pfx';
+import { impact, none } from './hd/picks';
 
 /** Every effect module, by id ("warrior/cleave-a"), for the labs and the contact-sheet tool. */
 export const EFFECTS: Record<string, PfxModule> = Object.fromEntries(
   Object.entries(import.meta.glob<{ default: PfxModule }>('./*/*.ts', { eager: true }))
     .filter(([, m]) => m.default).map(([path, m]) => [path.slice(2, -3), m.default]),
 );
+// PixelLab VFX sheets (src/fx/hd/<class>/<name>.ts, baked by tools/pixellab/build_fx.py), by id "hd/<class>/<name>"
+Object.assign(EFFECTS, Object.fromEntries(
+  Object.entries(import.meta.glob<{ default: PfxModule }>('./hd/*/*.ts', { eager: true }))
+    .filter(([, m]) => m.default).map(([path, m]) => [path.slice(2, -3), m.default]),
+));
 
 /** The effect each fx kind plays in the game. */
 export const PLAYS: Record<string, string> = {
@@ -169,6 +175,18 @@ Object.assign(PLAYS, {
 });
 
 for (const [kind, id] of Object.entries(PLAYS)) registerPfx(kind, EFFECTS[id]);
+registerPfx('impact', impact);
+
+// PixelLab sheets for the basic attacks (src/fx/hd/, tools/pixellab/fx.json). A shot's own hit look is left to the
+// element hit spark (impact), which now carries the hit at the fighters' pixel density.
+Object.assign(PLAYS, {
+  cleave: 'hd/warrior/cleave',
+  cleaveHeavy: 'hd/warrior/cleave-heavy',
+  dagger: 'hd/rogue/stab',
+  smite: 'hd/priest/smite',
+});
+for (const k of ['cleave', 'cleaveHeavy', 'dagger', 'smite']) registerPfx(k, EFFECTS[PLAYS[k]]);
+for (const k of ['knifeHit', 'arrowHit', 'aimedHit', 'sparkHit']) registerPfx(k, none);
 
 /** The effect each flying projectile kind plays (Projectile.kind); kinds not listed keep their hand-drawn shot. */
 export const SHOT_PLAYS: Record<string, string> = {
@@ -198,4 +216,12 @@ Object.assign(SHOT_PLAYS, {
   explosiveArrow: 'ranger/explosive-arrow',
 });
 
+Object.assign(SHOT_PLAYS, {
+  orb: 'hd/mage/orb',
+  beam: 'hd/mage/beam',
+  spark: 'hd/priest/spark',
+  arrow: 'hd/ranger/arrow',
+  aimed: 'hd/ranger/aimed',
+  knife: 'hd/rogue/knife',
+});
 for (const [kind, id] of Object.entries(SHOT_PLAYS)) registerShotPfx(kind, EFFECTS[id]);

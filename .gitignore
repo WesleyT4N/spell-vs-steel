@@ -10,3 +10,4 @@ dist-fx
 test-results
 release
 *.keystore
+__pycache__/

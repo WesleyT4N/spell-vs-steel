@@ -1,7 +1,8 @@
 // Contact sheets of battle effects on the real renderer: each row fires one attack or spell in a fresh battle and
 // draws evenly spaced frames of it, zoomed, with the effect's box marked. tests/fx/run.ts drives it; the job comes
 // in the URL hash as JSON (see Job).
-import { W, H } from '../../src/engine/gfx';
+import { W, H, HD } from '../../src/engine/gfx';
+import { sheetsReady } from '../../src/fx/sheet';
 import { Battle, NO_INTENT } from '../../src/game/battle';
 import { drawBattle } from '../../src/game/battleView';
 import { boxOf, pfxFor, registerPfx, unregisterPfx, shotPfxFor, registerShotPfx, unregisterShotPfx, type PfxModule } from '../../src/game/pfx';
@@ -33,8 +34,9 @@ const CROP = job.full
   : { x: X0 + PW - 8, y: Y0 + (FACE + LIP) - 14, w: PW * 3 + 16, h: FACE + 18 };
 const LABEL = 18, GAP = 4;
 
-const world = document.createElement('canvas'); world.width = W; world.height = H;
-const wc = world.getContext('2d')!; wc.imageSmoothingEnabled = false;
+// the world at the game's backing density (HD), so 48px fighters and sheet effects keep every pixel
+const world = document.createElement('canvas'); world.width = W * HD; world.height = H * HD;
+const wc = world.getContext('2d')!; wc.imageSmoothingEnabled = false; wc.setTransform(HD, 0, 0, HD, 0, 0);
 const out = document.getElementById('out') as HTMLCanvasElement;
 const LINES = Math.ceil(N / PER), ROW_H = LABEL + LINES * (CROP.h * Z + GAP);
 out.width = Math.min(N, PER) * (CROP.w * Z + GAP) + GAP;
@@ -49,7 +51,7 @@ function fire(b: Battle, attack: string): void {
   b.castTop(f, null);
 }
 
-job.rows.forEach((row, ri) => {
+void sheetsReady().then(() => { job.rows.forEach((row, ri) => {
   const restore: Array<[string, PfxModule | undefined]> = [];
   for (const [kind, id] of Object.entries(row.use ?? {})) {
     if (!EFFECTS[id]) throw new Error(`no effect ${id}`);
@@ -73,7 +75,7 @@ job.rows.forEach((row, ri) => {
     wc.clearRect(0, 0, W, H);
     drawBattle(wc, b, Math.floor(b.time * 30), 0, true);
     const x = GAP + (i % PER) * (CROP.w * Z + GAP), y = y0 + LABEL + Math.floor(i / PER) * (CROP.h * Z + GAP);
-    oc.drawImage(world, CROP.x, CROP.y, CROP.w, CROP.h, x, y, CROP.w * Z, CROP.h * Z);
+    oc.drawImage(world, CROP.x * HD, CROP.y * HD, CROP.w * HD, CROP.h * HD, x, y, CROP.w * Z, CROP.h * Z);
     if (job.boxes !== false) {
       // the box each live pixelfx effect must stay inside
       oc.strokeStyle = 'rgba(255,0,255,0.7)'; oc.lineWidth = 1;
@@ -94,3 +96,4 @@ job.rows.forEach((row, ri) => {
   }
 });
 (window as unknown as { done: string }).done = out.toDataURL();
+});
