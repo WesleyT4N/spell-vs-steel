@@ -44,8 +44,9 @@ export interface SaveData {
   mods: SavedMods | null;
 }
 
-/** The MODS screen's section: ids of mods switched off, and imported mod files as their text. */
-export interface SavedMods { off: string[]; imported: Array<{ id: string; text: string }> }
+/** The MODS screen's section: ids of mods switched off, and the imported mod files: a zip as base64 (`zip`), or an
+ *  old one-file JSON mod as its text (`text`). */
+export interface SavedMods { off: string[]; imported: Array<{ id: string; text?: string; zip?: string }> }
 
 /** One of the player's own spell decks: an id unique within its class, a name, and card id -> copies. */
 export interface SavedDeck { id: string; name: string; cards: Record<string, number> }
@@ -140,7 +141,8 @@ function normalize(raw: Obj): SaveData {
     mods: isObj(r.mods) ? {
       off: Array.isArray(r.mods.off) ? r.mods.off.filter((x): x is string => typeof x === 'string') : [],
       imported: Array.isArray(r.mods.imported) ? r.mods.imported.map(clean)
-        .filter(m => typeof m.id === 'string' && typeof m.text === 'string').map(m => ({ id: m.id as string, text: m.text as string })) : [],
+        .filter(m => typeof m.id === 'string' && (typeof m.text === 'string' || typeof m.zip === 'string'))
+        .map(m => (typeof m.zip === 'string' ? { id: m.id as string, zip: m.zip } : { id: m.id as string, text: m.text as string })) : [],
     } : null,
   };
 }

@@ -36,6 +36,6 @@ function fighter(cls: string, f: FighterFile): PlSet {
   };
 }
 
-export const PL: Record<string, PlSet> = Object.fromEntries(
-  Object.entries({ warrior, mage, rogue, ranger, priest } as Record<string, FighterFile>).map(([cls, f]) => [cls, fighter(cls, f)]),
-);
+/** Each class's assets/fighters/<class>.json. */
+export const PL_FILES: Record<string, FighterFile> = { warrior, mage, rogue, ranger, priest } as Record<string, FighterFile>;
+export const PL: Record<string, PlSet> = Object.fromEntries(Object.entries(PL_FILES).map(([cls, f]) => [cls, fighter(cls, f)]));

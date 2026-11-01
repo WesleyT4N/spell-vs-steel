@@ -1,33 +1,47 @@
 # Modding
 
-Mods are plain data. A mod is one JSON file; nothing in it ever runs as code or is put into a web page, and the
-loader refuses any key, color, letter or size the format doesn't name (see `src/mods/format.ts`, checked by
-`tests/mods.ts`). A file that fails the checks is listed on the MODS screen with the reason; the game still starts.
+Mods are plain data. A mod is a **zip** of a `mod.json` manifest and PNG images; nothing in it ever runs as code or
+is put into a web page, and the loader refuses any key, file, color or size the format doesn't name (see
+`src/mods/format.ts`, checked by `tests/mods.ts`). The game reads the zip and the PNGs with its own small decoders
+(`src/mods/files.ts`), with every size capped before anything is unpacked. A mod that fails the checks is listed on
+the MODS screen with the reason; the game still starts.
 
 Today a mod can add **skins with their own drawn art** for the 48px HD fighters. More kinds of content (spells,
-stages, classes) will use the same file and the same rules as they become data.
+stages, classes) will use the same manifest and the same rules as they become data.
 
 ## Installing mods
 
 - **In game:** title > **MODS** lists every installed mod. Each one can be switched **on or off** (kept in the
-  save). **IMPORT** opens a file picker (or a box to paste the file's text); an imported mod is checked like any
-  other, switched on, and kept in the save until it is **deleted**. Up to 12 imported mods, about 1 MB in all.
-- **With the build:** files in the repo's `mods/` folder ship with the game. They can be switched off, not deleted.
+  save). **IMPORT** opens a file picker for the mod's `.zip`; an imported mod is checked like any other, switched
+  on, and kept in the save until it is **deleted**. Up to 12 imported mods, about 750 KB of zips in all.
+- **With the build:** each folder in the repo's `mods/` folder (`mod.json` and its PNGs) ships with the game. They
+  can be switched off, not deleted.
 
 A mod skin shows up on the fighter select under a SKINS tab next to COLORS (the tabs only appear for a class that has mod skins; Q/E or LB/RB switch them), and in the Art Lab.
 
 ## The shipped mods
 
-`mods/wes-skin.json` (Mage: Wes, a young wizard) and `mods/hazel-druid-skin.json` (Ranger: Hazel Druid). Both were made with PixelLab: a 48px idle
+`mods/wes-skin/` (Mage: Wes, a young wizard) and `mods/hazel-druid-skin/` (Ranger: Hazel Druid). Both were made with PixelLab: a 48px idle
 sprite generated from the reference sheet (`/mnt/project-files/art/skin-mods-pl/ref/`), then `transfer_outfit` on
 the class's own game frames so every pose lines up with the built-in art, then
-`python3 tools/pixellab/build_skin_mod.py <frames dir> <prefix> <class> <mod id> <name> <skin id> <skin name> [author]`.
+`python3 tools/pixellab/build_skin_mod.py <frames dir> <prefix> <class> <mod id> <name> <skin id> <skin name> [author]`,
+which writes the mod's folder. Zip that folder's files to share the mod.
 
 ## File format
 
+A mod zip holds `mod.json` and the PNGs it names, at the top of the zip or all inside one folder (zipping the mod's
+folder works). Any other file is refused. A zip is at most 512 KB.
+
+```
+wes-skin.zip
+  mod.json
+  wes.png            every animation frame, side by side
+  wes-portrait.png   optional character select bust
+```
+
 ```json
 {
-  "format": "spell-vs-steel-mod/2",
+  "format": "spell-vs-steel-mod/3",
   "id": "wes-skin",
   "name": "Wes Skin",
   "author": "Wes",
@@ -36,10 +50,9 @@ the class's own game frames so every pose lines up with the built-in art, then
       "class": "mage",
       "id": "wes",
       "name": "Wes",
-      "palette": { "a": "#0a0810", "b": "#42357f", "c": "#211854" },
-      "team": "b",
-      "frames": { "idle0": ["....", "..."], "idle1": ["..."] },
-      "portrait": ["..."]
+      "sheet": "wes.png",
+      "portrait": "wes-portrait.png",
+      "team": "#42357f"
     }
   ]
 }
@@ -47,25 +60,34 @@ the class's own game frames so every pose lines up with the built-in art, then
 
 | Key | Rule |
 | --- | --- |
-| `format` | Always `spell-vs-steel-mod/2`. (Format 1 drew the old 24px fighters and is refused.) |
+| `format` | Always `spell-vs-steel-mod/3`. |
 | `id` | Lowercase letters, digits and `-`, up to 32. Unique among installed mods. |
 | `name`, `author` | Short plain text (letters, digits, spaces, a little punctuation), up to 32. |
 | `skins` | 1 to 16 skins. |
 | `skins[].class` | A built-in class: `warrior`, `mage`, `rogue`, `ranger`, `priest`. |
 | `skins[].id` | Lowercase id, unique within the class (a built-in color id is refused). |
 | `skins[].name` | Up to 12 characters, shown in menus. |
-| `skins[].palette` | Letter to `#rrggbb`, in the order `a`-`z`, `A`-`Z`, `0`-`9` with no gaps (up to 62). `a` is the outline. |
-| `skins[].team` | The palette letter of the main cloth color: HUD ribbons and the fighter select use it. |
-| `skins[].frames` | Pixel rows per animation frame. `idle0` is required; any frame left out shows `idle0`. |
-| `skins[].portrait` | Optional character select bust (40 by 32). Left out, the class's default portrait shows. |
+| `skins[].sheet` | The PNG of the animation frames (see below). |
+| `skins[].portrait` | Optional 40 by 32 PNG character select bust. Left out, the class's default portrait shows. |
+| `skins[].team` | `#rrggbb` of the main cloth color, one the art uses: HUD ribbons and the fighter select use it. |
+| `skins[].palette` | Optional list of every `#rrggbb` the art uses, outline first (up to 62). Left out, the game collects the art's colors itself and takes the color around the art's edge as the outline. |
 
-Pixel rows are strings: `.` is clear, any other character is a palette letter. A file is at most 512 KB.
+Images are 8-bit PNGs (RGBA, RGB or indexed), not interlaced. Pixels under half opacity are clear; the rest must
+be one solid palette color (no soft edges).
 
-### Frame ids and sizes
+### Frames
 
-Frames are the class's own HD frame size: 64 wide (2 sprite pixels per world pixel), as tall as the class's frames
-in `src/art/pl/<class>.ts`, feet on the bottom row at the same column. The ids are `idle0`-`idle3`, `hop`, `land`,
-`windup`, `slash`, `cast0`, `cast1`, `hit`, `stagger`, `kneel`, `slump`, `fall1`, `fall2`, `down`.
+The sheet is the class's frames side by side, each the class's own HD frame size: 64 wide (2 sprite pixels per
+world pixel), as tall as the class's frames (`frameHeight` in `assets/fighters/<class>.json`), feet on the bottom
+row at the same column. The order is the class's `frames` list there: `idle0`-`idle3`, `hop`, `land`, `windup`,
+`slash`, `cast0`, `cast1`, `hit`, `stagger`, `kneel`, `slump`, `fall1`, `fall2`, `down`. A sheet may stop early, and
+a frame left empty shows `idle0`; `idle0` itself is required. The class's own sheet (`assets/fighters/<class>.png`)
+is the best template.
+
+### Older mods
+
+Mods from before zips (one `.json` file with the art as palette-letter rows, format `spell-vs-steel-mod/2`) still
+import and load.
 
 ### Art rules
 

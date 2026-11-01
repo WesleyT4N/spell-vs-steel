@@ -8,7 +8,7 @@ import { setScene, setHome, goHome, getScene, commitZones, hotZone, noteTouch, l
 import { TitleScene } from './scenes/title';
 import { OnlineScene } from './scenes/online';
 import { DEV_TOOLS } from './flags';
-import './mods/boot';
+import { modsReady } from './mods/boot';
 import { endTextFields } from './engine/textField';
 import { setDefaultSink } from './game/events';
 import { playBattleEvent } from './engine/battleAudio';
@@ -146,9 +146,10 @@ function frame(now: number): void {
   canvas.style.cursor = hotZone() ? 'pointer' : 'default';
   requestAnimationFrame(frame);
 }
-// The game starts once every image asset has decoded (see engine/assets.ts), so no screen ever draws without its art.
+// The game starts once every image asset has decoded (see engine/assets.ts) and the mods are in, so no screen ever
+// draws without its art or misses a mod skin.
 /** Resolves when the first screen is up (the screen tests wait on it). */
-export const ready: Promise<void> = loadImages().then(() => {
+export const ready: Promise<void> = Promise.all([loadImages(), modsReady]).then(() => {
   // a shared online link (?room=CODE) goes straight to joining that room
   const room = new URLSearchParams(location.search).get('room');
   // the title is always the bottom of the scene stack: BACK from the first screen lands there

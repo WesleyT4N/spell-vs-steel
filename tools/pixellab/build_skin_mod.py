@@ -1,4 +1,4 @@
-"""Build a skin mod (mods/<id>.json) from PixelLab frames of a reskinned fighter.
+"""Build a skin mod (mods/<id>/: mod.json and its PNGs) from PixelLab frames of a reskinned fighter.
 
 The frames come from transfer_outfit run on the class's own game frames (rendered 64x64, feet on the bottom row), so
 every pose lines up with the built-in art. Each frame is cleaned (clean.py), the set is quantized to one palette
@@ -12,6 +12,7 @@ import sys, os, json, re
 from PIL import Image
 sys.path.insert(0, os.path.dirname(__file__))
 from clean import clean, OUT
+from palette_png import save_rows, save_json
 
 ALPHA = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 IDS = ['idle0', 'idle1', 'idle2', 'idle3', 'hop', 'land', 'windup', 'slash', 'cast0', 'cast1', 'hit', 'stagger', 'kneel', 'slump', 'fall1', 'fall2', 'down']
@@ -55,14 +56,18 @@ def main(src, prefix, cls, mod_id, mod_name, skin_id, skin_name, author=''):
   px0, py0 = cx - 20, max(0, top - 2)
   portrait = [''.join(px(x, y) if 0 <= x < 64 and y < H else '.' for x in range(px0, px0 + 40)) for y in range(py0, py0 + 32)]
   team = min(range(1, len(pal)), key=lambda i: d2(cols[order[i]], TEAM_HINT[cls]))
-  mod = {'format': 'spell-vs-steel-mod/2', 'id': mod_id, 'name': mod_name, **({'author': author} if author else {}),
-         'skins': [{'class': cls, 'id': skin_id, 'name': skin_name, 'palette': {ALPHA[i]: c for i, c in enumerate(pal)},
-                    'team': ALPHA[team], 'frames': out, 'portrait': portrait}]}
-  # one frame row per line keeps the file readable and diffable
-  text = json.dumps(mod, indent=2)
-  path = f'{ROOT}/mods/{mod_id}.json'
-  open(path, 'w').write(text + '\n')
-  print(path, len(pal), 'colours,', len(ids), 'frames,', len(text) // 1024, 'KB')
+  # the mod is a folder: mod.json plus the frames side by side (class frame order) and the portrait, as indexed PNGs
+  d = f'{ROOT}/mods/{mod_id}'
+  order = json.load(open(f'{ROOT}/assets/fighters/{cls}.json'))['frames']
+  n = max(order.index(f) for f in ids) + 1
+  blank = ['.' * 64] * H
+  save_rows([out.get(f, blank) for f in order[:n]], pal, f'{d}/{skin_id}.png')
+  save_rows([portrait], pal, f'{d}/{skin_id}-portrait.png')
+  mod = {'format': 'spell-vs-steel-mod/3', 'id': mod_id, 'name': mod_name, **({'author': author} if author else {}),
+         'skins': [{'class': cls, 'id': skin_id, 'name': skin_name, 'sheet': f'{skin_id}.png', 'portrait': f'{skin_id}-portrait.png',
+                    'team': pal[team], 'palette': pal}]}
+  save_json(mod, f'{d}/mod.json')
+  print(d, len(pal), 'colours,', len(ids), 'frames (zip the folder to share it)')
 
 if __name__ == '__main__':
   main(*sys.argv[1:])
