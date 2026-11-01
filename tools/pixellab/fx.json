@@ -852,5 +852,134 @@
       8
     ],
     "rows": 3
+  },
+  {
+    "id": "rogue/shadow-poof",
+    "name": "Shadow Poof",
+    "desc": "A violet smoke poof: vanish and reappear.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/fe85080e-5af0-46cd-89ad-12924f63df80/svs-rogue-shadow-poof",
+    "ax": 28,
+    "ay": 50
+  },
+  {
+    "id": "rogue/shadow-aura",
+    "name": "Shadow Aura",
+    "desc": "Violet shadow wisps rising round the rogue.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/95670c37-13f0-41fd-a21b-0a1e86ab90f4/svs-rogue-shadow-aura",
+    "ax": 21,
+    "ay": 40,
+    "hollow": 3
+  },
+  {
+    "id": "rogue/flurry",
+    "name": "Blade Flurry",
+    "desc": "Three quick steel cuts, the last the biggest.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/d5674d25-fbe8-4c97-b8e4-3a7c1eb74a0c/svs-rogue-flurry",
+    "ax": 23,
+    "ay": 42
+  },
+  {
+    "id": "rogue/eviscerate",
+    "name": "Eviscerate",
+    "desc": "A crimson X cut with a glint and sparks.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/72615502-d86b-4dd2-8735-65a51f7b0940/svs-rogue-eviscerate",
+    "ax": 17,
+    "ay": 40,
+    "frames": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ]
+  },
+  {
+    "id": "rogue/vial-burst",
+    "name": "Vial Burst",
+    "desc": "A poison-green cloud bursts and drifts away.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/fe7cf386-9c50-45c8-a1e5-63399a43f801/svs-rogue-vial-burst",
+    "ax": 24,
+    "ay": 53,
+    "hollow": 3
+  },
+  {
+    "id": "rogue/poison",
+    "name": "Poison",
+    "desc": "Green poison bubbles rising and popping.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/8d60f432-44a3-44d5-a714-cd35655175b7/svs-rogue-poison",
+    "ax": 14,
+    "ay": 50
+  },
+  {
+    "id": "rogue/death-mark",
+    "name": "Death Mark",
+    "desc": "Pale violet skulls drifting round the marked foe.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/8cc57735-8118-4734-8690-ae1eb8ccc659/svs-rogue-death-mark",
+    "ax": 24,
+    "ay": 61
+  },
+  {
+    "id": "rogue/pickpocket",
+    "name": "Pickpocket",
+    "desc": "Gold coins pop out of the foe.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/890e96ee-b999-40f2-b847-c7a3b1c532a2/svs-rogue-pickpocket",
+    "ax": 23,
+    "ay": 46
+  },
+  {
+    "id": "rogue/riposte",
+    "name": "Riposte",
+    "desc": "A whirling steel parry ring.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/c802a3fa-e6bc-4d68-ae9c-4003fb86d895/svs-rogue-riposte",
+    "ax": 30,
+    "ay": 39
+  },
+  {
+    "id": "rogue/adrenaline",
+    "name": "Adrenaline Rush",
+    "desc": "Hot gold up-arrows rising off the rogue.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/96c32d43-7a73-4f90-b91c-7e0159b56b3a/svs-rogue-adrenaline",
+    "ax": 21,
+    "ay": 37
+  },
+  {
+    "id": "rogue/cold-blood",
+    "name": "Cold Blood",
+    "desc": "Crimson up-arrows rising off the rogue.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/00831d4d-05cf-4a15-a9c6-0ec80481b803/svs-rogue-cold-blood",
+    "ax": 21,
+    "ay": 37
+  },
+  {
+    "id": "rogue/evasion",
+    "name": "Evasion",
+    "desc": "Pale speed streaks rushing past the rogue.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/71700503-9b84-4833-81c3-afef6b3cea72/svs-rogue-evasion",
+    "ax": 37,
+    "ay": 37
+  },
+  {
+    "id": "rogue/blind",
+    "name": "Blind",
+    "desc": "A gray smoke puff in the foe's face.",
+    "url": "https://api.pixellab.ai/mcp/pixel-tools/9490807d-2a0f-4bf4-8260-e3176de2ce3f/svs-rogue-blind",
+    "ax": 24,
+    "ay": 47,
+    "frames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ]
   }
 ]
