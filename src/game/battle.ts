@@ -197,6 +197,8 @@ export interface Projectile {
   kind: 'fireball' | 'hook' | 'gust' | 'missile' | 'reflected' | 'knife' | 'arrow' | 'orb' | 'spark' | 'beam' | 'aimed' | 'net' | 'wolf' | 'hawk' | 'hammer' | 'sting' | 'vial';
   /** Render only: the pixelfx shot it plays when that isn't its kind's (a Multi-Shot arrow is still an 'arrow'). */
   look?: string;
+  /** Render only: the shot is the monster itself dashing down the row (its sprite runs with it), so the view draws no shot. */
+  body?: boolean;
   /** Piercing shots fly through walls (hitting them) instead of stopping. */
   pierce?: boolean;
   hitWalls?: Wall[];

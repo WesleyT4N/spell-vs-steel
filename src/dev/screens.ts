@@ -435,6 +435,10 @@ export const screens: Record<string, () => void> = {
   'exp-act3-elite': () => expFight(['titan'], 4, 2),
   'exp-act3-boss': () => expFight(['emberwyrm'], 5, 2),
   // a fight won and a fight lost, played through to what comes after (the rewards, the end of the run)
+  // monsters that move: the sprite itself dashes or leaps (caught mid-move)
+  'exp-wolf-dash': () => { expFight(['wolf'], 0); run(10, () => battle().b.mobs[0].dx < -60); },
+  'exp-ghoul-leap': () => { expFight(['ghoul'], 0, 1); run(10, () => battle().b.mobs[0].dy < -12); },
+  'exp-rider-charge': () => { expFight(['drakerider'], 0, 2); run(14, () => battle().b.mobs[0].dx < -60); },
   'exp-fight-won': () => { expFight(['stumpkin', 'wolf'], 1); for (const m of battle().b.mobs) m.hp = 0; run(6, () => !(getScene() instanceof ExpeditionBattleScene)); },
   'exp-fight-lost': () => { expFight(['stumpkin', 'wolf'], 1); battle().b.f[0].hp = 0; run(6, () => !(getScene() instanceof ExpeditionBattleScene)); },
   'exp-reward': () => { const r = expRun(3); setScene(new RewardScene(r, r.map[r.at])); },
