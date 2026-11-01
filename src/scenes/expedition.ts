@@ -697,7 +697,7 @@ export class RunOverScene implements Scene {
   }
 }
 
-/** Title > EXPEDITION, after the fighter is picked: a fresh run. */
+/** Title > EXPEDITION MODE, after the fighter is picked: a fresh run. */
 export function startExpedition(cls: ExpeditionRun['cls'], skin: string): void {
   pushScene(new ExpeditionMapScene(newRun(cls, skin)));
 }

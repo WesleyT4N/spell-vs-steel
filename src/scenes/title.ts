@@ -23,7 +23,7 @@ import { platform } from '../platform';
 import { flushSave } from '../engine/save';
 
 // QUIT only in an app that can close itself (a web page can't)
-const ITEMS = ['ARCADE MODE', 'EXPEDITION', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'SPELL DECK BUILDER', 'PROFILE', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : []), ...(platform.lifecycle.canQuit ? ['QUIT'] : [])];
+const ITEMS = ['EXPEDITION MODE', 'ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', 'TRAINING MODE', 'TUTORIAL', 'SPELL DECK BUILDER', 'PROFILE', 'OPTIONS', ...(DEV_TOOLS ? ['DEV TOOLS'] : []), ...(platform.lifecycle.canQuit ? ['QUIT'] : [])];
 
 // nine rows (ten in dev builds and the desktop app, eleven in a dev desktop build) still clear the version line
 const MENU_Y = ITEMS.length > 10 ? 146 : ITEMS.length > 9 ? 150 : ITEMS.length > 8 ? 156 : ITEMS.length > 7 ? 162 : ITEMS.length > 6 ? 168 : 172;
@@ -214,7 +214,7 @@ export class TitleScene implements Scene {
       sfx('select');
       const item = ITEMS[this.sel];
       if (item === 'ARCADE MODE') pushScene(new CharSelectScene(undefined, 0, 'arcade'));
-      if (item === 'EXPEDITION') pushScene(new CharSelectScene(undefined, 0, 'expedition'));
+      if (item === 'EXPEDITION MODE') pushScene(new CharSelectScene(undefined, 0, 'expedition'));
       if (item === 'VERSUS MODE') pushScene(new CharSelectScene());
       if (item === 'ONLINE MODE') pushScene(new OnlineScene());
       if (item === 'TRAINING MODE') pushScene(new CharSelectScene(undefined, 0, 'training'));
@@ -333,7 +333,7 @@ export class TitleScene implements Scene {
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   M: MUTE`);
   }
 
-  /** The full-height phone menu: one big ARCADE button, then the modes two to a row, all in the thumb zone. */
+  /** The full-height phone menu: one big button for the top mode, then the modes two to a row, all in the thumb zone. */
   private drawTall(ui: Ctx, rise: number): void {
     const a = tallArea();
     const rows = tallRows();
@@ -347,7 +347,7 @@ export class TitleScene implements Scene {
       r.items.forEach((item, j) => {
         const i = ITEMS.indexOf(item);
         const x = a.x + PAD + (r.items.length > 1 ? j * (half + GAP) : 0);
-        bigButton(ui, `menu:${i}`, TALL_LABEL[item] ?? item, x, y, r.items.length > 1 ? half : w, r.h, { primary: item === 'ARCADE MODE', on: i === this.sel && showSel() && item !== 'ARCADE MODE' });
+        bigButton(ui, `menu:${i}`, TALL_LABEL[item] ?? item, x, y, r.items.length > 1 ? half : w, r.h, { primary: item === ITEMS[0], on: i === this.sel && showSel() && item !== ITEMS[0] });
       });
       y += r.h + GAP;
     }
@@ -359,10 +359,10 @@ export class TitleScene implements Scene {
 
 /** Shorter names for the two-column phone menu. */
 const TALL_LABEL: Record<string, string> = { 'ARCADE MODE': 'ARCADE', 'VERSUS MODE': 'VERSUS', 'ONLINE MODE': 'ONLINE', 'TRAINING MODE': 'TRAINING', 'SPELL DECK BUILDER': 'DECKS' };
-/** The phone menu's rows: ARCADE alone and tall, the rest in pairs. */
+/** The phone menu's rows: the top mode alone and tall, the rest in pairs. */
 function tallRows(): Array<{ items: string[]; h: number }> {
-  const rest = ITEMS.filter(i => i !== 'ARCADE MODE');
-  const rows = [{ items: ['ARCADE MODE'], h: 76 }];
+  const rest = ITEMS.slice(1);
+  const rows = [{ items: [ITEMS[0]], h: 76 }];
   for (let i = 0; i < rest.length; i += 2) rows.push({ items: rest.slice(i, i + 2), h: TAP + 8 });
   return rows;
 }

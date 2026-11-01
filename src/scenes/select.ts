@@ -271,7 +271,7 @@ export class CharSelectScene implements Scene {
     else this.drawSlot(ui, 1, showing(1), tick);
 
     // drawn after the slots so its rolled ends sit on top of them
-    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING MODE' : this.expedition ? 'EXPEDITION' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, vy(3));
+    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING MODE' : this.expedition ? 'EXPEDITION MODE' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, vy(3));
 
     // where this screen sits in the steps before a fight, then VS and the matchup
     if (!this.tutorial && !this.expedition) stepTrail(ui, 0, UW / 2, this.py, { stack: true });
@@ -453,7 +453,7 @@ export class CharSelectScene implements Scene {
     const x0 = a.x + PAD, w = a.w - PAD * 2;
     const barTop = a.y + a.h - 84;
     let y = a.y + 12;
-    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING' : this.expedition ? 'EXPEDITION' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, y);
+    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING' : this.expedition ? 'EXPEDITION MODE' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, y);
     y += 40;
     if (!this.tutorial && !this.expedition) { stepTrail(ui, 0, UW / 2, y, { scale: 2 }); y += 22 + GAP; }
 
