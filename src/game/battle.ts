@@ -713,6 +713,9 @@ export class Battle {
     }
   }
 
+  /** True when `m` is a monster and another monster of its pack still has HP (so its K.O. is not the last one). */
+  packLeft(m: Fighter): boolean { return !!m.mob && this.mobs.some(o => o !== m && o.hp > 0); }
+
   /** Expedition K.O.s: each monster falls on its own; the fight ends when the player or the whole pack is down. */
   private packKo(): void {
     for (const m of this.mobs) if (m.mob && m.dead) m.mob.deadT += 1 / 60;
@@ -730,7 +733,7 @@ export class Battle {
       if (m.dead || m.hp > 0) continue;
       m.dead = true;
       if (m.mob) m.mob.deadT = 0;
-      this.addFx('impact', 0, m.col, m.row, 0.42, { el: 'steel', tier: 3 });
+      this.addFx('impact', 0, m.col, m.row, 0.42, { el: 'steel', tier: this.packLeft(m) ? 2 : 3 });
       this.sound('ko', { pan: panOf(m.col) });
     }
     if (this.mobs.every(m => m.dead)) end(0, this.f[1]);
@@ -1282,10 +1285,13 @@ export class Battle {
     }
     // impact spark for the view, and the hit pause (BN-style: the whole fight stops for a few frames, so it is part of the rules)
     if (!opts.dot) {
-      const tier = target.hp <= 0 ? 3 : amt >= BIG_HIT ? 2 : opts.basic === 'heavy' || amt >= TUNING.flinchThreshold ? 1 : 0;
+      // in a pack fight only the last monster standing gets the K.O. treatment; earlier kills hit like a big hit, with no slow-mo
+      const ko = target.hp <= 0, finalKo = ko && !this.packLeft(target);
+      const tier = finalKo ? 3 : ko || amt >= BIG_HIT ? 2 : opts.basic === 'heavy' || amt >= TUNING.flinchThreshold ? 1 : 0;
       this.addFx('impact', src && src !== target ? src.side : (1 - target.side) as Side, target.col, target.row, 0.3 + tier * 0.06, { el: opts.element ?? 'steel', tier });
       if (tier >= 3 || this.time - this.stopEnd >= TUNING.hitStopGap) { this.hitStop = Math.max(this.hitStop, TUNING.hitStop[tier]); this.stopT = 0; }
-      if (tier >= 2) this.slowmo = Math.max(this.slowmo, tier >= 3 ? TUNING.slowmo.ko : TUNING.slowmo.big);
+      if (finalKo) this.slowmo = Math.max(this.slowmo, TUNING.slowmo.ko);
+      else if (tier >= 2 && !ko) this.slowmo = Math.max(this.slowmo, TUNING.slowmo.big);
     }
     if (amt >= BIG_HIT) { this.shake = Math.max(this.shake, 0.25); this.cheer = 1.5; }
     if (opts.basic === 'heavy') this.shake = Math.max(this.shake, 0.18);
