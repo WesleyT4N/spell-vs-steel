@@ -3,6 +3,8 @@
 // spell colors from the fxView element ramps. Generated from the authored grids in the project files'
 // art/card-icons/ (gen.py, emit.py); letters index `pal`, 'a' is the outline.
 
+import { CARD_ART, CARD_ART_RES } from './cardArt';
+
 export const ICON_SIZE = 20;
 
 interface IconDef { pal: string[]; rows: string[] }
@@ -3278,4 +3280,35 @@ export function cardIconCanvas(id: string): HTMLCanvasElement | null {
   }));
   cache.set(id, o);
   return o;
+}
+
+const hdCache = new Map<string, HTMLCanvasElement>();
+
+/** The spell's HD icon (PixelLab art, ICON_SIZE * CARD_ART_RES square, src/art/cardArt.ts), or null if it has none. */
+export function cardIconHd(id: string): HTMLCanvasElement | null {
+  const def = CARD_ART[id];
+  if (!def) return null;
+  let o = hdCache.get(id);
+  if (o) return o;
+  o = document.createElement('canvas');
+  o.width = o.height = ICON_SIZE * CARD_ART_RES;
+  const c = o.getContext('2d')!;
+  def.rows.forEach((r, y) => [...r].forEach((ch, x) => {
+    if (ch === '.') return;
+    c.fillStyle = def.pal[ALPHA.indexOf(ch)];
+    c.fillRect(x, y, 1, 1);
+  }));
+  hdCache.set(id, o);
+  return o;
+}
+const ALPHA = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+/** Draw the spell's icon in an ICON_SIZE * z box at (x, y): the HD art where z is a whole multiple of its density
+ *  (it is never scaled down or stretched), the 20px icon otherwise. False if the spell has neither. */
+export function drawIconAt(c: CanvasRenderingContext2D, id: string, x: number, y: number, z: number): boolean {
+  const hd = z % CARD_ART_RES === 0 ? cardIconHd(id) : null, img = hd ?? cardIconCanvas(id);
+  if (!img) return false;
+  c.imageSmoothingEnabled = false;
+  c.drawImage(img, x, y, ICON_SIZE * z, ICON_SIZE * z);
+  return true;
 }

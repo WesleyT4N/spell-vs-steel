@@ -125,7 +125,7 @@ Thanks for wanting to help! Here's how to get going.
 ### House rules
 
 - **The battle must stay deterministic.** Online play runs the same simulation on both machines, so anything random in the rules uses the battle's own generator (`b.rand()`), never `Math.random`. Sound and visual effects never live in the simulation: the battle emits events and the engine plays them. `npm run netcheck` and `npm run rollcheck` catch slips.
-- **Spells are data.** Each spell is one entry in its class's card file under `src/game/`, and every number worth tuning is in `src/game/tuning.ts`. A new spell also needs a 20×20 card icon in `src/art/cardIcons.ts`.
+- **Spells are data.** Each spell is one entry in its class's card file under `src/game/`, and every number worth tuning is in `src/game/tuning.ts`. A new spell also needs a 20×20 card icon in `src/art/cardIcons.ts` (small list thumbnails) and a 40×40 HD icon for the card frames (`src/art/cardArt.ts`, made with `tools/pixellab/build_card_icons.py`).
 - **Respect the pixel grid.** Fighters are 24×24 with their own animation frames. Never stretch sprites; pad them instead.
 - **Saves go through the save module** (`src/engine/save.ts`), never straight to `localStorage`.
 - **New screens get a screenshot test**: add them to `src/dev/screens.ts`.

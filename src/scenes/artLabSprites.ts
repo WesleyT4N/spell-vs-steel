@@ -3,7 +3,7 @@
 import { FRAMES, type FrameId } from '../art/fighterFrames';
 import { PL } from '../art/pl';
 import { getFrame, getPortrait, drawFighterSprite, type ClassId, type Sprite, type Tint } from '../art/sprites';
-import { cardIconCanvas, ICON_SIZE } from '../art/cardIcons';
+import { drawIconAt, ICON_SIZE } from '../art/cardIcons';
 import { cardsFor } from '../game/cards';
 import { UW, UH, P, type Ctx } from '../engine/gfx';
 import { drawTextCentered } from '../engine/font';
@@ -110,8 +110,7 @@ export function drawSprites(ui: Ctx, cls: ClassId, skin: string, alt: boolean, v
     ids.forEach((id, i) => {
       const x = x0 + (i % cols) * (cell + gap), y = 26 + Math.floor(i / cols) * (cell + gap);
       backing(ui, x, y, cell, cell, z * 2);
-      const img = cardIconCanvas(id);
-      if (img) ui.drawImage(img, x, y, cell, cell); else label('NONE', x + cell / 2, y + cell / 2 - 3);
+      if (!drawIconAt(ui, id, x, y, z)) label('NONE', x + cell / 2, y + cell / 2 - 3);
       if (showGrid) grid(ui, x, y, ICON_SIZE, ICON_SIZE, z);
     });
     return;
