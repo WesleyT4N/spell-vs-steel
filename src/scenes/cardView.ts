@@ -5,19 +5,15 @@ import { drawText, drawTextCentered, textWidth, wrap } from '../engine/font';
 import { ELEMENT_COLOR, RARITY_COLOR, type CardDef, type Element } from '../game/cards';
 import { CLASS_INFO } from '../game/classes';
 import { drawIconAt, ICON_SIZE } from '../art/cardIcons';
+import { smallSprite } from '../art/paletteImage';
+import { assetData } from '../engine/assets';
 import { modSign, modInk, drawDelta, deltaText, pctText, BUFF_WAX, NERF_WAX } from './modValue';
 
-const EMBLEM: Record<Element | 'shield', string[]> = {
-  shield: ['#########', '####.####', '####.####', '#.......#', '####.####', '.###.###.', '.###.###.', '..##.##..', '...#.#...'],
-  steel: ['........#', '.......##', '......##.', '.....##..', '#...##...', '.#.##....', '..##.....', '.###.....', '#..#.....'],
-  fire: ['....#....', '...##....', '...###...', '..####.#.', '.######..', '.#######.', '#########', '.#######.', '..#####..'],
-  frost: ['....#....', '.#..#..#.', '..#.#.#..', '...###...', '#########', '...###...', '..#.#.#..', '.#..#..#.', '....#....'],
-  arcane: ['....#....', '....#....', '...###...', '..#####..', '#########', '..#####..', '...###...', '....#....', '....#....'],
-  shadow: ['...####..', '..##.....', '.##......', '.##......', '.##......', '.##......', '.##......', '..##.....', '...####..'],
-  poison: ['....#....', '....#....', '...###...', '..#####..', '.#######.', '.###.###.', '.##...##.', '..##.##..', '...###...'],
-  nature: ['......###', '....#####', '...######', '..######.', '.######..', '.#####...', '.###.....', '#.#......', '#........'],
-  holy: ['...###...', '...###...', '#########', '#########', '...###...', '...###...', '...###...', '...###...', '...###...'],
-};
+/** The element emblems (assets/sprites/emblems.png, 9x9 masks in the order its .json names them), by name. */
+function emblem(name: Element | 'shield'): string[] {
+  const sp = smallSprite('emblems'), names = assetData<{ names: string[] }>('sprites/emblems.json')?.names ?? [];
+  return sp.frames[names.indexOf(name)] ?? [];
+}
 
 export const resName = (card: CardDef): string => CLASS_INFO[card.cls].res;
 export const resColor = (card: CardDef): string => CLASS_INFO[card.cls].resColor;
@@ -35,7 +31,7 @@ export function costSign(card: CardDef, cost: number | undefined): number {
 export const costDeltaText = (card: CardDef, cost: number): string => (card.cost === 'all' ? 'FREE' : deltaText(cost - card.cost));
 
 export function drawEmblem(c: Ctx, el: Element | 'shield', cx: number, cy: number, s: number, col: string): void {
-  const rows = EMBLEM[el], x0 = Math.round(cx - (9 * s) / 2), y0 = Math.round(cy - (9 * s) / 2);
+  const rows = emblem(el), x0 = Math.round(cx - (9 * s) / 2), y0 = Math.round(cy - (9 * s) / 2);
   for (const [dx, dy, color] of [[s, s, '#000000'], [0, 0, col]] as const)
     rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === '#') P(c, color, x0 + x * s + dx, y0 + y * s + dy, s, s); }));
 }

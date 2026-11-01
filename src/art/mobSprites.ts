@@ -1,6 +1,14 @@
-// Expedition monster sprites, baked once per tint the same way the fighters are (art/sprites.ts).
+// Expedition monster sprites: assets/monsters/<id>.png (PixelLab art facing right, 2 sprite pixels per world pixel)
+// with its palette and feet column in <id>.json, from tools/pixellab/build_mobs.py. Baked once per tint the same
+// way the fighters are (art/sprites.ts).
 import type { Sprite, Tint } from './sprites';
-import { MOB_ART, MOB_RES } from './mobArt';
+import { assetData, assetImage } from '../engine/assets';
+import { rowsFromImage } from './paletteImage';
+
+/** assets/monsters/<id>.json */
+export interface MobFile { ax: number; palette: string[] }
+/** Sprite pixels per world pixel for the monster art. */
+export const MOB_RES = 2;
 
 /** Palette index of a pixel letter: a-z are 0-25, A-Z 26-51, 0-9 52-61. */
 const letterIndex = (ch: string): number => {
@@ -36,10 +44,12 @@ function bake(rows: string[], pal: string[], tint: Tint): HTMLCanvasElement {
 export function getMobSprite(kind: string): Sprite {
   let s = cache.get(kind);
   if (!s) {
-    const art = MOB_ART[kind] ?? MOB_ART.stumpkin;
+    const id = assetData<MobFile>(`monsters/${kind}.json`) ? kind : 'stumpkin';
+    const art = assetData<MobFile>(`monsters/${id}.json`)!, png = assetImage(`monsters/${id}.png`)!;
+    const rows = rowsFromImage(png, art.palette);
     const img = {} as Record<Tint, HTMLCanvasElement>;
-    for (const t of ['none', 'flash', 'ice', 'stun', 'ghost'] as Tint[]) img[t] = bake(art.rows, art.pal, t);
-    s = { w: art.rows[0].length / MOB_RES, h: art.rows.length / MOB_RES, ax: art.ax / MOB_RES, res: MOB_RES, img };
+    for (const t of ['none', 'flash', 'ice', 'stun', 'ghost'] as Tint[]) img[t] = bake(rows, art.palette, t);
+    s = { w: rows[0].length / MOB_RES, h: rows.length / MOB_RES, ax: art.ax / MOB_RES, res: MOB_RES, img };
     cache.set(kind, s);
   }
   return s;

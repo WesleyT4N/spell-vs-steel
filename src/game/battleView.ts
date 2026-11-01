@@ -23,6 +23,7 @@ import { kickOffset, noteImpacts } from './hitFeel';
 import { endPfxFrame, drawShotPfx } from './pfx';
 import '../fx';
 import { isHome, setHome, team } from './teamColors';
+import { smallSprite } from '../art/paletteImage';
 import { FIRE, HOLY, ICE, SHADOW, STEEL, TOX, drawBurn, drawFrozen, drawFx, drawParticles, useParticles } from './fxView';
 
 /** Whose hidden things (traps, a stealthed fighter) are visible: one side's, or everything in the dev sandbox. */
@@ -296,24 +297,7 @@ function drawPet(c: Ctx, b: Battle, p: Pet, tick: number): void {
   drawWolf(c, x, y, d, tick % 8 < 4);
 }
 
-// a grey wolf facing right: b = fur, h = light fur, w = white muzzle and belly, e = eye, n = nose, k = paws
-const WOLF = [
-  '..................k..k..',
-  '..................kbbk..',
-  '.................bbbbbb.',
-  '.................bbebbbbn',
-  'hh..............bbbbbwww',
-  'hhh.hhhhhhhhhhhbbbbbww..',
-  '.hbbbbbbbbbbbbbbbbbbw...',
-  '..bbbbbbbbbbbbbbbbbb....',
-  '..b.bbbbbbbbbbbbbbbb....',
-  '.....wwwwbbbbbbwwwbb....',
-];
-const WOLF_LEGS = [
-  ['.....bb.bb.....bb.bb....', '....bb...bb...bb...bb...', '...bb.....bb.bb.....bb..', '...kk.....kk.kk.....kk..'],
-  ['.....bbbb......bbbb.....', '.....bbbb......bbbb.....', '.....b..b......b..b.....', '.....kk.kk.....kk.kk....'],
-];
-const WOLF_COL: Record<string, string> = { b: '#7c7c7c', h: '#bcbcbc', w: '#fcfcfc', e: '#f8b800', n: '#000000', k: '#3c3c3c' };
+// the wolf, hawk and bear are small sprites in assets/sprites/ (facing right; wolf and hawk have two frames)
 
 /** Pixel rows with a black outline, centered on x with the last row on y; d < 0 mirrors it. */
 function drawPix(c: Ctx, rows: string[], pal: Record<string, string>, x: number, y: number, d: number): void {
@@ -324,35 +308,13 @@ function drawPix(c: Ctx, rows: string[], pal: Record<string, string>, x: number,
 }
 
 function drawWolf(c: Ctx, x: number, y: number, d: number, step: boolean): void {
-  drawPix(c, [...WOLF, ...WOLF_LEGS[step ? 1 : 0]], WOLF_COL, x, y, d);
+  const s = smallSprite('wolf');
+  drawPix(c, s.frames[step ? 1 : 0] ?? [], s.colors, x, y, d);
 }
 
-// a hawk facing right: b = feathers, h = light wing edge, w = white head, e = beak, k = tail and talons
-const HAWK_UP = [
-  'b................b..',
-  'bb..............bb..',
-  '.bbh...........hbb..',
-  '..bbhh.......hhbb...',
-  '...bbbbh...hbbbb.ww.',
-  '....bbbbbbbbbbbbwwwe',
-  '.....bbbbbbbbbbbbw.e',
-  '..kkbbbbbbbbbb......',
-  '...k...k.k..........',
-];
-const HAWK_DOWN = [
-  '....................',
-  '................ww..',
-  '...............wwwe.',
-  '..kkbbbbbbbbbbbbbw.e',
-  '...kbbbbbbbbbbbbb...',
-  '....hbbbbbbbbbbbh...',
-  '...hbbb.k.k...bbbh..',
-  '..hbb..........bbh..',
-  '.hb..............bh.',
-];
-const HAWK_COL: Record<string, string> = { b: '#ac7c00', h: '#f8d878', w: '#fcfcfc', e: '#f8b800', k: '#503000' };
 function drawHawk(c: Ctx, x: number, y: number, d: number, up: boolean): void {
-  drawPix(c, up ? HAWK_UP : HAWK_DOWN, HAWK_COL, x, y + 4, d);
+  const s = smallSprite('hawk');
+  drawPix(c, s.frames[up ? 0 : 1] ?? [], s.colors, x, y + 4, d);
 }
 
 function drawWall(c: Ctx, w: Wall, time: number): void {
@@ -410,28 +372,11 @@ function drawLightWall(c: Ctx, cx: number, base: number, time: number): number {
 }
 
 /** Spirit Bear: a big pale-blue bear, facing the enemy. */
-// Spirit Bear facing right: b = fur, h = glow highlight, k = dark, e = eye, n = nose
-const BEAR = [
-  '................bb..bb....',
-  '...........hhhh.bbbbbb....',
-  '........hhhbbbbhbbbbbbb...',
-  '......hhbbbbbbbbbbbebbbb..',
-  '....hhbbbbbbbbbbbbbbbbbbbn',
-  '...hbbbbbbbbbbbbbbbbbbbbbk',
-  '..hbbbbbbbbbbbbbbbbbbkkkk.',
-  '..bbbbbbbbbbbbbbbbbbb.....',
-  '..bbbbbbbbbbbbbbbbbbb.....',
-  '..bbbbbbbbbbbbbbbbbbb.....',
-  '..bbbbkbbbbbbbbbbkbbb.....',
-  '..bbbb.bbbb..bbbb.bbbb....',
-  '..bbbb.bbbb..bbbb.bbbb....',
-  '..kkkk.kkkk..kkkk.kkkk....',
-];
-const BEAR_COL: Record<string, string> = { b: '#6888fc', h: '#a4e4fc', k: '#0000a8', e: '#fcfcfc', n: '#000000' };
 
 function drawBear(c: Ctx, w: Wall, cx: number, base: number, time: number): number {
   const d = w.side === 0 ? 1 : -1;
   const bob = Math.floor(time * 2) % 2;
+  const { frames: [BEAR], colors: BEAR_COL } = smallSprite('bear');
   const top = base - BEAR.length - 1 + bob;
   const px = (i: number): number => (d > 0 ? cx - 13 + i : cx + 12 - i);
   // the legs stay planted; the body breathes

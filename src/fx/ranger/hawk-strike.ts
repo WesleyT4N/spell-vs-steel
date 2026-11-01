@@ -1,7 +1,7 @@
 // Hawk Strike (the flying hawk): the hawk sprite, unchanged, now trailing gold wind lines off its wingtips and
 // shedding a feather or two; as it stoops in the second half its wake turns to white dive streaks.
 import type { PfxModule, Opts, Painter } from '../../game/pfx';
-import { drawPix, feather, HAWK_UP, HAWK_DOWN, HAWK_COL, K } from './lib';
+import { drawPix, feather, smallSprite, K } from './lib';
 
 export const meta = { name: 'Hawk Strike', desc: 'The hawk trails gold wind lines and turns to white streaks as it dives.', duration: 2, panels: 2 };
 
@@ -16,7 +16,8 @@ export function draw(p: Painter, t: number, o: Opts): void {
     const a = t - 0.12 - i * 0.16;
     if (a > 0 && a < 0.2) feather(p, -12 - a * 120, 4 + a * 30, (Math.floor(a * 30 + o.seed) % 3) - 1, K.straw, K.bark);
   }
-  drawPix(p, flap ? HAWK_UP : HAWK_DOWN, HAWK_COL, 0, 4);
+  const hawk = smallSprite('hawk');
+  drawPix(p, hawk.frames[flap ? 0 : 1] ?? [], hawk.colors, 0, 4);
 }
 
 export default { meta, draw } satisfies PfxModule;

@@ -1,50 +1,10 @@
-// Cartridge-style NES fighters, extracted from the round-3 sprite page (art/sprite-styles-round3.html).
-// Rogue, Ranger and Priest are the Classic set (art/classic-sprites.ts); their skins recolor the tint letters b/c/d.
+// The fighters: 48px PixelLab art (assets/fighters/, see art/pl) baked once per skin and hit tint.
 import type { Ctx } from '../engine/gfx';
-import { HIRES } from './hiresSprites';
-import { FRAMES, type FrameId, type FrameSet } from './fighterFrames';
-import { PORTRAITS } from './portraits';
+import type { FrameId, FrameSet } from './fighterFrames';
 import { PL, PL_RES } from './pl';
-
-/** Draw the 24px fighters from the reference sheet (art/hi-res) instead of the ~18px Cartridge sprites. */
-export const USE_HIRES = true;
-/** Sprite pixels per world pixel (1: both sprite sets draw at world resolution). */
-const RES = 1;
 
 export type { ClassId } from '../content/classes/registry';
 import type { ClassId } from '../content/classes/registry';
-
-interface SpriteDef { pal: string[]; rows: string[]; ax: number }
-
-const DEFS: Record<ClassId, SpriteDef> = {
-  warrior: {
-    // m (face) starts as the horn color b; skins recolor them separately
-    pal: ['#000000', '#fce0a8', '#ac7c00', '#fcfcfc', '#7c7c7c', '#bcbcbc', '#e45c10', '#d82800', '#f87858', '#f8b800', '#881400', '#503000', '#fce0a8'],
-    rows: ['....aa.......a...', '...abca.....aba..', '.a.aba......aba..', 'adaabcaaaaaaabca.', 'adeaabcdffffbca..', '.adeaaffffffaa...', '..adeaffffmaba...', '...adaffffmgga...', '...addffeeeedaaa.', '..affffeeeeddfffa', '..affeehhhhdijhfa', '...aeehffhhjjjjea', '...akhhfekkfhjkea', '..akkkkkkkjfhjea.', '..akkhhhhhkkeja..', '..akllfeaafeaea..', '...aaaklaaklla...', '......aa..aaa....'],
-    ax: 9,
-  },
-  mage: {
-    // m is a spare slot for skin detail pixels (stars, leaves)
-    pal: ['#000000', '#6888fc', '#0058f8', '#ac7c00', '#00e8d8', '#008888', '#f8b800', '#0000a8', '#fce0a8', '#e45c10', '#fcfcfc', '#bcbcbc', '#fcfcfc'],
-    rows: ['...aa........', '..abba...aaa.', '...acca.adeea', '....accaadefa', '....acghaddda', '...achhhaada.', '.aabgggggcda.', 'acccccchhhha.', '.aaaiiiajada.', '....aikkkada.', '...abckklada.', '...accclcada.', '...acccchhia.', '..aggggggaja.', '..accccghada.', '..acchhghada.', '.achhhhddhda.', 'agggggggggda.', '.aaaaaaaaada.', '..........a..'],
-    ax: 6,
-  },
-  rogue: {
-    pal: ['#000000', '#9878f8', '#6844fc', '#4428bc', '#fce0a8', '#3c3c3c', '#7c7c7c', '#bcbcbc', '#fcfcfc', '#503000', '#58d854'],
-    rows: ['.....aaa.........', '....abbca........', '...abbccca.......', '...abccccca......', '..abccaaaaca.....', '..abcagggfa......', '..abcagfiffa.....', '..abccacddda.....', '.abcccddddda...a.', '.abccddffffda.aia', 'abccdffffffdaahia', 'abcdafggffaeahaa.', 'abdaffjjjjjaeaa..', '.aa.affgaffaa....', '..ahaffa.affa....', '..aiaffa..affa...', '...aaaa...aaaa...'],
-    ax: 8,
-  },
-  ranger: {
-    pal: ['#000000', '#b8f818', '#00a800', '#005800', '#fce0a8', '#ac7c00', '#503000', '#fcfcfc', '#d82800', '#bcbcbc', '#000000', '#e4a060'],
-    rows: ['........ia..........', '.h....aaaia.aa......', 'ahaa.abbbcda.hfa....', 'ahgaabbcccdda.h.fa..', 'agfabcccccddah..fa..', '.afaaaeeelaa.h..fa..', '.afa.aeekea..h...fa.', '.afa.adeela..h...fa.', '.agaaccdddcaah...fa.', 'aaccbccccdcccccaaea.', 'acbbccccddaaaaaaaea.', 'acbcccgggga..h...fa.', '.adbccfjfda..h..fa..', '.adccdgggga..h..fa..', '..adddcdddca.h.fa...', '...adda.adda.hfa....', '...afga..afga.aa....', '..afggga.afgga......', '..aaaaa..aaaaa......'],
-    ax: 8,
-  },
-  priest: {
-    pal: ['#000000', '#fcfcfc', '#bcbcbc', '#7c7c7c', '#fce0a8', '#f8b800', '#ac7c00', '#f8d878', '#fcfcfc', '#bcbcbc', '#000000', '#e4a060'],
-    rows: ['....aaaaaa.......', '...ahhhhhfa..aaa.', '....aaaaaa..ajija', '....abbbca..ajjja', '...abbbbcca.ajija', '..acbfeeelfa.aga.', '..acbfeekefa.aga.', '..acbfeeelfa.aga.', '..acbbfeeffa..ga.', '.acbbbbffbbbccea.', 'acbcbbfgfbbcaaga.', 'acdcbbbffbcca.ga.', 'acdcbbfffbcca..a.', '.acdcbbfbbbcca...', '.acdcbbfbbbbcca..', 'acdccbbfbbbccda..', 'affffffffffffgga.', '.aaaaaaaaaaaaaa..'],
-    ax: 8,
-  },
-};
 
 /** A skin recolors palette letters and may repaint a few inner pixels; the outline never changes. */
 export interface Skin {
@@ -165,24 +125,11 @@ export function mirrorSkin(cls: ClassId, mine: string, theirs: string): string {
   return colors[(colors.findIndex(s => s.id === b.id) + 1) % colors.length].id;
 }
 
-/** Palette and pixel rows for a class in a skin (plus the mirror-match ALT recolor). */
-function skinned(cls: ClassId, skinId: string, alt: boolean): { pal: string[]; rows: string[] } {
+/** Palette and still-sprite pixel rows for a class in a skin. */
+function skinned(cls: ClassId, skinId: string): { pal: string[]; rows: string[] } {
   const art = skinOf(cls, skinId).art;
   if (art) return { pal: art.pal, rows: artStill(art).rows };
-  const pl = PL[cls];
-  if (pl) return { pal: plPalette(cls, skinId), rows: pl.frames.idle0! };
-  if (USE_HIRES) {
-    const h = HIRES[cls], pal = h.pal.slice();
-    for (const [ch, col] of Object.entries(h.skins[skinOf(cls, skinId).id] ?? {})) pal[ch.charCodeAt(0) - 97] = col;
-    return { pal, rows: h.rows };
-  }
-  const def = DEFS[cls], skin = skinOf(cls, skinId);
-  const pal = def.pal.slice();
-  for (const [ch, col] of Object.entries(skin.set)) pal[ch.charCodeAt(0) - 97] = col;
-  if (alt) for (const [i, col] of Object.entries(ALT[cls])) pal[+i] = col;
-  const rows = def.rows.map(r => r.split(''));
-  for (const [x, y, ch] of skin.px ?? []) if (rows[y][x] !== '.' && rows[y][x] !== 'a') rows[y][x] = ch;
-  return { pal, rows: rows.map(r => r.join('')) };
+  return { pal: plPalette(cls, skinId), rows: PL[cls].frames.idle0! };
 }
 
 // ---------- PixelLab fighter skins ----------
@@ -238,13 +185,6 @@ function plPalette(cls: ClassId, skinId: string): string[] {
   return pal;
 }
 
-// Alternate palettes for mirror matches (the CPU's copy). Keys are palette indices to replace.
-const ALT: Record<ClassId, Record<number, string>> = {
-  warrior: { 7: '#00a800', 10: '#005800', 8: '#58d854' },
-  mage: { 1: '#f878f8', 2: '#d800cc', 7: '#940084' },
-  rogue: {}, ranger: {}, priest: {},
-};
-
 export type Tint = 'none' | 'flash' | 'ice' | 'stun' | 'ghost';
 
 /** w, h and ax are in world pixels; `res` is sprite pixels per world pixel. */
@@ -284,14 +224,13 @@ export function getSprite(cls: ClassId, skin: string, alt: boolean): Sprite {
   const key = `${cls}:${skin}${alt ? ':alt' : ''}`;
   let s = cache.get(key);
   if (!s) {
-    const def = DEFS[cls];
-    const { pal, rows } = skinned(cls, skin, alt);
+    const { pal, rows } = skinned(cls, skin);
     const tints: Tint[] = ['none', 'flash', 'ice', 'stun', 'ghost'];
     const img = {} as Record<Tint, HTMLCanvasElement>;
     for (const t of tints) img[t] = bake({ rows }, pal, t);
-    const art = skinOf(cls, skin).art, pl = !art && PL[cls];
-    const ax = art ? artStill(art).ax : pl ? pl.ax : USE_HIRES ? HIRES[cls].ax : def.ax;
-    const res = art ? art.res : pl ? PL_RES : RES;
+    const art = skinOf(cls, skin).art;
+    const ax = art ? artStill(art).ax : PL[cls].ax;
+    const res = art ? art.res : PL_RES;
     s = { w: rows[0].length / res, h: rows.length / res, ax: ax / res, res, img };
     cache.set(key, s);
   }
@@ -299,17 +238,17 @@ export function getSprite(cls: ClassId, skin: string, alt: boolean): Sprite {
 }
 
 const frameCache = new Map<string, Sprite>();
-/** One animation frame of a fighter (art/fighterFrames.ts) in a skin. Falls back to the idle frame. */
+/** One animation frame of a fighter in a skin. Falls back to the idle frame. */
 export function getFrame(cls: ClassId, skin: string, alt: boolean, frame: FrameId): Sprite {
-  const art = skinOf(cls, skin).art, pl = !art ? PL[cls] : undefined;
-  const set: FrameSet = art ?? pl ?? FRAMES[cls], id = set.frames[frame] ? frame : 'idle0';
+  const art = skinOf(cls, skin).art;
+  const set: FrameSet = art ?? PL[cls], id = set.frames[frame] ? frame : 'idle0';
   const key = `${cls}:${skin}${alt ? ':alt' : ''}:${id}`;
   let s = frameCache.get(key);
   if (!s) {
-    const { pal } = skinned(cls, skin, alt), rows = set.frames[id]!;
+    const pal = art ? art.pal : plPalette(cls, skin), rows = set.frames[id]!;
     const img = {} as Record<Tint, HTMLCanvasElement>;
     for (const t of ['none', 'flash', 'ice', 'stun', 'ghost'] as Tint[]) img[t] = bake({ rows }, pal, t);
-    const res = art ? art.res : pl ? PL_RES : 1;
+    const res = art ? art.res : PL_RES;
     s = { w: rows[0].length / res, h: rows.length / res, ax: set.ax / res, res, img };
     frameCache.set(key, s);
   }
@@ -317,7 +256,7 @@ export function getFrame(cls: ClassId, skin: string, alt: boolean, frame: FrameI
 }
 
 const portraitCache = new Map<string, HTMLCanvasElement>();
-/** A class's character select portrait (art/portraits.ts) in a skin, one canvas pixel per portrait pixel. */
+/** A class's character select portrait in a skin, one canvas pixel per portrait pixel. */
 export function getPortrait(cls: ClassId, skin: string): HTMLCanvasElement {
   const key = `${cls}:${skinOf(cls, skin).id}`;
   let img = portraitCache.get(key);
@@ -325,7 +264,7 @@ export function getPortrait(cls: ClassId, skin: string): HTMLCanvasElement {
     const art = skinOf(cls, skin).art;
     // an art skin without its own portrait shows the class's default one
     img = art && !art.portrait ? getPortrait(cls, defaultSkin(cls))
-      : bake({ rows: art?.portrait ?? (PL[cls] && !art ? PL[cls].portrait : PORTRAITS[cls]) }, skinned(cls, skin, false).pal, 'none');
+      : bake({ rows: art?.portrait ?? PL[cls].portrait }, skinned(cls, skin).pal, 'none');
     portraitCache.set(key, img);
   }
   return img;
@@ -408,11 +347,8 @@ export function spriteRows(s: Sprite): Array<Array<[number, string]>> {
 }
 
 /** The main team color of a fighter, for HUD accents. */
-export function teamColor(cls: ClassId, skin: string, alt: boolean): string {
-  // the tabard (Warrior h), robe (Mage c) or the mid tint tone (c) of the Classic set
+export function teamColor(cls: ClassId, skin: string, _alt: boolean): string {
   const art = skinOf(cls, skin).art;
   if (art) return art.pal[letterIndex(art.team)];
-  if (PL[cls]) return skinned(cls, skin, alt).pal[letterIndex(PL[cls].team)];
-  if (USE_HIRES) return skinned(cls, skin, alt).pal[HIRES[cls].team.charCodeAt(0) - 97];
-  return skinned(cls, skin, alt).pal[cls === 'warrior' ? 7 : 2];
+  return plPalette(cls, skin)[letterIndex(PL[cls].team)];
 }

@@ -124,47 +124,8 @@ export function plunge(p: Painter, x: number, y: number, lean: number, a = 1, le
   p.dot(tx - 1, ty, K.white, a); p.dot(tx + 1, ty, K.white, a); p.dot(tx, ty - 1, K.white, a);
 }
 
-// ---------- the pets, copied from battleView so a shot effect can carry its creature ----------
-export const WOLF = [
-  '..................k..k..',
-  '..................kbbk..',
-  '.................bbbbbb.',
-  '.................bbebbbbn',
-  'hh..............bbbbbwww',
-  'hhh.hhhhhhhhhhhbbbbbww..',
-  '.hbbbbbbbbbbbbbbbbbbw...',
-  '..bbbbbbbbbbbbbbbbbb....',
-  '..b.bbbbbbbbbbbbbbbb....',
-  '.....wwwwbbbbbbwwwbb....',
-];
-export const WOLF_LEGS = [
-  ['.....bb.bb.....bb.bb....', '....bb...bb...bb...bb...', '...bb.....bb.bb.....bb..', '...kk.....kk.kk.....kk..'],
-  ['.....bbbb......bbbb.....', '.....bbbb......bbbb.....', '.....b..b......b..b.....', '.....kk.kk.....kk.kk....'],
-];
-export const WOLF_COL: Record<string, string> = { b: '#7c7c7c', h: '#bcbcbc', w: '#fcfcfc', e: '#f8b800', n: '#000000', k: '#3c3c3c' };
-export const HAWK_UP = [
-  'b................b..',
-  'bb..............bb..',
-  '.bbh...........hbb..',
-  '..bbhh.......hhbb...',
-  '...bbbbh...hbbbb.ww.',
-  '....bbbbbbbbbbbbwwwe',
-  '.....bbbbbbbbbbbbw.e',
-  '..kkbbbbbbbbbb......',
-  '...k...k.k..........',
-];
-export const HAWK_DOWN = [
-  '....................',
-  '................ww..',
-  '...............wwwe.',
-  '..kkbbbbbbbbbbbbbw.e',
-  '...kbbbbbbbbbbbbb...',
-  '....hbbbbbbbbbbbh...',
-  '...hbbb.k.k...bbbh..',
-  '..hbb..........bbh..',
-  '.hb..............bh.',
-];
-export const HAWK_COL: Record<string, string> = { b: '#ac7c00', h: '#f8d878', w: '#fcfcfc', e: '#f8b800', k: '#503000' };
+// ---------- the pets (assets/sprites/wolf.png, hawk.png, the same sprites battleView draws) ----------
+export { smallSprite } from '../../art/paletteImage';
 
 /** Pixel rows with a black outline (3x3 under every pixel, like battleView's drawPix), centered on x with the last
  *  row on y, facing +x. The painter mirrors it for the right-hand side. */

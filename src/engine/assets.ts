@@ -7,6 +7,7 @@
 // In Node (sims and tests) nothing is registered: every lookup comes back empty and nothing draws.
 
 const urls = new Map<string, string>();
+const data = new Map<string, unknown>();
 const images = new Map<string, HTMLImageElement>();
 let loading: Promise<void> | null = null;
 
@@ -14,6 +15,17 @@ let loading: Promise<void> | null = null;
 export function registerAssets(map: Record<string, string>): void {
   for (const [path, url] of Object.entries(map)) urls.set(path.replace(/^.*?assets\//, ''), url);
 }
+
+/** Register parsed JSON asset files (sprite metadata and the like) by file path. */
+export function registerAssetData(map: Record<string, unknown>): void {
+  for (const [path, v] of Object.entries(map)) data.set(path.replace(/^.*?assets\//, ''), v);
+}
+
+/** A JSON asset file's contents ("monsters/wolf.json"), or undefined when there is none. */
+export const assetData = <T>(path: string): T | undefined => data.get(path) as T | undefined;
+
+/** Every registered JSON asset path under a folder ("monsters/"), sorted. */
+export const assetDataPaths = (prefix: string): string[] => [...data.keys()].filter(k => k.startsWith(prefix)).sort();
 
 /** The URL of an asset file, or undefined when there is none. */
 export const assetUrl = (path: string): string | undefined => urls.get(path);

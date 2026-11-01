@@ -1,0 +1,7 @@
+{
+  "glyphWidth": 5,
+  "glyphHeight": 7,
+  "advance": 6,
+  "lineHeight": 8,
+  "chars": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ.,:!?-+/%'()<>=×*#↑↓→←●○ "
+}
