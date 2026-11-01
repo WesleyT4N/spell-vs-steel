@@ -17,14 +17,19 @@ export const registerStage = (m: StageModule): StageModule => STAGES.register(m)
 export const STAGE_IDS = STAGES.ids;
 
 /** The battle theme for stage `id`. */
-export const stageMusic = (id: string): TrackId => STAGES.get(id)?.music ?? 'stage_colosseum';
+export const stageMusic = (id: string): TrackId => (STAGES.get(id) ?? EXTRA.get(id))?.music ?? 'stage_colosseum';
+
+/** Stages a mode uses for its own fights (Expedition's Crypt): drawable by id, but not in the stage select,
+ *  random picks or online votes, so they leave those orders alone. */
+const EXTRA = new Map<string, StageModule>();
+export const registerExtraStage = (m: StageModule): StageModule => { EXTRA.set(m.id, m); return m; };
 
 const built = new Map<string, Stage>();
 /** The stage with this id, built on first use (falls back to the Colosseum). */
 export function getStage(id: string): Stage {
   let s = built.get(id);
   if (!s) {
-    s = (STAGES.get(id) ?? STAGES.get('colosseum')!).create();
+    s = (STAGES.get(id) ?? EXTRA.get(id) ?? STAGES.get('colosseum')!).create();
     built.set(s.id, s);
   }
   return s;

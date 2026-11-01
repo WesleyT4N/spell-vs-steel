@@ -397,10 +397,10 @@ export class CharSelectScene implements Scene {
     const x = PX[1], cx = x + PW / 2;
     win(ui, x, this.py, PW, PH);
     if (this.expedition) {
-      drawTextCentered(ui, 'THE FOREST', cx, this.py + 10, BLUE_INK, 1, false);
+      drawTextCentered(ui, '3 ACTS', cx, this.py + 10, BLUE_INK, 1, false);
       drawTextCentered(ui, '?', cx, this.py + 40, RED_INK, 3, false);
       drawTextCentered(ui, 'A ROGUELIKE RUN', cx, this.py + 80, INK, 1, false);
-      ['FIGHT MONSTER PACKS', 'DRAFT SPELLS AS YOU GO', 'HP CARRIES OVER', 'ONE LOSS ENDS THE RUN', 'BEAT OLD OAKHEART'].forEach((l, i) => drawTextCentered(ui, l, cx, this.py + 96 + i * 10, TRIM, 1, false));
+      ['FOREST, CRYPT, VOLCANO', 'FIGHT MONSTER PACKS', 'DRAFT SPELLS AS YOU GO', 'HP CARRIES OVER', 'ONE LOSS ENDS THE RUN'].forEach((l, i) => drawTextCentered(ui, l, cx, this.py + 96 + i * 10, TRIM, 1, false));
       return;
     }
     drawTextCentered(ui, 'THE LADDER', cx, this.py + 10, BLUE_INK, 1, false);
@@ -483,7 +483,7 @@ export class CharSelectScene implements Scene {
     this.tallRects.panel = [[x0, y, pw, ph], [x0 + w - pw, y, pw, ph]];
     this.drawTallSlot(ui, 0, showing(0), x0, y, pw, ph, tick, z);
     if (this.tutorial) this.drawTallNote(ui, x0 + w - pw, y, pw, ph, 'OPPONENT', 'DUMMY', ['A TRAINING', 'DUMMY. ABOUT', '5 MINUTES OF', 'LESSONS'], BLUE_INK, z);
-    else if (this.expedition) this.drawTallNote(ui, x0 + w - pw, y, pw, ph, 'THE FOREST', 'ROGUELIKE', ['MONSTER PACKS', 'DRAFT SPELLS', 'HP CARRIES OVER', 'ONE LOSS ENDS IT'], BLUE_INK, z);
+    else if (this.expedition) this.drawTallNote(ui, x0 + w - pw, y, pw, ph, '3 ACTS', 'ROGUELIKE', ['FOREST, CRYPT,', 'VOLCANO', 'DRAFT SPELLS', 'ONE LOSS ENDS IT'], BLUE_INK, z);
     else if (this.arcade) {
       const best = loadRecords()[this.m.p1];
       this.drawTallNote(ui, x0 + w - pw, y, pw, ph, 'THE LADDER', '4 RIVALS', ['+ YOUR SHADOW', 'EASY TO HARD', 'BEST OF 3', best ? `BEST ${clock(best.time)}` : 'NOT CLEARED'], BLUE_INK, z);

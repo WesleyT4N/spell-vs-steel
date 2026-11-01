@@ -15,7 +15,7 @@ import { CARDS } from '../game/cards';
 import { CLASS_INFO } from '../game/classes';
 import {
   choices, makeFight, spellChoices, goldFor, rollRelic, addRelic, addSpell, removeSpell, heal, stock, relicOf, has, newRun,
-  REST_HEAL, BOSS_FLOOR, type ExpeditionRun, type MapNode, type NodeKind, type ShopItem,
+  REST_HEAL, BOSS_FLOOR, RUN_FLOORS, actOf, nextAct, type ExpeditionRun, type MapNode, type NodeKind, type ShopItem,
 } from '../game/expedition';
 import { UW, P, screenRect, spread, vy, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, drawTextOutlined, textWidth, wrap } from '../engine/font';
@@ -28,19 +28,18 @@ import { drawCardFace, drawCardDetail, CARD_W, CARD_H } from './cardView';
 import type { RoundRecord } from '../game/stats';
 import type { ReplayMode } from '../game/replay';
 
-const STAGE = 'elderwood';
 const KIND_NAME: Record<NodeKind, string> = { fight: 'FIGHT', elite: 'ELITE', rest: 'REST STOP', shop: 'SHOP', boss: 'BOSS' };
 const KIND_TEXT: Record<NodeKind, string[]> = {
   fight: ['A PACK OF MONSTERS.', 'WIN: GOLD + A SPELL.'],
   elite: ['A TOUGH MONSTER.', 'WIN: GOLD, A RELIC', 'AND A RARER SPELL.'],
   rest: ['HEAL OR REMOVE', 'A SPELL.'],
   shop: ['BUY SPELLS, RELICS', 'OR A REMOVAL.'],
-  boss: ['THE FOREST BOSS.', 'WIN: A LEGENDARY.'],
+  boss: ['THE ACT BOSS.', 'WIN: A LEGENDARY.'],
 };
 
-/** The forest behind the run's menus, washed out so the parchment reads. */
-function backdrop(c: Ctx, tick: number): void {
-  useStage(STAGE);
+/** The act's stage behind the run's menus, washed out so the parchment reads. */
+function backdrop(c: Ctx, tick: number, run: ExpeditionRun): void {
+  useStage(actOf(run).stage);
   drawStage(c, getArena(), tick);
   c.fillStyle = 'rgba(40,20,0,0.45)';
   c.fillRect(...screenRect());
@@ -107,7 +106,9 @@ export class ExpeditionMapScene implements Scene {
   quitSel = 1;
   /** Node centers from the last draw, for taps. */
   private spots = new Map<number, [number, number]>();
-  constructor(public run: ExpeditionRun) {}
+  /** Seconds left on the new act's title card (after an act boss). */
+  introT = 0;
+  constructor(public run: ExpeditionRun, newAct = false) { if (newAct) this.introT = 3; }
 
   enter(): void { playMusic('menu'); }
   resume(): void { playMusic('menu'); }
@@ -122,11 +123,11 @@ export class ExpeditionMapScene implements Scene {
     sfx('select');
     run.at = n.id;
     run.path.push(n.id);
-    run.stats.floors = n.floor + 1;
+    run.stats.floors = run.act * (BOSS_FLOOR + 1) + n.floor + 1;
     if (n.kind === 'rest') { replaceScene(new RestScene(run)); return; }
     if (n.kind === 'shop') { replaceScene(new ShopScene(run)); return; }
     stopMusic();
-    useStage(STAGE);
+    useStage(actOf(run).stage);
     replaceScene(new ExpeditionBattleScene(run, n));
   }
 
@@ -134,6 +135,11 @@ export class ExpeditionMapScene implements Scene {
     this.t += dt;
     // a beat before taking input, so keys mashed in the fight (or on the screen before) don't pick anything
     if (this.t < SETTLE) return;
+    if (this.introT > 0) {
+      this.introT -= dt;
+      if (mouse.click || wasPressed('confirm') || wasPressed('attack') || wasPressed('back')) { this.introT = 0; sfx('select'); }
+      return;
+    }
     const opts = this.options;
     this.sel = Math.min(this.sel, opts.length - 1);
     if (this.quitting) { this.updateQuit(dt); return; }
@@ -168,10 +174,10 @@ export class ExpeditionMapScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    backdrop(c, tick);
+    backdrop(c, tick, this.run);
     if (spread.tall) { this.drawTall(ui, tick); return; }
     const run = this.run;
-    banner(ui, 'EXPEDITION: THE FOREST', UW / 2, vy(3));
+    banner(ui, `ACT ${run.act + 1}: ${actOf(run).name}`, UW / 2, vy(3));
     // you, on the left
     const lx = 8, ly = vy(36), lw = 112, lh = vy(296) - ly;
     win(ui, lx, ly, lw, lh);
@@ -199,6 +205,7 @@ export class ExpeditionMapScene implements Scene {
     this.drawInfo(ui, n, rx, ly, rw, 1);
     if (this.quitting) this.drawQuit(ui, tick);
     else hint(ui, `CLICK OR ${k('left')}/${k('right')}: PICK   ${k('attack')}: GO   ${k('cast')}: DECK`);
+    this.drawIntro(ui);
   }
 
   private smallButton(ui: Ctx, id: string, label: string, x: number, y: number, w: number): void {
@@ -260,6 +267,16 @@ export class ExpeditionMapScene implements Scene {
     }
   }
 
+  /** The new act's title card: ACT 2, its name, and the full heal. */
+  private drawIntro(ui: Ctx): void {
+    if (this.introT <= 0) return;
+    dim(ui, 0.75);
+    const cy = spread.tall ? tallArea().y + tallArea().h / 2 : vy(150);
+    drawTextCentered(ui, `ACT ${this.run.act + 1}`, UW / 2, cy - 44, GOLD, 2, true);
+    drawTextCentered(ui, actOf(this.run).name, UW / 2, cy - 18, '#fcfcfc', 4, true);
+    drawTextCentered(ui, 'FULLY HEALED', UW / 2, cy + 26, '#58d854', 2, true);
+  }
+
   private drawQuit(ui: Ctx, tick: number): void {
     dim(ui, 0.6);
     drawTextCentered(ui, 'ABANDON THIS RUN?', UW / 2, vy(110), '#fcfcfc', 3);
@@ -269,7 +286,7 @@ export class ExpeditionMapScene implements Scene {
   private drawTall(ui: Ctx, tick: number): void {
     const run = this.run, a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
     let y = a.y + PAD;
-    drawTextCentered(ui, 'THE FOREST', UW / 2, y, PAPER, 3, true);
+    drawTextCentered(ui, actOf(run).name, UW / 2, y, PAPER, 3, true);
     y += 26;
     drawTextCentered(ui, runLine(run), UW / 2, y, run.hp / run.maxHp < 0.3 ? '#f87858' : '#fcfcfc', 1, true);
     y += 12;
@@ -292,6 +309,7 @@ export class ExpeditionMapScene implements Scene {
       bigButton(ui, 'quit:yes', 'YES, ABANDON', x0, by, w, TAP);
       bigButton(ui, 'quit:no', 'NO, KEEP GOING', x0, by + TAP + GAP, w, TAP, { primary: true });
     }
+    this.drawIntro(ui);
   }
 }
 
@@ -304,7 +322,7 @@ const IDLE = { intent: () => NO_INTENT, pick: () => [], wantsDraw: () => false }
 export class ExpeditionBattleScene extends BattleScene {
   private left = false;
   constructor(private run: ExpeditionRun, private node: MapNode, battle?: Battle) {
-    useStage(STAGE);
+    useStage(actOf(run).stage);
     const m = { ...loadMatch(), p1: run.cls, p1Deck: 'starter', bestOf: 1 as const, sides: ['player', 'cpu'] as ['player', 'cpu'] };
     m.p1Skin = { ...m.p1Skin, [run.cls]: run.skin };
     super(m, [0, 0], battle ?? makeFight(run, node.pack, undefined, 1), [], ['player', 'cpu']);
@@ -362,7 +380,11 @@ export class RewardScene implements Scene {
   private take(i: number): void {
     const run = this.run;
     if (i < this.offer.length) { addSpell(run, this.offer[i]); sfx('confirm'); } else { run.gold += 10; sfx('select'); }
-    if (this.node.kind === 'boss') { run.over = 'won'; replaceScene(new RunOverScene(run)); return; }
+    if (this.node.kind === 'boss') {
+      // the act is cleared: on to the next one (fully healed), or the run is won
+      if (nextAct(run)) { replaceScene(new ExpeditionMapScene(run, true)); return; }
+      run.over = 'won'; replaceScene(new RunOverScene(run)); return;
+    }
     replaceScene(new ExpeditionMapScene(run));
   }
 
@@ -379,7 +401,7 @@ export class RewardScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    backdrop(c, tick);
+    backdrop(c, tick, this.run);
     const tall = spread.tall, a = tall ? tallArea() : null;
     const top = a ? a.y + PAD : vy(3);
     if (a) drawTextCentered(ui, 'VICTORY!', UW / 2, top, PAPER, 3, true); else banner(ui, 'VICTORY!', UW / 2, top);
@@ -453,7 +475,7 @@ export class RestScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    backdrop(c, tick);
+    backdrop(c, tick, this.run);
     const run = this.run;
     if (spread.tall) {
       const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
@@ -535,7 +557,7 @@ export class ShopScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    backdrop(c, tick);
+    backdrop(c, tick, this.run);
     const run = this.run, tall = spread.tall, a = tall ? tallArea() : null;
     const x0 = a ? a.x + PAD : 40, w = a ? a.w - PAD * 2 : 230;
     let y = a ? a.y + PAD : vy(3);
@@ -622,7 +644,7 @@ export class DeckScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    backdrop(c, tick);
+    backdrop(c, tick, this.run);
     const ids = this.ids, run = this.run, total = Object.values(run.deck).reduce((a, b) => a + b, 0);
     this.sel = Math.min(this.sel, ids.length - 1);
     const title = this.mode === 'remove' ? 'REMOVE A SPELL' : `YOUR DECK (${total})`;
@@ -695,7 +717,7 @@ export class RunOverScene implements Scene {
   private lines(): string[] {
     const s = this.run.stats, mins = Math.floor(s.secs / 60), secs = Math.floor(s.secs % 60);
     return [
-      `FLOORS CLEARED  ${s.floors}/${BOSS_FLOOR + 1}`,
+      `FLOORS CLEARED  ${s.floors}/${RUN_FLOORS}`,
       `FIGHTS WON  ${s.fights}   ELITES  ${s.elites}`,
       `MONSTERS DEFEATED  ${s.kills}`,
       `DAMAGE DEALT  ${s.dealt}`,
@@ -706,8 +728,8 @@ export class RunOverScene implements Scene {
   }
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
-    backdrop(c, tick);
-    const won = this.run.over === 'won', title = won ? 'FOREST CLEARED!' : 'RUN OVER';
+    backdrop(c, tick, this.run);
+    const won = this.run.over === 'won', title = won ? 'EXPEDITION CLEARED!' : 'RUN OVER';
     if (spread.tall) {
       const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
       let y = a.y + PAD;
