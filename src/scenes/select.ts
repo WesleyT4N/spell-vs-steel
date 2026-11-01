@@ -19,7 +19,7 @@ import type { NetSession } from '../net/session';
 import { DeckSelectScene } from './deckSelect';
 import { TutorialScene, type TutorialClass } from './tutorial';
 import { loadRecords, clock } from '../game/arcade';
-import type { PadMode } from '../engine/touch';
+import { touchActive, type PadMode } from '../engine/touch';
 import { YOU, FOE } from '../game/teamColors';
 import { bigButton, actionBar, barTapped, swipeIn, tallArea, GAP, PAD } from './touchUi';
 
@@ -182,8 +182,9 @@ export class CharSelectScene implements Scene {
         (s === 0 ? this.m.p1Skin : this.m.cpuSkin)[cls] = SKINS[cls][n].id;
         saveMatch(this.m);
         sfx('select');
-        // in the skin step a click is also the confirm
-        if ((s === 0 && this.step === 1) || (s === 1 && this.step === 3)) this.advance();
+        // in the skin step a click is also the confirm; a tap only picks the color (on a phone the color row would
+        // jump to the CPU's colors under the finger), and the action button moves on
+        if (!touchActive() && ((s === 0 && this.step === 1) || (s === 1 && this.step === 3))) this.advance();
         this.sync();
         return;
       }
@@ -439,7 +440,7 @@ export class CharSelectScene implements Scene {
     const skinStep = (s === 0 && this.step === 1) || (s === 1 && this.step === 3);
     list.forEach((sk, n) => {
       const px = sx + n * sw, py = this.py + 146;
-      zone(`${s === 0 ? 'swatch' : 'cswatch'}:${n}`, px, py - 1, sw, 12);
+      zone(`${s === 0 ? 'swatch' : 'cswatch'}:${n}`, px, py - 4, sw, 18);
       if (sk.id === skin) P(ui, skinStep && tick % 8 >= 6 ? GOLD : INK, px, py - 1, 12, 12);
       P(ui, '#000000', px + 2, py + 1, 8, 8);
       P(ui, teamColor(cls, sk.id, false), px + 3, py + 2, 6, 6);
