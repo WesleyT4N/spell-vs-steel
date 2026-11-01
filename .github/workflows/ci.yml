@@ -34,6 +34,8 @@ jobs:
         run: npx tsx tests/saves.ts
       - name: CPU vs CPU matches, every class pair
         run: npx tsx tests/matches.ts
+      - name: Expedition pack K.O. slow-mo
+        run: npx tsx tests/packKo.ts
       - name: Scene stack (BACK)
         run: npx tsx tests/scene-stack.ts
       - name: Gamepad input
