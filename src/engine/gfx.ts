@@ -5,6 +5,9 @@ export const H = 160;
 /** The sharp UI layer: twice the world resolution, drawn over the scaled-up world. */
 export const UW = W * 2;
 export const UH = H * 2;
+/** Backing pixels per layer pixel. Both layers keep drawing in their own coordinates (world W×H, UI UW×UH) and
+ *  every whole pixel is HD×HD on the backing store, so 48px fighters can draw at half-pixel detail (Sprite.res). */
+export const HD = 2;
 
 /**
  * The visible screen in world pixels. Screens wider or taller than 3:2 show more than W×H: the game

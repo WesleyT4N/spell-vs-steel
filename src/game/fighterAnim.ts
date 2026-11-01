@@ -4,6 +4,7 @@
 import { panelFoot } from '../art/arena';
 import { spriteRows, type ClassId, type Pose, type Sprite } from '../art/sprites';
 import type { FrameId } from '../art/fighterFrames';
+import { PL } from '../art/pl';
 import { P, glow, type Ctx } from '../engine/gfx';
 import { TUNING } from './tuning';
 import type { Battle, Fighter, Fx } from './battle';
@@ -88,6 +89,8 @@ export function observe(b: Battle, f: Fighter): State {
   return s;
 }
 
+const IDLE4: FrameId[] = ['idle0', 'idle1', 'idle2', 'idle3', 'idle2', 'idle1'];
+
 /** The fighter's frame and offset this frame. `held`: frozen, stunned or asleep (no recoil, no idle). */
 export function lookOf(b: Battle, f: Fighter, s: State, held: boolean): Look {
   const t = b.time, d = b.dir(f), cls = f.cls;
@@ -97,7 +100,9 @@ export function lookOf(b: Battle, f: Fighter, s: State, held: boolean): Look {
 
   // idle: each class breathes at its own pace
   const rate = cls === 'rogue' ? 3.6 : cls === 'warrior' ? 1.6 : cls === 'priest' ? 1.4 : cls === 'mage' ? 1.3 : 2.5;
-  L.frame = Math.floor(t * rate) % 2 ? 'idle1' : 'idle0';
+  // the 48px fighters breathe through four drawn frames (there and back); the 24px art has two
+  if (PL[cls]) L.frame = IDLE4[Math.floor(t * rate * 3) % IDLE4.length];
+  else L.frame = Math.floor(t * rate) % 2 ? 'idle1' : 'idle0';
   if (cls === 'mage') L.oy = -1 - Math.round(Math.sin(t * 2.6));   // hovers on his magic
 
   // steps

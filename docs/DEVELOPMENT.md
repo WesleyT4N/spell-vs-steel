@@ -122,3 +122,11 @@ Every number worth tuning is in [`src/game/tuning.ts`](../src/game/tuning.ts). S
 - `src/scenes/` title, tutorial, setup, deck builder, battle (Draw screen, pause, results), online lobby and online battle, options, controls, card faces (`cardView.ts`); clickable zones live in `scene.ts`
 - `src/mods/` the data-only mod format (`format.ts`) and the loader for `mods/*.json` (`index.ts`); see [MODDING.md](MODDING.md)
 - `src/net/` online play: packets, transports, the session, rollback (`rollback.ts`, `snapshot.ts`), the desync checksum
+
+## PixelLab art
+
+The fighters and stage backdrops are made with PixelLab (the PixelLab MCP connector) and baked into TypeScript by the scripts in `tools/pixellab/`. Source images live in the project files under `art/pixellab/` (`<class>_48_pl.png` bases, `idle/` loops, `anim/<class>_<move>_<n>.png` frames, `stages/<id>.png`).
+
+- **Fighters** are 48x48 on a 64x64 canvas, drawn at 2 sprite pixels per world pixel (`Sprite.res`). Both canvas layers have an HD backing store (`HD` in `src/engine/gfx.ts`): scenes still draw in 240x160 / 480x320 coordinates, and a half-pixel lands on a whole backing pixel, so the sprites stay native, never stretched. `python3 tools/pixellab/build_frames.py [srcDir] [class...]` cleans every frame (`clean.py`: one outline ink, no stray pixels, closed gaps), quantizes one palette per class (index 0 is the outline), picks which generated frame plays each game frame (`MAP`), crops a 40x32 portrait and writes `src/art/pl/<class>.ts`. Skins hue-shift the class's main color family (`plPalette` in `src/art/sprites.ts`).
+- **Stages** keep their panels, name and music; `src/content/stages/backdrop.ts` swaps the Inked scenery for a 792x336 panorama, and the outer bands repeat (mirrored) past its edges for tall and wide screens. `python3 tools/pixellab/build_stages.py [srcDir]` writes `src/content/stages/art/<id>.ts`; set the image row where the wall meets the floor (`foot`) in `src/content/stages/index.ts`.
+- Every battle stage has a screen (`battle-stage-<id>`) in `src/dev/screens.ts`.

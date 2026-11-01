@@ -2,6 +2,7 @@
 // at every screen shape (tests/screens/), and the Art Lab's Screens tab opens them. Online screens get made-up
 // rivals over in-memory links; some entries write decks or match settings, so the Art Lab pauses saves first.
 // Add a screen here when you add one to the game.
+import { useStage } from '../game/battleView';
 import { setScene, getScene } from '../scenes/scene';
 import { endFrame, pollInput } from '../engine/input';
 import { TitleScene } from '../scenes/title';
@@ -384,6 +385,10 @@ export const screens: Record<string, () => void> = {
     const b = battle().b; b.endCustom([[], []]); run(1);
     const f = b.f[0]; f.empowered = 1.25; f.queue = ['meteor', 'fireball']; f.resMax = 5; f.res = 5; run(0.2);
   },
+  // every stage's backdrop behind a live fight (Expedition's Crypt included)
+  ...Object.fromEntries(['colosseum', 'courtyard', 'archive', 'frostpeak', 'emberforge', 'elderwood', 'crypt'].map(id => [`battle-stage-${id}`, () => {
+    useStage(id); setScene(new BattleScene(match({ p1: 'ranger', cpu: 'rogue', stage: id }))); run(0.5); battle().b.endCustom([[], []]); run(1.5);
+  }])),
   'battle-fight': () => { watch(); run(8, () => battle().b.phase === 'over'); },
   // mid-fight as the player, so phones show the fight pad
   'battle-player': () => { setScene(new BattleScene(match({ p1: 'priest', cpu: 'ranger' }))); run(0.5); battle().b.endCustom([[0, 1], []]); run(3); },

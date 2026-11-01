@@ -6,7 +6,7 @@ import { getStage, stageMusic, STAGE_IDS } from '../content/stages';
 import { drawPanel, drawStage, panelFoot } from '../art/arena';
 import { useStage } from '../game/battleView';
 import { getSprite, drawFighterSprite, skinOf, mirrorSkin } from '../art/sprites';
-import { P, W, H, UW, rng, screenRect, fillScreen, vy, spread, type Ctx } from '../engine/gfx';
+import { P, W, H, UW, HD, rng, screenRect, fillScreen, vy, spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { win, plaque, banner, stepTrail, FRAME, GOLD, PAPER, INK, INK2, RED_INK } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
@@ -79,7 +79,8 @@ export class StageSelectScene implements Scene {
     const i = TILES.indexOf(this.m.stage);
     this.cur = i < 0 ? 0 : i;
     this.view = this.cursorStage();
-    this.preview.width = W; this.preview.height = H;
+    this.preview.width = W * HD; this.preview.height = H * HD;
+    const pcx = this.preview.getContext('2d')!; pcx.setTransform(HD, 0, 0, HD, 0, 0); pcx.imageSmoothingEnabled = false;
     if (net) net.lobby = { ...net.lobby, stage: TILES[this.cur], voted: false };
   }
 
@@ -207,7 +208,7 @@ export class StageSelectScene implements Scene {
     // the preview sits in a parchment mat, like a framed painting
     win(ui, VX - 5, previewY - 5, W + 10, H + 10, { burn: 2 });
     P(ui, FRAME, VX - 1, previewY - 1, W + 2, H + 2);
-    ui.drawImage(this.preview, VX, previewY);
+    ui.drawImage(this.preview, VX, previewY, W, H);
 
     banner(ui, 'SELECT STAGE', UW / 2, vy(2));
     stepTrail(ui, 2, 58, ny - 2, { stack: true });
