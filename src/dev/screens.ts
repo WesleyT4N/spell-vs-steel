@@ -34,7 +34,8 @@ import { RankedScene } from '../scenes/ranked';
 import { ReplaysScene, ReplayScene } from '../scenes/replays';
 import { ProfileScene } from '../scenes/profile';
 import { ModsScene } from '../scenes/mods';
-import { MODS, setModOn } from '../mods';
+import { MODS, setModOn, importMod } from '../mods';
+import wesMod from '../../mods/wes-skin.json?raw';
 import { Battle, type Intent } from '../game/battle';
 import { Cpu } from '../game/ai';
 import { TapeWriter } from '../game/replay';
@@ -493,6 +494,17 @@ export const screens: Record<string, () => void> = {
   'mods-import': () => { const m = new ModsScene(); setScene(m); (m as unknown as { openImport(): void }).openImport(); run(0.1); },
   // the mod skins on the fighter select and in a fight
   'select-mod-skin': () => { saveMatch({ ...loadMatch(), p1: 'mage', p1Skin: { ...loadMatch().p1Skin, mage: 'wes' } }); setScene(new CharSelectScene(undefined, 1)); run(0.2); },
+  // a class with mod skins and the classic look on: the COLORS tab, with SKINS beside it
+  'select-mod-colors': () => { saveMatch({ ...loadMatch(), p1: 'mage', p1Skin: { ...loadMatch().p1Skin, mage: 'red' } }); setScene(new CharSelectScene(undefined, 1)); run(0.2); },
+  // more mod skins than fit by name on the desktop panel
+  'select-many-skins': () => {
+    const wes = JSON.parse(wesMod) as { skins: Array<Record<string, unknown>> };
+    for (const n of ['Archmage', 'Necromancer', 'Battlemage']) {
+      importMod(JSON.stringify({ ...wes, id: n.toLowerCase(), name: n, skins: wes.skins.map(s => ({ ...s, id: n.toLowerCase(), name: n })) }));
+    }
+    saveMatch({ ...loadMatch(), p1: 'mage', p1Skin: { ...loadMatch().p1Skin, mage: 'necromancer' } });
+    setScene(new CharSelectScene(undefined, 1)); run(0.2);
+  },
   'battle-mod-skins': () => {
     setScene(new BattleScene(match({ p1: 'mage', cpu: 'ranger', p1Skin: { ...loadMatch().p1Skin, mage: 'wes' }, cpuSkin: { ...loadMatch().cpuSkin, ranger: 'hazel' } })));
     run(0.5); battle().b.endCustom([[], []]); run(1.2);

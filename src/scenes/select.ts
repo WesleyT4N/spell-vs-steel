@@ -8,11 +8,11 @@ import { pushScene, popScene, goHome, hint, zone, hot, isHot, button, showSel, t
 import { PLAYABLE, CLASS_INFO } from '../game/classes';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
-import { getSprite, getPortrait, drawFighterSprite, teamColor, SKINS, skinOf, mirrorSkin, type ClassId } from '../art/sprites';
+import { getSprite, getPortrait, drawFighterSprite, teamColor, SKINS, skinOf, mirrorSkin, type ClassId, type Skin } from '../art/sprites';
 import { P, UW, screenRect, fillScreen, vy, vspan, mix, dith, spread, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, wrap } from '../engine/font';
 import { win, plaque, banner, vsSeal, stepTrail, FRAME, GOLD, INK, INK2, TRIM, PAPER, RED_INK, BLUE_INK } from './skin';
-import { wasPressed, navPressed, k, mouse } from '../engine/input';
+import { wasPressed, navPressed, k, mouse, usingPad } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { loadMatch, saveMatch, playerDeck, sideName, type MatchConfig } from '../game/match';
 import type { NetSession } from '../net/session';
@@ -63,6 +63,13 @@ export class CharSelectScene implements Scene {
   pad(): PadMode { return spread.tall ? 'none' : 'back'; }
   /** Full-height phone layout: where each side's panel and the color row were drawn, for swipes. */
   private tallRects: { panel: Array<[number, number, number, number]>; colors: [number, number, number, number] | null } = { panel: [], colors: null };
+  /**
+   * Per side: which tab of the skin picker is open, COLORS (0) or SKINS (1, the classic look and each mod skin).
+   * null follows the skin on: a mod skin opens SKINS. The tabs only show for a class that has mod skins.
+   */
+  private tab: [0 | 1 | null, 0 | 1 | null] = [null, null];
+  /** Per side and class: the color last picked, which the classic look goes back to after a mod skin. */
+  private lastColor: Record<string, string> = {};
   /** Back from the spell deck select, the stage select or a fight: pick up what they saved. */
   resume(): void { this.m = loadMatch(); }
 
@@ -103,18 +110,50 @@ export class CharSelectScene implements Scene {
   }
 
   private setClass(s: 0 | 1, cls: ClassId): void {
+    if (cls !== this.slotClass(s)) this.tab[s] = null;
     // a new class starts on its starter (RANDOM stays RANDOM)
     if (s === 0) { if (cls !== this.m.p1 && this.m.p1Deck !== 'random') this.m.p1Deck = 'starter'; this.m.p1 = cls; }
     else { if (cls !== this.m.cpu && this.m.cpuDeck !== 'random') this.m.cpuDeck = 'starter'; this.m.cpu = cls; }
     saveMatch(this.m);
   }
 
-  private stepSkin(s: 0 | 1, d: 1 | -1): void {
-    const cls = this.slotClass(s), list = SKINS[cls].map(x => x.id), skins = s === 0 ? this.m.p1Skin : this.m.cpuSkin;
-    const i = list.indexOf(skinOf(cls, skins[cls]).id);
-    skins[cls] = list[(i + d + list.length) % list.length];
+  /** A side's colors (the built-in recolors), its mod skins and the skin it has on. */
+  private looks(s: 0 | 1): { cls: ClassId; colors: Skin[]; mods: Skin[]; cur: Skin } {
+    const cls = this.slotClass(s), all = SKINS[cls];
+    return { cls, colors: all.filter(x => !x.art), mods: all.filter(x => x.art), cur: skinOf(cls, (s === 0 ? this.m.p1Skin : this.m.cpuSkin)[cls]) };
+  }
+  /** The open tab of a side's skin picker (always COLORS for a class without mod skins). */
+  private tabOf(s: 0 | 1): 0 | 1 {
+    const { mods, cur } = this.looks(s);
+    return mods.length ? this.tab[s] ?? (cur.art ? 1 : 0) : 0;
+  }
+  private setTab(s: 0 | 1, t: 0 | 1): void {
+    if (!this.looks(s).mods.length || this.tabOf(s) === t) return;
+    this.tab[s] = t;
     sfx('move');
+  }
+  /** The SKINS tab: the classic look (in the last color picked), then each mod skin. */
+  private skinItems(s: 0 | 1): Array<{ id: string; name: string }> {
+    const { cls, colors, mods, cur } = this.looks(s);
+    const last = this.lastColor[`${s}:${cls}`];
+    const classic = !cur.art ? cur.id : colors.some(c => c.id === last) ? last : colors[0].id;
+    return [{ id: classic, name: 'CLASSIC' }, ...mods.map(m => ({ id: m.id, name: m.name.toUpperCase().slice(0, 12) }))];
+  }
+  private setSkin(s: 0 | 1, id: string): void {
+    const cls = this.slotClass(s), skins = s === 0 ? this.m.p1Skin : this.m.cpuSkin;
+    // remember the color being left too, so a mod skin and back keeps it
+    for (const c of [skins[cls], id]) if (!skinOf(cls, c).art) this.lastColor[`${s}:${cls}`] = skinOf(cls, c).id;
+    skins[cls] = id;
     saveMatch(this.m);
+  }
+  /** Step through the open tab: the colors, or the looks on the SKINS tab. */
+  private stepSkin(s: 0 | 1, d: 1 | -1): void {
+    const { colors, cur } = this.looks(s);
+    const list = this.tabOf(s) === 1 ? this.skinItems(s).map(x => x.id) : colors.map(x => x.id);
+    // a mod skin isn't on the COLORS tab: stepping there starts from the classic look's color
+    const at = list.indexOf(cur.id), i = at >= 0 ? at : list.indexOf(this.skinItems(s)[0].id);
+    this.setSkin(s, list[(i + d + list.length) % list.length]);
+    sfx('move');
   }
 
   /** Lock in the hovered tile for the current slot and move on to its skin. */
@@ -177,10 +216,13 @@ export class CharSelectScene implements Scene {
         this.sync();
         return;
       }
-      if (sw >= 0 || csw >= 0) {
-        const s: 0 | 1 = sw >= 0 ? 0 : 1, n = sw >= 0 ? sw : csw, cls = this.slotClass(s);
-        (s === 0 ? this.m.p1Skin : this.m.cpuSkin)[cls] = SKINS[cls][n].id;
-        saveMatch(this.m);
+      const tb = hot('tab');
+      if (tb >= 0) { this.setTab((tb >> 1) as 0 | 1, (tb & 1) as 0 | 1); this.sync(); return; }
+      const si = hot('look'), csi = hot('clook');
+      if (sw >= 0 || csw >= 0 || si >= 0 || csi >= 0) {
+        const s: 0 | 1 = sw >= 0 || si >= 0 ? 0 : 1, cls = this.slotClass(s);
+        // swatches number the class's skins; looks number the SKINS tab
+        this.setSkin(s, sw >= 0 || csw >= 0 ? SKINS[cls][sw >= 0 ? sw : csw].id : this.skinItems(s)[si >= 0 ? si : csi].id);
         sfx('select');
         // in the skin step a click is also the confirm; a tap only picks the color (on a phone the color row would
         // jump to the CPU's colors under the finger), and the action button moves on
@@ -198,7 +240,8 @@ export class CharSelectScene implements Scene {
     }
 
     const l = navPressed('left', dt), r = navPressed('right', dt), d: 1 | -1 = r ? 1 : -1;
-    const ok = wasPressed('confirm') || wasPressed('custom');
+    // RB is also the draw button (custom): on this screen it switches the skin tab instead
+    const ok = wasPressed('confirm') || (wasPressed('custom') && !wasPressed('rb'));
     // local Versus: up/down flips the side being picked between player and CPU
     const flip = this.local && (navPressed('up', dt) || navPressed('down', dt));
     if (this.step === 0 || this.step === 2) {
@@ -209,6 +252,7 @@ export class CharSelectScene implements Scene {
       if (ok) this.pickTile(this.cur);
     } else {
       if (l || r) this.stepSkin(this.slot, d);
+      if (wasPressed('lb') || wasPressed('rb')) this.setTab(this.slot, this.tabOf(this.slot) === 0 ? 1 : 0);
       if (flip) this.toggleCtl(this.slot);
       if (ok) this.advance();
     }
@@ -319,9 +363,11 @@ export class CharSelectScene implements Scene {
       return;
     }
     const keys = `${k('left')}/${k('right')}`, ud = `${k('up')}/${k('down')}`;
-    hint(ui, this.local && (this.step === 1 || this.step === 3) ? `${keys}: SKIN   ${ud}: PLAYER OR CPU   ${k('attack')} / CLICK A COLOR: OK   ${k('cast')}: BACK`
+    // a class with mod skins: the bumpers (Q/E) switch between COLORS and SKINS
+    const tabs = (this.step === 1 || this.step === 3) && SKINS[this.slotClass(this.slot)].some(x => x.art) ? `${usingPad() ? 'LB/RB' : 'Q/E'}: COLORS/SKINS   ` : '';
+    hint(ui, this.local && (this.step === 1 || this.step === 3) ? `${keys}: SKIN   ${tabs}${ud}: PLAYER OR CPU   ${k('attack')}: OK   ${k('cast')}: BACK`
       : this.local ? `${keys}: CHOOSE   ${ud} / CLICK THE NAME: PLAYER OR CPU   ${k('attack')}: PICK   ${k('cast')}: BACK`
-        : this.step === 1 || this.step === 3 ? `${keys}: SKIN   ${k('attack')} / CLICK A COLOR: ${this.tutorial ? 'START' : 'OK'}   ${k('cast')}: BACK`
+        : this.step === 1 || this.step === 3 ? `${keys}: SKIN   ${tabs}${k('attack')}${tabs ? '' : ' / CLICK A COLOR'}: ${this.tutorial ? 'START' : 'OK'}   ${k('cast')}: BACK`
           : `${keys} OR HOVER: CHOOSE   ${k('attack')} / CLICK A FIGHTER: PICK   ${k('cast')} / RIGHT-CLICK: BACK`);
   }
 
@@ -434,17 +480,54 @@ export class CharSelectScene implements Scene {
     this.drawPortrait(ui, s, cls, skin, cx, this.py + 23);
     drawTextCentered(ui, CLASS_INFO[cls].name, cx, this.py + 95, INK, 2, false);
     CLASS_INFO[cls].blurb.forEach((l, i) => drawTextCentered(ui, l, cx, this.py + 111 + i * 9, INK2, 1, false));
-    // skins: clickable swatches for your slot (and the CPU's)
-    const list = SKINS[cls], sw = Math.min(14, Math.floor((PW - 6) / list.length)), sx = Math.round(cx - (list.length * sw) / 2);
     if (s === 1 && net) return;
     const skinStep = (s === 0 && this.step === 1) || (s === 1 && this.step === 3);
+    // skins: clickable swatches for your slot (and the CPU's); a class with mod skins gets COLORS / SKINS tabs
+    // (colors are the class's first skins, so a swatch's number is its place in SKINS)
+    const list = SKINS[cls].filter(x => !x.art), sw = Math.min(14, Math.floor((PW - 6) / list.length)), sx = Math.round(cx - (list.length * sw) / 2);
+    let rowY = this.py + 146;
+    if (SKINS[cls].some(x => x.art) && cls === this.slotClass(s)) {
+      const tab = this.tabOf(s);
+      ['COLORS', 'SKINS'].forEach((label, t) => {
+        const tx = cx - 52 + t * 54, on = tab === t;
+        zone(`tab:${s * 2 + t}`, tx, this.py + 130, 50, 13);
+        plaque(ui, tx, this.py + 131, 50, 11, on, !on && isHot(`tab:${s * 2 + t}`) ? GOLD : FRAME);
+        drawTextCentered(ui, label, tx + 25, this.py + 133, on ? PAPER : INK2, 1, false);
+      });
+      rowY = this.py + 149;
+      if (tab === 1) { this.drawLooks(ui, s, skin, cx, rowY - 2, skinStep, tick); return; }
+    }
     list.forEach((sk, n) => {
-      const px = sx + n * sw, py = this.py + 146;
+      const px = sx + n * sw, py = rowY;
       zone(`${s === 0 ? 'swatch' : 'cswatch'}:${n}`, px, py - 4, sw, 18);
       if (sk.id === skin) P(ui, skinStep && tick % 8 >= 6 ? GOLD : INK, px, py - 1, 12, 12);
       P(ui, '#000000', px + 2, py + 1, 8, 8);
       P(ui, teamColor(cls, sk.id, false), px + 3, py + 2, 6, 6);
     });
+  }
+
+  /** The SKINS tab: the classic look and each mod skin by name, or just the one on with arrows when they don't fit. */
+  private drawLooks(ui: Ctx, s: 0 | 1, skin: string, cx: number, y: number, skinStep: boolean, tick: number): void {
+    const items = this.skinItems(s), id = s === 0 ? 'look' : 'clook';
+    const ws = items.map(x => x.name.length * 6 + 8), gap = 4, total = ws.reduce((a, b) => a + b, 0) + gap * (items.length - 1);
+    const lit = (on: boolean): boolean => on && !(skinStep && tick % 8 >= 6);
+    if (total <= PW - 8) {
+      let px = Math.round(cx - total / 2);
+      items.forEach((x, n) => {
+        const on = x.id === skin;
+        zone(`${id}:${n}`, px, y - 2, ws[n], 16);
+        plaque(ui, px, y, ws[n], 12, lit(on), on ? GOLD : isHot(`${id}:${n}`) ? GOLD : FRAME);
+        drawTextCentered(ui, x.name, px + ws[n] / 2, y + 3, lit(on) ? PAPER : INK, 1, false);
+        px += ws[n] + gap;
+      });
+      return;
+    }
+    // too many to show: the one on, with arrows to the ones either side
+    const i = Math.max(0, items.findIndex(x => x.id === skin)), n = items.length, w = PW - 12, x = cx - w / 2;
+    zone(`${id}:${(i + n - 1) % n}`, x, y - 2, 24, 16);
+    zone(`${id}:${(i + 1) % n}`, x + w - 24, y - 2, 24, 16);
+    plaque(ui, x, y, w, 12, lit(true), GOLD);
+    drawTextCentered(ui, `< ${items[i].name} >`, cx, y + 3, lit(true) ? PAPER : INK, 1, false);
   }
 
   // ---------- full-height phone layout ----------
@@ -460,10 +543,12 @@ export class CharSelectScene implements Scene {
 
     // laid out from the bar up: colors and the roster sit in the thumb zone; the two sides fill the rest
     const cols = 3, tw = Math.floor((w - GAP * (cols - 1)) / cols), th = 108;
-    const cs = this.colorSide(), cls = this.slotClass(cs), list = SKINS[cls];
+    const cs = this.colorSide(), cls = this.slotClass(cs), list = SKINS[cls].filter(x => !x.art);
     const sw = Math.min(52, Math.floor((w - 4 * (list.length - 1)) / list.length));
     const colorY = barTop - 4 - 14 - sw;
-    const rosterY = colorY - 14 - 2 * th - GAP;
+    // a class with mod skins gets COLORS / SKINS tabs over the row, and the row grows to fit a fighter
+    const tabs = SKINS[cls].some(x => x.art), tabH = 36, lift = tabs ? tabH + GAP + 24 : 0;
+    const rosterY = colorY - lift - 14 - 2 * th - GAP;
     const statusY = rosterY - 26;
     // tall enough for a 4x bust, the name and the blurb; any spare height stays open above the roster
     const ph = Math.max(220, Math.min(272, statusY - 10 - y));
@@ -516,7 +601,27 @@ export class CharSelectScene implements Scene {
     // the color row for the side being picked
     const sx = Math.round(UW / 2 - (list.length * sw + (list.length - 1) * 4) / 2);
     const skin = cs === 0 ? this.mySkin() : this.cpuSkin();
-    this.tallRects.colors = [x0, colorY - 6, w, sw + 12];
+    this.tallRects.colors = [x0, colorY - 6 - (tabs ? 24 : 0), w, sw + 12 + (tabs ? 24 : 0)];
+    if (tabs) {
+      const tab = this.tabOf(cs), tw = Math.floor((w - GAP) / 2), ty = colorY - lift;
+      bigButton(ui, `tab:${cs * 2}`, 'COLORS', x0, ty, tw, tabH, { scale: 2, on: tab === 0 });
+      bigButton(ui, `tab:${cs * 2 + 1}`, 'SKINS', x0 + tw + GAP, ty, w - tw - GAP, tabH, { scale: 2, on: tab === 1 });
+      if (tab === 1) {
+        // a card per look with its fighter; names go once there's room for them
+        const items = this.skinItems(cs), n = items.length, cy = colorY - 24, ch = sw + 28;
+        const cw = Math.floor((w - 6 * (n - 1)) / n), named = cw >= 120;
+        items.forEach((x, i) => {
+          const px = x0 + i * (cw + 6), on = x.id === skin;
+          bigButton(ui, `${cs === 0 ? 'look' : 'clook'}:${i}`, '', px, cy, cw, ch, { on });
+          if (named) {
+            drawFighterSprite(ui, getSprite(cls, x.id, false), px + 34, cy + ch - 6, false, 'none', 2);
+            drawText(ui, x.name.slice(0, Math.floor((cw - 72) / 12)), px + 66, cy + ch / 2 - 7, INK, 2);
+          } else drawFighterSprite(ui, getSprite(cls, x.id, false), px + cw / 2, cy + ch - 6, false, 'none', cw >= 60 ? 2 : 1);
+        });
+        actionBar(ui, { primary: { id: 'next', label: this.tutorial ? 'START →' : this.nextLabel } });
+        return this.drawTallOverlay(ui);
+      }
+    }
     list.forEach((sk, n) => {
       const px = sx + n * (sw + 4);
       zone(`${cs === 0 ? 'swatch' : 'cswatch'}:${n}`, px, colorY, sw, sw);
@@ -527,7 +632,12 @@ export class CharSelectScene implements Scene {
     });
 
     actionBar(ui, { primary: { id: 'next', label: this.tutorial ? 'START →' : this.nextLabel } });
+    this.drawTallOverlay(ui);
+  }
 
+  /** Phone layout: the online error cover. */
+  private drawTallOverlay(ui: Ctx): void {
+    const net = this.net;
     if (net && (net.status === 'error' || net.status === 'left' || net.status === 'lost')) {
       fillScreen(ui, 'rgba(0,0,0,0.8)', 2);
       drawTextCentered(ui, net.status === 'left' ? 'YOUR RIVAL LEFT' : net.status === 'lost' ? 'CONNECTION LOST' : net.error || 'CONNECTION ERROR', UW / 2, 140, '#f83800', 2);
