@@ -1,13 +1,13 @@
 {
   "format": "spell-vs-steel-mod/2",
-  "id": "wizard",
-  "name": "Wizard",
+  "id": "wes-skin",
+  "name": "Wes Skin",
   "author": "Wes",
   "skins": [
     {
       "class": "mage",
-      "id": "wizard",
-      "name": "Wizard",
+      "id": "wes",
+      "name": "Wes",
       "palette": {
         "a": "#0a0810",
         "b": "#f2ece6",

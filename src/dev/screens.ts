@@ -487,14 +487,14 @@ export const screens: Record<string, () => void> = {
   },
   'replays-empty': () => { const s = new ReplaysScene(); s.list = []; setScene(s); },
   'profile': () => setScene(fakeProfile(false)),
-  // MODS: the shipped Wizard and Druid skins, the Druid picked; then one switched off, and the import panel
-  'mods': () => { const m = new ModsScene(); m.cur = Math.max(0, MODS.findIndex(e => e.id === 'druid')); setScene(m); run(0.2); },
-  'mods-off': () => { setModOn('wizard', false); const m = new ModsScene(); setScene(m); run(0.2); },
+  // MODS: the shipped Wes (Mage) and Hazel Druid (Ranger) skins, Hazel picked; then one switched off, and the import panel
+  'mods': () => { const m = new ModsScene(); m.cur = Math.max(0, MODS.findIndex(e => e.id === 'hazel-druid-skin')); setScene(m); run(0.2); },
+  'mods-off': () => { setModOn('wes-skin', false); const m = new ModsScene(); setScene(m); run(0.2); },
   'mods-import': () => { const m = new ModsScene(); setScene(m); (m as unknown as { openImport(): void }).openImport(); run(0.1); },
   // the mod skins on the fighter select and in a fight
-  'select-mod-skin': () => { saveMatch({ ...loadMatch(), p1: 'mage', p1Skin: { ...loadMatch().p1Skin, mage: 'wizard' } }); setScene(new CharSelectScene(undefined, 1)); run(0.2); },
+  'select-mod-skin': () => { saveMatch({ ...loadMatch(), p1: 'mage', p1Skin: { ...loadMatch().p1Skin, mage: 'wes' } }); setScene(new CharSelectScene(undefined, 1)); run(0.2); },
   'battle-mod-skins': () => {
-    setScene(new BattleScene(match({ p1: 'mage', cpu: 'ranger', p1Skin: { ...loadMatch().p1Skin, mage: 'wizard' }, cpuSkin: { ...loadMatch().cpuSkin, ranger: 'druid' } })));
+    setScene(new BattleScene(match({ p1: 'mage', cpu: 'ranger', p1Skin: { ...loadMatch().p1Skin, mage: 'wes' }, cpuSkin: { ...loadMatch().cpuSkin, ranger: 'hazel' } })));
     run(0.5); battle().b.endCustom([[], []]); run(1.2);
   },
   'profile-empty': () => setScene(fakeProfile(true)),

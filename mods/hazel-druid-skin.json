@@ -1,13 +1,13 @@
 {
   "format": "spell-vs-steel-mod/2",
-  "id": "druid",
-  "name": "Druid",
+  "id": "hazel-druid-skin",
+  "name": "Hazel Druid Skin",
   "author": "Wes",
   "skins": [
     {
       "class": "ranger",
-      "id": "druid",
-      "name": "Druid",
+      "id": "hazel",
+      "name": "Hazel Druid",
       "palette": {
         "a": "#0a0810",
         "b": "#f5eaca",

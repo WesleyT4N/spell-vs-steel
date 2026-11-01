@@ -18,7 +18,7 @@ A mod skin shows up as an extra color swatch after the built-in ones on the figh
 
 ## The shipped mods
 
-`mods/wizard.json` (Mage: Wizard) and `mods/druid.json` (Ranger: Druid). Both were made with PixelLab: a 48px idle
+`mods/wes-skin.json` (Mage: Wes, a young wizard) and `mods/hazel-druid-skin.json` (Ranger: Hazel Druid). Both were made with PixelLab: a 48px idle
 sprite generated from the reference sheet (`/mnt/project-files/art/skin-mods-pl/ref/`), then `transfer_outfit` on
 the class's own game frames so every pose lines up with the built-in art, then
 `python3 tools/pixellab/build_skin_mod.py <frames dir> <prefix> <class> <mod id> <name> <skin id> <skin name> [author]`.
@@ -28,14 +28,14 @@ the class's own game frames so every pose lines up with the built-in art, then
 ```json
 {
   "format": "spell-vs-steel-mod/2",
-  "id": "wizard",
-  "name": "Wizard",
+  "id": "wes-skin",
+  "name": "Wes Skin",
   "author": "Wes",
   "skins": [
     {
       "class": "mage",
-      "id": "wizard",
-      "name": "Wizard",
+      "id": "wes",
+      "name": "Wes",
       "palette": { "a": "#0a0810", "b": "#42357f", "c": "#211854" },
       "team": "b",
       "frames": { "idle0": ["....", "..."], "idle1": ["..."] },

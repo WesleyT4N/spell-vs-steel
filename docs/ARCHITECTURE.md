@@ -221,7 +221,7 @@ flowchart TD
 - Format `spell-vs-steel-mod/2`: `id`, `name`, `author`, 1 to 16 `skins`. Each skin names a built-in `class`, a new `id`, a `palette` (letters `a`-`z`, `A`-`Z`, `0`-`9` to `#rrggbb`, no gaps, `a` = outline), a `team` letter, `frames` at the class's HD size from `src/art/pl/<class>.ts` (64 wide, `idle0` required, missing ones fall back to it) and an optional 40x32 `portrait`. `__proto__`, unknown keys, HTML-ish names, format 1 (old 24px art) and files over 512 KB are refused.
 - `format.ts` is pure (no DOM, no game state); `tests/mods.ts` (in `npm test`) checks the fixture, the shipped mods, 19 hostile files, and installing (on/off, import, delete, reload from the save).
 - Installed state lives in the save's `mods` section (`SavedMods`): ids switched off, and imported files as text (at most 12, about 1 MB). Built-in mods can be switched off, imported ones also deleted.
-- `Skin.art: SkinArt` (`pal`, `team`, `ax`, `res`, `frames`, `portrait`) sits beside the palette recolours; the menu still sprite is `idle0` trimmed. Shipped: `mods/wizard.json` (Mage) and `mods/druid.json` (Ranger), built by `tools/pixellab/build_skin_mod.py` from PixelLab `transfer_outfit` frames of the class's own poses.
+- `Skin.art: SkinArt` (`pal`, `team`, `ax`, `res`, `frames`, `portrait`) sits beside the palette recolours; the menu still sprite is `idle0` trimmed. Shipped: `mods/wes-skin.json` (Mage: Wes) and `mods/hazel-druid-skin.json` (Ranger: Hazel Druid), built by `tools/pixellab/build_skin_mod.py` from PixelLab `transfer_outfit` frames of the class's own poses.
 - Cosmetic and render-only: the sim never sees mods. Online, an opponent without the mod sees your default colour.
 
 ## Stages
