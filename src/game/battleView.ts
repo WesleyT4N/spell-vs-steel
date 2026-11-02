@@ -21,6 +21,7 @@ import { drawOver, drawUnder, lookOf, observe } from './fighterAnim';
 
 import { kickOffset, noteImpacts } from './hitFeel';
 import { endPfxFrame, drawShotPfx } from './pfx';
+import { drawDart } from '../fx/mage/darts';
 import '../fx';
 import { isHome, setHome, team } from './teamColors';
 import { smallSprite } from '../art/paletteImage';
@@ -591,6 +592,7 @@ function drawProjectile(c: Ctx, b: Battle, p: Projectile): void {
   if (p.homing) {
     const t = b.f[p.homing.target];
     const s = panelFoot(p.homing.sx, p.homing.sy), e = fighterPos(b, t);
+    if (p.kind === 'missile' && p.homing.lane !== undefined) { drawDart(c, p, { x: s.x, y: s.y - 10 }, { x: e.x, y: e.y - 10 }); return; }
     const q = p.homing.p;
     const x = s.x + (e.x - s.x) * q, y = s.y - 10 + (e.y - 10 - (s.y - 10)) * q - Math.sin(q * Math.PI) * 18;
     drawShotPfx(c, b, p, x, y, e.x - s.x > 0 ? 1 : -1);

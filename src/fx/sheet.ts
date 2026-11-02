@@ -62,3 +62,16 @@ export type PickModule = PfxModule & { pick(data: Record<string, number | string
 export function pickFx(name: string, desc: string, pick: PickModule['pick']): PickModule {
   return { meta: { name, desc, duration: 1 }, pick };
 }
+
+/** Like drawSheet, but only sheet columns [sx0, sx1) of the frame (e.g. a shot's head without its baked-in tail). */
+export function drawSheetPart(c: CanvasRenderingContext2D, s: Sheet, f: number, x: number, y: number, flip: boolean, sx0: number, sx1: number): void {
+  const img = assetImage(s.src);
+  if (!img || f < 0) return;
+  const k = SHEET_RES;
+  c.save();
+  c.imageSmoothingEnabled = false;
+  c.translate(Math.round(x * k) / k, Math.round(y * k) / k);
+  if (flip) c.scale(-1, 1);
+  c.drawImage(img, f * s.fw + sx0, 0, sx1 - sx0, s.fh, (sx0 - s.ax) / k, -s.ay / k, (sx1 - sx0) / k, s.fh / k);
+  c.restore();
+}
