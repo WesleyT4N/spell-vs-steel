@@ -1,4 +1,4 @@
-// Dev tools menu: card encyclopedia, debug sandbox, balance lab and art lab.
+// Dev tools menu: card encyclopedia, debug sandbox, balance lab, art lab, voice test and sound test.
 import { pushScene, popScene, drawMenu, hint, listMouse, showSel, type Scene } from './scene';
 import { getArena, useStage } from '../game/battleView';
 import { BattleScene } from './battle';
@@ -12,15 +12,17 @@ import { EncyclopediaScene } from './encyclopedia';
 import { SandboxScene } from './sandbox';
 import { LabScene } from './lab';
 import { VoiceTestScene } from './voiceTest';
+import { SfxTestScene } from './sfxTest';
 import { ArtLabScene } from './artLab';
 
-const ITEMS = ['CARD ENCYCLOPEDIA', 'SANDBOX', 'BALANCE LAB', 'ART LAB', 'VOICE TEST', 'BACK'];
+const ITEMS = ['CARD ENCYCLOPEDIA', 'SANDBOX', 'BALANCE LAB', 'ART LAB', 'VOICE TEST', 'SOUND TEST', 'BACK'];
 const ABOUT = [
   'EVERY SPELL OF EVERY CLASS, WITH FILTERS',
   'DEBUG MODE: CAST ANY SPELL, DUMMIES, SLOW-MO, HIT LOG',
   'CPU VS CPU SIMS, PER-CARD STATS, LIVE TUNING',
   'EVERY ATTACK AND SPELL ON LOOP: SHIPPED, BEFORE AND DRAFT LOOKS',
   'EVERY CLASS VOICE LINE AND ANNOUNCER CALL',
+  'EVERY SOUND EFFECT, AND NEW VS ORIGINAL SOUNDS',
   '',
 ];
 
@@ -40,7 +42,8 @@ export class DevMenuScene implements Scene {
     if (i === 2) pushScene(new LabScene());
     if (i === 3) pushScene(new ArtLabScene());
     if (i === 4) pushScene(new VoiceTestScene());
-    if (i === 5) { sfx('back'); this.back(); }
+    if (i === 5) pushScene(new SfxTestScene());
+    if (i === 6) { sfx('back'); this.back(); }
   }
 
   update(dt: number): void {
@@ -74,12 +77,13 @@ export function devFromHash(): boolean {
     pushScene(new BattleScene({ ...loadMatch(), p1: a, cpu: b, p1Deck: 'starter', cpuDeck: 'starter', stage, bestOf: 5 }, [0, 0], undefined, [], ['cpu', 'cpu']));
     return true;
   }
-  if (!['cards', 'sandbox', 'lab', 'art', 'voices', 'dev'].includes(tag)) return false;
+  if (!['cards', 'sandbox', 'lab', 'art', 'voices', 'sounds', 'dev'].includes(tag)) return false;
   pushScene(new DevMenuScene());
   if (tag === 'cards') openEncyclopedia();
   else if (tag === 'sandbox') pushScene(new SandboxScene());
   else if (tag === 'lab') pushScene(new LabScene());
   else if (tag === 'art') pushScene(new ArtLabScene());
   else if (tag === 'voices') pushScene(new VoiceTestScene());
+  else if (tag === 'sounds') pushScene(new SfxTestScene());
   return true;
 }

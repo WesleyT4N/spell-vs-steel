@@ -1,0 +1,451 @@
+{
+ "_about": "Sound effect samples. slots: one file per slot (<slot>.mp3 beside this file) and its mix gain. sounds: game sound name (fx:<kind> for spell effects) -> slot or list of slots played together; {element} is the hit element (steel when none); [] plays nothing. Names not listed fall back to the synthesized sound.",
+ "slots": {
+  "aimed": {
+   "gain": 0.75
+  },
+  "arcaneHit": {
+   "gain": 0.75
+  },
+  "arrow": {
+   "gain": 0.75
+  },
+  "arrowRain": {
+   "gain": 0.75
+  },
+  "banner": {
+   "gain": 0.75
+  },
+  "bite": {
+   "gain": 0.7
+  },
+  "blink": {
+   "gain": 0.75
+  },
+  "block": {
+   "gain": 0.7
+  },
+  "bolt": {
+   "gain": 0.75
+  },
+  "boltHeavy": {
+   "gain": 0.75
+  },
+  "break": {
+   "gain": 0.8
+  },
+  "cast_arcane": {
+   "gain": 0.75
+  },
+  "cast_fire": {
+   "gain": 0.75
+  },
+  "cast_frost": {
+   "gain": 0.75
+  },
+  "cast_holy": {
+   "gain": 0.75
+  },
+  "cast_nature": {
+   "gain": 0.75
+  },
+  "cast_poison": {
+   "gain": 0.75
+  },
+  "cast_shadow": {
+   "gain": 0.75
+  },
+  "cast_steel": {
+   "gain": 0.75
+  },
+  "charged": {
+   "gain": 0.5
+  },
+  "claw": {
+   "gain": 0.7
+  },
+  "cleave": {
+   "gain": 0.75
+  },
+  "cleaveHeavy": {
+   "gain": 0.75
+  },
+  "counter": {
+   "gain": 0.7
+  },
+  "dagger": {
+   "gain": 0.75
+  },
+  "explode": {
+   "gain": 0.75
+  },
+  "flare": {
+   "gain": 0.75
+  },
+  "freeze": {
+   "gain": 0.8
+  },
+  "guard": {
+   "gain": 0.6
+  },
+  "hawkDive": {
+   "gain": 0.6
+  },
+  "heal": {
+   "gain": 0.65
+  },
+  "heavyImpact": {
+   "gain": 0.9
+  },
+  "hit_arcane": {
+   "gain": 0.8
+  },
+  "hit_fire": {
+   "gain": 0.8
+  },
+  "hit_frost": {
+   "gain": 0.8
+  },
+  "hit_holy": {
+   "gain": 0.8
+  },
+  "hit_nature": {
+   "gain": 0.8
+  },
+  "hit_poison": {
+   "gain": 0.8
+  },
+  "hit_shadow": {
+   "gain": 0.8
+  },
+  "hit_steel": {
+   "gain": 0.8
+  },
+  "holyNova": {
+   "gain": 0.75
+  },
+  "holyPillar": {
+   "gain": 0.75
+  },
+  "holySpark": {
+   "gain": 0.75
+  },
+  "knife": {
+   "gain": 0.75
+  },
+  "ko": {
+   "gain": 1
+  },
+  "laser": {
+   "gain": 0.6
+  },
+  "lob": {
+   "gain": 0.75
+  },
+  "meteorFall": {
+   "gain": 0.75
+  },
+  "novaZone": {
+   "gain": 0.75
+  },
+  "pillar": {
+   "gain": 0.75
+  },
+  "pip": {
+   "gain": 0.4
+  },
+  "quake": {
+   "gain": 0.75
+  },
+  "reflect": {
+   "gain": 0.7
+  },
+  "shard": {
+   "gain": 0.75
+  },
+  "shieldHit": {
+   "gain": 0.7
+  },
+  "shockwave": {
+   "gain": 0.75
+  },
+  "shot_beast": {
+   "gain": 0.6
+  },
+  "shot_chain": {
+   "gain": 0.75
+  },
+  "shot_fireball": {
+   "gain": 0.75
+  },
+  "shot_magic": {
+   "gain": 0.75
+  },
+  "shot_net": {
+   "gain": 0.75
+  },
+  "shot_spin": {
+   "gain": 0.75
+  },
+  "shot_wind": {
+   "gain": 0.75
+  },
+  "shout": {
+   "gain": 0.75
+  },
+  "smash": {
+   "gain": 0.75
+  },
+  "smoke": {
+   "gain": 0.75
+  },
+  "spark": {
+   "gain": 0.55
+  },
+  "stab": {
+   "gain": 0.75
+  },
+  "step": {
+   "gain": 0.25
+  },
+  "thaw": {
+   "gain": 0.75
+  },
+  "thrust": {
+   "gain": 0.75
+  },
+  "toxicPuff": {
+   "gain": 0.75
+  },
+  "transform": {
+   "gain": 0.75
+  },
+  "trapPop": {
+   "gain": 0.75
+  },
+  "ui_back": {
+   "gain": 0.45
+  },
+  "ui_confirm": {
+   "gain": 0.5
+  },
+  "ui_deny": {
+   "gain": 0.45
+  },
+  "ui_move": {
+   "gain": 0.3
+  },
+  "ui_open": {
+   "gain": 0.5
+  },
+  "ui_select": {
+   "gain": 0.45
+  },
+  "wide": {
+   "gain": 0.75
+  },
+  "win": {
+   "gain": 0.7
+  }
+ },
+ "sounds": {
+  "arcane": "cast_arcane",
+  "back": "ui_back",
+  "block": "block",
+  "bolt": "bolt",
+  "boltHeavy": "boltHeavy",
+  "break": "break",
+  "cast": "cast_arcane",
+  "cast_arcane": "cast_arcane",
+  "cast_fire": "cast_fire",
+  "cast_frost": "cast_frost",
+  "cast_holy": "cast_holy",
+  "cast_nature": "cast_nature",
+  "cast_poison": "cast_poison",
+  "cast_shadow": "cast_shadow",
+  "cast_steel": "cast_steel",
+  "charged": "charged",
+  "confirm": "ui_confirm",
+  "deny": "ui_deny",
+  "explode": "explode",
+  "fire": "cast_fire",
+  "freeze": "freeze",
+  "frost": "cast_frost",
+  "fx:aimed": "aimed",
+  "fx:ambush": "stab",
+  "fx:arcaneHit": "arcaneHit",
+  "fx:arcanePower": "transform",
+  "fx:arcaneSurge": "arcaneHit",
+  "fx:arrow": "arrow",
+  "fx:arrowRain": "arrowRain",
+  "fx:ascendance": "transform",
+  "fx:avatar": "transform",
+  "fx:banner": "banner",
+  "fx:barrage": "arrowRain",
+  "fx:battleShout": "shout",
+  "fx:berserk": "shout",
+  "fx:bite": "bite",
+  "fx:blessHeal": [],
+  "fx:blessMana": [],
+  "fx:blessPower": [],
+  "fx:blessSacred": [],
+  "fx:blessShield": [],
+  "fx:blind": "toxicPuff",
+  "fx:blink": "blink",
+  "fx:bolt": "bolt",
+  "fx:boltHeavy": "boltHeavy",
+  "fx:claw": "claw",
+  "fx:cleave": "cleave",
+  "fx:cleaveHeavy": "cleaveHeavy",
+  "fx:comet": "explode",
+  "fx:counter": "counter",
+  "fx:dagger": "dagger",
+  "fx:deadeye": "transform",
+  "fx:deadlyPoison": "toxicPuff",
+  "fx:deepFreeze": "shard",
+  "fx:disengage": "smoke",
+  "fx:dragonsBreath": "explode",
+  "fx:envenom": "toxicPuff",
+  "fx:evasion": "smoke",
+  "fx:eviscerate": "stab",
+  "fx:execute": "smash",
+  "fx:explode": "explode",
+  "fx:explosiveShot": "explode",
+  "fx:fanKnife": "stab",
+  "fx:fireballBlast": "explode",
+  "fx:flare": "flare",
+  "fx:flashHeal": [],
+  "fx:flurry": "stab",
+  "fx:glacialFortress": "novaZone",
+  "fx:groundSlam": "shockwave",
+  "fx:guard": "guard",
+  "fx:guardUp": "guard",
+  "fx:haloBolt": "holyPillar",
+  "fx:hammer": "shockwave",
+  "fx:hawkDive": "hawkDive",
+  "fx:healBurst": [],
+  "fx:holyFire": "holyPillar",
+  "fx:holyNova": "holyNova",
+  "fx:holyPillar": "holyPillar",
+  "fx:holySpark": "holySpark",
+  "fx:hymnTick": [],
+  "fx:iceBlock": "shard",
+  "fx:iceWall": "shard",
+  "fx:ignite": "pillar",
+  "fx:inferno": "explode",
+  "fx:ironSkin": "guard",
+  "fx:kick": "smash",
+  "fx:kidneyShot": "dagger",
+  "fx:killCommand": "shout",
+  "fx:killShot": "aimed",
+  "fx:knife": "knife",
+  "fx:laser": "laser",
+  "fx:lastStand": "transform",
+  "fx:lastStandBlast": "shockwave",
+  "fx:leapSmash": "smash",
+  "fx:lob": "lob",
+  "fx:meteorBlast": "explode",
+  "fx:meteorFall": "meteorFall",
+  "fx:mortal": "smash",
+  "fx:nightsEmbrace": "smoke",
+  "fx:nova": "cast_frost",
+  "fx:novaZone": "novaZone",
+  "fx:pandemic": "toxicPuff",
+  "fx:penanceBolt": "holyPillar",
+  "fx:pickpocket": "dagger",
+  "fx:pillar": "pillar",
+  "fx:powerInfusion": "transform",
+  "fx:psychicScream": "cast_shadow",
+  "fx:quake": "quake",
+  "fx:rally": "shout",
+  "fx:rampage": "cleaveHeavy",
+  "fx:reflectUp": "guard",
+  "fx:riposte": "guard",
+  "fx:riposteHit": "stab",
+  "fx:roar": "shout",
+  "fx:sanctum": "transform",
+  "fx:sanctumBless": [],
+  "fx:scorch": "explode",
+  "fx:seismic": "quake",
+  "fx:shadowBlink": "smoke",
+  "fx:shadowClone": "smoke",
+  "fx:shadowDance": "smoke",
+  "fx:shadowform": "transform",
+  "fx:shadowstep": "stab",
+  "fx:shard": "shard",
+  "fx:shatter": "shockwave",
+  "fx:shieldHit": "shieldHit",
+  "fx:shieldSlam": "smash",
+  "fx:shiv": "dagger",
+  "fx:shockwave": "shockwave",
+  "fx:shout": "shout",
+  "fx:smash": "smash",
+  "fx:smite": "holyPillar",
+  "fx:smoke": "smoke",
+  "fx:smokescreen": "smoke",
+  "fx:spark": "spark",
+  "fx:spree": "stab",
+  "fx:stab": "stab",
+  "fx:stepSlash": "cleaveHeavy",
+  "fx:thrust": "thrust",
+  "fx:titanFall": "quake",
+  "fx:toxicPuff": "toxicPuff",
+  "fx:transform": "transform",
+  "fx:trapBlast": [
+   "trapPop",
+   "explode"
+  ],
+  "fx:trapExplode": [
+   "trapPop",
+   "explode"
+  ],
+  "fx:trapFreeze": [
+   "trapPop",
+   "freeze"
+  ],
+  "fx:trapMine": "trapPop",
+  "fx:trapPop": "trapPop",
+  "fx:trapWire": "trapPop",
+  "fx:unbreakable": "guard",
+  "fx:vanish": "smoke",
+  "fx:vialBurst": "toxicPuff",
+  "fx:vialLob": "lob",
+  "fx:wallRise": "smash",
+  "fx:wide": "wide",
+  "fx:wrath": "holyPillar",
+  "heal": "heal",
+  "heavyImpact": [
+   "heavyImpact",
+   "hit_{element}"
+  ],
+  "hit": [
+   "hit_{element}"
+  ],
+  "hitBig": [
+   "heavyImpact",
+   "hit_{element}"
+  ],
+  "ko": "ko",
+  "missile": "bolt",
+  "move": "ui_move",
+  "open": "ui_open",
+  "pip": "pip",
+  "reflect": "reflect",
+  "select": "ui_select",
+  "shot_arrow": "arrow",
+  "shot_beast": "shot_beast",
+  "shot_chain": "shot_chain",
+  "shot_fireball": "shot_fireball",
+  "shot_hawk": "hawkDive",
+  "shot_knife": "knife",
+  "shot_magic": "shot_magic",
+  "shot_net": "shot_net",
+  "shot_spin": "shot_spin",
+  "shot_wind": "shot_wind",
+  "slash": "cleave",
+  "slashHeavy": "cleaveHeavy",
+  "step": "step",
+  "thaw": "thaw",
+  "win": "win"
+ }
+}

@@ -23,6 +23,8 @@ import { registerPfx, unregisterPfx, registerShotPfx, unregisterShotPfx } from '
 import { EFFECTS, PLAYS, SHOT_PLAYS } from '../fx';
 import { playBattleEvent } from '../engine/battleAudio';
 import { unlockAudio, playMusic, stopMusic, voiceLine } from '../engine/audio';
+import { slotsFor, isSynthOnly, setSynthOnly } from '../engine/sfxSamples';
+import type { RealOpts } from '../engine/sfxReal';
 import { UW, UH, P, view, type Ctx } from '../engine/gfx';
 import { drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k } from '../engine/input';
@@ -63,7 +65,7 @@ const ANIMS: Array<[AnimKind, string, number, string]> = [
   ['ko', 'K.O.', 3.5, 'Knocked out.'],
 ];
 const VOICES: VoiceKind[] = ['cast', 'castBig', 'death', 'win', 'grunt', 'hurt', 'hurtBig'];
-const SOUND_ABOUT = 'Every sound the move fires is listed below as it plays; tap one to hear it alone. Voice lines play on their own. Sound is always on in this section.';
+const SOUND_ABOUT = 'Every sound the move fires is listed below as it plays, with the recorded file it uses (assets/audio/sfx/); tap one to hear it alone. Voice lines play on their own. Sound is always on in this section.';
 type StageScene = 'idle' | 'panels' | 'fight';
 const STAGE_ENTRIES: Entry[] = [
   { label: 'IDLE', scene: 'idle', foeCol: 4, loop: Infinity },
@@ -160,8 +162,12 @@ function zoomOn(c: Ctx, b: Battle, z: number): void {
 
 /** How the Sounds section names a battle event. */
 function soundName(e: BattleEvent): string {
-  if (e.type === 'sound') return e.name;
-  if (e.type === 'fxSound') return `fx:${e.kind}`;
+  const file = (name: string, o?: RealOpts): string => {
+    const slots = isSynthOnly() ? null : slotsFor(name, o);
+    return `${name}  ${slots ? (slots.length ? `→ ${slots.join(' + ')}` : '(silent)') : '(synth)'}`;
+  };
+  if (e.type === 'sound') return file(e.name, e.opts);
+  if (e.type === 'fxSound') return file(`fx:${e.kind}`, e.opts);
   if (e.type === 'voice') return `voice ${e.cls}:${e.kind}${e.element ? ` (${e.element})` : ''}`;
   return e.type;
 }
@@ -560,7 +566,7 @@ export class ArtLabScene implements Scene {
         btn(this.paused ? 'Resume (P)' : 'Pause (P)', () => this.togglePause(), this.paused ? 'on' : ''),
         btn('Step (.)', () => { this.paused = true; this.step = true; this.render(); }),
         check('Loop', saved.auto, v => { saved.auto = v; }),
-        ...(this.sounds ? [] : [check('Sound', saved.sound, v => { saved.sound = v; unlockAudio(); this.restart(); })]),
+        ...(this.sounds ? [check('Original sounds', isSynthOnly(), v => { setSynthOnly(v); unlockAudio(); this.restart(); })] : [check('Sound', saved.sound, v => { saved.sound = v; unlockAudio(); this.restart(); })]),
       ),
       speed.el,
       ...(this.stages ? [] : [h('div', { class: 'row' }, h('span', { class: 'muted' }, 'Zoom'), zoom.el)]),
