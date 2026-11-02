@@ -66,7 +66,7 @@ export function openModPanel(o: ModPanelOpts): () => void {
   const root = el('div', { className: 'svs-mod' },
     el('div', { className: 'box' },
       el('h2', { textContent: 'IMPORT A MOD' }),
-      el('p', { textContent: 'A mod is a .zip of plain data (a mod.json and PNG images): it adds skins and never runs code. A file that breaks the mod rules is refused.' }),
+      el('p', { textContent: 'A mod is a .zip of plain data (a mod.json, PNG images and MP3 voice lines): it adds skins and their voices and never runs code. A file that breaks the mod rules is refused.' }),
       el('div', { className: 'row' }, pick, cancel), file,
       msg,
       ...(o.pad ? [el('p', { className: 'pad', textContent: 'Gamepad: picking a file needs a mouse or touch. B closes.' })] : [])));

@@ -4,7 +4,11 @@
 Setup (once): python3 -m venv venv && venv/bin/pip install kokoro-onnx soundfile
   and download kokoro-v1.0.int8.onnx + voices-v1.0.bin from
   https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
-Run: venv/bin/python scripts/voices/gen.py <model dir>   (needs ffmpeg with libmp3lame)
+Run: venv/bin/python scripts/voices/gen.py <model dir> [speaker]   (needs ffmpeg with libmp3lame)
+
+Mod skin voices: venv/bin/python scripts/voices/gen.py <model dir> skins [skin id]
+  renders lines.json's "skins" entries into the mod's folder (mods/<mod>/<skin>-<line>-<n>.mp3) and lists them
+  under the skin's "voice" key in that mod.json. A skin speaks its class's lines unless it lists its own.
 """
 import json, os, subprocess, sys, tempfile
 import numpy as np
@@ -53,8 +57,40 @@ def render(text, v):
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', mid, '-c:a', 'libmp3lame', '-b:a', '40k', mp3], check=True)
         return open(mp3, 'rb').read()
 
+def skins(only):
+    """Voices for mod skins (see the docstring)."""
+    total = 0
+    for sid, sk in script['skins'].items():
+        if sid.startswith('_') or (only and sid != only):
+            continue
+        d = os.path.join(root, 'mods', sk['mod'])
+        man_path = os.path.join(d, 'mod.json')
+        man = json.load(open(man_path))
+        skin = next(s for s in man['skins'] if s['id'] == sid and s['class'] == sk['class'])
+        for f in os.listdir(d):  # drop the skin's old takes first
+            if f.startswith(sid + '-') and f.endswith('.mp3'): os.remove(os.path.join(d, f))
+        banks = sk.get('lines') or {k.split(':')[1]: t for k, t in script['lines'].items() if k.split(':')[0] == sk['class']}
+        voice = {}
+        for line, texts in banks.items():
+            voice[line] = []
+            for n, t in enumerate(texts, 1):
+                data = render(t, sk['voice'])
+                total += len(data)
+                name = f'{sid}-{line}-{n}.mp3'
+                open(os.path.join(d, name), 'wb').write(data)
+                voice[line].append(name)
+        skin['voice'] = voice
+        with open(man_path, 'w') as f:
+            json.dump(man, f, indent=2)
+            f.write('\n')
+        print(sid, sk['mod'], sum(len(v) for v in voice.values()), 'clips')
+    print(f'{total / 1024:.0f} KB of MP3')
+
 total = 0
 only = sys.argv[2] if len(sys.argv) > 2 else None
+if only == 'skins':
+    skins(sys.argv[3] if len(sys.argv) > 3 else None)
+    sys.exit(0)
 voice_dir = os.path.join(root, 'assets/audio/voice')
 for key, texts in script['lines'].items():
     who, line = key.split(':')

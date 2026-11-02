@@ -30,7 +30,35 @@
         "#312666",
         "#211854",
         "#07050d"
-      ]
+      ],
+      "voice": {
+        "cast_fire": [
+          "wes-cast_fire-1.mp3",
+          "wes-cast_fire-2.mp3"
+        ],
+        "cast_frost": [
+          "wes-cast_frost-1.mp3",
+          "wes-cast_frost-2.mp3"
+        ],
+        "cast_arcane": [
+          "wes-cast_arcane-1.mp3",
+          "wes-cast_arcane-2.mp3"
+        ],
+        "cast": [
+          "wes-cast-1.mp3"
+        ],
+        "castBig": [
+          "wes-castBig-1.mp3",
+          "wes-castBig-2.mp3"
+        ],
+        "death": [
+          "wes-death-1.mp3"
+        ],
+        "win": [
+          "wes-win-1.mp3",
+          "wes-win-2.mp3"
+        ]
+      }
     }
   ]
 }

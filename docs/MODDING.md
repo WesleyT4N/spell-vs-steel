@@ -1,12 +1,12 @@
 # Modding
 
-Mods are plain data. A mod is a **zip** of a `mod.json` manifest and PNG images; nothing in it ever runs as code or
+Mods are plain data. A mod is a **zip** of a `mod.json` manifest, PNG images and (optionally) MP3 voice lines; nothing in it ever runs as code or
 is put into a web page, and the loader refuses any key, file, color or size the format doesn't name (see
 `src/mods/format.ts`, checked by `tests/mods.ts`). The game reads the zip and the PNGs with its own small decoders
 (`src/mods/files.ts`), with every size capped before anything is unpacked. A mod that fails the checks is listed on
 the MODS screen with the reason; the game still starts.
 
-Today a mod can add **skins with their own drawn art** for the 48px HD fighters. More kinds of content (spells,
+Today a mod can add **skins with their own drawn art** for the 48px HD fighters, and give a skin **its own voice**. More kinds of content (spells,
 stages, classes) will use the same manifest and the same rules as they become data.
 
 ## Installing mods
@@ -26,6 +26,10 @@ sprite generated from the reference sheet (`/mnt/project-files/art/skin-mods-pl/
 the class's own game frames so every pose lines up with the built-in art, then
 `python3 tools/pixellab/build_skin_mod.py <frames dir> <prefix> <class> <mod id> <name> <skin id> <skin name> [author]`,
 which writes the mod's folder. Zip that folder's files to share the mod.
+
+Each also has its own voice: Hazel a young woman (Kokoro `af_bella`), Wes a younger wizard (`bm_fable`), saying their
+class's lines. `scripts/voices/gen.py <model dir> skins` renders the `skins` entries of `scripts/voices/lines.json`
+into the mod's folder (`<skin>-<line>-<n>.mp3`) and lists them under the skin's `voice` key in its `mod.json`.
 
 ## File format
 
@@ -84,6 +88,26 @@ row at the same column. The order is the class's `frames` list there: `idle0`-`i
 a frame left empty shows `idle0`; `idle0` itself is required. The class's own sheet (`assets/fighters/<class>.png`)
 is the best template.
 
+### Voice
+
+A skin may bring its own voice lines: `"voice"` maps a line to 1 to 4 MP3 files in the zip (one is picked at random
+each time). Lines: `cast`, `castBig` (Legendary, Mythic and big spells), `death`, `win`, `grunt`, `hurt`, `hurtBig`,
+and per-element cast lines `cast_<element>` (`steel`, `fire`, `frost`, `arcane`, `shadow`, `poison`, `nature`,
+`holy`). Each clip is at most 64 KB and must be an MP3 (short mono clips at about 40 kbps are around 10 KB).
+
+```json
+"voice": {
+  "cast": ["hazel-cast-1.mp3", "hazel-cast-2.mp3"],
+  "castBig": ["hazel-castBig-1.mp3"],
+  "death": ["hazel-death-1.mp3"],
+  "win": ["hazel-win-1.mp3"]
+}
+```
+
+A skin with a voice says only its own clips, never the class's, so a fighter never changes speaker mid-match. A
+line it has no clip for stays silent, except that a missing `cast_<element>` line falls back to its `cast` line.
+Keep to spoken words: synthesized grunts and yells sound like words read aloud.
+
 ### Older mods
 
 Mods from before zips (one `.json` file with the art as palette-letter rows, format `spell-vs-steel-mod/2`) still
@@ -96,4 +120,5 @@ and the poses of the class's own frames so attacks and hits line up.
 
 ## Limits
 
-- Mod skins are cosmetic. Online, an opponent who doesn't have the mod sees your default color.
+- Mod skins are cosmetic. Online, an opponent who doesn't have the mod sees your default color and hears the
+  class's default voice.

@@ -5,6 +5,7 @@ import { parseMod, readMod, readModFiles, MAX_MOD_SIZE } from '../src/mods/forma
 import { loadMods, importMod, setModOn, removeMod, MODS, type BuiltInMod } from '../src/mods';
 import { SKINS } from '../src/art/sprites';
 import { resetSaveForTests, getSave } from '../src/engine/save';
+import { hasSkinVoice } from '../src/engine/voice';
 
 let failed = 0;
 const check = (ok: boolean, what: string): void => { if (!ok) { failed++; console.error(`FAIL ${what}`); } };
@@ -85,6 +86,27 @@ await bad('a team color the art does not use', m => { m.skins[0].team = '#123456
 await bad('HTML in a name', m => { m.skins[0].name = '<b>x</b>'; });
 await bad('a long name', m => { m.skins[0].name = 'A'.repeat(13); });
 await bad('the same skin twice', m => { m.skins.push(m.skins[0]); });
+// a skin's own voice: named MP3s in the zip, only for lines the game says
+const mp3 = readFileSync(new URL('../mods/wes-skin/wes-win-1.mp3', import.meta.url));
+const voiced = (m: any, f: Map<string, Uint8Array>): void => { m.skins[0].voice = { win: ['w-win.mp3'] }; f.set('w-win.mp3', new Uint8Array(mp3)); };
+await (async () => {
+  const m = structuredClone(manifest), f = new Map(good);
+  voiced(m, f); f.set('mod.json', text(JSON.stringify(m)));
+  const r = await readModFiles(f);
+  check(r.ok && r.mod.skins[0].voice?.win?.length === 1, `a skin with its own voice reads${r.ok ? '' : `: ${r.error}`}`);
+})();
+await bad('an unknown voice line', (m, f) => { voiced(m, f); m.skins[0].voice = { taunt: ['w-win.mp3'] }; });
+await bad('a voice line from the prototype', (m, f) => { voiced(m, f); m.skins[0].voice = JSON.parse('{"__proto__":["w-win.mp3"]}'); });
+await bad('an empty voice', (m, f) => { voiced(m, f); m.skins[0].voice = {}; f.delete('w-win.mp3'); });
+await bad('a voice clip that is not in the zip', (m, f) => { voiced(m, f); m.skins[0].voice.win = ['nope.mp3']; f.delete('w-win.mp3'); });
+await bad('a voice clip that is not an MP3', (m, f) => { voiced(m, f); f.set('w-win.mp3', text('<script>')); });
+await bad('a voice clip named as a PNG', (m, f) => { voiced(m, f); m.skins[0].voice.win = ['wes.png']; });
+await bad('too many takes of a line', (m, f) => { voiced(m, f); m.skins[0].voice.win = Array(5).fill('w-win.mp3'); });
+await bad('a voice clip that is too big', (m, f) => { voiced(m, f); f.set('w-win.mp3', new Uint8Array(65 * 1024).fill(0xff)); });
+for (const [dir, cls, id] of [['wes-skin', 'mage', 'wes'], ['hazel-druid-skin', 'ranger', 'hazel']] as const) {
+  const r = await readModFiles(folder(new URL(`${dir}/`, modsDir)));
+  check(r.ok && ['cast', 'castBig', 'death', 'win'].every(k => !!r.mod.skins.find(s => s.cls === cls && s.id === id)?.voice?.[k]?.length), `${dir} ships its own voice`);
+}
 check(!(await readMod(new Uint8Array(MAX_MOD_SIZE + 1))).ok, 'refuses a file that is too big');
 check(!(await readMod(text('PK not really a zip'))).ok, 'refuses a broken zip');
 check(!(await readMod(await zip(new Map([['../mod.json', good.get('mod.json')!]])))).ok, 'refuses a zip path that climbs out');
@@ -104,9 +126,9 @@ const builtIn = (): BuiltInMod[] => [{ folder: 'wes-skin', files: folder(wesDir)
 const has = (cls: string, id: string): boolean => SKINS[cls].some(s => s.id === id);
 resetSaveForTests();
 await loadMods(builtIn());
-check(MODS.length === 1 && MODS[0].on && has('mage', 'wes'), 'a built-in mod loads switched on');
+check(MODS.length === 1 && MODS[0].on && has('mage', 'wes') && hasSkinVoice('mage', 'wes'), 'a built-in mod loads switched on, voice and all');
 setModOn('wes-skin', false);
-check(!has('mage', 'wes') && getSave('mods')?.off.includes('wes-skin') === true, 'switching a mod off takes its skins away and is kept');
+check(!has('mage', 'wes') && !hasSkinVoice('mage', 'wes') && getSave('mods')?.off.includes('wes-skin') === true, 'switching a mod off takes its skins away and is kept');
 check(!(await importMod(await zip(folder(wesDir)))).ok, 'a mod with a built-in mod\'s id is refused');
 check(!(await importMod(text('{"format":"spell-vs-steel-mod/2"}'))).ok, 'a broken import is refused');
 const imp = await importMod(await zip(folder(hazelDir), true));

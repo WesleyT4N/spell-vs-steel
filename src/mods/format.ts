@@ -26,7 +26,9 @@ export const FRAME_IDS: readonly FrameId[] = ['idle0', 'idle1', 'idle2', 'idle3'
   'kneel', 'down', 'stagger', 'slump', 'fall1', 'fall2'];
 export const MOD_ID = /^[a-z][a-z0-9-]*$/;
 
-export interface ModSkin { cls: string; id: string; name: string; art: SkinArt }
+/** A skin's own voice: clip banks by line ("cast", "castBig", "death", "win", "cast_fire", ...), each a list of MP3 files' bytes. */
+export type ModVoice = Record<string, Uint8Array[]>;
+export interface ModSkin { cls: string; id: string; name: string; art: SkinArt; voice?: ModVoice }
 export interface Mod { id: string; name: string; author: string; skins: ModSkin[] }
 export type ParseResult = { ok: true; mod: Mod } | { ok: false; error: string };
 
@@ -124,6 +126,15 @@ function list(v: unknown, each: (s: unknown, where: string) => ModSkin): ModSkin
 // ---------- format 3: a zip of mod.json + PNGs ----------
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const FILE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\.png$/;
+const MP3 = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\.mp3$/;
+/** The voice lines a skin can replace (see src/engine/voice.ts); "cast_<element>" banks are per-element cast lines. */
+export const VOICE_LINES = ['cast', 'castBig', 'death', 'win', 'grunt', 'hurt', 'hurtBig'] as const;
+const ELEMENTS = ['steel', 'fire', 'frost', 'arcane', 'shadow', 'poison', 'nature', 'holy'];
+const VOICE_KEYS = [...VOICE_LINES, ...ELEMENTS.map(e => `cast_${e}`)];
+/** Clips per voice line, and the most a voice clip may weigh (a short spoken line at 40 kbps is about 10 KB). */
+const MAX_TAKES = 4, MAX_CLIP = 64 * 1024;
+/** An MP3 file: an ID3 tag or an MPEG audio frame sync at the start. */
+const isMp3 = (b: Uint8Array): boolean => (b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0);
 const hex = (px: Uint8Array, i: number): string => '#' + [0, 1, 2].map(k => px[i + k].toString(16).padStart(2, '0')).join('');
 /** The art's outline ink: the color found most often on its edge (opaque pixels next to clear ones). */
 function edgeColor(img: Png): string | undefined {
@@ -136,7 +147,7 @@ function edgeColor(img: Png): string | undefined {
 
 /** One skin of a zip mod: its sheet (and portrait) PNGs read into palette rows. */
 async function zipSkin(v: unknown, where: string, files: Map<string, Uint8Array>, used: Set<string>): Promise<ModSkin> {
-  const o = obj(v, where, ['class', 'id', 'name', 'sheet', 'team'], ['portrait', 'palette']);
+  const o = obj(v, where, ['class', 'id', 'name', 'sheet', 'team'], ['portrait', 'palette', 'voice']);
   const cls = str(o.class, `${where}.class`, /^[a-z][a-z0-9-]*$/, 24);
   const base = own(PL_FILES, cls) ? PL_FILES[cls] : undefined;
   if (!base) return fail(`${where}.class: no class "${cls}"`);
@@ -187,7 +198,31 @@ async function zipSkin(v: unknown, where: string, files: Map<string, Uint8Array>
   if (!frames.idle0) fail(`${where}.sheet: the first frame (idle0) is empty`);
   const art: SkinArt = { pal, team: LETTERS[pal.indexOf(team)], ax: base.ax, res: PL_RES, frames };
   if (portrait) art.portrait = rowsFromPixels(portrait.px, portrait.w, portrait.h, pal);
-  return { cls, id, name, art };
+  const skin: ModSkin = { cls, id, name, art };
+  if (o.voice !== undefined) skin.voice = voice(o.voice, `${where}.voice`, files, used);
+  return skin;
+}
+
+/** A skin's voice: line -> MP3 files in the zip. Only the listed lines, 1 to MAX_TAKES clips each. */
+function voice(v: unknown, where: string, files: Map<string, Uint8Array>, used: Set<string>): ModVoice {
+  const o = obj(v, where, [], VOICE_KEYS);
+  if (!Object.keys(o).length) fail(`${where}: name at least one line (${VOICE_LINES.join(', ')})`);
+  const out: ModVoice = {};
+  for (const k of VOICE_KEYS) {
+    if (!own(o, k)) continue;
+    const list = o[k];
+    if (!Array.isArray(list) || list.length === 0 || list.length > MAX_TAKES) fail(`${where}.${k}: 1 to ${MAX_TAKES} MP3 files`);
+    out[k] = (list as unknown[]).map((f, i) => {
+      const name = str(f, `${where}.${k}[${i}]`, MP3, 68);
+      const bytes = files.get(name);
+      if (!bytes) return fail(`${where}.${k}: no "${name}" in the zip`);
+      if (bytes.length > MAX_CLIP) fail(`${name}: a voice clip is at most ${MAX_CLIP / 1024} KB`);
+      if (!isMp3(bytes)) fail(`${name}: not an MP3 file`);
+      used.add(name);
+      return bytes;
+    });
+  }
+  return out;
 }
 
 /** Read a mod from its files by name (mod.json and the PNGs it names). Never throws. */

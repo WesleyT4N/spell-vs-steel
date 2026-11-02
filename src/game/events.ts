@@ -21,7 +21,7 @@ export type BattleEvent =
   /** The sound of a visual effect, by fx kind. */
   | { type: 'fxSound'; kind: string; opts?: SoundOpts }
   /** A class voice line. `chance` < 1: the listener plays it only that often (variety, not rules). */
-  | { type: 'voice'; cls: string; kind: VoiceKind; pan: number; side: 0 | 1; element?: string; chance?: number }
+  | { type: 'voice'; cls: string; kind: VoiceKind; pan: number; side: 0 | 1; element?: string; chance?: number; skin?: string }
   /** Damage landed on `side` (after shields; 0 when fully blocked). */
   | { type: 'hit'; side: 0 | 1; col: number; row: number; amt: number; element?: string; basic?: 'light' | 'heavy'; spell?: boolean; dot?: boolean; blocked: boolean }
   /** `side` cast spell `card`. */

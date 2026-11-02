@@ -407,7 +407,7 @@ export class Battle {
   sound(name: string, opts?: SoundOpts): void { this.sink?.({ type: 'sound', name, opts }); }
   voice(f: Fighter, kind: VoiceKind, element?: string, chance?: number): void {
     if (f.mob) return;
-    this.sink?.({ type: 'voice', cls: f.cls, kind, pan: panOf(f.col), side: f.side, element, chance });
+    this.sink?.({ type: 'voice', cls: f.cls, kind, pan: panOf(f.col), side: f.side, element, chance, skin: f.skin });
   }
   addFx(kind: string, side: Side, col: number, row: number, dur: number, data?: Record<string, number | string>): void {
     this.fx.push({ t: 0, dur: kind === 'castName' ? dur : dur * TUNING.fxSlow, kind, side, col, row, data });

@@ -312,9 +312,9 @@ export class ArtLabScene implements Scene {
   private say(kind: VoiceKind): void {
     const el = cardsFor(saved.cls)[0]?.element;
     unlockAudio();
-    const e: BattleEvent = { type: 'voice', cls: saved.cls, kind, pan: 0, side: 0, element: kind === 'cast' ? el : undefined };
+    const e: BattleEvent = { type: 'voice', cls: saved.cls, kind, pan: 0, side: 0, element: kind === 'cast' ? el : undefined, skin: skinOfLab(saved.cls) };
     this.hear(e);
-    voiceLine(saved.cls, kind, 0, 0, e.type === 'voice' ? e.element : undefined);
+    voiceLine(saved.cls, kind, 0, 0, e.type === 'voice' ? e.element : undefined, skinOfLab(saved.cls));
   }
 
   private hear(e: BattleEvent): void {
@@ -332,7 +332,7 @@ export class ArtLabScene implements Scene {
     el.replaceChildren(...(this.heard.length ? this.heard.map(({ t, e }) => {
       const b = btn(`${t.toFixed(2)}s  ${soundName(e)}`, () => {
         unlockAudio();
-        if (e.type === 'voice') voiceLine(e.cls as ClassId, e.kind, 0, 0, e.element); else playBattleEvent(e);
+        if (e.type === 'voice') voiceLine(e.cls as ClassId, e.kind, 0, 0, e.element, e.skin); else playBattleEvent(e);
       });
       b.style.cssText = 'min-height:28px;text-align:left;font:11px ui-monospace,monospace';
       return b;

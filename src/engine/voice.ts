@@ -1,6 +1,7 @@
 // Character voices and announcer lines: neural-TTS clips (scripts/voices/gen.py) decoded once, then played
 // through a short stone room. Each fighter says one line at a time, ranked by priority. The clips are MP3s in
-// assets/audio/voice/<speaker>/<line>-<n>.mp3; a bank is "<speaker>:<line>" (ann is the announcer).
+// assets/audio/voice/<speaker>/<line>-<n>.mp3; a bank is "<speaker>:<line>" (ann is the announcer). A mod skin can
+// bring its own voice (setSkinVoice): then that skin speaks only its own clips, never the class's.
 import type { ClassId } from '../art/sprites';
 import { assetBytes, assetPaths } from './assets';
 
@@ -15,12 +16,39 @@ const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
 let bankCtx: BaseAudioContext | null = null;
 const bank = new Map<string, AudioBuffer[]>();
 
+// ---------- skin voices (from mods) ----------
+/** Mod skins' clips, still encoded, by "<class>/<skin>" then line. Decoded into `bank` as "<class>/<skin>:<line>". */
+const skinVoices = new Map<string, Record<string, Uint8Array[]>>();
+const skinKey = (cls: string, skin: string): string => `${cls}/${skin}`;
+
+function decodeSkin(c: BaseAudioContext, key: string, lines: Record<string, Uint8Array[]>): Array<Promise<void>> {
+  return Object.entries(lines).flatMap(([line, clips]) => {
+    const into: AudioBuffer[] = [];
+    bank.set(`${key}:${line}`, into);
+    // decodeAudioData takes (detaches) its buffer, so each decode gets a copy
+    return clips.map(b => c.decodeAudioData(b.slice().buffer).then(buf => { into.push(buf); }, () => { /* undecodable: skip */ }));
+  });
+}
+
+/** Give a mod skin its own voice lines (MP3 bytes by line), or take them away with null. */
+export function setSkinVoice(cls: string, skin: string, lines: Record<string, Uint8Array[]> | null): void {
+  const key = skinKey(cls, skin);
+  for (const k of [...bank.keys()]) if (k.startsWith(`${key}:`)) bank.delete(k);
+  if (!lines) { skinVoices.delete(key); return; }
+  skinVoices.set(key, lines);
+  if (bankCtx) void Promise.all(decodeSkin(bankCtx, key, lines));
+}
+
+/** Does this skin speak with a voice of its own? */
+export const hasSkinVoice = (cls: string, skin?: string): boolean => !!skin && skinVoices.has(skinKey(cls, skin));
+
 /** Decode every clip for this context (async; lines asked for before a clip is ready are skipped). */
 export function loadClips(c: BaseAudioContext): Promise<void> {
   if (bankCtx === c) return Promise.resolve();
   bankCtx = c;
   bank.clear();
   const jobs: Array<Promise<void>> = [];
+  for (const [key, lines] of skinVoices) jobs.push(...decodeSkin(c, key, lines));
   for (const path of assetPaths('audio/voice/')) {
     const m = /^audio\/voice\/([^/]+)\/(.+)-\d+\.mp3$/.exec(path);
     if (!m) continue;
@@ -96,15 +124,20 @@ function play(r: Rig, buf: AudioBuffer, pan: number, vol: number, send: number, 
 interface Playing { c: BaseAudioContext; stop: () => void; end: number; prio: number }
 const active: Array<Playing | null> = [null, null];
 
-/** Say a line for a class. `side` lets a fighter's new line cut off its last one; `element` picks per-element cast lines. */
-export function playVoice(c: BaseAudioContext, out: AudioNode, cls: ClassId, kind: VoiceKind, pan = 0, side = 0, element?: string): void {
+/**
+ * Say a line for a class. `side` lets a fighter's new line cut off its last one; `element` picks per-element cast lines.
+ * A `skin` with its own voice (a mod) says its own clips instead; a line it has no clip for stays silent, so a fighter
+ * never switches speakers mid-match (a missing per-element cast line falls back to its plain cast line).
+ */
+export function playVoice(c: BaseAudioContext, out: AudioNode, cls: ClassId, kind: VoiceKind, pan = 0, side = 0, element?: string, skin?: string): void {
   void loadClips(c);
   const now = c.currentTime, cur = active[side];
   if (cur && cur.c === c && now < cur.end) {
     if (PRIORITY[kind] < cur.prio) return;
     cur.stop();
   }
-  const buf = (element && kind === 'cast' ? clip(`${cls}:cast_${element}`) : null) ?? clip(`${cls}:${kind}`);
+  const who = skin && hasSkinVoice(cls, skin) ? skinKey(cls, skin) : cls;
+  const buf = (element && kind === 'cast' ? clip(`${who}:cast_${element}`) : null) ?? clip(`${who}:${kind}`);
   if (!buf) return;
   // a hair of pitch drift so repeats don't sound pasted in
   const p = play(rig(c, out, false), buf, pan * 0.7, 1, 0.3, rnd(0.97, 1.03));

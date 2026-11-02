@@ -26,6 +26,8 @@ const title = (e: ModEntry): string => (e.mod?.name ?? e.id).toUpperCase();
 const sourceText = (e: ModEntry): string => (e.source === 'built-in' ? 'INCLUDED WITH THE GAME' : 'IMPORTED');
 /** One line per skin: "WIZARD (MAGE)". */
 const skinText = (e: ModEntry): string[] => (e.mod?.skins ?? []).map(s => `${s.name.toUpperCase()} (${CLASS_INFO[s.cls as ClassId]?.name.toUpperCase() ?? s.cls})`);
+/** Where a mod's skins show up, and whether they bring their own voices. */
+const footText = (e: ModEntry): string => (e.mod?.skins.some(s => s.voice) ? 'SKINS AND VOICES ON THE FIGHTER SELECT' : 'EXTRA SKINS ON THE FIGHTER SELECT');
 
 export class ModsScene implements Scene {
   /** The mod under the cursor. */
@@ -200,7 +202,7 @@ export class ModsScene implements Scene {
         this.skins(ui, e, mx, top + h - 56, sc, gap, tick);
         const lines = skinText(e);
         drawTextCentered(ui, `${lines.length} SKIN${lines.length === 1 ? '' : 'S'}: ${lines.join(', ')}`.slice(0, 38), mx, top + h - 26, INK2, 1, false);
-        drawTextCentered(ui, 'EXTRA COLORS ON THE FIGHTER SELECT', mx, top + h - 14, TRIM, 1, false);
+        drawTextCentered(ui, footText(e), mx, top + h - 14, TRIM, 1, false);
         if (e.refused.length) drawTextCentered(ui, `ALREADY TAKEN: ${e.refused.join(', ')}`.toUpperCase().slice(0, 38), mx, top + 68, RED_INK, 1, false);
       } else {
         drawTextCentered(ui, 'THIS FILE FAILED THE MOD CHECKS:', mx, top + 60, RED_INK, 1, false);
@@ -259,7 +261,7 @@ export class ModsScene implements Scene {
     if (e.mod) {
       const n = e.mod.skins.length, gap = n > 1 ? Math.min(150, (w - 80) / (n - 1)) : 0;
       this.skins(ui, e, cx, dTop + 180, n > 3 ? 2 : n > 1 ? 3 : 5, gap, tick);
-      drawTextCentered(ui, 'EXTRA COLORS ON THE FIGHTER SELECT', cx, dTop + detailH - 24, TRIM, 1, false);
+      drawTextCentered(ui, footText(e), cx, dTop + detailH - 24, TRIM, 1, false);
     } else {
       wrap((e.error ?? '').toUpperCase(), 28).slice(0, 6).forEach((l, i) => drawTextCentered(ui, l, cx, dTop + 80 + i * 20, RED_INK, 2, false));
     }
