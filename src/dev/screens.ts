@@ -17,6 +17,7 @@ import { BattleScene } from '../scenes/battle';
 import { TrainingScene } from '../scenes/training';
 import { TutorialScene } from '../scenes/tutorial';
 import { DevMenuScene } from '../scenes/devMenu';
+import { SfxTestScene } from '../scenes/sfxTest';
 import { EncyclopediaScene } from '../scenes/encyclopedia';
 import { LabScene } from '../scenes/lab';
 import { ArtLabScene } from '../scenes/artLab';
@@ -520,6 +521,7 @@ export const screens: Record<string, () => void> = {
   'tournament-browse': () => setScene(fakeTournament('open')),
   'tournament-bracket': () => setScene(fakeTournament('live')),
   'dev-menu': () => setScene(new DevMenuScene(title)),
+  'sound-test': () => setScene(new SfxTestScene(title)),
   'encyclopedia': () => setScene(new EncyclopediaScene(title)),
   // a card open for reading (on phones, the sheet with its clip and rules)
   'encyclopedia-card': () => { const e = new EncyclopediaScene(title, () => {}); e.cls = 'mage'; e.sel = e.reading = 4; setScene(e); run(0.5); },

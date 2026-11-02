@@ -1,5 +1,6 @@
 // Realistic spell and combat sounds, synthesized live: layered noise, crackle and crystal partials, stereo
-// panning by column, a short stone-arena room and a punchy master chain. No audio files.
+// panning by column, a short stone-arena room and a punchy master chain. No audio files. These are now the fallback:
+// the recorded effects in assets/audio/sfx/ (sfxSamples.ts) play first for every name their map lists.
 // Profile (Wes): realistic not chiptune, light on bass, snappy, hits punchy, pitched a tad low.
 
 /** Global pitch for the whole set: scales noise playback, filters, sweeps and tones. */
@@ -409,3 +410,6 @@ export function playReal(c: AudioContext, out: AudioNode, name: string, o: RealO
   fn(o);
   return true;
 }
+
+/** Every name this file has a recipe for ("fx:" names for spell effects), for the sound map's coverage test. */
+export const recipeNames = (): string[] => [...Object.keys(REAL), ...Object.keys(FX).map(k => `fx:${k}`)];

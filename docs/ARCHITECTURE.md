@@ -351,11 +351,12 @@ flowchart TD
 
 ## Audio
 
-Effects are synthesized live in WebAudio. Music is an original sampled soundtrack (#40): `scripts/music/` renders a score DSL offline with a soundfont, and writes the MP3s plus `tracks.json` (loop points) to `assets/audio/music/`, which `engine/musicTracks.ts` reads. Voice clips are recorded TTS in `assets/audio/voice/<speaker>/<line>-<n>.mp3`, from `scripts/voices/gen.py` (#127). A mod skin can bring its own voice (#134): `setSkinVoice` adds `<cls>/<skin>:<line>` banks and `playVoice` takes the skin from the `voice` event (see Mods).
+Effects are recorded samples (ElevenLabs, Storybook JRPG style) in `assets/audio/sfx/<slot>.mp3`. `assets/audio/sfx/sfx.json` maps each game sound name (and each spell effect as `fx:<kind>`) to the slots it plays; `engine/sfxSamples.ts` decodes them on first unlock and `sfx()` tries them first. Any name the map leaves out, or anything played before decoding finishes, falls back to the synthesized recipes in `sfxReal.ts`; DEV TOOLS > SOUND TEST can switch the whole game back to those. Music is an original sampled soundtrack (#40): `scripts/music/` renders a score DSL offline with a soundfont, and writes the MP3s plus `tracks.json` (loop points) to `assets/audio/music/`, which `engine/musicTracks.ts` reads. Voice clips are recorded TTS in `assets/audio/voice/<speaker>/<line>-<n>.mp3`, from `scripts/voices/gen.py` (#127). A mod skin can bring its own voice (#134): `setSkinVoice` adds `<cls>/<skin>:<line>` banks and `playVoice` takes the skin from the `voice` event (see Mods).
 
 ```mermaid
 flowchart LR
-  spell["Spell and hit sounds<br/>sfxReal.ts"] --> real["realBus<br/>compressor, limiter, room"] --> sfxBus
+  samp["Recorded effects<br/>sfxSamples.ts + sfx.json"] --> sbus["sampleBus<br/>compressor"] --> sfxBus
+  spell["Synth fallback<br/>sfxReal.ts"] --> real["realBus<br/>compressor, limiter, room"] --> sfxBus
   blips["Menu blips, charge hum"] --> sfxBus
   sting["Announcer stingers"] --> sfxBus
   voice["Voices, announcer clips"] --> vbus["voiceBus / annBus"]

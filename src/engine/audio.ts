@@ -1,6 +1,8 @@
-// WebAudio sound: realistic combat/spell effects (sfxReal), NES-style blips for menus, and pre-rendered looping BGM.
+// WebAudio sound: recorded sound effects (sfxSamples, synthesized fallback in sfxReal), NES-style blips for anything
+// unmapped, voices, the announcer and pre-rendered looping BGM.
 import { getSave, setSave } from './save';
 import { playReal, type RealOpts } from './sfxReal';
+import { playSample, playSlot, loadSfx } from './sfxSamples';
 import { playVoice, loadClips, type VoiceKind } from './voice';
 import { playCall, type Call } from './announcer';
 import type { ClassId } from '../art/sprites';
@@ -8,7 +10,7 @@ import { TRACKS, trackFile, type TrackId } from './musicTracks';
 import { assetBytes } from './assets';
 
 let ctx: AudioContext | null = null;
-let master: GainNode, sfxBus: GainNode, stingBus: GainNode, voiceBus: GainNode, annBus: GainNode, realBus: GainNode, musicBus: GainNode;
+let master: GainNode, sfxBus: GainNode, sampleBus: AudioNode, stingBus: GainNode, voiceBus: GainNode, annBus: GainNode, realBus: GainNode, musicBus: GainNode;
 let noiseBuf: AudioBuffer;
 let muted = false;
 
@@ -57,6 +59,11 @@ function init(): AudioContext | null {
   master.connect(ctx.destination);
   sfxBus = ctx.createGain(); sfxBus.gain.value = sfxGain(); sfxBus.connect(master);
   realBus = ctx.createGain(); realBus.gain.value = 0.75; realBus.connect(sfxBus);
+  // recorded effects: a gentle limiter so stacked hits and spells don't clip
+  const sGain = ctx.createGain(); sGain.gain.value = 0.9;
+  const lim = ctx.createDynamicsCompressor();
+  lim.threshold.value = -6; lim.knee.value = 4; lim.ratio.value = 12; lim.attack.value = 0.002; lim.release.value = 0.1;
+  sGain.connect(lim); lim.connect(sfxBus); sampleBus = sGain;
   musicBus = ctx.createGain(); musicBus.gain.value = musicGain(); musicBus.connect(master);
   voiceBus = ctx.createGain(); voiceBus.gain.value = voiceGain(); voiceBus.connect(master);
   annBus = ctx.createGain(); annBus.gain.value = annGain(); annBus.connect(master);
@@ -72,7 +79,7 @@ function init(): AudioContext | null {
 export function unlockAudio(): void {
   const was = ctx;
   const c = init();
-  if (!was && c) void loadClips(c);
+  if (!was && c) { void loadClips(c); void loadSfx(c); }
   if (c && c.state === 'suspended') void c.resume();
 }
 
@@ -143,6 +150,7 @@ export function withoutSfx<T>(fn: () => T): T {
 export function sfx(name: string, o?: RealOpts): void {
   const c = ctx;
   if (!c || c.state !== 'running' || quiet || muted || !settings.sfxOn || settings.sfx === 0) return;
+  if (playSample(c, sampleBus, name, o)) return;
   if (playReal(c, realBus, name, o)) return;
   const list = SFX[name];
   if (!list) return;
@@ -173,6 +181,13 @@ export function sfx(name: string, o?: RealOpts): void {
     src.start(t);
     src.stop(t + b.d + 0.02);
   }
+}
+
+/** Dev tools' sound test: play one recorded slot as is. */
+export function sfxSlot(slot: string): boolean {
+  const c = ctx;
+  if (!c || c.state !== 'running' || muted || !settings.sfxOn || settings.sfx === 0) return false;
+  return playSlot(c, sampleBus, slot);
 }
 
 /** A fighter's voice: grunts, casting, hurt and death. `side` keeps each fighter to one line at a time. */

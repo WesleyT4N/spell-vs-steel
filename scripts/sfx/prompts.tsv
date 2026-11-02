@@ -1,0 +1,75 @@
+ui_move	Fantasy RPG menu cursor move, tiny soft wooden tick with faint chime, very short
+ui_select	Fantasy RPG menu select, light bright magical chime, short
+ui_back	Fantasy RPG menu cancel, soft descending two-note chime, short
+ui_open	Fantasy RPG menu open, page flip with sparkling magical swell, short
+ui_deny	Fantasy RPG error buzz, dull low wooden thunk, short
+pip	Fantasy RPG mana point gained, small bright crystal ding, short
+charged	Fantasy RPG power charged up, rising magical shimmer ending in a bright ping
+win	Fantasy RPG victory fanfare, short bright brass and chime flourish
+step	Light footstep on stone with soft armor jingle, single step, short
+cleave	Fantasy RPG sword swing whoosh, sharp bright swish, short
+cleaveHeavy	Fantasy RPG heavy greatsword swing, deep whoosh into a powerful slash
+dagger	Fantasy RPG quick dagger slash, thin fast swish with small metal glint
+stab	Fantasy RPG rapid double dagger stab, two quick sharp swishes
+knife	Fantasy RPG throwing knife flying, spinning metal whistle
+thrust	Fantasy RPG spear thrust, fast forward whoosh with metal ring
+smash	Fantasy RPG heavy hammer smash on the ground, punchy deep thud
+wide	Fantasy RPG wide axe sweep, big broad whoosh and thud
+arrow	Fantasy RPG bow shot, bowstring twang and arrow whoosh
+aimed	Fantasy RPG powerful charged bow shot, heavy twang and fast piercing whoosh
+bolt	Fantasy RPG magic bolt fired, small glowing energy zap
+boltHeavy	Fantasy RPG magic beam blast, charged energy beam firing
+holySpark	Fantasy RPG small holy light bolt, bright quick shimmer zip
+hit_fire	Fantasy RPG fire hit, small flame burst impact
+hit_frost	Fantasy RPG ice hit, crisp frosty crack impact
+hit_holy	Fantasy RPG holy light hit, bright radiant impact
+hit_shadow	Fantasy RPG dark magic hit, eerie low impact
+hit_poison	Fantasy RPG poison hit, wet bubbly splash impact
+hit_nature	Fantasy RPG nature hit, wooden thump with leaf rustle
+heavyImpact	Fantasy RPG critical hit, big powerful punchy impact
+ko	Fantasy RPG enemy defeated, heavy final hit and body falling
+block	Fantasy RPG attack blocked by shield, bright metal clang
+guard	Fantasy RPG raise shield guard, solid metal clank with soft magical ring
+shieldHit	Fantasy RPG magic barrier hit, glassy energy shield thud
+break	Fantasy RPG magic shield breaking, glass shatter with magical burst
+reflect	Fantasy RPG spell reflected, metallic ping and ricochet whoosh
+counter	Fantasy RPG counterattack parry, sharp swish and quick strike
+freeze	Fantasy RPG enemy frozen solid, ice crystallizing crackle and chime
+thaw	Fantasy RPG ice block shattering, crystal shards breaking apart
+cast_fire	Fantasy RPG fire spell cast, flame ignites with magical whoosh
+cast_frost	Fantasy RPG ice spell cast, cold crystalline shimmer swirl
+cast_arcane	Fantasy RPG arcane spell cast, deep magical energy hum rising
+cast_holy	Fantasy RPG holy spell cast, soft angelic choir swell
+cast_shadow	Fantasy RPG dark spell cast, eerie swirling whisper whoosh
+cast_poison	Fantasy RPG poison spell cast, bubbling hiss of toxic gas
+cast_nature	Fantasy RPG nature spell cast, rustling leaves and wooden creak magic
+cast_steel	Fantasy RPG warrior skill activate, blade drawn with bright metal ring
+pillar	Fantasy RPG fire pillar erupting from the ground, roaring flame column
+meteorFall	Fantasy RPG meteor falling from the sky, rising fiery whistle rush
+novaZone	Fantasy RPG frost nova, icy blast burst outward with crystal chimes
+blink	Fantasy RPG teleport blink, quick magical sparkle whoosh
+holyNova	Fantasy RPG holy nova, radiant burst of light outward with chime
+quake	Fantasy RPG earthquake slam, ground rumble and rocks cracking
+shockwave	Fantasy RPG shockwave slam, powerful ground impact and blast wave
+shout	Fantasy RPG battle war horn blast, short deep horn
+transform	Fantasy RPG power up aura, rising magical energy swell into burst
+banner	Fantasy RPG war banner planted, cloth flapping and wooden thud
+smoke	Fantasy RPG smoke bomb, soft poof and hiss of smoke
+toxicPuff	Fantasy RPG poison cloud burst, bubbly hiss of toxic gas
+lob	Fantasy RPG potion vial thrown, glass bottle spinning whoosh
+trapPop	Fantasy RPG trap triggered, metal bear trap snapping shut
+hawkDive	Fantasy RPG hawk diving to attack, hawk screech and wing whoosh
+bite	Fantasy RPG wolf bite attack, snarl and snapping jaws
+claw	Fantasy RPG beast claw swipe, fast tearing scratches
+flare	Fantasy RPG flare launched, fizzing hiss and bright pop
+arrowRain	Fantasy RPG volley of arrows raining down, many arrow whooshes and thuds
+laser	Fantasy RPG continuous holy light beam, steady humming energy ray
+shot_fireball	Fantasy RPG fireball launched, roaring fiery whoosh flying
+shot_spin	Fantasy RPG spinning axe thrown, rapid whirring whoosh
+shot_magic	Fantasy RPG magic orb launched, sparkling energy whoosh
+shot_chain	Fantasy RPG chain hook thrown, rattling metal chain whip
+shot_net	Fantasy RPG net thrown, rope net whoosh
+shot_wind	Fantasy RPG wind spell gust, swirling magical wind rush
+shot_beast	Fantasy RPG wolf charging, growl and running paws
+spark	Fantasy RPG sword sparks, metal scrape with bright sparks
+hit_arcane	Fantasy RPG arcane magic hit, glowing energy pop impact
