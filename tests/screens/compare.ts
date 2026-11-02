@@ -3,17 +3,20 @@
 // that differs is listed for a human to look at. Visual changes are often the point of a PR, so this
 // never fails the build: it writes report.html (base, PR and a diff image side by side) and summary.md.
 // Usage: npx tsx tests/screens/compare.ts <baseDir> <headDir> <outDir>
+//        npx tsx tests/screens/compare.ts --merge <outDir> <reportDir>...   (joins reports made in parallel, e.g. one per shape in CI)
 import { chromium } from 'playwright';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, cpSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { Shot } from './run';
 
-const [baseDir, headDir, outDir] = process.argv.slice(2).map(p => resolve(p));
-if (!outDir) { console.error('usage: compare.ts <baseDir> <headDir> <outDir>'); process.exit(2); }
+const argv = process.argv.slice(2);
+const merging = argv[0] === '--merge';
+const [baseDir, headDir, outDir] = merging ? ['', '', resolve(argv[1] ?? '')] : argv.map(p => resolve(p));
+if (!argv[merging ? 1 : 2]) { console.error('usage: compare.ts <baseDir> <headDir> <outDir> | --merge <outDir> <reportDir>...'); process.exit(2); }
 
 const load = (dir: string): Shot[] => existsSync(join(dir, 'shots.json')) ? (JSON.parse(readFileSync(join(dir, 'shots.json'), 'utf8')) as { shots: Shot[] }).shots : [];
-const base = new Map(load(baseDir).map(s => [s.file, s]));
-const head = load(headDir);
+const base = new Map(merging ? [] : load(baseDir).map(s => [s.file, s]));
+const head = merging ? [] : load(headDir);
 interface Row { file: string; status: 'changed' | 'new' | 'same' | 'gone'; changed?: number; problems: string[] }
 const rows: Row[] = [];
 
@@ -98,8 +101,20 @@ function write(): void {
 ${[...changed, ...added].map(card).join('\n')}
 ${gone.length ? `<h2>Removed</h2><p>${gone.map(r => esc(name(r.file))).join(', ')}</p>` : ''}`;
   mkdirSync(outDir, { recursive: true });
+  writeFileSync(join(outDir, 'rows.json'), JSON.stringify(rows, null, 2));
   writeFileSync(join(outDir, 'report.html'), html);
   writeFileSync(join(outDir, 'summary.md'), md + '\n');
   console.log(md);
 }
-void main();
+/** --merge: each report dir holds rows.json plus its base/head/diff images; join them into one report. */
+function merge(): void {
+  for (const dir of argv.slice(2).map(p => resolve(p))) {
+    if (!existsSync(join(dir, 'rows.json'))) { console.log(`skipping ${dir}: no rows.json`); continue; }
+    rows.push(...(JSON.parse(readFileSync(join(dir, 'rows.json'), 'utf8')) as Row[]));
+    for (const sub of ['base', 'head', 'diff']) if (existsSync(join(dir, sub))) cpSync(join(dir, sub), join(outDir, sub), { recursive: true });
+  }
+  rows.sort((a, b) => a.file.localeCompare(b.file));
+  write();
+}
+
+if (merging) merge(); else void main();
