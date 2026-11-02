@@ -281,7 +281,7 @@ flowchart TD
 - `format.ts` and `files.ts` are pure (no DOM, no game state); `tests/mods.ts` (in `npm test`) checks the fixtures, the shipped mods, hostile files, and installing (on/off, import, delete, reload from the save).
 - Installed state lives in the save's `mods` section (`SavedMods`): ids switched off, and imported zips as base64 (at most 12, `IMPORT_BUDGET` about 1 MB). Built-in mods can be switched off, imported ones also deleted.
 - `Skin.art: SkinArt` (`pal`, `team`, `ax`, `res`, `frames`, `portrait`) sits beside the palette recolours; the menu still sprite is `idle0` trimmed. Shipped: `mods/wes-skin/` (Mage: Wes) and `mods/hazel-druid-skin/` (Ranger: Hazel), written by `tools/pixellab/build_skin_mod.py` from PixelLab `transfer_outfit` frames of the class's own poses.
-- Voice lines (#134): a skin's `voice` key maps a line (`cast`, `castBig`, `death`, `win`, `grunt`, `hurt`, `hurtBig`, `cast_<element>`) to 1 to 4 MP3s in the zip (each at most 64 KB, MP3 magic checked). `mods/index.ts` calls `setSkinVoice(cls, skin, bytes)` in `engine/voice.ts`, which decodes them into banks named `<cls>/<skin>:<line>`; a voiced skin speaks only its own clips. Battle `voice` events carry `skin` (sound only). `mods/boot.ts` globs MP3s too, and `scripts/voices/gen.py` has a `skins` mode driven by `lines.json` `skins`; the shipped Wes and Hazel mods have voices.
+- Voice lines (#134): a skin's `voice` key maps a line (`cast`, `castBig`, `death`, `win`, `grunt`, `hurt`, `hurtBig`, `cast_<element>`) to 1 to 4 MP3s in the zip (each at most 64 KB, MP3 magic checked). `mods/index.ts` calls `setSkinVoice(cls, skin, bytes)` in `engine/voice.ts`, which decodes them into banks named `<cls>/<skin>:<line>`; a voiced skin speaks only its own clips. Battle `voice` events carry `skin` (sound only). `mods/boot.ts` globs MP3s too, and `scripts/voices/skin.py` puts a skin's ElevenLabs clips into its mod (voices in `lines.json` `skins`); the shipped Wes and Hazel mods have voices, grunts and hurt sounds.
 - Cosmetic and render-only: the sim never sees mods. Online, an opponent without the mod sees your default colour.
 
 ## Stages
@@ -351,7 +351,7 @@ flowchart TD
 
 ## Audio
 
-Effects are synthesized live in WebAudio. Music is an original sampled soundtrack (#40): `scripts/music/` renders a score DSL offline with a soundfont, and writes the MP3s plus `tracks.json` (loop points) to `assets/audio/music/`, which `engine/musicTracks.ts` reads. Voice clips are recorded TTS in `assets/audio/voice/<speaker>/<line>-<n>.mp3`, from `scripts/voices/gen.py` (#127). A mod skin can bring its own voice (#134): `setSkinVoice` adds `<cls>/<skin>:<line>` banks and `playVoice` takes the skin from the `voice` event (see Mods).
+Effects are synthesized live in WebAudio. Music is an original sampled soundtrack (#40): `scripts/music/` renders a score DSL offline with a soundfont, and writes the MP3s plus `tracks.json` (loop points) to `assets/audio/music/`, which `engine/musicTracks.ts` reads. Voice clips (lines, attack grunts, hurt sounds, announcer) are ElevenLabs renders in `assets/audio/voice/<speaker>/<line>-<n>.mp3`; `scripts/voices/README.md` has the workflow (#127, #137). A mod skin can bring its own voice (#134): `setSkinVoice` adds `<cls>/<skin>:<line>` banks and `playVoice` takes the skin from the `voice` event (see Mods).
 
 ```mermaid
 flowchart LR

@@ -17,6 +17,7 @@ import { BattleScene } from '../scenes/battle';
 import { TrainingScene } from '../scenes/training';
 import { TutorialScene } from '../scenes/tutorial';
 import { DevMenuScene } from '../scenes/devMenu';
+import { VoiceTestScene } from '../scenes/voiceTest';
 import { EncyclopediaScene } from '../scenes/encyclopedia';
 import { LabScene } from '../scenes/lab';
 import { ArtLabScene } from '../scenes/artLab';
@@ -524,6 +525,8 @@ export const screens: Record<string, () => void> = {
   // a card open for reading (on phones, the sheet with its clip and rules)
   'encyclopedia-card': () => { const e = new EncyclopediaScene(title, () => {}); e.cls = 'mage'; e.sel = e.reading = 4; setScene(e); run(0.5); },
   'balance-lab': () => setScene(new LabScene(title)),
+  // every class line incl. grunts and hurt sounds, the voiced mod skins (Hazel, Wes) and the announcer
+  'voice-test': () => setScene(new VoiceTestScene(title)),
   // Warrior's light attack, mid-swing
   'art-lab': () => { setScene(new ArtLabScene(title, { tab: 'warrior', section: 'fx', zoom: 1 })); run(0.15); },
   'art-lab-anims': () => { setScene(new ArtLabScene(title, { tab: 'rogue', section: 'anims', entry: 6, zoom: 3 })); run(0.35); },
