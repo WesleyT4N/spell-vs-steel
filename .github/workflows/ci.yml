@@ -60,6 +60,9 @@ jobs:
   shots:
     name: Screens (${{ matrix.profile }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -82,15 +85,31 @@ jobs:
 
       # The same screens on the base branch, to list what this PR changes visually. This PR's tests/ folder
       # is used on both sides so the screen list matches; if the base can't build it, the diff is skipped.
-      - name: Shoot the base branch
+      # Every push to main already shoots main, so when this PR leaves tests/ alone those shots are reused
+      # (artifact shots-<shape> of main's CI run for the base commit); otherwise, or while that run hasn't
+      # finished, the base is shot here.
+      - name: Shoot the base branch (or reuse main's shots)
         id: base
         if: github.event_name == 'pull_request' && always()
         continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROFILE: ${{ matrix.profile }}
         run: |
-          git worktree add ../base "origin/${{ github.base_ref }}"
+          base=$(git rev-parse HEAD^1)
+          if git diff --quiet "$base" HEAD -- tests/; then
+            run=$(gh run list --workflow ci.yml --branch main --event push --commit "$base" --status success --json databaseId --jq '.[0].databaseId // empty' || true)
+            if [ -n "$run" ] && gh run download "$run" -n "shots-$PROFILE" -D ../cached && [ -f ../cached/head/shots.json ]; then
+              mv ../cached/head test-results/base
+              echo "reused main's shots from run $run (commit $base)" | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
+          echo "shooting the base commit $base"
+          git worktree add ../base "$base"
           rm -rf ../base/tests && cp -r tests ../base/tests
           (cd ../base && npm ci && npx vite build --config tests/screens/vite.config.ts)
-          npx tsx tests/screens/run.ts test-results/base --profiles ${{ matrix.profile }} --harness ../base/dist-test/tests/screens/harness.html || true
+          npx tsx tests/screens/run.ts test-results/base --profiles "$PROFILE" --harness ../base/dist-test/tests/screens/harness.html || true
       - name: Compare with base
         if: github.event_name == 'pull_request' && always() && steps.base.outcome == 'success'
         run: npx tsx tests/screens/compare.ts test-results/base test-results/head test-results/report
