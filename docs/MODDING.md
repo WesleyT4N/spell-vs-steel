@@ -21,7 +21,7 @@ A mod skin shows up on the fighter select under a SKINS tab next to COLORS (the 
 
 ## The shipped mods
 
-`mods/wes-skin/` (Mage: Wes, a young wizard) and `mods/hazel-druid-skin/` (Ranger: Hazel Druid). Both were made with PixelLab: a 48px idle
+`mods/wes-skin/` (Mage: Wes, a young wizard) and `mods/hazel-druid-skin/` (Ranger: Hazel). Both were made with PixelLab: a 48px idle
 sprite generated from the reference sheet (`/mnt/project-files/art/skin-mods-pl/ref/`), then `transfer_outfit` on
 the class's own game frames so every pose lines up with the built-in art, then
 `python3 tools/pixellab/build_skin_mod.py <frames dir> <prefix> <class> <mod id> <name> <skin id> <skin name> [author]`,
