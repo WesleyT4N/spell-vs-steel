@@ -23,9 +23,16 @@ env:
   TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || (inputs.version != '' && format('v{0}', inputs.version) || '') }}
 
 jobs:
+  # Windows and Linux package at the same time, on separate runners
   desktop:
+    name: desktop (${{ matrix.target }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      matrix:
+        include:
+          - { target: win, args: '--win portable', files: 'release/*.exe' }
+          - { target: linux, args: '--linux AppImage', files: 'release/*.AppImage' }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,13 +47,11 @@ jobs:
         run: npm run build:native
       # electron-builder makes the Windows portable .exe on Linux without Wine (no signing)
       - name: Package
-        run: npx electron-builder --win portable --linux AppImage --publish never
+        run: npx electron-builder ${{ matrix.args }} --publish never
       - uses: actions/upload-artifact@v4
         with:
-          name: spell-vs-steel-desktop
-          path: |
-            release/*.exe
-            release/*.AppImage
+          name: spell-vs-steel-desktop-${{ matrix.target }}
+          path: ${{ matrix.files }}
           retention-days: 30
 
   android:

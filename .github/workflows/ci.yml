@@ -4,8 +4,12 @@ name: CI
 
 on:
   pull_request:
+    # a PR or push that only touches docs skips CI; anything else runs all of it
+    paths-ignore: ['**.md', 'docs/**', 'scripts/voices/**', 'LICENSE']
   push:
     branches: [main]
+    # a PR or push that only touches docs skips CI; anything else runs all of it
+    paths-ignore: ['**.md', 'docs/**', 'scripts/voices/**', 'LICENSE']
   merge_group:
 
 concurrency:
@@ -51,10 +55,16 @@ jobs:
       - name: Rollback matches straight play
         run: npx tsx scripts/rollcheck.ts 25
 
-  screens:
-    name: Screens at every aspect ratio
+  # One job per screen shape, all at once. Each shoots this PR and (on PRs) the base branch at its shape and
+  # diffs the two; the "Screens at every aspect ratio" job below joins them into one report and one pass/fail.
+  shots:
+    name: Screens (${{ matrix.profile }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [desktop-4x3, desktop-3x2, desktop-16x9, desktop-21x9, desktop-32x9, phone-portrait, phone-landscape]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,8 +77,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Build the screen harness
         run: npx vite build --config tests/screens/vite.config.ts
-      - name: Shoot every screen at every shape
-        run: npx tsx tests/screens/run.ts test-results/head
+      - name: Shoot every screen at this shape
+        run: npx tsx tests/screens/run.ts test-results/head --profiles ${{ matrix.profile }}
 
       # The same screens on the base branch, to list what this PR changes visually. This PR's tests/ folder
       # is used on both sides so the screen list matches; if the base can't build it, the diff is skipped.
@@ -80,15 +90,49 @@ jobs:
           git worktree add ../base "origin/${{ github.base_ref }}"
           rm -rf ../base/tests && cp -r tests ../base/tests
           (cd ../base && npm ci && npx vite build --config tests/screens/vite.config.ts)
-          npx tsx tests/screens/run.ts test-results/base --harness ../base/dist-test/tests/screens/harness.html || true
+          npx tsx tests/screens/run.ts test-results/base --profiles ${{ matrix.profile }} --harness ../base/dist-test/tests/screens/harness.html || true
       - name: Compare with base
         if: github.event_name == 'pull_request' && always() && steps.base.outcome == 'success'
-        run: |
-          npx tsx tests/screens/compare.ts test-results/base test-results/head test-results/report
-          cat test-results/report/summary.md >> "$GITHUB_STEP_SUMMARY"
+        run: npx tsx tests/screens/compare.ts test-results/base test-results/head test-results/report
       - uses: actions/upload-artifact@v4
         if: always()
+        with:
+          name: shots-${{ matrix.profile }}
+          path: test-results/
+          retention-days: 3
+
+  screens:
+    name: Screens at every aspect ratio
+    needs: shots
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: shots-*
+          path: shots
+      - name: Gather the shots
+        run: |
+          mkdir -p test-results
+          for d in shots/*/; do for side in head base; do [ -d "$d$side" ] && cp -r "$d$side" test-results/; done; done
+          rm -f test-results/*/shots.json
+      - name: Join the diff reports
+        if: github.event_name == 'pull_request'
+        run: |
+          npx tsx tests/screens/compare.ts --merge test-results/report shots/*/report
+          cat test-results/report/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
         with:
           name: screens-report
           path: test-results/
           retention-days: 14
+      - name: Every shape passed
+        run: |
+          [ "${{ needs.shots.result }}" = success ] || { echo "a screen shape failed: ${{ needs.shots.result }} (see the Screens (...) jobs)"; exit 1; }
