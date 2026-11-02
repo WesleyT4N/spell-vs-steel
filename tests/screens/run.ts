@@ -1,5 +1,5 @@
 // Screen checks: opens every screen in src/dev/screens.ts at every screen shape the game supports
-// (4:3 to 21:9, wider than 21:9, phones in portrait and landscape) and saves a screenshot of each.
+// (4:3 to 21:9, wider than 21:9, phones in landscape; a phone held upright only gets the turn-your-phone card) and saves a screenshot of each.
 // A shot fails when the page throws or logs an error, the game screen doesn't fill the window the way
 // fit() in src/main.ts promises, or the screen is blank. Pixels are compared separately (compare.ts),
 // against the base branch, since visual changes are often on purpose.
@@ -18,7 +18,7 @@ const onlyProfiles = flag('--profiles');
 const harness = resolve(flag('--harness')?.[0] ?? 'dist-test/tests/screens/harness.html');
 if (!existsSync(harness)) { console.error(`missing ${harness}: run npx vite build --config tests/screens/vite.config.ts`); process.exit(2); }
 
-interface Profile { name: string; w: number; h: number; touch: boolean; portrait?: boolean }
+interface Profile { name: string; w: number; h: number; touch: boolean; upright?: boolean }
 export const PROFILES: Profile[] = [
   { name: 'desktop-4x3', w: 1024, h: 768, touch: false },
   { name: 'desktop-3x2', w: 960, h: 640, touch: false },
@@ -26,7 +26,8 @@ export const PROFILES: Profile[] = [
   { name: 'desktop-21x9', w: 1680, h: 720, touch: false },
   // wider than 21:9 letterboxes at the sides
   { name: 'desktop-32x9', w: 1920, h: 540, touch: false },
-  { name: 'phone-portrait', w: 390, h: 844, touch: true, portrait: true },
+  // phones play in landscape only: upright, every screen sits under the turn-your-phone card, so one shot checks it
+  { name: 'phone-portrait', w: 390, h: 844, touch: true, upright: true },
   { name: 'phone-landscape', w: 844, h: 390, touch: true },
 ];
 /** Screens that dock DOM panels over or beside the canvas, so the canvas doesn't fill the window. */
@@ -82,9 +83,15 @@ async function shoot(browser: Browser, p: Profile, screen: string): Promise<Shot
         if (d[0] + d[1] + d[2] > 24) lit++;
         n++;
       }
-      const tall = (window as unknown as { __test: { tall(): boolean } }).__test.tall();
-      return { x: r.x, y: r.y, w: r.width, h: r.height, colors: colors.size, lit: lit / n, vw: innerWidth, vh: innerHeight, tall };
+      const card = document.getElementById('svs-rotate');
+      const rotate = !!card && getComputedStyle(card).display !== 'none';
+      return { x: r.x, y: r.y, w: r.width, h: r.height, colors: colors.size, lit: lit / n, vw: innerWidth, vh: innerHeight, rotate };
     });
+    if (p.upright) {
+      if (!facts.rotate) shot.problems.push('a phone held upright should show the turn-your-phone card');
+      return shot;
+    }
+    if (facts.rotate) shot.problems.push('the turn-your-phone card is showing on a landscape screen');
     if (facts.colors < 6) shot.problems.push(`screen looks blank (${facts.colors} colors in a 32x24 sample)`);
     if (facts.lit < 0.1) shot.problems.push(`screen is ${Math.round((1 - facts.lit) * 100)}% black`);
     if (!DOM_PANELS.has(screen)) shot.problems.push(...layoutProblems(p, facts));
@@ -96,24 +103,16 @@ async function shoot(browser: Browser, p: Profile, screen: string): Promise<Shot
   return shot;
 }
 
-/**
- * The promise of fit() in src/main.ts: the screen fills the window between 4:3 and 21:9 and letterboxes past them;
- * phones in portrait fill the top half, or the whole screen on screens with a full-height layout (Scene.tall).
- */
-function layoutProblems(p: Profile, r: { x: number; y: number; w: number; h: number; tall: boolean }): string[] {
+/** The promise of fit() in src/main.ts: the screen fills the window between 4:3 and 21:9 and letterboxes past them. */
+function layoutProblems(p: Profile, r: { x: number; y: number; w: number; h: number }): string[] {
   const out: string[] = [];
-  if (r.tall && !p.portrait) out.push('full-height layout is only for phones in portrait');
-  const tall = p.portrait && r.tall;
-  const bh = p.portrait && !tall ? p.h / 2 : p.h;
-  const aspect = p.w / bh;
-  const min = tall ? 9 / 22 : p.portrait ? 3 / 4 : 4 / 3, max = 7 / 3;
+  const aspect = p.w / p.h, min = 4 / 3, max = 7 / 3;
   if (r.x < -0.5 || r.y < -0.5 || r.x + r.w > p.w + 0.5 || r.y + r.h > p.h + 0.5) out.push(`screen spills out of the window (${fmt(r)})`);
   // the view keeps whole world pixels, so it can come up a little short of the window (under 2%)
-  const fillsW = r.w >= p.w * 0.98, fillsH = r.h >= bh * 0.98;
-  if (aspect >= min && aspect <= max && !(fillsW && fillsH)) out.push(`screen should fill the ${p.w}x${Math.round(bh)} area but is ${fmt(r)}`);
+  const fillsW = r.w >= p.w * 0.98, fillsH = r.h >= p.h * 0.98;
+  if (aspect >= min && aspect <= max && !(fillsW && fillsH)) out.push(`screen should fill the ${p.w}x${p.h} window but is ${fmt(r)}`);
   if (aspect > max && !(fillsH && !fillsW)) out.push(`wider than 21:9 should letterbox at the sides, got ${fmt(r)}`);
   if (Math.abs(r.x + r.w / 2 - p.w / 2) > 1.5) out.push(`screen is off center (${fmt(r)})`);
-  if (p.portrait && r.y > 1) out.push(`portrait screen should sit at the top, got ${fmt(r)}`);
   return out;
 }
 const fmt = (r: { x: number; y: number; w: number; h: number }): string => `${Math.round(r.w)}x${Math.round(r.h)} at ${Math.round(r.x)},${Math.round(r.y)}`;
@@ -127,7 +126,7 @@ async function main(): Promise<void> {
   const names = (await probe.evaluate(() => (window as unknown as { __test: { names: string[] } }).__test.names)).filter(n => !onlyScreens || onlyScreens.includes(n));
   await probe.close();
   const profiles = PROFILES.filter(p => !onlyProfiles || onlyProfiles.includes(p.name));
-  const jobs = profiles.flatMap(p => names.map(n => [p, n] as const));
+  const jobs = profiles.flatMap(p => (p.upright ? names.slice(0, 1) : names).map(n => [p, n] as const));
   const shots: Shot[] = [];
   const t0 = Date.now();
   let next = 0;

@@ -9,9 +9,9 @@ import { getArena, useStage } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getPortrait, teamColor, skinOf, mirrorSkin, type ClassId } from '../art/sprites';
 import { drawIconAt, ICON_SIZE } from '../art/cardIcons';
-import { P, UW, screenRect, fillScreen, vy, vspan, spread, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered, textWidth } from '../engine/font';
-import { win, banner, stepTrail, plaque, GOLD, FRAME, INK, INK2, TRIM, PAPER, PAPER2, RED_INK, BLUE_INK, BURN } from './skin';
+import { P, UW, screenRect, fillScreen, type Ctx } from '../engine/gfx';
+import { drawText, drawTextCentered } from '../engine/font';
+import { win, banner, stepTrail, plaque, GOLD, FRAME, INK, INK2, TRIM, PAPER, PAPER2, RED_INK, BLUE_INK } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx } from '../engine/audio';
 import { loadMatch, saveMatch, playerDeck, sideName, type MatchConfig } from '../game/match';
@@ -25,7 +25,6 @@ import { TrainingScene } from './training';
 import { ArcadeLadderScene } from './arcade';
 import { newRun } from '../game/arcade';
 import type { PadMode } from '../engine/touch';
-import { bigButton, actionBar, barTapped, swipeIn, tallArea, Scroller, TAP, GAP, PAD } from './touchUi';
 
 /** One line of a side's list: a ready-made deck, one of the player's own, or RANDOM. */
 interface Choice { id: string; name: string; sub: string; mythic: string | null; legends: string[]; ok: boolean }
@@ -65,14 +64,10 @@ export class DeckSelectScene implements Scene {
   msg = '';
   msgT = 0;
   t = 0;
-  /** Phone layout: where the list was drawn, for swipes between the sides. */
-  private listRect: [number, number, number, number] = [0, 0, 0, 0];
   /** Wider screens: each side's first visible row when its list is longer than the panel. */
   private top: [number, number] = [0, 0];
   /** Wider screens: each panel's list window [x, y, w, h] and how many rows fit, for the wheel. */
   private listWin: Array<[number, number, number, number, number]> = [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0]];
-  /** Phone layout: the list's scroll. */
-  private scroller = new Scroller();
   /** A side's list should scroll its cursor's row into view when next drawn. */
   private follow: [boolean, boolean] = [true, true];
 
@@ -80,9 +75,7 @@ export class DeckSelectScene implements Scene {
     this.findRows();
     this.sync();
   }
-
-  tall(): boolean { return true; }
-  pad(): PadMode { return spread.tall ? 'none' : 'back'; }
+  pad(): PadMode { return 'back'; }
   /** Back from the deck builder: the decks may have changed. */
   resume(): void { this.m = loadMatch(); this.findRows(); this.msgT = 0; }
 
@@ -202,18 +195,10 @@ export class DeckSelectScene implements Scene {
         return;
       }
       if (this.locked && net.rivalLobby?.step === 2 && net.rival) { pushScene(new StageSelectScene(net)); return; }
-      if (this.locked) { if (wasPressed('back') || mouse.rclick || (spread.tall && barTapped('back'))) this.back(); return; }
+      if (this.locked) { if (wasPressed('back') || mouse.rclick) this.back(); return; }
     }
     if (wasPressed('back') || mouse.rclick) { this.back(); return; }
-    if (spread.tall) {
-      if (barTapped('back')) { this.back(); return; }
-      if (barTapped('primary')) { this.next(); return; }
-      const tab = hot('dside');
-      if (mouse.click && tab >= 0 && this.sides.includes(tab as 0 | 1)) { if (this.side !== tab) sfx('move'); this.side = tab as 0 | 1; this.reveal(this.side); return; }
-      const sw = this.sides.length > 1 ? swipeIn(...this.listRect) : 0;
-      if (sw) { this.side = this.side === 0 ? 1 : 0; this.reveal(this.side); sfx('move'); return; }
-      this.scroller.update(...this.listRect);
-    } else if (mouse.wheel) {
+    if (mouse.wheel) {
       for (const s of this.sides) {
         const [wx, wy, ww, wh, vis] = this.listWin[s], n = deckChoices(this.clsOf(s)).length;
         if (mouse.x >= wx && mouse.x < wx + ww && mouse.y >= wy && mouse.y < wy + wh) this.top[s] = Math.max(0, Math.min(n - vis, this.top[s] + Math.sign(mouse.wheel)));
@@ -266,16 +251,16 @@ export class DeckSelectScene implements Scene {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.45)';
     c.fillRect(...screenRect());
-    if (spread.tall) { this.drawTall(ui, tick); return; }
+    
 
-    banner(ui, 'CHOOSE YOUR SPELL DECK', UW / 2, vy(3));
-    stepTrail(ui, 1, UW / 2, vy(30));
-    const panels = this.panels, py = vy(PY), ph = vspan(PY, PH);
+    banner(ui, 'CHOOSE YOUR SPELL DECK', UW / 2, 3);
+    stepTrail(ui, 1, UW / 2, 30);
+    const panels = this.panels, py = PY, ph = PH;
     panels.forEach((s, i) => this.drawPanel(ui, s, panels.length > 1 ? PX2[i] : PX1, py, PW, ph, tick));
 
     const chips = this.chips, cw = 110, gap = 6, x0 = Math.round(UW / 2 - (chips.length * cw + (chips.length - 1) * gap) / 2);
-    chips.forEach((ch, i) => button(ui, `chip:${i}`, this.chipLabel(ch), x0 + i * (cw + gap), vy(CY), cw, vspan(CY, CH), this.low && this.chip === i && showSel(), ch === 'NEXT' ? '#f8b800' : '#fcfcfc'));
-    if (this.msgT > 0) { P(ui, FRAME, screenRect(2)[0], vy(CY) - 18, screenRect(2)[2], 16); drawTextCentered(ui, this.msg, UW / 2, vy(CY) - 14, '#f87858', 1, false); }
+    chips.forEach((ch, i) => button(ui, `chip:${i}`, this.chipLabel(ch), x0 + i * (cw + gap), CY, cw, CH, this.low && this.chip === i && showSel(), ch === 'NEXT' ? '#f8b800' : '#fcfcfc'));
+    if (this.msgT > 0) { P(ui, FRAME, screenRect(2)[0], CY - 18, screenRect(2)[2], 16); drawTextCentered(ui, this.msg, UW / 2, CY - 14, '#f87858', 1, false); }
 
     if (this.netDown(ui)) { hint(ui, 'CLICK: BACK TO TITLE'); return; }
     const ud = `${k('up')}/${k('down')}`, lr = `${k('left')}/${k('right')}`;
@@ -323,7 +308,7 @@ export class DeckSelectScene implements Scene {
     }
     const list = deckChoices(cls), pick = this.deckOf(s), step = ROW_H + ROW_GAP;
     // the rows that fit above the EDIT row, which stays at the bottom of the panel
-    const ly = y + vspan(PY, ROW_Y), editY = y + h - 4 - ROW_H, vis = Math.max(1, Math.floor((editY - ROW_GAP - ly + ROW_GAP) / step));
+    const ly = y + ROW_Y, editY = y + h - 4 - ROW_H, vis = Math.max(1, Math.floor((editY - ROW_GAP - ly + ROW_GAP) / step));
     this.listWin[s] = [x, ly, w, vis * step, vis];
     // keep the cursor's row in view after it moves (the EDIT row is always in view)
     const r = this.row[s];
@@ -364,89 +349,5 @@ export class DeckSelectScene implements Scene {
     if (ch.id === 'random') { drawTextCentered(ui, '?', x + n / 2, y + n / 2 - 7 * z, on ? GOLD : RED_INK, 2 * z, false); return; }
     P(ui, TRIM, x + 2 * z, y + 2 * z, n - 4 * z, n - 4 * z);
     P(ui, on ? '#a81000' : PAPER, x + 3 * z, y + 3 * z, n - 6 * z, n - 6 * z);
-  }
-
-  // ---------- full-height phone layout ----------
-
-  private drawTall(ui: Ctx, tick: number): void {
-    const a = tallArea(), net = this.net, x0 = a.x + PAD, w = a.w - PAD * 2;
-    let y = a.y + 12;
-    banner(ui, 'CHOOSE SPELL DECK', UW / 2, y);
-    y += 40;
-    stepTrail(ui, 1, UW / 2, y, { scale: 2 });
-    y += 22 + GAP;
-
-    // who's picking: a tab per side (online the rival's shows where they are), or just yours
-    const panels = this.panels, tw = Math.floor((w - GAP * (panels.length - 1)) / panels.length), th = 72;
-    panels.forEach((s, i) => {
-      const tx = x0 + i * (tw + GAP), rival = s === 1 && !!net, mine = this.sides.includes(s);
-      if (panels.length > 1) bigButton(ui, `dside:${s}`, ' ', tx, y, tw, th, { on: mine && this.side === s, disabled: !mine });
-      else win(ui, tx, y, tw, th);
-      if (!rival || net!.rival) this.bust(ui, s, tx + 10, y + (th - 36) / 2, 1);
-      drawText(ui, this.who(s), tx + 62, y + 18, s === 0 ? RED_INK : BLUE_INK, 1);
-      const sub = rival ? (!net!.rival ? 'CONNECTING' : net!.rivalLobby?.step === 2 ? 'LOCKED IN' : 'PICKING...') : CLASS_INFO[this.clsOf(s)].name;
-      drawText(ui, sub, tx + 62, y + 34, rival ? INK2 : INK, textWidth(sub, 2) <= tw - 70 ? 2 : 1);
-    });
-    y += th + GAP;
-
-    // from the bar up: the match options, the picked deck's Mythic and Legendaries with EDIT, then the list fills the rest
-    const barTop = actionBar(ui, { back: this.locked ? 'LEAVE' : undefined, primary: { id: 'next', label: this.chipLabel('NEXT'), disabled: this.locked } });
-    const opts = this.chips.map((ch, i) => ({ ch, i })).filter(o => o.ch !== 'NEXT');
-    const optY = barTop - 14 - TAP, stripH = 92;
-    const stripY = (opts.length ? optY - GAP : barTop - 14) - stripH;
-    if (opts.length) {
-      const cw = Math.floor((w - GAP * (opts.length - 1)) / opts.length);
-      opts.forEach(({ ch, i }, j) => {
-        const [sub, val] = this.chipLabel(ch).includes(': ') ? this.chipLabel(ch).split(': ') : ['MATCH', this.chipLabel(ch)];
-        bigButton(ui, `chip:${i}`, val, x0 + j * (cw + GAP), optY, cw, TAP, { sub, on: this.low && this.chip === i && showSel() });
-      });
-    }
-    if (this.netDown(ui)) { drawTextCentered(ui, 'TAP: BACK TO TITLE', UW / 2, 170, '#fcfcfc', 2); return; }
-
-    const s = this.side, cls = this.clsOf(s), list = deckChoices(cls), pick = this.deckOf(s);
-    this.listRect = [a.x, y, a.w, stripY - y];
-    if (this.locked) {
-      win(ui, x0, y, w, stripY - GAP - y);
-      drawTextCentered(ui, 'LOCKED IN', UW / 2, y + 40, '#007800', 3, false);
-      drawTextCentered(ui, tick % 16 < 12 ? 'WAITING FOR RIVAL...' : '', UW / 2, y + 80, INK2, 2, false);
-    } else {
-      // rows grow to fill the space; past that the list scrolls (drag it)
-      const lh = stripY - GAP - y, rh = Math.max(TAP, Math.min(TAP + 18, Math.floor((lh + GAP) / list.length) - GAP));
-      const sc = this.scroller;
-      sc.max = Math.max(0, list.length * (rh + GAP) - GAP - lh);
-      if (this.follow[s] && this.row[s] < list.length) sc.reveal(this.row[s] * (rh + GAP), rh, lh);
-      this.follow[s] = false;
-      ui.save();
-      ui.beginPath(); ui.rect(a.x, y - 2, a.w, lh + 4); ui.clip();
-      list.forEach((ch, i) => {
-        const ry = y + i * (rh + GAP) - Math.round(sc.pos), on = ch.id === pick;
-        if (ry + rh < y - 2 || ry > y + lh + 2) return;
-        bigButton(ui, `d${s}:${i}`, ' ', x0, ry, w, rh, { primary: on, on: !on && this.row[s] === i && !this.low && showSel(), clip: [y, lh] });
-        this.icon(ui, ch, x0 + 10, ry + (rh - 40) / 2, 2, on);
-        drawText(ui, ch.name, x0 + 62, ry + rh / 2 - 12, on ? PAPER : INK, 2);
-        drawText(ui, ch.sub, x0 + 62, ry + rh / 2 + 6, on ? PAPER2 : ch.ok ? INK2 : RED_INK, 1);
-      });
-      ui.restore();
-      if (sc.max > 0) {
-        const sh = Math.max(24, Math.round(lh * lh / (lh + sc.max)));
-        P(ui, BURN, a.x + a.w - 6, y, 4, lh);
-        P(ui, INK2, a.x + a.w - 6, y + Math.round((sc.pos / sc.max) * (lh - sh)), 4, sh);
-      }
-    }
-
-    // the picked deck at a glance, and EDIT
-    win(ui, x0, stripY, w, stripH);
-    const cur = list.find(ch => ch.id === pick) ?? list[0], ew = 110, iy = stripY + 34;
-    if (cur.id === 'random') drawText(ui, 'A READY-MADE SPELL DECK, ROLLED EACH ROUND', x0 + 12, stripY + 40, INK2, 1);
-    else {
-      drawText(ui, 'MYTHIC', x0 + 12, stripY + 16, INK2, 1);
-      if (cur.mythic) this.cardIcon(ui, cur.mythic, x0 + 12, iy, 2); else drawText(ui, 'NONE', x0 + 12, iy + 16, RED_INK, 1);
-      drawText(ui, 'LEGENDARIES', x0 + 70, stripY + 16, INK2, 1);
-      const fit = Math.floor((w - 70 - ew - 12) / 44);
-      cur.legends.slice(0, fit).forEach((id, j) => this.cardIcon(ui, id, x0 + 70 + j * 44, iy, 2));
-      if (!cur.legends.length) drawText(ui, 'NONE', x0 + 70, iy + 16, INK2, 1);
-    }
-    if (!this.locked) bigButton(ui, `edit:${s}`, 'EDIT', x0 + w - ew - 10, stripY + (stripH - TAP) / 2, ew, TAP);
-    if (this.msgT > 0) { P(ui, FRAME, a.x, stripY - 30, a.w, 26); drawTextCentered(ui, this.msg, UW / 2, stripY - 24, '#f87858', 1, false); }
   }
 }

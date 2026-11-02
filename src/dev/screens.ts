@@ -313,7 +313,7 @@ export const screens: Record<string, () => void> = {
   'online-rematch': () => onlineSetOver('rematch'),
   'online-rematch-waiting': () => { const s = onlineSetOver(); s.waitingNext = true; s.net.myRepick = s.net.myReady = 3; s.resultSel = 1; run(0.2); },
   'online-rematch-repick': () => { const s = onlineSetOver('change'); s.waitingNext = true; s.net.myReady = 3; run(0.3); },
-  // a ready-made deck's spells open over the start-from picker (on phones in portrait; wider screens list it on hover)
+  // a ready-made deck's spells open over the start-from picker 
   'deck-builder-peek': () => { const d = new DeckBuilderScene('ranger', title); (d as unknown as { peek: number; pickSel: number }).peek = 1; (d as unknown as { pickSel: number }).pickSel = 1; setScene(d); },
   ...Object.fromEntries(PLAYABLE.map(c => [`deck-builder-${c}`, () => setScene(new DeckBuilderScene(c, title))])),
   // your decks: the list; one opened (its actions on wider screens, its sheet on phones); DELETE pressed once

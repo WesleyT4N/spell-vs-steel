@@ -363,8 +363,7 @@ flowchart LR
 
   `artFont.ts` draws the `retro` (damage numbers) and `gold` (win banners) fonts from glyph masks, colored in code and cached per string. `drawChip` recolors the queue chip to each spell's element. Every path falls back to the old drawing when its asset is missing.
 - Team colours (#75, `game/teamColors.ts`, view-only): `team(side)` makes the watching player blue and the opponent red for panel rims and faces, telegraphs, reticles, shot paths and HUD ribbons. P1 is "you" in local 2P and CPU vs CPU.
-- The canvas fits the window between 4:3 and 21:9 (shows more stage, no letterbox); phones in portrait give the bottom half to the touch pad.
-- Screens with a full-height phone layout (`Scene.tall`: title, fighter select, spell deck select (#69), decks, stages, options, online, lobby, ranked, replays, tournament, arcade, training, tutorial, spell encyclopedia) take the whole portrait screen instead and draw big controls from `scenes/touchUi.ts`: the action bar, tabs, scrolling row lists, sheets and swipes.
+- The canvas fits the window between 4:3 and 21:9 (shows more stage, no letterbox); phones play in landscape only (see Phones).
 - UI skin: Parchment (`scenes/skin.ts`). Cards: `scenes/cardView.ts`. Font: `engine/font.ts` (5×7).
 
 ## Audio
@@ -431,20 +430,17 @@ flowchart LR
 - Menus are mouse-first: scenes register click zones while drawing (`zone(...)`), the next update reads `hotZone()`. Combat is keyboard, gamepad or the touch pad (`engine/touch.ts`); see Input and platform.
 - Everything kept between sessions goes through the save module (see Saves).
 
-### Phones (#51)
+### Phones (landscape only)
 
 ```mermaid
 flowchart TB
-  fit["main.ts fit()"] --> q{"Scene hook?"}
-  q -- "tall()" --> tall["Full-height portrait layout<br/>spread.tall"]
-  q -- "split()" --> split["Scene drawn in the top part<br/>shiftZones offsets its hit zones"]
-  split --> below["drawBelow(ui)<br/>controls under it"]
-  q -- neither --> std["Standard fit, touch pad below"]
+  fit["main.ts fit()"] --> q{"Touch play and held upright?"}
+  q -- yes --> card["engine/rotate.ts<br/>turn-your-phone card, input released, fight paused"]
+  q -- no --> std["Standard fit (4:3 to 21:9), touch pad on the sides"]
 ```
 
-- Every menu has a `tall()` layout (#51, #63) except key mapping, the dev tools and the balance lab. Battle and tutorial use `split()`.
-- `engine/input.ts` exports `gesture` (swipe, start, delta, held, fling); a swipe in from the left edge presses `PadBack`.
-- `scenes/touchUi.ts` is the touch kit: `bigButton`, `actionBar`, `tabs`, `swipeIn` / `flickIn`, `dots`, `Scroller`, `rowList` (scrolling panel of big rows), `panel`, `sheet`, `tallArea` (safe-area insets from `touch.ts` `safeInsets()`).
+- Phones play in landscape only. The Android app is locked by `screenOrientation="sensorLandscape"`; phone browsers can't be locked (iPhone Safari never allows it), so `engine/rotate.ts` covers the game with a turn-your-phone card while a touch device is upright, and the first tap asks for `screen.orientation.lock('landscape')` where supported. The old full-height portrait layouts (`Scene.tall` / `split`, `spread`, `touchUi.ts`) were removed.
+- `engine/input.ts` exports `gesture` (swipe, start, delta, held, fling); a swipe in from the left edge presses `PadBack`. `scenes/scroller.ts` scrolls lists under a finger with momentum and under the mouse wheel.
 - Touch settings (pad size S/M/L, left-handed, vibration) live in `engine/touch.ts` and save in the `touch` section of `save.json` (#63, old `svs:touch` imported once); `layout()` applies them.
 
 ## Expedition mode
@@ -476,7 +472,7 @@ flowchart LR
 | --- | --- |
 | `game/expedition.ts` | The run as plain data (`ExpeditionRun`): `ACTS`, `makeMap`, `choices`, rewards, relics, shop stock, `makeFight` |
 | `game/mobs.ts` | `MOBS` (HP, start column, rank, blurb) and each monster's brain in `MOB_BRAINS`; `setupPack` puts a pack on the field |
-| `scenes/expedition.ts` | Map, fight, reward, rest, shop, deck and run-over screens, each with a phone portrait layout |
+| `scenes/expedition.ts` | Map, fight, reward, rest, shop, deck and run-over screens |
 | `art/mobSprites.ts` | Monster sprites read from `assets/monsters` (PixelLab, 48px regulars / 56px elites / 80px bosses at 2 sprite px per world px), baked per tint like the fighters |
 | `art/cardIcons.ts` | Spell icons: 40px PixelLab art from `assets/cards` and small versions from `assets/cards/small` for thumbnails |
 | `content/stages/crypt.ts` | The Crypt stage (`registerExtraStage`) |

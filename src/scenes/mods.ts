@@ -2,14 +2,14 @@
 // on or off (kept in the save); imported ones can be deleted; IMPORT opens a file picker / paste box (modPanel.ts).
 // Mod skins show up as extra colors on the fighter select.
 import { popScene, hint, zone, hot, isHot, showSel, type Scene } from './scene';
-import { actionBar, barTapped, bigButton, panel, rowList, tallArea, Scroller, GAP, PAD, TAP } from './touchUi';
+import { Scroller } from './scroller';
 import { openModPanel } from './modPanel';
 import { MODS, setModOn, removeMod, type ModEntry } from '../mods';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getFrame, drawFighterSprite, type ClassId } from '../art/sprites';
 import { CLASS_INFO } from '../game/classes';
-import { UW, screenRect, spread, vy, vspan, type Ctx } from '../engine/gfx';
+import { UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth, wrap } from '../engine/font';
 import { wasPressed, navPressed, k, mouse, usingPad } from '../engine/input';
 import { type PadMode } from '../engine/touch';
@@ -42,9 +42,7 @@ export class ModsScene implements Scene {
   private top = 0;
   private tscroll = new Scroller();
   private tlist: [number, number, number, number] = [0, 0, 0, 0];
-
-  tall(): boolean { return true; }
-  pad(): PadMode { return spread.tall ? 'none' : 'back'; }
+  pad(): PadMode { return 'back'; }
   exit(): void { this.closePanel?.(); }
 
   private get entry(): ModEntry | undefined { return MODS[this.cur]; }
@@ -103,26 +101,16 @@ export class ModsScene implements Scene {
       return;
     }
     const n = MODS.length;
-    if (spread.tall) {
-      if (barTapped('back')) { sfx('back'); popScene(); return; }
-      if (barTapped('primary')) { this.openImport(); return; }
-      if (barTapped('mid')) { this.toggle(this.entry); return; }
-      if (mouse.click && isHot('tdel')) { this.del(this.entry); return; }
-      this.tscroll.update(...this.tlist);
-      const i = hot('trow');
-      if (mouse.click && i >= 0) { if (i === this.cur) this.toggle(this.entry); else this.pick(i); return; }
-    }
+    
     if (wasPressed('back') || mouse.rclick) { sfx('back'); popScene(); return; }
     // mouse: rows pick, their switch toggles; the buttons below
-    if (!spread.tall) {
-      if (mouse.wheel && n > SHOWN) this.top = Math.max(0, Math.min(n - SHOWN, this.top + Math.sign(mouse.wheel)));
+    if (mouse.wheel && n > SHOWN) this.top = Math.max(0, Math.min(n - SHOWN, this.top + Math.sign(mouse.wheel)));
       const sw = hot('sw'), row = hot('row'), b = hot('mb');
       if (mouse.click && sw >= 0) { this.pick(sw); this.toggle(MODS[sw]); return; }
       if (mouse.moved && row >= 0 && row !== this.cur) { this.pick(row); this.btn = -1; }
       if (mouse.moved && b >= 0) this.btn = b;
       if (mouse.click && row >= 0) { if (row === this.cur) this.toggle(this.entry); else this.pick(row); return; }
       if (mouse.click && b >= 0) { this.press(BTNS[b]); return; }
-    }
     // keys and pads: up and down through the list and onto the buttons, left and right along them
     if (navPressed('up', dt)) {
       if (this.btn >= 0) { this.btn = -1; if (!n) this.btn = 0; }
@@ -161,9 +149,9 @@ export class ModsScene implements Scene {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.35)';
     c.fillRect(...screenRect());
-    if (spread.tall) { this.drawTall(ui, tick); return; }
-    banner(ui, 'MODS', UW / 2, vy(3));
-    const top = vy(36), h = vspan(36, 236), lx = 16, lw = 196, dx = lx + lw + 8, dw = UW - 16 - dx;
+    
+    banner(ui, 'MODS', UW / 2, 3);
+    const top = 36, h = 236, lx = 16, lw = 196, dx = lx + lw + 8, dw = UW - 16 - dx;
     // the list
     win(ui, lx, top, lw, h);
     const n = MODS.length;
@@ -211,7 +199,7 @@ export class ModsScene implements Scene {
     }
 
     // the buttons
-    const by = vy(280), bw = 96;
+    const by = 280, bw = 96;
     BTNS.forEach((b, i) => {
       const dis = b === 'DELETE' && e?.source !== 'imported';
       const label = b === 'BACK' ? '← BACK' : b === 'DELETE' && this.armed && this.armed === e?.id ? 'SURE?' : b;
@@ -222,50 +210,5 @@ export class ModsScene implements Scene {
     });
     if (this.msgT > 0) drawTextCentered(ui, this.msg.slice(0, 38), dx + dw / 2, top + 80, RED_INK, 1, false);
     hint(ui, `${k('attack')}: SWITCH ON / OFF   ${k('custom')}: IMPORT   ${k('cast')}: BACK`);
-  }
-
-  /** The phone layout: big mod rows (tap one to pick it, again to switch it), its skins below, IMPORT in the bar. */
-  private drawTall(ui: Ctx, tick: number): void {
-    const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2, cx = UW / 2;
-    let y = a.y + PAD;
-    drawTextCentered(ui, 'MODS', cx, y, PAPER, 3, true);
-    y += 21 + GAP * 2;
-    const e = this.entry;
-    const barTop = actionBar(ui, {
-      primary: { id: 'import', label: 'IMPORT +' },
-      ...(e?.mod ? { mid: { id: 'onoff', label: e.on ? 'MOD ON' : 'MOD OFF', on: e.on } } : {}),
-    });
-    const detailH = 250, dTop = barTop - GAP * 2 - detailH;
-    const lh = dTop - GAP * 3 - y;
-    this.tlist = [x0, y, w, lh];
-    if (!MODS.length) {
-      panel(ui, x0 - 6, y, w + 12, 150);
-      drawTextCentered(ui, 'NO MODS YET', cx, y + 40, RED_INK, 3, false);
-      drawTextCentered(ui, 'IMPORT ONE TO ADD NEW', cx, y + 84, INK2, 2, false);
-      drawTextCentered(ui, 'SKINS FOR THE FIGHTERS.', cx, y + 104, INK2, 2, false);
-      return;
-    }
-    rowList(ui, this.tscroll, 'trow', MODS.length, this.cur, x0, y, w, lh, TROW, (i, rx, ry, rw) => {
-      const it = MODS[i], state = !it.mod ? 'BAD FILE' : it.on ? 'ON' : 'OFF';
-      const name = title(it), max = Math.floor((rw - 40 - textWidth(state, 2)) / 12);
-      drawText(ui, name.length > max ? `${name.slice(0, max - 1)}.` : name, rx + 14, ry + 16, it.mod ? INK : RED_INK, 2);
-      drawText(ui, state, rx + rw - 14 - textWidth(state, 2), ry + 16, !it.mod ? RED_INK : it.on ? ON_INK : INK2, 2);
-      drawText(ui, it.source === 'built-in' ? 'WITH THE GAME' : 'IMPORTED', rx + 14, ry + 44, INK2, 2);
-    });
-
-    // the picked mod
-    panel(ui, x0 - 6, dTop, w + 12, detailH);
-    if (!e) return;
-    drawTextCentered(ui, title(e), cx, dTop + 18, INK, textWidth(title(e), 3) <= w - 24 ? 3 : 2, false);
-    drawTextCentered(ui, e.mod?.author ? `BY ${e.mod.author.toUpperCase()}` : sourceText(e), cx, dTop + 48, INK2, 2, false);
-    if (e.mod) {
-      const n = e.mod.skins.length, gap = n > 1 ? Math.min(150, (w - 80) / (n - 1)) : 0;
-      this.skins(ui, e, cx, dTop + 180, n > 3 ? 2 : n > 1 ? 3 : 5, gap, tick);
-      drawTextCentered(ui, footText(e), cx, dTop + detailH - 24, TRIM, 1, false);
-    } else {
-      wrap((e.error ?? '').toUpperCase(), 28).slice(0, 6).forEach((l, i) => drawTextCentered(ui, l, cx, dTop + 80 + i * 20, RED_INK, 2, false));
-    }
-    if (e.source === 'imported') bigButton(ui, 'tdel', this.armed === e.id ? 'SURE?' : 'DELETE', x0 + w - 110, dTop + 14, 104, TAP - 14, { scale: 2 });
-    if (this.msgT > 0) drawTextCentered(ui, this.msg, cx, dTop - 18, PAPER, 1, true);
   }
 }

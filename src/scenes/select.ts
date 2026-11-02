@@ -9,8 +9,8 @@ import { PLAYABLE, CLASS_INFO } from '../game/classes';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { getSprite, getPortrait, drawFighterSprite, teamColor, SKINS, skinOf, mirrorSkin, type ClassId, type Skin } from '../art/sprites';
-import { P, UW, screenRect, fillScreen, vy, vspan, mix, dith, spread, type Ctx } from '../engine/gfx';
-import { drawText, drawTextCentered, wrap } from '../engine/font';
+import { P, UW, screenRect, fillScreen, mix, dith, type Ctx } from '../engine/gfx';
+import { drawText, drawTextCentered } from '../engine/font';
 import { win, plaque, banner, vsSeal, stepTrail, FRAME, GOLD, INK, INK2, TRIM, PAPER, RED_INK, BLUE_INK } from './skin';
 import { wasPressed, navPressed, k, mouse, usingPad } from '../engine/input';
 import { sfx } from '../engine/audio';
@@ -21,7 +21,6 @@ import { TutorialScene, type TutorialClass } from './tutorial';
 import { loadRecords, clock } from '../game/arcade';
 import { touchActive, type PadMode } from '../engine/touch';
 import { YOU, FOE } from '../game/teamColors';
-import { bigButton, actionBar, barTapped, swipeIn, tallArea, GAP, PAD } from './touchUi';
 
 /** Roster tiles: every playable class, then RANDOM. */
 const TILES = PLAYABLE.length + 1;
@@ -43,8 +42,8 @@ const TX0 = Math.round(UW / 2 - (TILES * TW + (TILES - 1) * TGAP) / 2);
 const CY = 272, CH = 20, NEXT_W = 150;
 
 export class CharSelectScene implements Scene {
-  /** Top of the fighter panels; phone portrait moves them up into the spare height. */
-  private get py(): number { return vy(PY); }
+  /** Top of the fighter panels. */
+  private get py(): number { return PY; }
   m: MatchConfig = loadMatch();
   step: Step = 0;
   /** Roster cursor for the slot being picked. */
@@ -58,11 +57,7 @@ export class CharSelectScene implements Scene {
     this.cur = this.tileOf(this.slotClass(this.step >= 2 && !net ? 1 : 0));
     if (net) this.sync();
   }
-
-  tall(): boolean { return true; }
-  pad(): PadMode { return spread.tall ? 'none' : 'back'; }
-  /** Full-height phone layout: where each side's panel and the color row were drawn, for swipes. */
-  private tallRects: { panel: Array<[number, number, number, number]>; colors: [number, number, number, number] | null } = { panel: [], colors: null };
+  pad(): PadMode { return 'back'; }
   /**
    * Per side: which tab of the skin picker is open, COLORS (0) or SKINS (1, the classic look and each mod skin).
    * null follows the skin on: a mod skin opens SKINS. The tabs only show for a class that has mod skins.
@@ -213,7 +208,7 @@ export class CharSelectScene implements Scene {
       }
     }
     if (wasPressed('back') || mouse.rclick) { this.back(); return; }
-    if (spread.tall && this.tallInput()) { this.sync(); return; }
+    
 
     if (mouse.click) {
       const tile = hot('tile'), sw = hot('swatch'), csw = hot('cswatch');
@@ -271,44 +266,11 @@ export class CharSelectScene implements Scene {
     this.sync();
   }
 
-  /** Full-height phone layout: the action bar and swipes. True when something was handled. */
-  private tallInput(): boolean {
-    if (barTapped('back')) { this.back(); return true; }
-    if (barTapped('primary')) {
-      if (this.tutorial) { sfx('select'); pushScene(new TutorialScene(this.m.p1 as TutorialClass)); }
-      else this.next();
-      return true;
-    }
-    // swipe a fighter panel to step its class; swipe the color row to step the skin
-    for (const s of [0, 1] as const) {
-      const r = this.tallRects.panel[s];
-      if (!r || (s === 1 && (this.net || this.tutorial || this.arcade))) continue;
-      const d = swipeIn(...r);
-      if (!d) continue;
-      const i = PLAYABLE.indexOf(this.slotClass(s)), cls = PLAYABLE[(i + d + PLAYABLE.length) % PLAYABLE.length];
-      this.setClass(s, cls);
-      if (this.slot === s && (this.step === 0 || this.step === 2)) this.step = (s === 0 ? 1 : 3) as Step;
-      this.cur = this.tileOf(cls);
-      sfx('move');
-      return true;
-    }
-    const cr = this.tallRects.colors;
-    const d = cr ? swipeIn(...cr) : 0;
-    if (d) { this.stepSkin(this.colorSide(), d); return true; }
-    return false;
-  }
-
-  /** Whose colors the phone layout's color row shows: the side being picked, else the focused one. */
-  private colorSide(): 0 | 1 {
-    if (this.net || this.arcade || this.tutorial) return 0;
-    return this.step === 2 || this.step === 3 ? 1 : 0;
-  }
-
   draw(c: Ctx, tick: number, ui: Ctx): void {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.35)';
     c.fillRect(...screenRect());
-    if (spread.tall) { this.drawTall(ui, tick); return; }
+    
 
     const net = this.net, rl = net?.rivalLobby, rival = net?.rival;
     // what each slot shows: the hovered tile while choosing, the pick after
@@ -328,7 +290,7 @@ export class CharSelectScene implements Scene {
     else this.drawSlot(ui, 1, showing(1), tick);
 
     // drawn after the slots so its rolled ends sit on top of them
-    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING MODE' : this.expedition ? 'EXPEDITION MODE' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, vy(3));
+    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING MODE' : this.expedition ? 'EXPEDITION MODE' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, 3);
 
     // where this screen sits in the steps before a fight, then VS and the matchup
     if (!this.tutorial && !this.expedition) stepTrail(ui, 0, UW / 2, this.py, { stack: true });
@@ -337,7 +299,7 @@ export class CharSelectScene implements Scene {
     if (status) drawTextCentered(ui, tick % 16 < 12 || !status.blink ? status.text : '', UW / 2, this.py + 100, status.color, 1);
 
     // roster row
-    const ty = vy(TILE_Y);
+    const ty = TILE_Y;
     for (let n = 0; n < TILES; n++) {
       const x = TX0 + n * (TW + TGAP);
       zone(`tile:${n}`, x, ty, TW, TH);
@@ -366,7 +328,7 @@ export class CharSelectScene implements Scene {
     }
 
     // on to the spell decks: the last OK gets there too
-    if (!this.tutorial) button(ui, 'next', this.nextLabel, Math.round(UW / 2 - NEXT_W / 2), vy(CY), NEXT_W, vspan(CY, CH), false, '#f8b800');
+    if (!this.tutorial) button(ui, 'next', this.nextLabel, Math.round(UW / 2 - NEXT_W / 2), CY, NEXT_W, CH, false, '#f8b800');
 
     if (net && (net.status === 'error' || net.status === 'left' || net.status === 'lost')) {
       fillScreen(ui, 'rgba(0,0,0,0.8)', 2);
@@ -540,158 +502,5 @@ export class CharSelectScene implements Scene {
     zone(`${id}:${(i + 1) % n}`, x + w - 24, y - 2, 24, 16);
     plaque(ui, x, y, w, 12, lit(true), GOLD);
     drawTextCentered(ui, `< ${items[i].name} >`, cx, y + 3, lit(true) ? PAPER : INK, 1, false);
-  }
-
-  // ---------- full-height phone layout ----------
-
-  private drawTall(ui: Ctx, tick: number): void {
-    const a = tallArea(), net = this.net, rl = net?.rivalLobby, rival = net?.rival;
-    const x0 = a.x + PAD, w = a.w - PAD * 2;
-    const barTop = a.y + a.h - 84;
-    let y = a.y + 12;
-    banner(ui, this.tutorial ? 'TUTORIAL' : this.training ? 'TRAINING' : this.expedition ? 'EXPEDITION MODE' : this.arcade ? 'ARCADE' : 'CHOOSE YOUR FIGHTER', UW / 2, y);
-    y += 40;
-    if (!this.tutorial && !this.expedition) { stepTrail(ui, 0, UW / 2, y, { scale: 2 }); y += 22 + GAP; }
-
-    // laid out from the bar up: colors and the roster sit in the thumb zone; the two sides fill the rest
-    const cols = 3, tw = Math.floor((w - GAP * (cols - 1)) / cols), th = 108;
-    const cs = this.colorSide(), cls = this.slotClass(cs), list = SKINS[cls].filter(x => !x.art);
-    const sw = Math.min(52, Math.floor((w - 4 * (list.length - 1)) / list.length));
-    const colorY = barTop - 4 - 14 - sw;
-    // a class with mod skins gets COLORS / SKINS tabs over the row, and the row grows to fit a fighter
-    const tabs = SKINS[cls].some(x => x.art), tabH = 36, lift = tabs ? tabH + GAP + 24 : 0;
-    const rosterY = colorY - lift - 14 - 2 * th - GAP;
-    const statusY = rosterY - 26;
-    // tall enough for a 4x bust, the name and the blurb; any spare height stays open above the roster
-    const ph = Math.max(220, Math.min(272, statusY - 10 - y));
-    const z = ph >= 262 ? 4 : 3;
-
-    // the two sides, with the VS seal between them
-    const pw = Math.floor((w - 40) / 2);
-    const showing = (s: 0 | 1): { cls: ClassId | null; skin: string } => {
-      if (s === 1 && net) {
-        if (!rival || !rl) return { cls: null, skin: '' };
-        if (rl.step === 0) return { cls: rl.tile === RANDOM ? null : PLAYABLE[rl.tile] ?? null, skin: '' };
-        return { cls: rival.cls, skin: rival.skin };
-      }
-      const choosing = s === this.slot && (this.step === 0 || this.step === 2);
-      if (choosing && showSel()) return { cls: this.cur === RANDOM ? null : PLAYABLE[this.cur], skin: '' };
-      return { cls: this.slotClass(s), skin: s === 0 ? this.mySkin() : this.cpuSkin() };
-    };
-    this.tallRects.panel = [[x0, y, pw, ph], [x0 + w - pw, y, pw, ph]];
-    this.drawTallSlot(ui, 0, showing(0), x0, y, pw, ph, tick, z);
-    if (this.tutorial) this.drawTallNote(ui, x0 + w - pw, y, pw, ph, 'OPPONENT', 'DUMMY', ['A TRAINING', 'DUMMY. ABOUT', '5 MINUTES OF', 'LESSONS'], BLUE_INK, z);
-    else if (this.expedition) this.drawTallNote(ui, x0 + w - pw, y, pw, ph, '3 ACTS', 'ROGUELIKE', ['FOREST, CRYPT,', 'VOLCANO', 'DRAFT SPELLS', 'ONE LOSS ENDS IT'], BLUE_INK, z);
-    else if (this.arcade) {
-      const best = loadRecords()[this.m.p1];
-      this.drawTallNote(ui, x0 + w - pw, y, pw, ph, 'THE LADDER', '4 RIVALS', ['+ YOUR SHADOW', 'EASY TO HARD', 'BEST OF 3', best ? `BEST ${clock(best.time)}` : 'NOT CLEARED'], BLUE_INK, z);
-    } else this.drawTallSlot(ui, 1, showing(1), x0 + w - pw, y, pw, ph, tick, z);
-    vsSeal(ui, UW / 2, y + 54 + frameH(z) / 2);
-
-    const status = this.statusLine();
-    if (status?.text) drawTextCentered(ui, tick % 16 < 12 || !status.blink ? status.text : '', UW / 2, statusY, status.color, status.text.length * 12 < w ? 2 : 1);
-
-    // the roster, three to a row
-    for (let n = 0; n < TILES; n++) {
-      const x = x0 + (n % cols) * (tw + GAP), ty = rosterY + Math.floor(n / cols) * (th + GAP);
-      const mine = (this.step === 0 || this.step === 2) && this.cur === n && showSel();
-      bigButton(ui, `tile:${n}`, '', x, ty, tw, th, { on: mine });
-      if (n === RANDOM) drawTextCentered(ui, '?', x + tw / 2, ty + 20, RED_INK, 7, false);
-      else drawFighterSprite(ui, getSprite(PLAYABLE[n], SKINS[PLAYABLE[n]][0].id, false), x + tw / 2, ty + th - 30, false, 'none', 3);
-      drawTextCentered(ui, n === RANDOM ? 'RANDOM' : CLASS_INFO[PLAYABLE[n]].name, x + tw / 2, ty + th - 24, INK, 2, false);
-      const tag = (label: string, color: string, right: boolean): void => {
-        const lw = label.length * 6 + 5, lx = right ? x + tw - lw - 5 : x + 5;
-        P(ui, color, lx, ty + 5, lw, 11);
-        drawText(ui, label, lx + 3, ty + 7, '#fcfcfc');
-      };
-      const theirs = net && rl && rl.step === 0 && rl.tile === n;
-      if (n === PLAYABLE.indexOf(this.m.p1) && this.step !== 0) tag(this.who(0), '#881400', false);
-      if (theirs || (net && rl && rl.step > 0 && rival && n === PLAYABLE.indexOf(rival.cls))) tag('RIVAL', '#0000a8', true);
-      else if (!net && !this.arcade && !this.tutorial && n === PLAYABLE.indexOf(this.m.cpu) && this.step === 3) tag(this.who(1), '#0000a8', true);
-    }
-
-    // the color row for the side being picked
-    const sx = Math.round(UW / 2 - (list.length * sw + (list.length - 1) * 4) / 2);
-    const skin = cs === 0 ? this.mySkin() : this.cpuSkin();
-    this.tallRects.colors = [x0, colorY - 6 - (tabs ? 24 : 0), w, sw + 12 + (tabs ? 24 : 0)];
-    if (tabs) {
-      const tab = this.tabOf(cs), tw = Math.floor((w - GAP) / 2), ty = colorY - lift;
-      bigButton(ui, `tab:${cs * 2}`, 'COLORS', x0, ty, tw, tabH, { scale: 2, on: tab === 0 });
-      bigButton(ui, `tab:${cs * 2 + 1}`, 'SKINS', x0 + tw + GAP, ty, w - tw - GAP, tabH, { scale: 2, on: tab === 1 });
-      if (tab === 1) {
-        // a card per look with its fighter; names go once there's room for them
-        const items = this.skinItems(cs), n = items.length, cy = colorY - 24, ch = sw + 28;
-        const cw = Math.floor((w - 6 * (n - 1)) / n), named = cw >= 120;
-        items.forEach((x, i) => {
-          const px = x0 + i * (cw + 6), on = x.id === skin;
-          bigButton(ui, `${cs === 0 ? 'look' : 'clook'}:${i}`, '', px, cy, cw, ch, { on });
-          if (named) {
-            drawFighterSprite(ui, getSprite(cls, x.id, false), px + 34, cy + ch - 6, false, 'none', 2);
-            drawText(ui, x.name.slice(0, Math.floor((cw - 72) / 12)), px + 66, cy + ch / 2 - 7, INK, 2);
-          } else drawFighterSprite(ui, getSprite(cls, x.id, false), px + cw / 2, cy + ch - 6, false, 'none', cw >= 60 ? 2 : 1);
-        });
-        actionBar(ui, { primary: { id: 'next', label: this.tutorial ? 'START →' : this.nextLabel } });
-        return this.drawTallOverlay(ui);
-      }
-    }
-    list.forEach((sk, n) => {
-      const px = sx + n * (sw + 4);
-      zone(`${cs === 0 ? 'swatch' : 'cswatch'}:${n}`, px, colorY, sw, sw);
-      P(ui, '#000000', px - 1, colorY - 1, sw + 2, sw + 2);
-      P(ui, sk.id === skin ? GOLD : FRAME, px, colorY, sw, sw);
-      P(ui, FRAME, px + 4, colorY + 4, sw - 8, sw - 8);
-      P(ui, teamColor(cls, sk.id, false), px + 6, colorY + 6, sw - 12, sw - 12);
-    });
-
-    actionBar(ui, { primary: { id: 'next', label: this.tutorial ? 'START →' : this.nextLabel } });
-    this.drawTallOverlay(ui);
-  }
-
-  /** Phone layout: the online error cover. */
-  private drawTallOverlay(ui: Ctx): void {
-    const net = this.net;
-    if (net && (net.status === 'error' || net.status === 'left' || net.status === 'lost')) {
-      fillScreen(ui, 'rgba(0,0,0,0.8)', 2);
-      drawTextCentered(ui, net.status === 'left' ? 'YOUR RIVAL LEFT' : net.status === 'lost' ? 'CONNECTION LOST' : net.error || 'CONNECTION ERROR', UW / 2, 140, '#f83800', 2);
-      drawTextCentered(ui, 'TAP: BACK TO TITLE', UW / 2, 170, '#fcfcfc', 2);
-    }
-  }
-
-  /** A side's panel in the phone layout: who it is, a 3x portrait, the class name and a hint to swipe. */
-  private drawTallSlot(ui: Ctx, s: 0 | 1, show: { cls: ClassId | null; skin: string }, x: number, y: number, w: number, h: number, tick: number, z: number): void {
-    const net = this.net, cls = show.cls, skin = cls ? show.skin || SKINS[cls][0].id : '';
-    zone(`panel:${s}`, x, y, w, h);
-    const active = s === this.slot;
-    win(ui, x, y, w, h, { accent: cls ? teamColor(cls, skin, false) : undefined, edge: active && tick % 8 < 6 ? GOLD : FRAME });
-    const cx = x + w / 2, who = this.who(s);
-    if (this.local) bigButton(ui, `ctl:${s}`, who, x + 10, y + 10, w - 20, 36, { scale: 2 });
-    else drawTextCentered(ui, who, cx, y + 18, s === 0 ? RED_INK : BLUE_INK, 2, false);
-    const py = y + 54;
-    this.drawPortrait(ui, s, cls, skin, cx, py, z);
-    let ty = py + frameH(z) + 8;
-    if (!cls) {
-      drawTextCentered(ui, '?', cx, py + 26, PAPER, 8, false);
-      drawTextCentered(ui, net && s === 1 && !net.rival ? 'CONNECTING' : 'RANDOM', cx, ty, INK2, 2, false);
-      return;
-    }
-    drawTextCentered(ui, CLASS_INFO[cls].name, cx, ty, INK, 2, false);
-    ty += 20;
-    wrap(CLASS_INFO[cls].blurb[0], Math.floor((w - 16) / 6)).slice(0, 2).forEach((l, i) => drawTextCentered(ui, l, cx, ty + i * 10, INK2, 1, false));
-    // a nudge that the panel swipes
-    if (!(net && s === 1) && !(s === 1 && (this.tutorial || this.arcade))) {
-      drawText(ui, '<', x + 8, py + frameH(z) / 2 - 7, TRIM, 2);
-      drawText(ui, '>', x + w - 18, py + frameH(z) / 2 - 7, TRIM, 2);
-    }
-  }
-
-  /** The right panel in the phone layout when it isn't a fighter (tutorial dummy, arcade ladder). */
-  private drawTallNote(ui: Ctx, x: number, y: number, w: number, h: number, head: string, big: string, lines: string[], color: string, z: number): void {
-    win(ui, x, y, w, h);
-    const cx = x + w / 2, fh = frameH(z);
-    drawTextCentered(ui, head, cx, y + 18, color, 2, false);
-    this.drawPortrait(ui, 1, null, '', cx, y + 54, z);
-    drawFighterSprite(ui, getSprite('mage', SKINS.mage[0].id, false), cx, y + 54 + fh - 12, true, 'ghost', 3);
-    drawTextCentered(ui, big, cx, y + 54 + fh + 8, INK2, 2, false);
-    lines.forEach((l, i) => drawTextCentered(ui, l, cx, y + 54 + fh + 30 + i * 12, TRIM, 1, false));
   }
 }
