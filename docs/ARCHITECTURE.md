@@ -323,7 +323,7 @@ flowchart TD
 
 ## Audio
 
-Effects are synthesized live in WebAudio. Music is an original sampled soundtrack (#40): `scripts/music/` renders a score DSL offline with a soundfont, and writes the MP3s plus `tracks.json` (loop points) to `assets/audio/music/`, which `engine/musicTracks.ts` reads. Voice clips are recorded TTS in `assets/audio/voice/<speaker>/<line>-<n>.mp3`, from `scripts/voices/gen.py` (#127).
+Effects are synthesized live in WebAudio. Music is an original sampled soundtrack (#40): `scripts/music/` renders a score DSL offline with a soundfont, and writes the MP3s plus `tracks.json` (loop points) to `assets/audio/music/`, which `engine/musicTracks.ts` reads. Voice clips (lines, attack grunts, hurt sounds, announcer) are ElevenLabs renders in `assets/audio/voice/<speaker>/<line>-<n>.mp3`; `scripts/voices/README.md` has the workflow (#127).
 
 ```mermaid
 flowchart LR

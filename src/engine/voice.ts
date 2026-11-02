@@ -1,14 +1,14 @@
-// Character voices and announcer lines: neural-TTS clips (scripts/voices/gen.py) decoded once, then played
+// Character voices and announcer lines: ElevenLabs clips (scripts/voices, see its README) decoded once, then played
 // through a short stone room. Each fighter says one line at a time, ranked by priority. The clips are MP3s in
 // assets/audio/voice/<speaker>/<line>-<n>.mp3; a bank is "<speaker>:<line>" (ann is the announcer). A mod skin can
 // bring its own voice (setSkinVoice): then that skin speaks only its own clips, never the class's.
 import type { ClassId } from '../art/sprites';
 import { assetBytes, assetPaths } from './assets';
 
-/** grunt/hurt/hurtBig have no clips yet (TTS can't do them); those calls stay silent until recordings land. */
 export type VoiceKind = 'grunt' | 'cast' | 'castBig' | 'hurt' | 'hurtBig' | 'death' | 'win';
 
-const PRIORITY: Record<VoiceKind, number> = { grunt: 1, cast: 1, hurt: 2, castBig: 3, hurtBig: 3, win: 4, death: 5 };
+/** A new line cuts off the fighter's current one only at the same or higher priority: an attack grunt never cuts off a spoken line. */
+const PRIORITY: Record<VoiceKind, number> = { grunt: 0, cast: 1, hurt: 2, castBig: 3, hurtBig: 3, win: 4, death: 5 };
 
 const rnd = (a: number, b: number): number => a + Math.random() * (b - a);
 
