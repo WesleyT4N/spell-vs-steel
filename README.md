@@ -63,7 +63,7 @@ A run for one: pick a class, start with a small deck, and fight your way through
 
 Skins are mods: drop a mod zip into the **MODS** screen to add new looks for your fighters, and switch each one on or off. The game ships with two to start.
 
-<p align="center"><img src="docs/media/mods.png" alt="The MODS screen with the Hazel Druid skin for the Ranger" width="480"></p>
+<p align="center"><img src="docs/media/mods.png" alt="The MODS screen with the Hazel skin for the Ranger" width="480"></p>
 
 ## How to play
 

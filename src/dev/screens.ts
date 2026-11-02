@@ -488,7 +488,7 @@ export const screens: Record<string, () => void> = {
   },
   'replays-empty': () => { const s = new ReplaysScene(); s.list = []; setScene(s); },
   'profile': () => setScene(fakeProfile(false)),
-  // MODS: the shipped Wes (Mage) and Hazel Druid (Ranger) skins, Hazel picked; then one switched off, and the import panel
+  // MODS: the shipped Wes (Mage) and Hazel (Ranger) skins, Hazel picked; then one switched off, and the import panel
   'mods': () => { const m = new ModsScene(); m.cur = Math.max(0, MODS.findIndex(e => e.id === 'hazel-druid-skin')); setScene(m); run(0.2); },
   'mods-off': () => { setModOn('wes-skin', false); const m = new ModsScene(); setScene(m); run(0.2); },
   'mods-import': () => { const m = new ModsScene(); setScene(m); (m as unknown as { openImport(): void }).openImport(); run(0.1); },

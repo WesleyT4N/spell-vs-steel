@@ -1,13 +1,13 @@
 {
   "format": "spell-vs-steel-mod/3",
   "id": "hazel-druid-skin",
-  "name": "Hazel Druid Skin",
+  "name": "Hazel Skin",
   "author": "Wes",
   "skins": [
     {
       "class": "ranger",
       "id": "hazel",
-      "name": "Hazel Druid",
+      "name": "Hazel",
       "sheet": "hazel.png",
       "portrait": "hazel-portrait.png",
       "team": "#89a8b6",
