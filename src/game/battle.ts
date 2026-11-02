@@ -944,8 +944,8 @@ export class Battle {
   basicAttack(f: Fighter, kind: 'light' | 'heavy'): void {
     f.pose = kind === 'light' ? 'attack' : 'heavy';
     f.poseT = kind === 'light' ? 0.2 : 0.32;
-    // heavies always grunt; light attacks only now and then, so rapid fire doesn't turn into a chant
-    this.voice(f, 'grunt', undefined, kind === 'heavy' ? 1 : 0.25);
+    // only heavies grunt (the listener spaces them out too, see engine/gruntGate.ts)
+    if (kind === 'heavy') this.voice(f, 'grunt');
     classRules(f.cls).basic(this, f, kind);
     this.breakStealth(f);
   }
