@@ -12,3 +12,4 @@ release
 *.keystore
 __pycache__/
 dist-native
+dist-readme

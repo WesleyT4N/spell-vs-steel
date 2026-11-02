@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/media/hero.gif" alt="A Mage and a Warrior trading fire, ice and steel on a snowy mountain pass" width="720">
+  <img src="docs/media/hero.gif" alt="A Mage and a Warrior trading fire, frost and steel at Frostpeak Pass" width="720">
 </p>
 
 <p align="center"><i>Choose your class, build your deck, and outplay your opponent in real-time tactical combat.</i></p>
@@ -36,25 +36,40 @@ Every class beats two others and struggles against two, so every matchup is a ba
 
 In the **Spell Deck Builder**, each class has its own pool of spells: commons, uncommons, a set of Legendaries and three Mythic signature cards. Shape a 30-spell deck around the way you like to win, or start from a ready-made deck and tweak it.
 
-<p align="center"><img src="docs/media/draw.gif" alt="The Draw screen: reading cards and queueing Fireball and Deep Freeze" width="600"></p>
+<p align="center"><img src="docs/media/draw.gif" alt="The Draw screen: reading the hand, queueing Fireball then Deep Freeze, and FIGHT!" width="600"></p>
 
 ### 🔥 Fight in real time
 
 No turns, no waiting. Move across your side of the grid, dodge telegraphed attacks, and cast your spells the moment the opening appears. Freeze or stun your foe and every hit lands harder.
 
-<p align="center"><img src="docs/media/cast.gif" alt="Ranger and Mage casting traps, beams and fire at Emberforge" width="600"></p>
+<p align="center"><img src="docs/media/cast.gif" alt="Ranger and Mage trading arrows, ice walls and blinks at Emberforge" width="600"></p>
 
 ### 🏆 Built for PvP
 
 Duel a friend on the same keyboard, challenge them online with a room code, or climb the ranked ladder. Rollback netcode keeps online fights smooth, even over a shaky connection.
 
-<p align="center"><img src="docs/media/title.gif" alt="The title screen, with a Mage and Warrior dueling under the logo" width="600"></p>
+<p align="center"><img src="docs/media/title.gif" alt="The title screen, with fighters dueling under the logo" width="600"></p>
+
+### 🗺️ Set out on an Expedition
+
+A run for one: pick a class, start with a small deck, and fight your way through the Forest, the Crypt and the Volcano. Choose your path on a branching map, draft new spells after every win, collect relics, rest or shop between fights, and take down each act's boss.
+
+<p align="center">
+  <img src="docs/media/expedition-map.png" alt="The Expedition map three floors into the Forest" width="49%">
+  <img src="docs/media/expedition.gif" alt="A Mage fighting a ghoul, a banshee and a skeleton archer in the Sunken Crypt" width="49%">
+</p>
+
+### 🧩 Mods
+
+Skins are mods: drop a mod zip into the **MODS** screen to add new looks for your fighters, and switch each one on or off. The game ships with two to start.
+
+<p align="center"><img src="docs/media/mods.png" alt="The MODS screen with the Hazel Druid skin for the Ranger" width="480"></p>
 
 ## How to play
 
 **1. Pick your hero and spell deck.** Choose one of the five classes and the deck of spells you'll bring.
 
-<p align="center"><img src="docs/media/select.gif" alt="Arcade mode character select: switching from Warrior to Mage" width="480"></p>
+<p align="center"><img src="docs/media/select.gif" alt="Character select: browsing from Warrior to Priest" width="480"></p>
 
 **2. Fight on the grid.** The arena is 6 panels wide and 3 tall. The red half is yours, the blue half is your rival's, and neither of you can cross the line. Tap attack for a quick light hit, hold and release for a heavy one, and move between your 9 panels to line up shots and dodge theirs. Each class also has a resource bar that pays for spells: Rage, Mana or Energy.
 
@@ -66,7 +81,7 @@ Duel a friend on the same keyboard, challenge them online with a room code, or c
 
 **5. Knock them out.** Bring your rival's HP to 0 to take the round. Win two rounds to win the match. Then it's back to the grid: fight, draw, cast, repeat.
 
-<p align="center"><img src="docs/media/ko.gif" alt="A Mage finishes a Warrior with a K.O., then the round stats screen" width="480"></p>
+<p align="center"><img src="docs/media/ko.gif" alt="A Mage freezes and finishes a Warrior at Castle Courtyard, then the round stats screen" width="480"></p>
 
 Never played before? The in-game **Tutorial** walks you through all of this!
 
@@ -74,14 +89,16 @@ Never played before? The in-game **Tutorial** walks you through all of this!
 
 - **5 playable classes**, each with its own resource, playstyle and 26-card spell pool
 - **Deck building** with Legendaries, Mythics, ready-made decks, and import and export to share your builds
+- **Expedition mode**: a solo run through three acts of monsters, with a drafted deck, relics and bosses
 - **Arcade mode**: four rivals of rising difficulty, then a duel against your own Shadow!
 - **Local versus** for two players on the same couch
 - **Online play** with room codes, ranked matches and rollback netcode
 - **Training mode** to test decks and practice combos, plus a step-by-step tutorial
 - **Replays** and a detailed stats screen after every round
-- **6 animated stages**, from a snowy mountain pass to a dwarven forge inside a volcano
-- **Retro-inspired pixel art** with fully animated fighters and spell effects colored by element
-- **Keyboard, mouse and touch** controls, all keys rebindable
+- **6 animated stages**, from a snowy mountain pass to a dwarven forge inside a volcano, plus the Expedition's Sunken Crypt
+- **HD pixel art** with fully animated fighters, monsters and spell effects colored by element
+- **Mods** for new fighter skins, imported as a zip
+- **Keyboard, mouse, gamepad and touch** controls, all keys rebindable
 
 ## Controls
 
@@ -126,10 +143,11 @@ Thanks for wanting to help! Here's how to get going.
 
 - **The battle must stay deterministic.** Online play runs the same simulation on both machines, so anything random in the rules uses the battle's own generator (`b.rand()`), never `Math.random`. Sound and visual effects never live in the simulation: the battle emits events and the engine plays them. `npm run netcheck` and `npm run rollcheck` catch slips.
 - **Spells are data.** Each spell is one entry in its class's card file under `src/game/`, and every number worth tuning is in `src/game/tuning.ts`. A new spell also needs a 20×20 card icon in `src/art/cardIcons.ts` (small list thumbnails) and a 40×40 HD icon for the card frames (`src/art/cardArt.ts`, made with `tools/pixellab/build_card_icons.py`).
-- **Respect the pixel grid.** Fighters are 24×24 with their own animation frames. Never stretch sprites; pad them instead.
+- **Respect the pixel grid.** Fighters are 48×48 with their own drawn animation frames. Never stretch sprites; pad them instead.
 - **Saves go through the save module** (`src/engine/save.ts`), never straight to `localStorage`.
 - **New screens get a screenshot test**: add them to `src/dev/screens.ts`.
 - **New classes get tutorial lessons** and show up in every character select.
+- **README clips come from the game.** `npm run readme:media` records every GIF and still in `docs/media/` from the current build (needs ffmpeg); the clips are set up in `tools/readme/clips.ts`.
 - **Balance changes come with numbers.** `npm run sim` and `npm run balance` run thousands of CPU-vs-CPU matches; include the before and after win rates in your PR.
 
 ## Desktop builds
