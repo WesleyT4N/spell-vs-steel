@@ -93,7 +93,7 @@ export const clips: Record<string, Clip> = {
   },
   'expedition-map': { setup: () => setScene(new ExpeditionMapScene(expRun(3, 0))), secs: 0, still: true },
   'expedition': { setup: () => expFight(['ghoul', 'banshee', 'skelarcher'], 1), secs: 7 },
-  'mods': { setup: () => { const m = new ModsScene(); m.cur = Math.max(0, MODS.findIndex(e => e.id === 'hazel-druid-skin')); setScene(m); run(0.2); }, secs: 0, still: true },
+  'mods': { setup: () => { const m = new ModsScene(); m.cur = Math.max(0, MODS.findIndex(e => e.id === 'wes-skin')); setScene(m); run(0.2); }, secs: 0, still: true },
 };
 
 declare global { interface Window { __clips: unknown } }
