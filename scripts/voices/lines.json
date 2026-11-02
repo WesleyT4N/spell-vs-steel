@@ -187,5 +187,30 @@
       "The light prevails.",
       "Go in peace."
     ]
+  },
+  "skins": {
+    "_comment": "Voices for mod skins: gen.py <models> skins. Each renders its class's lines (or its own 'lines') into mods/<mod>/ and lists them in that mod.json.",
+    "hazel": {
+      "mod": "hazel-druid-skin",
+      "class": "ranger",
+      "voice": {
+        "voice": "af_bella",
+        "lang": "en-us",
+        "semitones": 0,
+        "speed": 1.0,
+        "_who": "Hazel, a young druid"
+      }
+    },
+    "wes": {
+      "mod": "wes-skin",
+      "class": "mage",
+      "voice": {
+        "voice": "bm_fable",
+        "lang": "en-gb",
+        "semitones": 0,
+        "speed": 1.0,
+        "_who": "Wes, a young wizard"
+      }
+    }
   }
 }

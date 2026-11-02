@@ -218,7 +218,7 @@ export class BattleScene implements Scene {
       const call = (): void => announce(this.setOver && this.m.bestOf > 1 ? 'match' : 'wins', { who });
       if (perfect) { announce('perfect'); window.setTimeout(call, 1800); } else call();
       // the winner's victory line once the announcer is done
-      window.setTimeout(() => voiceLine(w.cls, 'win', 0, w.side), (perfect ? 1800 : 0) + (this.setOver && this.m.bestOf > 1 ? 2600 : 1500));
+      window.setTimeout(() => voiceLine(w.cls, 'win', 0, w.side, undefined, w.skin), (perfect ? 1800 : 0) + (this.setOver && this.m.bestOf > 1 ? 2600 : 1500));
     }
   }
 

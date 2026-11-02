@@ -176,10 +176,10 @@ export function sfx(name: string, o?: RealOpts): void {
 }
 
 /** A fighter's voice: grunts, casting, hurt and death. `side` keeps each fighter to one line at a time. */
-export function voiceLine(cls: ClassId, kind: VoiceKind, pan = 0, side = 0, element?: string): void {
+export function voiceLine(cls: ClassId, kind: VoiceKind, pan = 0, side = 0, element?: string, skin?: string): void {
   const c = ctx;
   if (!c || c.state !== 'running' || quiet || muted || settings.voice === 0) return;
-  playVoice(c, voiceBus, cls, kind, pan, side, element);
+  playVoice(c, voiceBus, cls, kind, pan, side, element, skin);
 }
 
 /** The announcer: a stinger plus the spoken words. */

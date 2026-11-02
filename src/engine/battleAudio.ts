@@ -7,7 +7,7 @@ export function playBattleEvent(e: BattleEvent): void {
     case 'sound': sfx(e.name, e.opts); break;
     case 'fxSound': sfxFx(e.kind, e.opts); break;
     case 'voice':
-      if (e.chance === undefined || e.chance >= 1 || Math.random() < e.chance) voiceLine(e.cls, e.kind, e.pan, e.side, e.element);
+      if (e.chance === undefined || e.chance >= 1 || Math.random() < e.chance) voiceLine(e.cls, e.kind, e.pan, e.side, e.element, e.skin);
       break;
     default: break; // hits, casts and K.O.s already sound through their own sound events
   }

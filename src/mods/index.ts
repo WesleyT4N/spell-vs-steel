@@ -4,6 +4,7 @@
 // imported one can be deleted. A bad mod is listed with its error instead of stopping the game.
 import { addSkin, removeSkin } from '../art/sprites';
 import { getSave, setSave, type SavedMods } from '../engine/save';
+import { setSkinVoice } from '../engine/voice';
 import { parseMod, readMod, readModFiles, type Mod, type ParseResult } from './format';
 
 export type ModSource = 'built-in' | 'imported';
@@ -30,10 +31,17 @@ const store = (f: (m: SavedMods) => SavedMods): void => { const m = saved(); set
 
 function register(e: ModEntry): void {
   e.refused = [];
-  for (const s of e.mod?.skins ?? []) if (!addSkin(s.cls, { id: s.id, name: s.name, set: {}, art: s.art })) e.refused.push(`${s.cls}:${s.id}`);
+  for (const s of e.mod?.skins ?? []) {
+    if (!addSkin(s.cls, { id: s.id, name: s.name, set: {}, art: s.art })) e.refused.push(`${s.cls}:${s.id}`);
+    else if (s.voice) setSkinVoice(s.cls, s.id, s.voice);
+  }
 }
 function unregister(e: ModEntry): void {
-  for (const s of e.mod?.skins ?? []) if (!e.refused.includes(`${s.cls}:${s.id}`)) removeSkin(s.cls, s.id);
+  for (const s of e.mod?.skins ?? []) {
+    if (e.refused.includes(`${s.cls}:${s.id}`)) continue;
+    removeSkin(s.cls, s.id);
+    if (s.voice) setSkinVoice(s.cls, s.id, null);
+  }
   e.refused = [];
 }
 

@@ -1,9 +1,9 @@
 // Loads the installed mods when the game starts. The repo's mods/ folder holds one folder per shipped mod (mod.json
-// and its PNGs); Vite hands over each file's URL (a data URL in the one-file web build) and the bytes are read back.
+// and its PNGs, plus MP3s for a skin with its own voice); Vite hands over each file's URL (a data URL in the one-file web build) and the bytes are read back.
 import { loadMods, type BuiltInMod } from './index';
 import { urlBytes } from '../engine/assets';
 
-const urls = import.meta.glob<string>('../../mods/*/*.{json,png}', { eager: true, query: '?url', import: 'default' });
+const urls = import.meta.glob<string>('../../mods/*/*.{json,png,mp3}', { eager: true, query: '?url', import: 'default' });
 
 async function shipped(): Promise<BuiltInMod[]> {
   const mods = new Map<string, BuiltInMod>();

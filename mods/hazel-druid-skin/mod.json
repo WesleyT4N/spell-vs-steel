@@ -50,7 +50,25 @@
         "#1f171a",
         "#070609",
         "#07050a"
-      ]
+      ],
+      "voice": {
+        "cast": [
+          "hazel-cast-1.mp3",
+          "hazel-cast-2.mp3",
+          "hazel-cast-3.mp3"
+        ],
+        "castBig": [
+          "hazel-castBig-1.mp3",
+          "hazel-castBig-2.mp3"
+        ],
+        "death": [
+          "hazel-death-1.mp3"
+        ],
+        "win": [
+          "hazel-win-1.mp3",
+          "hazel-win-2.mp3"
+        ]
+      }
     }
   ]
 }
