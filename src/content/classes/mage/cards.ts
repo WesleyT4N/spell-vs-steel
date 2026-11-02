@@ -4,10 +4,10 @@ import { type CardDef, shuffle, TUNING, targeted, sameRow, allEnemyPanels, lowHp
 type Cells = Array<[number, number]>;
 
 // Spells' later steps (see spellStep): what lands after a delay, a telegraph or a flight.
-const missile = spellStep('arcane_missiles.fire', x => {
+const missile = spellStep('arcane_missiles.fire', (x, a: { lane?: number }) => {
   x.b.projectiles.push({
     side: x.f.side, row: x.f.row, x: x.f.col, speed: 0, kind: 'missile', reflectable: true,
-    homing: { p: 0, dur: 0.4, sx: x.f.col, sy: x.f.row, target: x.foe.side },
+    homing: { p: 0, dur: 0.4, sx: x.f.col, sy: x.f.row, target: x.foe.side, lane: a.lane ?? 0 },
     onHit: missileHit(x),
   });
   x.b.sound('missile');
@@ -86,7 +86,7 @@ export const mage: CardDef[] = [
     id: 'arcane_missiles', name: 'Arcane Missiles', cls: 'mage', cost: 1, rarity: 'common', element: 'arcane', damaging: true, lock: 0.45,
     dmg: '300x3', short: '3 homing missiles strike the enemy wherever they are.',
     cast: x => {
-      for (let i = 0; i < 3; i++) x.b.later(i * 0.12, missile(x));
+      for (let i = 0; i < 3; i++) x.b.later(i * 0.12, missile(x, { lane: i }));
     },
   },
   {

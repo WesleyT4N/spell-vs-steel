@@ -202,8 +202,11 @@ export interface Projectile {
   /** Piercing shots fly through walls (hitting them) instead of stopping. */
   pierce?: boolean;
   hitWalls?: Wall[];
-  /** For homing missiles: progress 0..1 and start pixel. */
-  homing?: { p: number; dur: number; sx: number; sy: number; target: Side };
+  /**
+   * For homing missiles: progress 0..1 and start pixel. `lane` (render only) picks which curving path a volley's dart
+   * draws along (Arcane Missiles fans its darts out); the hit lands at p = 1 whatever the lane.
+   */
+  homing?: { p: number; dur: number; sx: number; sy: number; target: Side; lane?: number };
   reflectable: boolean;
   /** What happens when it lands (also when it lands on nothing: a homing shot whose target is down). */
   onHit: EffectRec<ShotHit>;
@@ -1439,7 +1442,7 @@ export class Battle {
     this.sound('reflect', { pan: panOf(by.col) });
     const back: Projectile = { ...p, dead: false, side: by.side, reflectable: false };
     if (p.homing) {
-      back.homing = { p: 0, dur: p.homing.dur, sx: by.col, sy: by.row, target: (1 - by.side) as Side };
+      back.homing = { p: 0, dur: p.homing.dur, sx: by.col, sy: by.row, target: (1 - by.side) as Side, lane: p.homing.lane };
     } else {
       back.speed = -p.speed;
       back.x = by.col + this.dir(by) * 0.5;
