@@ -1,7 +1,7 @@
 import { pushScene, drawMenu, hint, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
-import { drawLogo } from '../art/logo';
+import { drawLogo, LOGO_W } from '../art/logo';
 import { getFrame, drawFighterSprite, defaultSkin, type ClassId } from '../art/sprites';
 import type { FrameId } from '../art/fighterFrames';
 import { FIRE as FIRE_RAMP, STEEL, SHADOW, HOLY } from '../game/fxView';
@@ -29,6 +29,8 @@ const ITEMS = ['EXPEDITION MODE', 'ARCADE MODE', 'VERSUS MODE', 'ONLINE MODE', '
 // nine rows (ten in dev builds and the desktop app, eleven in a dev desktop build) still clear the version line
 const MENU_Y = ITEMS.length > 10 ? 146 : ITEMS.length > 9 ? 150 : ITEMS.length > 8 ? 156 : ITEMS.length > 7 ? 162 : ITEMS.length > 6 ? 168 : 172;
 const MENU_GAP = ITEMS.length > 10 ? 12 : ITEMS.length > 9 ? 13 : ITEMS.length > 8 ? 14 : ITEMS.length > 7 ? 15 : ITEMS.length > 6 ? 16 : 18;
+/** The logo's size (UI pixels per logo pixel; 2 is full size) and top edge on the UI layer when the menu sits under it. */
+const LOGO_SMALL = 1.5, LOGO_TOP = 14;
 // taller screens (phone portrait) have room under the stage: rows grow into it, with double-size text once they fit
 const MAX_GAP = 36, BIG_GAP = 24;
 
@@ -306,10 +308,19 @@ export class TitleScene implements Scene {
       onFighterGrid(c, p.x, p.y, () => P(c, r[i], 0, 0, z, z));
     }
 
-    // the logo drops in and lands with a bounce
+    // the logo drops in and lands with a bounce. The phone's full-height layout has room for it at full size, over the duel
     const drop = span(intro, LOGO_DROP);
-    if (drop > 0) drawLogo(c, W / 2, Math.round(10 - (1 - drop) ** 2 * 110), this.t);
+    if (drop > 0 && spread.tall) drawLogo(c, W / 2, Math.round(10 - (1 - drop) ** 2 * 110), this.t);
     c.restore();
+    // elsewhere the menu sits right under it, so it draws at 3/4 size on the sharper UI layer: each logo pixel is a
+    // whole 3x3 block of backing pixels there, so it shrinks without any uneven pixels
+    if (drop > 0 && !spread.tall) {
+      ui.save();
+      ui.translate(UW / 2 - (LOGO_W / 2) * LOGO_SMALL + sx * 2, LOGO_TOP - Math.round((1 - drop) ** 2 * 220));
+      ui.scale(LOGO_SMALL, LOGO_SMALL);
+      drawLogo(ui, LOGO_W / 2, 0, this.t);
+      ui.restore();
+    }
     // a white flash as it lands
     const flash = 1 - clamp((intro - LOGO_DROP[1]) / 0.25);
     if (intro >= LOGO_DROP[1] && flash > 0) {
