@@ -3,6 +3,7 @@
 import { P, HD, view, rng, mix, plain, piece, type Ctx } from '../engine/gfx';
 import { MX, MY, LIFT, BW, BH, XL, YT } from './ink';
 import { YOU, FOE } from '../game/teamColors';
+import { assetImage } from '../engine/assets';
 
 export const COLS = 6, ROWS = 3, PW = 38, FACE = 15, LIP = 4, X0 = 6, Y0 = 98;
 
@@ -102,12 +103,63 @@ const TINT: Record<PanelTint, { face: string; hi: string; lo: string; ink: [stri
 /** A panel: black outline, two-tone team rim, an outlined bevelled face, and a darker front lip. */
 export function drawPanel(c: Ctx, col: number, row: number, state: PanelState, _t: number, mine: boolean, highlight: string | undefined, stage: Stage, art: PanelArt = {}): void {
   const x = X0 + col * PW, y = Y0 + row * (FACE + LIP);
+  // the stage's PixelLab panel inside the team rim; element-soaked faces keep their drawn look
+  if (!art.tint && state !== 'burning' && drawArtPanel(c, x, y, col, row, state, mine, highlight, stage, art)) return;
   // a clean, untinted panel's look only depends on these, so it is painted once and stamped every frame; its
   // first fill is an opaque box over the whole piece, so anything blended inside it blends the same either way.
   // Tinted and cracked panels animate, so they paint fresh.
   if (!plain(c) || state !== 'clean' || art.tint) { paintPanel(c, x, y, col, row, state, mine, highlight, stage, art); return; }
   const key = `panel|${stage.id}|${col}|${row}|${mine ? 1 : 0}|${highlight ?? ''}`;
   c.drawImage(piece(key, PW, FACE + LIP + 1, p => paintPanel(p, 0, 1, col, row, state, mine, highlight, stage, art)), x, y - 1);
+}
+
+/** How strongly a PixelLab panel face is washed with its team's rim color (the rim carries the team). */
+const ART_WASH = 0.12;
+const artPanels = new Map<string, HTMLCanvasElement | null>();
+
+/**
+ * A stage's panel as drawn by PixelLab (assets/stages/panels/<stage>.png, 2 px per world px), framed by the black
+ * outline and two-tone team rim every panel has, its face lightly washed in the team color. Painted once per stage
+ * and team at the sharp backing density. Null when the stage has no panel art.
+ */
+function artPanel(stage: Stage, mine: boolean): HTMLCanvasElement | null {
+  const key = `${stage.id}|${mine ? 1 : 0}`;
+  if (artPanels.has(key)) return artPanels.get(key)!;
+  const img = assetImage(`stages/panels/${stage.id}.png`);
+  let cv: HTMLCanvasElement | null = null;
+  if (img && typeof document !== 'undefined') {
+    const [tl, td] = (mine ? YOU : FOE).rim, k = 2;
+    cv = document.createElement('canvas');
+    cv.width = PW * k; cv.height = (FACE + LIP + 1) * k;
+    const p = cv.getContext('2d')!;
+    p.imageSmoothingEnabled = false;
+    p.fillStyle = '#000000'; p.fillRect(0, 0, cv.width, cv.height);
+    // the rim: light on top and left, dark along the bottom and the right, like the drawn panels
+    p.fillStyle = tl; p.fillRect(k, 0, cv.width - 2 * k, cv.height - k);
+    p.fillStyle = td; p.fillRect(k, cv.height - 2 * k, cv.width - 2 * k, k); p.fillRect(cv.width - 2 * k, 0, k, cv.height - k);
+    const fx = 2 * k, fy = k;
+    p.drawImage(img, fx, fy);
+    p.globalCompositeOperation = 'source-atop';
+    p.globalAlpha = ART_WASH; p.fillStyle = tl; p.fillRect(fx, fy, img.naturalWidth, img.naturalHeight);
+    p.globalAlpha = 1; p.globalCompositeOperation = 'source-over';
+  }
+  artPanels.set(key, cv);
+  return cv;
+}
+
+function drawArtPanel(c: Ctx, x: number, y: number, col: number, row: number, state: PanelState, mine: boolean, highlight: string | undefined, stage: Stage, art: PanelArt): boolean {
+  const cv = artPanel(stage, mine);
+  if (!cv) return false;
+  c.drawImage(cv, x, y - 1, PW, FACE + LIP + 1);
+  // the face area of the art (inside the rim, above the art's own lip)
+  const fx = x + 2, fy = y, fw = PW - 4, fh = FACE - 1;
+  if (state === 'cracked') {
+    c.globalAlpha = 0.2; P(c, '#000000', fx, fy, fw, fh); c.globalAlpha = 1;
+    const look = stage.panel;
+    drawCrack(c, col, row, fx, fy, fw, fh, mix(look.lo, '#000000', 0.75), look.hi, look.lip, art.crackAge ?? 9);
+  }
+  if (highlight) { c.globalAlpha = 0.55; P(c, highlight, fx, fy, fw, fh); c.globalAlpha = 1; }
+  return true;
 }
 
 function paintPanel(c: Ctx, x: number, y: number, col: number, row: number, state: PanelState, mine: boolean, highlight: string | undefined, stage: Stage, art: PanelArt): void {

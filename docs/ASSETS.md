@@ -20,6 +20,11 @@ assets/
   cards/<spell>.png             40px spell icons; cards/small/<spell>.png the 20px ones (tools/pixellab/build_card_icons.py)
   sprites/<name>.png + .json    small hand-drawn sprites: Ranger pets, Warrior's hook, deck emblems
   ui/font.png + font.json       the pixel font, one 5x7 glyph per character
+  ui/fonts/<name>.png + .json   PixelLab display fonts as glyph masks (retro: damage numbers, gold: win banners);
+                                colored in code by src/engine/artFont.ts (tools/pixellab/build_combat_ui.py)
+  ui/splash/<word>.png          READY / FIGHT! / K.O. / DOUBLE K.O. lettering (same tool)
+  ui/queue-chip.png             the cast-queue card in five greys, recolored to each spell's element
+  stages/panels/<stage>.png     each arena's grid panel face (68x34, 2 px per world px), framed by the team rim in code
 ```
 
 ## Palette sprites

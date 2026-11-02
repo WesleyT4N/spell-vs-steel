@@ -396,6 +396,11 @@ export const screens: Record<string, () => void> = {
   'battle-fight': () => { watch(); run(8, () => battle().b.phase === 'over'); },
   // mid-fight as the player, so phones show the fight pad
   'battle-player': () => { setScene(new BattleScene(match({ p1: 'priest', cpu: 'ranger' }))); run(0.5); battle().b.endCustom([[0, 1], []]); run(3); },
+  // the cast queue over the player's head: four element-colored chips, the top one with its cost
+  'battle-queue': () => { setScene(new BattleScene(match({ p1: 'mage', cpu: 'priest' }))); run(0.5); battle().b.endCustom([[0, 1, 2, 3], []]); run(0.1); },
+  // the READY / FIGHT! lettering as a round starts
+  'battle-ready': () => { useStage('crypt'); setScene(new BattleScene(match({ p1: 'rogue', cpu: 'priest', stage: 'crypt' }))); run(0.5); battle().b.endCustom([[], []]); battle().fightBanner = 0.9; run(0.05); },
+  'battle-fight-banner': () => { useStage('elderwood'); setScene(new BattleScene(match({ p1: 'ranger', cpu: 'warrior', stage: 'elderwood' }))); run(0.5); battle().b.endCustom([[], []]); battle().fightBanner = 0.3; run(0.05); },
   // area-spell telegraphs in team colors: yours blue on their side, theirs red on yours (flash, reticle, lob shadow)
   'battle-warns': () => { setScene(new BattleScene(match({ p1: 'warrior', cpu: 'mage' }))); run(0.5); battle().b.endCustom([[], []]); run(0.3); warns(); run(0.5); },
   // the human on the right: the blue team follows you to the right side

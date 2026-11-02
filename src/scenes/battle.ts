@@ -5,6 +5,7 @@ import { pushScene, replaceScene, popTo, goHome, dim, drawMenu, hint, zone, zone
 import { CLASS_INFO } from '../game/classes';
 import { Battle, NO_INTENT, heavyChargeOf, type Dir, type Intent, type Side } from '../game/battle';
 import { drawBattle, drawBattleUi, getArena } from '../game/battleView';
+import { drawSplash } from '../game/combatArt';
 import { Cpu } from '../game/ai';
 import { styleFor } from '../game/playstyles';
 import { substream } from '../game/rng';
@@ -26,7 +27,7 @@ import { stageMusic } from '../content/stages';
 import { drawCardDetail, drawCardFace, costSign, costDeltaText, resName, resInk, RES_INK, CARD_W, CARD_H, PICKED } from './cardView';
 import { drawDelta, modInk } from './modValue';
 import { CardPreview } from './cardPreview';
-import { win, plaque, pip, disc, banner, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, BLUE_INK, WAX_HI, GOLD, FRAME } from './skin';
+import { win, plaque, pip, disc, winBanner, PAPER, PAPER2, BURN, INK, INK2, TRIM, RED_INK, BLUE_INK, WAX_HI, GOLD, FRAME } from './skin';
 import { bigButton, actionBar, barTapped, swipeIn, tallArea, TAP, GAP, PAD } from './touchUi';
 import { CharSelectScene } from './select';
 import { StatsPanel, type StatsData } from './statsView';
@@ -449,10 +450,16 @@ export class BattleScene implements Scene {
       else this.drawCustom(c, tick, ui);
     }
     if (this.fightBanner > 0 && b.phase === 'fight') {
-      const s = this.fightBanner > 0.45 ? 'READY' : 'FIGHT!';
-      drawTextCentered(ui, s, UW / 2, 124, s === 'FIGHT!' ? '#f8b800' : '#fcfcfc', 6);
+      const ready = this.fightBanner > 0.45;
+      if (!drawSplash(ui, ready ? 'ready' : 'fight', UW / 2, 145, 2)) {
+        const s = ready ? 'READY' : 'FIGHT!';
+        drawTextCentered(ui, s, UW / 2, 124, s === 'FIGHT!' ? '#f8b800' : '#fcfcfc', 6);
+      }
     }
-    if (b.phase === 'ko' && b.koT > 0.4) drawTextCentered(ui, b.winner === null ? 'DOUBLE K.O.' : 'K.O.', UW / 2, 116, '#f83800', b.winner === null ? 4 : 6);
+    if (b.phase === 'ko' && b.koT > 0.4) {
+      const dbl = b.winner === null;
+      if (!drawSplash(ui, dbl ? 'double-ko' : 'ko', UW / 2, 137, dbl ? 1 : 2)) drawTextCentered(ui, dbl ? 'DOUBLE K.O.' : 'K.O.', UW / 2, 116, '#f83800', dbl ? 4 : 6);
+    }
     if (spread.tall) return;
     if (b.phase === 'over') this.drawResult(ui, tick);
     if (this.paused) {
@@ -488,7 +495,7 @@ export class BattleScene implements Scene {
       title = b.winner === null && !this.setOver ? 'DRAW' : this.m.bestOf === 1 ? `${who} WINS!` : this.setOver ? `${who} WINS THE SET` : `${who} WINS THE ROUND`;
       score = `${b.f[0].name} ${this.score[0]} - ${this.score[1]} ${b.f[1].name}`;
     }
-    banner(ui, title, UW / 2, 6);
+    winBanner(ui, title, UW / 2, 6);
     // the score, and any note (online ranked: the rating change) after it on the same line
     const note = this.resultNote(), line = this.m.bestOf > 1 ? score : '';
     const gap = line && note ? '   ' : '', x0 = Math.round(UW / 2 - textWidth(line + gap + note) / 2);
@@ -708,7 +715,7 @@ export class BattleScene implements Scene {
       score = `${b.f[0].name} ${this.score[0]} - ${this.score[1]} ${b.f[1].name}`;
     }
     let y = a.y + 12;
-    banner(ui, title, UW / 2, y, title.length > 14 ? 2 : 3);
+    winBanner(ui, title, UW / 2, y, title.length > 14 ? 0.5 : 1);
     y += 48;
     if (this.m.bestOf > 1) { drawTextCentered(ui, score, UW / 2, y, '#fcfcfc', 2); y += 26; }
     // online ranked: the rating change; a tournament set: where it goes next
