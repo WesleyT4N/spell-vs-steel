@@ -2,6 +2,7 @@
 // Every menu, card and HUD plate is built from these parts, so they draw at any size and layout.
 import { P, UW, HD, dith, hash, mix, screenRect, view, plain, piece, type Ctx } from '../engine/gfx';
 import { drawText, textWidth } from '../engine/font';
+import { artFontReady, artTextWidth, artCapHeight, drawArtTextCentered, type ArtTextStyle } from '../engine/artFont';
 
 /** Paper and ink colors. Text on parchment uses the inks; text over the arena keeps the bright colors. */
 export const PAPER = '#fce0a8';
@@ -96,6 +97,27 @@ export function banner(c: Ctx, text: string, cx: number, y: number, scale = 2): 
     roll.forEach((col, i) => P(c, col, ex + i, y - 3, 1, h + 6));
   }
   drawText(c, text, Math.round(cx - tw / 2), y + 5, INK, scale);
+}
+
+/** The gold lettering on a win / results banner (PixelLab "gold" font). */
+const WIN_INK: ArtTextStyle = { fill: ['#fcfcfc', '#f8d878', '#d8a030', '#8a5a10'], outline: '#2a1408', ow: 1, shadow: '#000000' };
+
+/**
+ * A results banner (who won) with the title in the gold display font, sized to it; falls back to `banner` when the
+ * font isn't loaded. `scale` is UI px per font px (0.5 = the font's own pixels on the sharp backing).
+ */
+export function winBanner(c: Ctx, text: string, cx: number, y: number, scale = 0.5): void {
+  if (!artFontReady('gold')) { banner(c, text, cx, y, scale >= 1 ? 3 : 2); return; }
+  const tw = artTextWidth('gold', text, scale), th = artCapHeight('gold', scale);
+  const w = Math.round(tw + 28), x = Math.round(cx - w / 2), h = Math.round(th + 11);
+  P(c, BLACK, x - 1, y - 1, w + 2, h + 2); P(c, FRAME, x, y, w, h);
+  paper(c, x + 1, y + 1, w - 2, h - 2, 3);
+  const roll = [INK, TRIM, BURN, PAPER, PAPER, PAPER2, BURN, TRIM, INK2, INK];
+  for (const ex of [x - 8, x + w - 2]) {
+    P(c, BLACK, ex - 1, y - 4, 12, h + 8);
+    roll.forEach((col, i) => P(c, col, ex + i, y - 3, 1, h + 6));
+  }
+  drawArtTextCentered(c, 'gold', text, cx, y + Math.round((h - th) / 2) - 1, WIN_INK, scale);
 }
 
 /** Small plaque button: parchment, or red wax when lit. `edge` recolors the frame (gold on hover). Returns the text color to label it with. */

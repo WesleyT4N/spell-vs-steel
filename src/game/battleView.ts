@@ -7,6 +7,7 @@ import { getSprite, getFrame, drawFighterSprite, drawFighterPosed, type Tint } f
 import { getMobSprite } from '../art/mobSprites';
 import type { FrameId } from '../art/fighterFrames';
 import { P, UW, UH, blob, frame, glow, mix, type Ctx } from '../engine/gfx';
+import { drawChip, chipSize, drawDamageNumber } from './combatArt';
 import { drawText, drawTextOutlined, drawTextCentered, textWidth, wrap } from '../engine/font';
 import { drawCardIcon, costSign, costDeltaText, RES_INK } from '../scenes/cardView';
 import { drawModValue, drawDelta, pctText } from '../scenes/modValue';
@@ -570,15 +571,27 @@ function drawFighter(c: Ctx, b: Battle, f: Fighter, tick: number, me: Viewer): v
   if (f.st.deathMark > 0 && tick % 8 < 5) drawText(c, '×', fx - 2, y - s.h - 16, '#9878f8');
   if (f.st.hunted > 0 && tick % 8 < 5) { P(c, '#f83800', fx - 1, y - s.h - 14, 3, 1); P(c, '#f83800', fx, y - s.h - 15, 1, 3); }
 
-  // queued spells as stacked chips above the head (BN style)
-  const n = Math.min(5, f.queue.length);
+  // queued spells as stacked chips above the head (BN style), each one card in its element's color
+  const n = Math.min(5, f.queue.length), cs = chipSize();
   for (let i = n - 1; i >= 0; i--) {
     const card = CARDS[f.queue[i]];
+    const ok = i > 0 || b.canAfford(f, card), col = ok ? ELEMENT_COLOR[card.element] : '#7c7c7c';
+    const cost = card.cost === 'all' && !costSign(card, b.costOf(f, card)) ? 'A' : String(b.costOf(f, card));
+    if (cs) {
+      const cx = fx - 3 + i, cy = y - s.h - 10 - i * 3;
+      drawChip(c, cx, cy, col);
+      // global cooldown: a shade over the top chip that drains away as it recharges
+      if (i === 0 && f.castCd > 0) {
+        const sh = cs.h * f.castCd / TUNING.castCooldown;
+        c.globalAlpha = 0.65; c.save(); c.beginPath(); c.rect(cx, cy, cs.w, sh); c.clip(); drawChip(c, cx, cy, '#000000'); c.restore(); c.globalAlpha = 1;
+      }
+      if (i === 0) drawTextOutlined(c, cost, cx + cs.w + 1, cy, ok ? '#fcfcfc' : '#bcbcbc');
+      continue;
+    }
     const cx = fx - 4 + i * 1, cy = y - s.h - 9 - i * 2;
-    const ok = i > 0 || b.canAfford(f, card);
     P(c, '#000000', cx - 1, cy - 1, 10, 9);
-    P(c, ok ? ELEMENT_COLOR[card.element] : '#7c7c7c', cx, cy, 8, 7);
-    if (i === 0) drawText(c, card.cost === 'all' && !costSign(card, b.costOf(f, card)) ? 'A' : String(b.costOf(f, card)), cx + 1, cy, '#000000');
+    P(c, col, cx, cy, 8, 7);
+    if (i === 0) drawText(c, cost, cx + 1, cy, '#000000');
     // global cooldown: a shade over the top chip that drains away as it recharges
     if (i === 0 && f.castCd > 0) {
       const sh = Math.ceil(7 * f.castCd / TUNING.castCooldown);
@@ -630,9 +643,11 @@ export function drawBattleUi(ui: Ctx, b: Battle, tick: number, me: Side = 0, sha
     if (!big) { drawTextCentered(ui, t.text, pc.x * UI, (pc.y - 34) * UI - t.t * 28, t.color, 1); continue; }
     // damage numbers pop in a size up and white-hot, then settle into the element color as they float off
     const n = Number(t.text), pop = t.t < 0.07;
-    const scale = (n >= BIG_HIT ? 3 : 2) + (pop ? 1 : 0);
     const k = Math.min(1, t.t / 0.35), rise = 22 * (1 - (1 - k) * (1 - k)) + Math.max(0, t.t - 0.35) * 12;
-    drawTextCentered(ui, t.text, pc.x * UI, (pc.y - 34) * UI - rise - (pop ? 4 : 0), pop ? '#fcfcfc' : t.color, scale);
+    const ny = (pc.y - 34) * UI - rise - (pop ? 4 : 0);
+    if (drawDamageNumber(ui, t.text, pc.x * UI, ny, t.color, pop, n >= BIG_HIT, (n >= BIG_HIT ? 2 : 1.5) + (pop ? 0.5 : 0))) continue;
+    const scale = (n >= BIG_HIT ? 3 : 2) + (pop ? 1 : 0);
+    drawTextCentered(ui, t.text, pc.x * UI, ny, pop ? '#fcfcfc' : t.color, scale);
   }
   for (const f of b.f) { if (f.mob) drawPackHud(ui, b, tick); else drawFighterHud(ui, b, f, tick); }
   for (const f of b.f) if (!f.mob) drawChargeBar(ui, b, f, tick);
