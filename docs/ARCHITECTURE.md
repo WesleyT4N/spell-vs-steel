@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at e334013 (2026-11-01).
+How the game is put together, one section per system. Describes `main` at 20686e0 (2026-11-02).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -54,16 +54,35 @@ flowchart LR
   tools["Headless tools<br/>scripts/sim, netcheck, lab"] -.drive.-> battle
 ```
 
+```mermaid
+flowchart LR
+  root["spell-vs-steel/"] --> assets["assets/<br/>PNG, MP3, JSON"]
+  root --> mods["mods/<br/>built-in mods"]
+  root --> src["src/"]
+  root --> other["tests/ · scripts/ · tools/ · docs/<br/>electron/ · android/"]
+  src --> game["game/ + content/<br/>the sim core"]
+  src --> pres["scenes/ · art/ · fx/ · engine/<br/>screens, drawing, sound"]
+  src --> online["net/<br/>rollback, lobby, ranked"]
+  src --> extra["mods/ · platform/ · dev/ · vendor/"]
+  assets -. read by .-> pres
+  mods -. read by .-> extra
+  pres --> game
+  online --> game
+```
+
 | Folder | What lives there |
 | --- | --- |
-| `src/content/` | Built-in content: each class's spells in `classes/<id>/cards.ts`, stages in `stages/`, `api.ts` (the only engine surface content imports) |
-| `src/game/` | Rules (`battle.ts`, `cards.ts` gathers every class's spells, `ai.ts`, `tuning.ts`, `rng.ts`, decks, stats, combo) and the battle views |
-| `src/scenes/` | Every screen: title, select, stage select, battle, online, training, tutorial, deck builder, options, dev tools |
-| `src/art/` | Generated sprites and frames, Inked stages, logo |
-| `src/engine/` | Pixel gfx, bitmap font, input, gamepad, touch pad, audio, sampled music, battle audio, voice, save |
-| `src/net/` | Rollback netplay, snapshots, session, packet protocol, transports, desync hash |
-| `src/dev/` | Instrumentation, headless sims, live tuning edits (dev builds only) |
-| `scripts/` | `sim`, `netcheck`, `combo-check`, artifact packer, TTS voice generator |
+| `src/content/` | Built-in content: each class's folder in `classes/<id>/` (spells, rules, tuning, decks, CPU, lessons), stages in `stages/`, `api.ts` (the only engine surface content imports) |
+| `src/game/` | Rules (`battle.ts`, `cards.ts`, `ai.ts`, `tuning.ts`, `rng.ts`, decks, stats, Expedition and mobs) and the battle views |
+| `src/scenes/` | Every screen: title, select, battle, online, training, tutorial, Expedition, deck builder, MODS, options |
+| `src/fx/` | Spell and hit effects: baked-sheet players and pixelfx modules per class |
+| `src/engine/` | Pixel gfx, bitmap font, input, gamepad, touch pad, audio, music, voice, save, the asset registry |
+| `src/net/` | Rollback netplay, snapshots, session, packet protocol, transports, desync hash, lobby, ranked, tournaments |
+| `src/art/` | Readers for the PNG sprites and palettes, card icons, logo (the art itself is in `assets/`) |
+| `src/mods/` | Mod format, zip and PNG readers, install state |
+| `src/dev/` | Dev tools, Art Lab, headless sims, live tuning (dev builds only) |
+| `scripts/` | `sim`, `netcheck`, balance, music and voice generators, artifact packer |
+| `tools/` | PixelLab builders for frames, effects and skin mods (Python) |
 
 Platform decision (2026-10-26): stay on TypeScript; Steam through Electron, mobile through Capacitor; no consoles for now.
 
@@ -152,6 +171,14 @@ flowchart LR
   recv --> wrong{"Guess was wrong?"}
   wrong -- yes --> rb["Restore confirmed snapshot,<br/>replay silently, re-save,<br/>guess forward again"]
   run --> conf["Confirmed frames only:<br/>Draw screen, round end,<br/>hash every 30, replay tape"]
+```
+
+```mermaid
+flowchart LR
+  lobby["scenes/online.ts<br/>lobby, room codes"] -- opens --> ob["scenes/onlineBattle.ts"] -- runs --> np["net/netplay.ts<br/>one online round"]
+  np --> sess["net/session.ts<br/>handshake, input buffers"] --> tr["net/transport.ts + protocol.ts<br/>room / PeerJS / local"]
+  np --> rb["net/rollback.ts<br/>guess, rewind, replay"] --> snap["net/snapshot.ts"] --> b["game/battle.ts"]
+  np --> hash["net/hash.ts<br/>battleHash on confirmed frames"] --> b
 ```
 
 | File | Job |
@@ -254,6 +281,7 @@ flowchart TD
 - `format.ts` and `files.ts` are pure (no DOM, no game state); `tests/mods.ts` (in `npm test`) checks the fixtures, the shipped mods, hostile files, and installing (on/off, import, delete, reload from the save).
 - Installed state lives in the save's `mods` section (`SavedMods`): ids switched off, and imported zips as base64 (at most 12, `IMPORT_BUDGET` about 1 MB). Built-in mods can be switched off, imported ones also deleted.
 - `Skin.art: SkinArt` (`pal`, `team`, `ax`, `res`, `frames`, `portrait`) sits beside the palette recolours; the menu still sprite is `idle0` trimmed. Shipped: `mods/wes-skin/` (Mage: Wes) and `mods/hazel-druid-skin/` (Ranger: Hazel Druid), written by `tools/pixellab/build_skin_mod.py` from PixelLab `transfer_outfit` frames of the class's own poses.
+- Voice lines (#134): a skin's `voice` key maps a line (`cast`, `castBig`, `death`, `win`, `grunt`, `hurt`, `hurtBig`, `cast_<element>`) to 1 to 4 MP3s in the zip (each at most 64 KB, MP3 magic checked). `mods/index.ts` calls `setSkinVoice(cls, skin, bytes)` in `engine/voice.ts`, which decodes them into banks named `<cls>/<skin>:<line>`; a voiced skin speaks only its own clips. Battle `voice` events carry `skin` (sound only). `mods/boot.ts` globs MP3s too, and `scripts/voices/gen.py` has a `skins` mode driven by `lines.json` `skins`; the shipped Wes and Hazel mods have voices.
 - Cosmetic and render-only: the sim never sees mods. Online, an opponent without the mod sees your default colour.
 
 ## Stages
@@ -323,7 +351,7 @@ flowchart TD
 
 ## Audio
 
-Effects are synthesized live in WebAudio. Music is an original sampled soundtrack (#40): `scripts/music/` renders a score DSL offline with a soundfont, and writes the MP3s plus `tracks.json` (loop points) to `assets/audio/music/`, which `engine/musicTracks.ts` reads. Voice clips are recorded TTS in `assets/audio/voice/<speaker>/<line>-<n>.mp3`, from `scripts/voices/gen.py` (#127).
+Effects are synthesized live in WebAudio. Music is an original sampled soundtrack (#40): `scripts/music/` renders a score DSL offline with a soundfont, and writes the MP3s plus `tracks.json` (loop points) to `assets/audio/music/`, which `engine/musicTracks.ts` reads. Voice clips are recorded TTS in `assets/audio/voice/<speaker>/<line>-<n>.mp3`, from `scripts/voices/gen.py` (#127). A mod skin can bring its own voice (#134): `setSkinVoice` adds `<cls>/<skin>:<line>` banks and `playVoice` takes the skin from the `voice` event (see Mods).
 
 ```mermaid
 flowchart LR
@@ -415,13 +443,23 @@ flowchart LR
   rew -- boss beaten --> next["nextAct<br/>new map, full heal; act 3 wins"] --> map
 ```
 
+```mermaid
+flowchart LR
+  sc["scenes/expedition.ts<br/>map, fight, reward, rest, shop"] --> run["game/expedition.ts<br/>the run as plain data"]
+  crypt["content/stages/crypt.ts"] -- act stage --> run
+  run -- makeFight --> mobs["game/mobs.ts<br/>MOBS, MOB_BRAINS, setupPack"] -- pack --> b["game/battle.ts<br/>b.mobs"]
+  sc --> b --> view["game/battleView.ts"]
+  spr["art/mobSprites.ts<br/>assets/monsters"] --> view
+  chk["scripts/expedition-check.ts"] --> mobs
+```
+
 | File | Job |
 | --- | --- |
 | `game/expedition.ts` | The run as plain data (`ExpeditionRun`): `ACTS`, `makeMap`, `choices`, rewards, relics, shop stock, `makeFight` |
 | `game/mobs.ts` | `MOBS` (HP, start column, rank, blurb) and each monster's brain in `MOB_BRAINS`; `setupPack` puts a pack on the field |
 | `scenes/expedition.ts` | Map, fight, reward, rest, shop, deck and run-over screens, each with a phone portrait layout |
-| `art/mobArt.ts`, `art/mobSprites.ts` | Monster sprites (PixelLab, 48px regulars / 56px elites / 80px bosses at 2 sprite px per world px; generated by `tools/pixellab/build_mobs.py`), baked per tint like the fighters |
-| `art/cardArt.ts`, `art/cardIcons.ts` | Spell icons: 40px PixelLab art for the card frames (generated by `tools/pixellab/build_card_icons.py`) and the hand-drawn 20px icons for small thumbnails; `drawIconAt` picks one by draw scale, never scaling down |
+| `art/mobSprites.ts` | Monster sprites read from `assets/monsters` (PixelLab, 48px regulars / 56px elites / 80px bosses at 2 sprite px per world px), baked per tint like the fighters |
+| `art/cardIcons.ts` | Spell icons: 40px PixelLab art from `assets/cards` and small versions from `assets/cards/small` for thumbnails |
 | `content/stages/crypt.ts` | The Crypt stage (`registerExtraStage`) |
 | `scripts/expedition-check.ts` | Balance check for packs and bosses |
 
