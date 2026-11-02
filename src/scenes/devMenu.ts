@@ -12,15 +12,17 @@ import { EncyclopediaScene } from './encyclopedia';
 import { SandboxScene } from './sandbox';
 import { LabScene } from './lab';
 import { VoiceTestScene } from './voiceTest';
+import { MusicTestScene } from './musicTest';
 import { ArtLabScene } from './artLab';
 
-const ITEMS = ['CARD ENCYCLOPEDIA', 'SANDBOX', 'BALANCE LAB', 'ART LAB', 'VOICE TEST', 'BACK'];
+const ITEMS = ['CARD ENCYCLOPEDIA', 'SANDBOX', 'BALANCE LAB', 'ART LAB', 'VOICE TEST', 'MUSIC TEST', 'BACK'];
 const ABOUT = [
   'EVERY SPELL OF EVERY CLASS, WITH FILTERS',
   'DEBUG MODE: CAST ANY SPELL, DUMMIES, SLOW-MO, HIT LOG',
   'CPU VS CPU SIMS, PER-CARD STATS, LIVE TUNING',
   'EVERY ATTACK AND SPELL ON LOOP: SHIPPED, BEFORE AND DRAFT LOOKS',
   'EVERY CLASS VOICE LINE AND ANNOUNCER CALL',
+  'EVERY MUSIC TRACK, AND ITS LOOP POINT',
   '',
 ];
 
@@ -40,7 +42,8 @@ export class DevMenuScene implements Scene {
     if (i === 2) pushScene(new LabScene());
     if (i === 3) pushScene(new ArtLabScene());
     if (i === 4) pushScene(new VoiceTestScene());
-    if (i === 5) { sfx('back'); this.back(); }
+    if (i === 5) pushScene(new MusicTestScene());
+    if (i === 6) { sfx('back'); this.back(); }
   }
 
   update(dt: number): void {
@@ -74,12 +77,13 @@ export function devFromHash(): boolean {
     pushScene(new BattleScene({ ...loadMatch(), p1: a, cpu: b, p1Deck: 'starter', cpuDeck: 'starter', stage, bestOf: 5 }, [0, 0], undefined, [], ['cpu', 'cpu']));
     return true;
   }
-  if (!['cards', 'sandbox', 'lab', 'art', 'voices', 'dev'].includes(tag)) return false;
+  if (!['cards', 'sandbox', 'lab', 'art', 'voices', 'music', 'dev'].includes(tag)) return false;
   pushScene(new DevMenuScene());
   if (tag === 'cards') openEncyclopedia();
   else if (tag === 'sandbox') pushScene(new SandboxScene());
   else if (tag === 'lab') pushScene(new LabScene());
   else if (tag === 'art') pushScene(new ArtLabScene());
   else if (tag === 'voices') pushScene(new VoiceTestScene());
+  else if (tag === 'music') pushScene(new MusicTestScene());
   return true;
 }

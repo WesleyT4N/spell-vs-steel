@@ -214,8 +214,10 @@ export function preloadMusic(id: TrackId): void {
 interface Playing { id: TrackId; gain: GainNode; src: AudioBufferSourceNode | null }
 let current: Playing | null = null;
 
-export function playMusic(id: TrackId): void {
-  if (current?.id === id) return;
+/** Start a track (no-op if it's already playing). `at` starts it that many seconds in and always restarts it (the
+ *  music test uses it to land just before the loop point). */
+export function playMusic(id: TrackId, at?: number): void {
+  if (current?.id === id && at === undefined) return;
   stopMusic();
   const c = init();
   if (!c) return;
@@ -230,7 +232,7 @@ export function playMusic(id: TrackId): void {
     // loop points sit on bar lines; the file's loop head already holds the ringing tail of the loop's end
     if (t.loopEnd > t.loopStart) { src.loop = true; src.loopStart = t.loopStart; src.loopEnd = t.loopEnd; }
     src.connect(me.gain);
-    src.start();
+    src.start(0, Math.max(0, Math.min(at ?? 0, buf.duration - 0.1)));
     me.src = src;
   });
 }
