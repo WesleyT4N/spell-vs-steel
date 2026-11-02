@@ -14,6 +14,7 @@ import { setDefaultSink } from './game/events';
 import { playBattleEvent } from './engine/battleAudio';
 import { loadImages } from './engine/assets';
 import { touchActive, onTouchChange, layout as layoutPad, syncPad, touchText, viewport } from './engine/touch';
+import { showRotate, tryLockLandscape } from './engine/rotate';
 
 // The game screen is the sharp UI resolution. The world draws at 240×160 offscreen and is scaled up 2×
 // underneath, so the fight keeps its chunky pixels while menus and text get twice the room.
@@ -39,6 +40,8 @@ const wantTall = (): boolean => touchActive() && !!getScene()?.tall?.();
 function fit(): void {
   const [vw, vh] = touchActive() ? viewport() : [window.innerWidth, window.innerHeight];
   const portrait = touchActive() && vh > vw;
+  // phones play in landscape only: held upright, the game waits under a turn-your-phone card
+  if (showRotate(portrait)) { releaseAll(); getScene()?.suspend?.(); }
   // phones in portrait keep the bottom half for the touch pad, unless the screen has a full-height layout;
   // in landscape the pad sits over the margins
   const tall = portrait && wantTall();
@@ -81,7 +84,7 @@ initInput(canvas);
 setDefaultSink(playBattleEvent);
 // Inside an embedded frame, keys only arrive after the page gets focus.
 // (a gamepad press engages too: pads read without focus)
-const engage = (): void => { page.engaged = true; canvas.focus(); };
+const engage = (): void => { page.engaged = true; canvas.focus(); if (touchActive()) tryLockLandscape(); };
 window.addEventListener('pointerdown', engage);
 window.addEventListener('keydown', () => { page.engaged = true; });
 // in the background: let go of held keys, hush the audio and let the screen pause itself (single-player fights do)
