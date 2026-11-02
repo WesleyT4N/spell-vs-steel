@@ -1,6 +1,6 @@
 # Spell VS Steel architecture
 
-How the game is put together, one section per system. Describes `main` at 20686e0 (2026-11-02).
+How the game is put together, one section per system. Describes `main` at 352a185 (2026-11-02).
 
 The full version, with a drawn diagram per system, is the living doc: https://claude.ai/artifact/TSKxaHfJ3qJXaK4SC4az2V. Keep this file and that doc in step: when a PR changes the structure described here, update the matching section in the same PR.
 
@@ -104,13 +104,15 @@ flowchart TD
 | Folder | Holds | Read by |
 | --- | --- | --- |
 | `assets/audio/music` | stage and menu tracks, loop points in `tracks.json` | `engine/musicTracks.ts`, `engine/audio.ts` |
-| `assets/audio/voice` | announcer and class voice lines | `engine/voice.ts`, `engine/announcer.ts` |
-| `assets/stages` | painted stage backdrops | `content/stages/index.ts` |
+| `assets/audio/sfx` | recorded sound effects; `sfx.json` maps game sounds to slots (#139) | `engine/sfxSamples.ts` |
+| `assets/audio/voice` | voice lines, grunts, hurt sounds, announcer (ElevenLabs) | `engine/voice.ts`, `engine/announcer.ts` |
+| `assets/stages` | painted stage backdrops; `panels/` each arena's panel face (#145) | `content/stages/index.ts`, `art/arena.ts` |
 | `assets/fx` | baked effect sheets (PNG strip + JSON frames) per class and `impact` | `src/fx/sheet.ts` |
 | `assets/fighters` | 48px PixelLab fighters, `-portrait` art, JSON palettes and frame lists | `art/pl/`, `art/paletteImage.ts` |
 | `assets/monsters` | Expedition monster sprites | `art/mobSprites.ts` |
 | `assets/cards` (+ `small/`) | 40px spell icons and their small versions | `art/cardIcons.ts` |
-| `assets/sprites`, `assets/ui` | pets, emblems, the pixel font | `art/paletteImage.ts`, `engine/font.ts` |
+| `assets/sprites` | pets and emblems | `art/paletteImage.ts` |
+| `assets/ui` | the pixel font; `fonts/` retro + gold glyph masks, `splash/` lettering, `queue-chip.png` (#145) | `engine/font.ts`, `engine/artFont.ts`, `game/combatArt.ts` |
 | `mods/<id>/` | built-in mods (`mod.json` + PNGs) | `src/mods/boot.ts` |
 
 - Images are decoded once at boot: `ready` in `main.ts` waits on `loadImages()` and `modsReady` before the first scene draws. Audio is read on first play through `assetBytes` (web: data URL decoded in place; apps: fetched file).
@@ -344,6 +346,22 @@ flowchart TD
 - Fighters are never stretched in menus; spell effects keep a 24×24 footprint and take their element's colour.
 - Visual state never goes into the Battle, so rollback and the hash never see it. Hit feel (#34, #73): the hit pause and slow-mo are rules (`Battle.hitStop` / `stopT` / `slowmo`, by hit tier from `TUNING.hitStop` and `TUNING.slowmo`; presses made during a pause are buffered and played after it), so they stay in lockstep and rollback. `game/hitFeel.ts` is the render-only part: a directional screen kick, a 1 px shudder while a pause runs, element impact sparks and popping damage numbers, deduped so a rollback doesn't replay them.
 - Basic shots are real projectiles at a constant speed (`TUNING.<cls>.shotSpeed`, capped by `maxShotSpeed` 15; only Aimed Shot may pass it), so full-row heavies can be dodged. A shot lights its row in the shooter's team colour until it is gone.
+- Combat text and panels (#145):
+
+```mermaid
+flowchart LR
+  tool["tools/pixellab/build_combat_ui.py"] --> ui["assets/ui/<br/>fonts/, splash/, queue-chip.png"]
+  tool --> pan["assets/stages/panels/&lt;stage&gt;.png"]
+  ui --> af["engine/artFont.ts<br/>glyph masks: banded fill, outline, shadow"]
+  ui --> ca["game/combatArt.ts<br/>drawSplash, drawChip, drawDamageNumber"]
+  af --> ca
+  af --> wb["scenes/skin.ts winBanner<br/>gold font on parchment"]
+  ca --> sb["scenes/battle.ts<br/>READY, FIGHT!, K.O."]
+  ca --> bv["game/battleView.ts<br/>damage numbers, queue chips"]
+  pan --> ar["art/arena.ts drawPanel<br/>inside the team rim"] --> bv
+```
+
+  `artFont.ts` draws the `retro` (damage numbers) and `gold` (win banners) fonts from glyph masks, colored in code and cached per string. `drawChip` recolors the queue chip to each spell's element. Every path falls back to the old drawing when its asset is missing.
 - Team colours (#75, `game/teamColors.ts`, view-only): `team(side)` makes the watching player blue and the opponent red for panel rims and faces, telegraphs, reticles, shot paths and HUD ribbons. P1 is "you" in local 2P and CPU vs CPU.
 - The canvas fits the window between 4:3 and 21:9 (shows more stage, no letterbox); phones in portrait give the bottom half to the touch pad.
 - Screens with a full-height phone layout (`Scene.tall`: title, fighter select, spell deck select (#69), decks, stages, options, online, lobby, ranked, replays, tournament, arcade, training, tutorial, spell encyclopedia) take the whole portrait screen instead and draw big controls from `scenes/touchUi.ts`: the action bar, tabs, scrolling row lists, sheets and swipes.
