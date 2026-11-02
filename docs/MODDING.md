@@ -21,15 +21,16 @@ A mod skin shows up on the fighter select under a SKINS tab next to COLORS (the 
 
 ## The shipped mods
 
-`mods/wes-skin/` (Mage: Wes, a young wizard) and `mods/hazel-druid-skin/` (Ranger: Hazel Druid). Both were made with PixelLab: a 48px idle
+`mods/wes-skin/` (Mage: Wes, a young wizard) and `mods/hazel-druid-skin/` (Ranger: Hazel). Both were made with PixelLab: a 48px idle
 sprite generated from the reference sheet (`/mnt/project-files/art/skin-mods-pl/ref/`), then `transfer_outfit` on
 the class's own game frames so every pose lines up with the built-in art, then
 `python3 tools/pixellab/build_skin_mod.py <frames dir> <prefix> <class> <mod id> <name> <skin id> <skin name> [author]`,
 which writes the mod's folder. Zip that folder's files to share the mod.
 
-Each also has its own voice: Hazel a young woman (Kokoro `af_bella`), Wes a younger wizard (`bm_fable`), saying their
-class's lines. `scripts/voices/gen.py <model dir> skins` renders the `skins` entries of `scripts/voices/lines.json`
-into the mod's folder (`<skin>-<line>-<n>.mp3`) and lists them under the skin's `voice` key in its `mod.json`.
+Each also has its own ElevenLabs voice: Hazel a sweet young woman, Wes a chill, stoic young wizard. Each has their
+own lines, grunts and hurt sounds. The `skins` entries of `scripts/voices/lines.json` hold the voices and lines, and
+`scripts/voices/skin.py` puts the clips into the mod's folder (`<skin>-<line>-<n>.mp3`) and lists them under the skin's
+`voice` key in its `mod.json` (see `scripts/voices/README.md`).
 
 ## File format
 

@@ -1,13 +1,13 @@
 {
   "format": "spell-vs-steel-mod/3",
   "id": "hazel-druid-skin",
-  "name": "Hazel Druid Skin",
+  "name": "Hazel Skin",
   "author": "Wes",
   "skins": [
     {
       "class": "ranger",
       "id": "hazel",
-      "name": "Hazel Druid",
+      "name": "Hazel",
       "sheet": "hazel.png",
       "portrait": "hazel-portrait.png",
       "team": "#89a8b6",
@@ -55,18 +55,40 @@
         "cast": [
           "hazel-cast-1.mp3",
           "hazel-cast-2.mp3",
-          "hazel-cast-3.mp3"
+          "hazel-cast-3.mp3",
+          "hazel-cast-4.mp3"
         ],
         "castBig": [
           "hazel-castBig-1.mp3",
-          "hazel-castBig-2.mp3"
+          "hazel-castBig-2.mp3",
+          "hazel-castBig-3.mp3",
+          "hazel-castBig-4.mp3"
         ],
         "death": [
-          "hazel-death-1.mp3"
+          "hazel-death-1.mp3",
+          "hazel-death-2.mp3"
+        ],
+        "grunt": [
+          "hazel-grunt-1.mp3",
+          "hazel-grunt-2.mp3",
+          "hazel-grunt-3.mp3",
+          "hazel-grunt-4.mp3"
+        ],
+        "hurt": [
+          "hazel-hurt-1.mp3",
+          "hazel-hurt-2.mp3",
+          "hazel-hurt-3.mp3",
+          "hazel-hurt-4.mp3"
+        ],
+        "hurtBig": [
+          "hazel-hurtBig-1.mp3",
+          "hazel-hurtBig-2.mp3"
         ],
         "win": [
           "hazel-win-1.mp3",
-          "hazel-win-2.mp3"
+          "hazel-win-2.mp3",
+          "hazel-win-3.mp3",
+          "hazel-win-4.mp3"
         ]
       }
     }

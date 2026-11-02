@@ -18,6 +18,7 @@ import { TrainingScene } from '../scenes/training';
 import { TutorialScene } from '../scenes/tutorial';
 import { DevMenuScene } from '../scenes/devMenu';
 import { SfxTestScene } from '../scenes/sfxTest';
+import { VoiceTestScene } from '../scenes/voiceTest';
 import { EncyclopediaScene } from '../scenes/encyclopedia';
 import { LabScene } from '../scenes/lab';
 import { ArtLabScene } from '../scenes/artLab';
@@ -488,7 +489,7 @@ export const screens: Record<string, () => void> = {
   },
   'replays-empty': () => { const s = new ReplaysScene(); s.list = []; setScene(s); },
   'profile': () => setScene(fakeProfile(false)),
-  // MODS: the shipped Wes (Mage) and Hazel Druid (Ranger) skins, Hazel picked; then one switched off, and the import panel
+  // MODS: the shipped Wes (Mage) and Hazel (Ranger) skins, Hazel picked; then one switched off, and the import panel
   'mods': () => { const m = new ModsScene(); m.cur = Math.max(0, MODS.findIndex(e => e.id === 'hazel-druid-skin')); setScene(m); run(0.2); },
   'mods-off': () => { setModOn('wes-skin', false); const m = new ModsScene(); setScene(m); run(0.2); },
   'mods-import': () => { const m = new ModsScene(); setScene(m); (m as unknown as { openImport(): void }).openImport(); run(0.1); },
@@ -526,6 +527,8 @@ export const screens: Record<string, () => void> = {
   // a card open for reading (on phones, the sheet with its clip and rules)
   'encyclopedia-card': () => { const e = new EncyclopediaScene(title, () => {}); e.cls = 'mage'; e.sel = e.reading = 4; setScene(e); run(0.5); },
   'balance-lab': () => setScene(new LabScene(title)),
+  // every class line incl. grunts and hurt sounds, the voiced mod skins (Hazel, Wes) and the announcer
+  'voice-test': () => setScene(new VoiceTestScene(title)),
   // Warrior's light attack, mid-swing
   'art-lab': () => { setScene(new ArtLabScene(title, { tab: 'warrior', section: 'fx', zoom: 1 })); run(0.15); },
   'art-lab-anims': () => { setScene(new ArtLabScene(title, { tab: 'rogue', section: 'anims', entry: 6, zoom: 3 })); run(0.35); },

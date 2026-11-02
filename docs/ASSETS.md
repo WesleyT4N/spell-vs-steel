@@ -9,7 +9,7 @@ assets/
   audio/music/tracks.json       loop points per track, in seconds
   audio/sfx/<slot>.mp3          sound effects (scripts/sfx/)
   audio/sfx/sfx.json            per-slot gain, and which slots each game sound plays
-  audio/voice/<speaker>/<line>-<n>.mp3   voice lines (scripts/voices/gen.py); "ann" is the announcer
+  audio/voice/<speaker>/<line>-<n>.mp3   voice lines, grunts and hurt sounds (ElevenLabs, scripts/voices); "ann" is the announcer
   stages/<stage>.png            painted stage backdrops (tools/pixellab/build_stages.py)
   fx/<class>/<effect>.png       effect frames as one horizontal strip (tools/pixellab/build_fx.py)
   fx/<class>/<effect>.json      frame size and count, speed, origin, and how the game shows the effect
