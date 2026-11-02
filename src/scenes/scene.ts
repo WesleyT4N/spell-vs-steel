@@ -1,5 +1,5 @@
 // Scene switching (the stack lives in stack.ts), mouse hit zones and small UI widgets shared by the menus.
-import { spread, type Ctx } from '../engine/gfx';
+import { type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
 import { win, selRow, plaque, footer, sepia, toInk, INK, INK2, TRIM } from './skin';
 import { mouse } from '../engine/input';
@@ -28,8 +28,6 @@ let zones: Zone[] = [];
 let nextZones: Zone[] = [];
 let zoneDY = 0;
 export function zone(id: string, x: number, y: number, w: number, h: number): void { nextZones.push({ id, x, y: y + zoneDY, w, h }); }
-/** Move zones registered from now on by `dy` (a split screen's top part draws in its own coordinates). */
-export function shiftZones(dy: number): void { zoneDY = dy; }
 /** Swap in the zones drawn this frame. Called by the main loop after drawing. */
 export function commitZones(): void { zones = nextZones; nextZones = []; }
 /** The clickable zones live this frame (for automated playtests). */
@@ -39,14 +37,6 @@ export function hotZone(): string | null {
   for (let i = zones.length - 1; i >= 0; i--) {
     const z = zones[i];
     if (mouse.x >= z.x && mouse.x < z.x + z.w && mouse.y >= z.y && mouse.y < z.y + z.h) return z.id;
-  }
-  return null;
-}
-/** Id of the topmost zone at a point (UI coordinates), or null. */
-export function zoneAt(x: number, y: number): string | null {
-  for (let i = zones.length - 1; i >= 0; i--) {
-    const z = zones[i];
-    if (x >= z.x && x < z.x + z.w && y >= z.y && y < z.y + z.h) return z.id;
   }
   return null;
 }
@@ -74,7 +64,7 @@ export function drawMenu(c: Ctx, items: string[], sel: number, cx: number, y: nu
   const s = opts.scale ?? 1;
   let gap = opts.gap ?? 20;
   // phone portrait: rows grow taller, downward into the spare height
-  if (opts.grow !== false) gap = Math.round(gap * spread.k);
+  if (opts.grow !== false) gap = Math.round(gap);
   const w = opts.width ?? Math.max(...items.map(t => textWidth(t, s))) + 48;
   const x = Math.round(cx - w / 2);
   win(c, x, y - 8, w, items.length * gap + 10);

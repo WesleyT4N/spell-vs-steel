@@ -4,7 +4,7 @@ import { getArena, useStage } from '../game/battleView';
 import { BattleScene } from './battle';
 import { loadMatch } from '../game/match';
 import { drawStage } from '../art/arena';
-import { UW, screenRect, spread, type Ctx } from '../engine/gfx';
+import { UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k } from '../engine/input';
 import { sfx } from '../engine/audio';
@@ -61,8 +61,8 @@ export class DevMenuScene implements Scene {
     c.fillRect(...screenRect());
     drawTextCentered(ui, 'DEV TOOLS', UW / 2, 48, '#f8b800', 3);
     drawMenu(ui, ITEMS, this.sel, UW / 2, 112, tick, { width: 240, gap: 24 });
-    // under the menu, whose rows grow in phone portrait
-    if (showSel()) drawTextCentered(ui, ABOUT[this.sel], UW / 2, 112 + ITEMS.length * Math.round(24 * spread.k) + 24, '#bcbcbc');
+    // under the menu
+    if (showSel()) drawTextCentered(ui, ABOUT[this.sel], UW / 2, 112 + ITEMS.length * 24 + 24, '#bcbcbc');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   ${k('cast')}: BACK`);
   }
 }

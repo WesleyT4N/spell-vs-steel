@@ -1,6 +1,5 @@
 // Expedition (roguelike) screens: the act map, the fights, spell rewards, rest stops, the shop, your deck,
-// and the end of the run. Every screen has a phone portrait layout (tall) and the usual one for desktop and
-// phone landscape; both offer the same choices.
+// and the end of the run.
 import { pushScene, replaceScene, popScene, goHome, drawMenu, hint, zone, hot, isHot, listMouse, dim, type Scene } from './scene';
 import { BattleScene } from './battle';
 import { Battle, NO_INTENT } from '../game/battle';
@@ -17,13 +16,12 @@ import {
   choices, makeFight, spellChoices, goldFor, rollRelic, addRelic, addSpell, removeSpell, heal, stock, relicOf, has, newRun,
   REST_HEAL, BOSS_FLOOR, RUN_FLOORS, actOf, nextAct, type ExpeditionRun, type MapNode, type NodeKind, type ShopItem,
 } from '../game/expedition';
-import { UW, P, screenRect, spread, vy, mix, type Ctx } from '../engine/gfx';
+import { UW, P, screenRect, mix, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, drawTextOutlined, textWidth, wrap } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { touchActive, type PadMode } from '../engine/touch';
 import { playMusic, stopMusic, sfx } from '../engine/audio';
 import { win, plaque, banner, disc, PAPER, INK, INK2, TRIM, RED_INK, BLUE_INK, GOLD, FRAME, WAX } from './skin';
-import { actionBar, barTapped, bigButton, panel, tallArea, GAP, PAD, TAP } from './touchUi';
 import { drawCardFace, drawCardDetail, CARD_W, CARD_H } from './cardView';
 import type { RoundRecord } from '../game/stats';
 import type { ReplayMode } from '../game/replay';
@@ -113,7 +111,6 @@ export class ExpeditionMapScene implements Scene {
   enter(): void { playMusic('menu'); }
   resume(): void { playMusic('menu'); }
   pad(): PadMode { return 'none'; }
-  tall(): boolean { return true; }
 
   /** The nodes you can go to next, left to right, so left/right on the keys and pad move the way they look. */
   private get options(): MapNode[] { return [...choices(this.run)].sort((a, b) => a.lane - b.lane); }
@@ -143,15 +140,11 @@ export class ExpeditionMapScene implements Scene {
     const opts = this.options;
     this.sel = Math.min(this.sel, opts.length - 1);
     if (this.quitting) { this.updateQuit(dt); return; }
-    if (spread.tall && mouse.click) {
-      if (barTapped('back')) { this.quitting = true; this.quitSel = 1; sfx('back'); return; }
-      if (barTapped('mid')) { sfx('select'); pushScene(new DeckScene(this.run, 'view')); return; }
-      if (barTapped('primary')) { this.go(opts[this.sel]); return; }
-    }
+    
     const act = pointerPick('node', this.sel, i => { this.sel = i; });
     if (act >= 0) { this.go(opts[act]); return; }
-    if (!spread.tall && mouse.click && isHot('deck')) { sfx('select'); pushScene(new DeckScene(this.run, 'view')); return; }
-    if (!spread.tall && mouse.click && isHot('quit')) { this.quitting = true; this.quitSel = 1; sfx('back'); return; }
+    if (mouse.click && isHot('deck')) { sfx('select'); pushScene(new DeckScene(this.run, 'view')); return; }
+    if (mouse.click && isHot('quit')) { this.quitting = true; this.quitSel = 1; sfx('back'); return; }
     const n = opts.length;
     if (navPressed('left', dt) && this.sel > 0) { this.sel--; sfx('move'); }
     if (navPressed('right', dt) && this.sel < n - 1) { this.sel++; sfx('move'); }
@@ -161,10 +154,7 @@ export class ExpeditionMapScene implements Scene {
   }
 
   private updateQuit(dt: number): void {
-    if (spread.tall && mouse.click) {
-      if (isHot('quit:yes')) { stopMusic(); goHome(); return; }
-      if (isHot('quit:no') || barTapped('back')) { this.quitting = false; sfx('back'); return; }
-    }
+    
     const clicked = listMouse('menu', this.quitSel, i => { this.quitSel = i; sfx('move'); });
     if (navPressed('up', dt) || navPressed('down', dt)) { this.quitSel = 1 - this.quitSel; sfx('move'); }
     if (wasPressed('back') || mouse.rclick) { this.quitting = false; sfx('back'); return; }
@@ -175,11 +165,11 @@ export class ExpeditionMapScene implements Scene {
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
     backdrop(c, tick, this.run);
-    if (spread.tall) { this.drawTall(ui, tick); return; }
+    
     const run = this.run;
-    banner(ui, `ACT ${run.act + 1}: ${actOf(run).name}`, UW / 2, vy(3));
+    banner(ui, `ACT ${run.act + 1}: ${actOf(run).name}`, UW / 2, 3);
     // you, on the left
-    const lx = 8, ly = vy(36), lw = 112, lh = vy(296) - ly;
+    const lx = 8, ly = 36, lw = 112, lh = 296 - ly;
     win(ui, lx, ly, lw, lh);
     drawFighterSprite(ui, getSprite(run.cls, run.skin, false), lx + lw / 2, ly + 62 - (Math.floor(tick / 4) % 2) * 2, false, 'none', 2);
     drawTextCentered(ui, CLASS_INFO[run.cls].name, lx + lw / 2, ly + 68, INK, 1, false);
@@ -195,7 +185,7 @@ export class ExpeditionMapScene implements Scene {
     this.smallButton(ui, 'quit', 'ABANDON RUN', lx + 6, by + 20, lw - 12);
 
     // the map
-    const top = vy(66), bottom = vy(286);
+    const top = 66, bottom = 286;
     this.drawMap(ui, tick, UW / 2, 70, top, bottom, false);
 
     // the chosen node, on the right
@@ -271,7 +261,7 @@ export class ExpeditionMapScene implements Scene {
   private drawIntro(ui: Ctx): void {
     if (this.introT <= 0) return;
     dim(ui, 0.75);
-    const cy = spread.tall ? tallArea().y + tallArea().h / 2 : vy(150);
+    const cy = 150;
     drawTextCentered(ui, `ACT ${this.run.act + 1}`, UW / 2, cy - 44, GOLD, 2, true);
     drawTextCentered(ui, actOf(this.run).name, UW / 2, cy - 18, '#fcfcfc', 4, true);
     drawTextCentered(ui, 'FULLY HEALED', UW / 2, cy + 26, '#58d854', 2, true);
@@ -279,37 +269,8 @@ export class ExpeditionMapScene implements Scene {
 
   private drawQuit(ui: Ctx, tick: number): void {
     dim(ui, 0.6);
-    drawTextCentered(ui, 'ABANDON THIS RUN?', UW / 2, vy(110), '#fcfcfc', 3);
-    drawMenu(ui, ['YES, ABANDON', 'NO, KEEP GOING'], this.quitSel, UW / 2, vy(150), tick, { width: 180, gap: 22 });
-  }
-
-  private drawTall(ui: Ctx, tick: number): void {
-    const run = this.run, a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
-    let y = a.y + PAD;
-    drawTextCentered(ui, actOf(run).name, UW / 2, y, PAPER, 3, true);
-    y += 26;
-    drawTextCentered(ui, runLine(run), UW / 2, y, run.hp / run.maxHp < 0.3 ? '#f87858' : '#fcfcfc', 1, true);
-    y += 12;
-    drawTextCentered(ui, run.relics.length ? run.relics.map(id => relicOf(id).name).join('  ') : 'NO RELICS YET', UW / 2, y, GOLD, 1, true);
-    y += 16;
-    const barTop = actionBar(ui, { back: 'ABANDON', mid: { id: 'deck', label: 'DECK' }, primary: { id: 'go', label: 'GO!' } });
-    // the chosen node's card above the bar, the map above that
-    const infoH = 92, iy = barTop - GAP - infoH;
-    const n = this.options[this.sel];
-    panel(ui, x0, iy, w, infoH);
-    drawTextCentered(ui, KIND_NAME[n.kind], x0 + w / 2, iy + 10, n.kind === 'boss' ? RED_INK : BLUE_INK, 2, false);
-    const names = [...new Set(n.pack)].map(id => { const c = n.pack.filter(p => p === id).length; return c > 1 ? `${MOBS[id].name} X${c}` : MOBS[id].name; });
-    const lines = [...(names.length ? [names.join(', ')] : []), ...KIND_TEXT[n.kind]];
-    lines.slice(0, 4).forEach((l, i) => drawTextCentered(ui, l, x0 + w / 2, iy + 32 + i * 12, i === 0 && names.length ? INK : TRIM, 1, false));
-    this.drawMap(ui, tick, UW / 2, Math.min(130, Math.round(w / 3.4)), y + 30, iy - 30, true);
-    if (this.quitting) {
-      dim(ui, 0.6);
-      const by = a.y + a.h / 2 - TAP - GAP;
-      drawTextCentered(ui, 'ABANDON THIS RUN?', UW / 2, by - 40, '#fcfcfc', 3);
-      bigButton(ui, 'quit:yes', 'YES, ABANDON', x0, by, w, TAP);
-      bigButton(ui, 'quit:no', 'NO, KEEP GOING', x0, by + TAP + GAP, w, TAP, { primary: true });
-    }
-    this.drawIntro(ui);
+    drawTextCentered(ui, 'ABANDON THIS RUN?', UW / 2, 110, '#fcfcfc', 3);
+    drawMenu(ui, ['YES, ABANDON', 'NO, KEEP GOING'], this.quitSel, UW / 2, 150, tick, { width: 180, gap: 22 });
   }
 }
 
@@ -373,7 +334,6 @@ export class RewardScene implements Scene {
 
   enter(): void { playMusic('victory'); }
   pad(): PadMode { return 'none'; }
-  tall(): boolean { return true; }
 
   private get count(): number { return this.offer.length + 1; }
 
@@ -392,7 +352,7 @@ export class RewardScene implements Scene {
     this.t += dt;
     // a beat before taking input, so keys mashed in the fight (or on the screen before) don't pick anything
     if (this.t < SETTLE) return;
-    if (spread.tall && mouse.click && barTapped('primary')) { this.take(this.sel); return; }
+    
     const act = pointerPick('pick', this.sel, i => { this.sel = i; });
     if (act >= 0) { this.take(act); return; }
     if (navPressed('left', dt) || navPressed('up', dt)) { this.sel = (this.sel + this.count - 1) % this.count; sfx('move'); }
@@ -402,15 +362,15 @@ export class RewardScene implements Scene {
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
     backdrop(c, tick, this.run);
-    const tall = spread.tall, a = tall ? tallArea() : null;
-    const top = a ? a.y + PAD : vy(3);
-    if (a) drawTextCentered(ui, 'VICTORY!', UW / 2, top, PAPER, 3, true); else banner(ui, 'VICTORY!', UW / 2, top);
+
+    const top = 3;
+    banner(ui, 'VICTORY!', UW / 2, top);
     let y = top + 30;
-    drawTextCentered(ui, `+${this.gold} GOLD   (${this.run.gold} TOTAL)`, UW / 2, y, GOLD, tall ? 2 : 1, true);
-    y += tall ? 20 : 12;
+    drawTextCentered(ui, `+${this.gold} GOLD   (${this.run.gold} TOTAL)`, UW / 2, y, GOLD, 1, true);
+    y += 12;
     if (this.relic) { const r = relicOf(this.relic); drawTextCentered(ui, `RELIC: ${r.name} - ${r.text}`, UW / 2, y, '#fcfcfc', 1, true); y += 12; }
-    drawTextCentered(ui, this.node.kind === 'boss' ? 'CLAIM A LEGENDARY SPELL' : 'ADD A SPELL TO YOUR DECK', UW / 2, y + 4, PAPER, tall ? 2 : 1, true);
-    y += tall ? 26 : 18;
+    drawTextCentered(ui, this.node.kind === 'boss' ? 'CLAIM A LEGENDARY SPELL' : 'ADD A SPELL TO YOUR DECK', UW / 2, y + 4, PAPER, 1, true);
+    y += 18;
     // the offered cards in a row, then SKIP
     const n = this.offer.length, gap = 10, rowW = n * CARD_W + (n - 1) * gap, x0 = Math.round(UW / 2 - rowW / 2);
     this.offer.forEach((id, i) => {
@@ -424,19 +384,13 @@ export class RewardScene implements Scene {
     const skipSel = this.sel === n;
     // details of the card picked
     const card = this.sel < n ? CARDS[this.offer[this.sel]] : null;
-    if (tall && a) {
-      const barTop = actionBar(ui, { back: false, primary: { id: 'take', label: skipSel ? 'SKIP (+10 GOLD)' : 'TAKE IT' } });
-      bigButton(ui, `pick:${n}`, 'SKIP: +10 GOLD', a.x + PAD, y, a.w - PAD * 2, TAP, { on: skipSel });
-      y += TAP + GAP;
-      if (card) { panel(ui, a.x + PAD, y, a.w - PAD * 2, barTop - GAP - y); drawCardDetail(ui, card, a.x + PAD + 10, y + 10, a.w - PAD * 2 - 20, 2); }
-      return;
-    }
+    
     const sw = 160, sx = UW / 2 - sw / 2;
     zone(`pick:${n}`, sx, y, sw, 18);
     const ink = plaque(ui, sx, y, sw, 18, skipSel);
     drawTextCentered(ui, 'SKIP: +10 GOLD', UW / 2, y + 6, ink, 1, false);
     y += 26;
-    if (card) { win(ui, 70, y, UW - 140, vy(300) - y); drawCardDetail(ui, card, 80, y + 8, UW - 160, 1); }
+    if (card) { win(ui, 70, y, UW - 140, 300 - y); drawCardDetail(ui, card, 80, y + 8, UW - 160, 1); }
     hint(ui, `CLICK OR ${k('left')}/${k('right')}: PICK   ${k('attack')}: TAKE`);
   }
 }
@@ -450,7 +404,6 @@ export class RestScene implements Scene {
   enter(): void { playMusic('menu'); }
   resume(): void { if (this.removed) replaceScene(new ExpeditionMapScene(this.run)); }
   pad(): PadMode { return 'none'; }
-  tall(): boolean { return true; }
   private removed = false;
   private get share(): number { return has(this.run, 'moonwell') ? 0.5 : REST_HEAL; }
   private get items(): string[] {
@@ -468,7 +421,7 @@ export class RestScene implements Scene {
     this.t += dt;
     // a beat before taking input, so keys mashed in the fight (or on the screen before) don't pick anything
     if (this.t < SETTLE) return;
-    if (spread.tall && mouse.click) { const h = hot('rest'); if (h >= 0) { this.choose(h); return; } }
+    
     const clicked = listMouse('menu', this.sel, i => { this.sel = i; sfx('move'); });
     if (navPressed('up', dt) || navPressed('down', dt)) { this.sel = 1 - this.sel; sfx('move'); }
     if (wasPressed('confirm') || wasPressed('attack') || clicked >= 0) this.choose(clicked >= 0 ? clicked : this.sel);
@@ -477,22 +430,11 @@ export class RestScene implements Scene {
   draw(c: Ctx, tick: number, ui: Ctx): void {
     backdrop(c, tick, this.run);
     const run = this.run;
-    if (spread.tall) {
-      const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
-      let y = a.y + PAD;
-      drawTextCentered(ui, 'REST STOP', UW / 2, y, PAPER, 3, true);
-      y += 30;
-      drawTextCentered(ui, runLine(run), UW / 2, y, '#fcfcfc', 1, true);
-      y = a.y + Math.round(a.h * 0.22);
-      this.drawFire(ui, tick, UW / 2 + 20, y + 40, 4);
-      y = a.y + Math.round(a.h * 0.5);
-      this.items.forEach((label, i) => { bigButton(ui, `rest:${i}`, label, x0, y, w, TAP + 10, { primary: i === 0 }); y += TAP + 10 + GAP; });
-      return;
-    }
-    banner(ui, 'REST STOP', UW / 2, vy(3));
-    drawTextCentered(ui, runLine(run), UW / 2, vy(40), '#fcfcfc', 1, true);
-    this.drawFire(ui, tick, UW / 2, vy(110), 2);
-    drawMenu(ui, this.items, this.sel, UW / 2, vy(170), tick, { width: 220, gap: 24 });
+    
+    banner(ui, 'REST STOP', UW / 2, 3);
+    drawTextCentered(ui, runLine(run), UW / 2, 40, '#fcfcfc', 1, true);
+    this.drawFire(ui, tick, UW / 2, 110, 2);
+    drawMenu(ui, this.items, this.sel, UW / 2, 170, tick, { width: 220, gap: 24 });
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')}: CHOOSE`);
   }
 
@@ -522,7 +464,6 @@ export class ShopScene implements Scene {
   }
   private done = false;
   pad(): PadMode { return 'none'; }
-  tall(): boolean { return true; }
   private get count(): number { return this.items.length + 1; }
 
   private label(it: ShopItem): string {
@@ -546,8 +487,8 @@ export class ShopScene implements Scene {
     this.t += dt;
     // a beat before taking input, so keys mashed in the fight (or on the screen before) don't pick anything
     if (this.t < SETTLE) return;
-    if (spread.tall && mouse.click && barTapped('back')) { replaceScene(new ExpeditionMapScene(this.run)); return; }
-    if (spread.tall && mouse.click && barTapped('primary')) { this.buy(this.sel); return; }
+    
+    
     const act = pointerPick('shop', this.sel, i => { this.sel = i; });
     if (act >= 0) { this.buy(act); return; }
     if (navPressed('up', dt)) { this.sel = (this.sel + this.count - 1) % this.count; sfx('move'); }
@@ -558,16 +499,15 @@ export class ShopScene implements Scene {
 
   draw(c: Ctx, tick: number, ui: Ctx): void {
     backdrop(c, tick, this.run);
-    const run = this.run, tall = spread.tall, a = tall ? tallArea() : null;
-    const x0 = a ? a.x + PAD : 40, w = a ? a.w - PAD * 2 : 230;
-    let y = a ? a.y + PAD : vy(3);
-    if (a) drawTextCentered(ui, 'SHOP', UW / 2, y, PAPER, 3, true); else banner(ui, 'SHOP', UW / 2, y);
+    const run = this.run, tall = false;
+    const x0 = 40, w = 230;
+    let y = 3;
+    banner(ui, 'SHOP', UW / 2, y);
     y += 30;
-    drawTextCentered(ui, `GOLD ${run.gold}`, a ? UW / 2 : x0 + w / 2, y, GOLD, 2, true);
+    drawTextCentered(ui, `GOLD ${run.gold}`, x0 + w / 2, y, GOLD, 2, true);
     y += 22;
-    const rowH = tall ? TAP : 20;
+    const rowH = 20;
     const rows = [...this.items.map(it => ({ it, text: this.label(it) })), { it: null, text: 'LEAVE' }];
-    const barTop = a ? actionBar(ui, { back: 'LEAVE', primary: { id: 'buy', label: this.sel < this.items.length ? 'BUY' : 'LEAVE' } }) : 0;
     rows.forEach(({ it, text }, i) => {
       const yy = y + i * (rowH + (tall ? 6 : 4)), on = i === this.sel;
       if (tall && !it) return; // LEAVE lives in the bar on phones
@@ -583,15 +523,9 @@ export class ShopScene implements Scene {
     });
     // what the selected item is
     const it = this.items[this.sel];
-    if (!it) { if (!tall) hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')}: BUY`); return; }
-    if (tall && a) {
-      const py = y + this.items.length * (rowH + 6) + GAP, ph = Math.max(60, barTop - GAP - py);
-      panel(ui, x0, py, w, ph);
-      if (it.kind === 'spell') drawCardDetail(ui, CARDS[it.id], x0 + 10, py + 10, w - 20, 2);
-      else drawTextCentered(ui, it.kind === 'relic' ? relicOf(it.id).text : 'TAKE ONE SPELL OUT OF YOUR DECK', UW / 2, py + 20, INK, 2, false);
-      return;
-    }
-    const px = x0 + w + 16, pw = UW - px - 16, py = vy(36), ph = vy(296) - py;
+    if (!it) { hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')}: BUY`); return; }
+    
+    const px = x0 + w + 16, pw = UW - px - 16, py = 36, ph = 296 - py;
     win(ui, px, py, pw, ph);
     if (it.kind === 'spell') {
       drawCardFace(ui, CARDS[it.id], px + Math.round((pw - CARD_W) / 2), py + 10, {});
@@ -612,7 +546,6 @@ export class DeckScene implements Scene {
   sel = 0;
   constructor(private run: ExpeditionRun, private mode: 'view' | 'remove', private onRemove?: () => void) {}
   pad(): PadMode { return 'none'; }
-  tall(): boolean { return true; }
   private get ids(): string[] {
     return Object.keys(this.run.deck).sort((x, y) => {
       const a = CARDS[x], b = CARDS[y], ca = typeof a.cost === 'number' ? a.cost : 6, cb = typeof b.cost === 'number' ? b.cost : 6;
@@ -622,12 +555,12 @@ export class DeckScene implements Scene {
 
   update(dt: number): void {
     const ids = this.ids, n = ids.length;
-    if (spread.tall && mouse.click && barTapped('back')) { sfx('back'); popScene(); return; }
-    if (spread.tall && mouse.click && barTapped('primary') && this.mode === 'remove') { this.remove(ids[this.sel]); return; }
+    
+    
     const act = pointerPick('card', this.sel, i => { this.sel = i; });
     // viewing, a click only reads the card; removing, a click removes it (a finger taps twice: once to pick, once to remove)
     if (act >= 0) { if (this.mode === 'remove') this.remove(ids[act]); else this.sel = act; return; }
-    const cols = spread.tall ? 1 : 2;
+    const cols = 2;
     if (navPressed('up', dt)) { this.sel = (this.sel + n - cols) % n; sfx('move'); }
     if (navPressed('down', dt)) { this.sel = (this.sel + cols) % n; sfx('move'); }
     if (cols > 1 && (navPressed('left', dt) || navPressed('right', dt))) { this.sel = this.sel % 2 ? this.sel - 1 : Math.min(n - 1, this.sel + 1); sfx('move'); }
@@ -649,25 +582,9 @@ export class DeckScene implements Scene {
     this.sel = Math.min(this.sel, ids.length - 1);
     const title = this.mode === 'remove' ? 'REMOVE A SPELL' : `YOUR DECK (${total})`;
     const card = CARDS[ids[this.sel]];
-    if (spread.tall) {
-      const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
-      let y = a.y + PAD;
-      drawTextCentered(ui, title, UW / 2, y, PAPER, 3, true);
-      y += 30;
-      const barTop = actionBar(ui, { back: '← BACK', primary: this.mode === 'remove' ? { id: 'remove', label: 'REMOVE IT' } : undefined });
-      const detailH = 170, rowH = 26, rows = Math.max(1, Math.floor((barTop - GAP - detailH - GAP - y) / (rowH + 4)));
-      const first = Math.max(0, Math.min(ids.length - rows, this.sel - Math.floor(rows / 2)));
-      ids.slice(first, first + rows).forEach((id, j) => {
-        const i = first + j, yy = y + j * (rowH + 4);
-        zone(`card:${i}`, x0, yy, w, rowH);
-        const ink = plaque(ui, x0, yy, w, rowH, i === this.sel);
-        drawText(ui, `${run.deck[id]}X ${CARDS[id].name.toUpperCase()}`, x0 + 8, yy + 6, i === this.sel ? ink : INK, 2);
-      });
-      if (card) { const py = barTop - GAP - detailH; panel(ui, x0, py, w, detailH); drawCardDetail(ui, card, x0 + 10, py + 10, w - 20, 2); }
-      return;
-    }
-    banner(ui, title, UW / 2, vy(3));
-    const x0 = 16, colW = 136, rowH = 15, y0 = vy(36);
+    
+    banner(ui, title, UW / 2, 3);
+    const x0 = 16, colW = 136, rowH = 15, y0 = 36;
     ids.forEach((id, i) => {
       const x = x0 + (i % 2) * (colW + 6), y = y0 + Math.floor(i / 2) * (rowH + 3);
       zone(`card:${i}`, x, y, colW, rowH);
@@ -676,7 +593,7 @@ export class DeckScene implements Scene {
     });
     const px = x0 + colW * 2 + 18, pw = UW - px - 12;
     if (card) {
-      win(ui, px, y0, pw, vy(296) - y0);
+      win(ui, px, y0, pw, 296 - y0);
       drawCardFace(ui, card, px + Math.round((pw - CARD_W) / 2), y0 + 8, { lit: true });
       drawCardDetail(ui, card, px + 8, y0 + CARD_H + 18, pw - 16, 1);
     }
@@ -692,7 +609,6 @@ export class RunOverScene implements Scene {
   constructor(private run: ExpeditionRun) {}
   enter(): void { stopMusic(); playMusic(this.run.over === 'won' ? 'victory' : 'menu'); }
   pad(): PadMode { return 'none'; }
-  tall(): boolean { return true; }
   private readonly items = ['NEW RUN', 'TITLE'];
 
   private choose(i: number): void {
@@ -705,10 +621,7 @@ export class RunOverScene implements Scene {
     this.t += dt;
     // a beat before taking input, so keys mashed in the fight (or on the screen before) don't pick anything
     if (this.t < SETTLE) return;
-    if (spread.tall && mouse.click) {
-      if (barTapped('back')) { this.choose(1); return; }
-      if (barTapped('primary')) { this.choose(0); return; }
-    }
+    
     const clicked = listMouse('menu', this.sel, i => { this.sel = i; sfx('move'); });
     if (navPressed('up', dt) || navPressed('down', dt)) { this.sel = 1 - this.sel; sfx('move'); }
     if (wasPressed('confirm') || wasPressed('attack') || clicked >= 0) this.choose(clicked >= 0 ? clicked : this.sel);
@@ -730,23 +643,13 @@ export class RunOverScene implements Scene {
   draw(c: Ctx, tick: number, ui: Ctx): void {
     backdrop(c, tick, this.run);
     const won = this.run.over === 'won', title = won ? 'EXPEDITION CLEARED!' : 'RUN OVER';
-    if (spread.tall) {
-      const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
-      let y = a.y + PAD;
-      drawTextCentered(ui, title, UW / 2, y, won ? GOLD : '#f87858', 3, true);
-      y += 34;
-      const barTop = actionBar(ui, { back: 'TITLE', primary: { id: 'again', label: 'NEW RUN' } });
-      panel(ui, x0, y, w, barTop - GAP - y);
-      drawFighterSprite(ui, getSprite(this.run.cls, this.run.skin, false), UW / 2, y + 90, false, won ? 'none' : 'ghost', 3);
-      this.lines().forEach((l, i) => { for (const [j, part] of wrap(l, Math.floor((w - 20) / 6)).entries()) drawTextCentered(ui, part, UW / 2, y + 110 + i * 22 + j * 10, INK, 1, false); });
-      return;
-    }
-    banner(ui, title, UW / 2, vy(3));
-    const px = 70, pw = UW - 140, py = vy(40), ph = vy(230) - py;
+    
+    banner(ui, title, UW / 2, 3);
+    const px = 70, pw = UW - 140, py = 40, ph = 230 - py;
     win(ui, px, py, pw, ph, { accent: won ? GOLD : WAX });
     drawFighterSprite(ui, getSprite(this.run.cls, this.run.skin, false), px + 50, py + 80, false, won ? 'none' : 'ghost', 2);
     this.lines().forEach((l, i) => { for (const [j, part] of wrap(l, 44).entries()) drawText(ui, part, px + 100, py + 14 + i * 18 + j * 9, INK, 1); });
-    drawMenu(ui, this.items, this.sel, UW / 2, vy(244), tick, { width: 160, gap: 20 });
+    drawMenu(ui, this.items, this.sel, UW / 2, 244, tick, { width: 160, gap: 20 });
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')}: SELECT`);
   }
 }

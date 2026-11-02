@@ -6,7 +6,7 @@ import { getStage, stageMusic, STAGE_IDS } from '../content/stages';
 import { drawPanel, drawStage, panelFoot } from '../art/arena';
 import { useStage } from '../game/battleView';
 import { getSprite, drawFighterSprite, skinOf, mirrorSkin } from '../art/sprites';
-import { P, W, H, UW, HD, rng, screenRect, fillScreen, vy, spread, type Ctx } from '../engine/gfx';
+import { P, W, H, UW, HD, rng, screenRect, fillScreen, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { win, plaque, banner, stepTrail, FRAME, GOLD, PAPER, INK, INK2, RED_INK } from './skin';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
@@ -18,7 +18,6 @@ import { BattleScene } from './battle';
 import { OnlineBattleScene } from './onlineBattle';
 import type { PadMode } from '../engine/touch';
 import { YOU, FOE } from '../game/teamColors';
-import { bigButton, actionBar, barTapped, swipeIn, tallArea, dots, GAP, PAD } from './touchUi';
 
 /** Stage tiles: every stage, then RANDOM. */
 const TILES = [...STAGE_IDS, 'random'];
@@ -83,11 +82,7 @@ export class StageSelectScene implements Scene {
     const pcx = this.preview.getContext('2d')!; pcx.setTransform(HD, 0, 0, HD, 0, 0); pcx.imageSmoothingEnabled = false;
     if (net) net.lobby = { ...net.lobby, stage: TILES[this.cur], voted: false };
   }
-
-  tall(): boolean { return true; }
-  pad(): PadMode { return spread.tall ? 'none' : 'back'; }
-  /** Full-height phone layout: where the preview was drawn, for swipes. */
-  private previewRect: [number, number, number, number] = [0, 0, 0, 0];
+  pad(): PadMode { return 'back'; }
 
   private cursorStage(): string { return TILES[this.cur] === 'random' ? STAGE_IDS[Math.floor(this.t * 6) % STAGE_IDS.length] : TILES[this.cur]; }
   private get voted(): boolean { return this.net ? this.net.lobby.voted : this.final !== null; }
@@ -163,7 +158,7 @@ export class StageSelectScene implements Scene {
       return;
     }
 
-    if (wasPressed('back') || mouse.rclick || (spread.tall && barTapped('back'))) {
+    if (wasPressed('back') || mouse.rclick) {
       sfx('back');
       if (net) { if (!this.voted) { net.leave(); goHome(); } return; }
       popScene();
@@ -175,9 +170,9 @@ export class StageSelectScene implements Scene {
     const l = navPressed('left', dt), r = navPressed('right', dt);
     if (l || r) { this.cur = (this.cur + (r ? 1 : -1) + TILES.length) % TILES.length; sfx('move'); }
     // phones: swipe the preview through the stages, and FIGHT in the bar picks
-    const sw = spread.tall ? swipeIn(...this.previewRect) : 0;
+    const sw = 0;
     if (sw) { this.cur = (this.cur + sw + TILES.length) % TILES.length; sfx('move'); }
-    if (spread.tall && barTapped('primary')) { if (net) net.lobby = { ...net.lobby, stage: TILES[this.cur] }; this.view = this.cursorStage(); this.vote(); return; }
+    
     // a click or tap on a tile only picks it; FIGHT! (VOTE online) or OK starts
     if (mouse.click && h >= 0 && h !== this.cur) { this.cur = h; sfx('move'); }
     if (net) net.lobby = { ...net.lobby, stage: TILES[this.cur] };
@@ -202,15 +197,14 @@ export class StageSelectScene implements Scene {
       const foot = panelFoot(col, 1);
       drawFighterSprite(pc, getSprite(f.cls, f.skin, false), foot.x, foot.y - (flip ? bob : 1 - bob), flip);
     }
-    if (spread.tall) { this.drawTall(ui, st, tick); return; }
-    // phone portrait spreads the screen into the spare height
-    const previewY = vy(PREVIEW_Y), tileY = vy(TILE_Y), ny = vy(192);
+    
+    const previewY = PREVIEW_Y, tileY = TILE_Y, ny = 192;
     // the preview sits in a parchment mat, like a framed painting
     win(ui, VX - 5, previewY - 5, W + 10, H + 10, { burn: 2 });
     P(ui, FRAME, VX - 1, previewY - 1, W + 2, H + 2);
     ui.drawImage(this.preview, VX, previewY, W, H);
 
-    banner(ui, 'SELECT STAGE', UW / 2, vy(2));
+    banner(ui, 'SELECT STAGE', UW / 2, 2);
     stepTrail(ui, 2, 58, ny - 2, { stack: true });
     win(ui, UW / 2 - 130, ny, 260, 36, { burn: 3 });
     drawTextCentered(ui, st.name.toUpperCase(), UW / 2, ny + 5, INK, 2, false);
@@ -258,7 +252,7 @@ export class StageSelectScene implements Scene {
     else if (this.final) status = 'VOTES SPLIT: FLIPPING A COIN...';
     else if (net && net.lobby.voted) status = rl?.voted ? '' : tick % 16 < 12 ? 'WAITING FOR RIVAL TO VOTE...' : '';
     else if (net) status = rl?.voted ? 'RIVAL HAS VOTED' : 'VOTE FOR A STAGE';
-    if (status) drawTextCentered(ui, status, UW / 2, vy(294), '#f8b800', 1);
+    if (status) drawTextCentered(ui, status, UW / 2, 294, '#f8b800', 1);
 
     if (net && (net.status === 'error' || net.status === 'left' || net.status === 'lost')) {
       fillScreen(ui, 'rgba(0,0,0,0.8)', 2);
@@ -267,67 +261,5 @@ export class StageSelectScene implements Scene {
       return;
     }
     hint(ui, `${k('left')}/${k('right')} OR CLICK: CHOOSE   ${k('attack')} / ${net ? 'VOTE' : 'FIGHT!'}: ${net ? 'VOTE' : 'START'}   ${k('cast')} / RIGHT-CLICK: ${net ? 'LEAVE' : 'BACK'}`);
-  }
-
-  /** The full-height phone layout: the preview at the fight's own size, edge to edge, and big stage tiles under it. */
-  private drawTall(ui: Ctx, st: ReturnType<typeof getStage>, tick: number): void {
-    const a = tallArea(), net = this.net, rl = net?.rivalLobby;
-    const x0 = a.x + PAD, w = a.w - PAD * 2;
-    let y = a.y + 12;
-    banner(ui, 'SELECT STAGE', UW / 2, y);
-    y += 38;
-    stepTrail(ui, 2, UW / 2, y, { scale: 2 });
-    y += 22 + GAP;
-    // 2x, like the fight: the preview is 480 wide, the whole screen
-    P(ui, FRAME, a.x, y - 3, a.w, H * 2 + 6);
-    ui.drawImage(this.preview, a.x, y, W * 2, H * 2);
-    this.previewRect = [a.x, y, a.w, H * 2];
-    // the name, the dots and the tiles sit together down by the bar, in the thumb zone
-    const cols = 4, tw = Math.floor((w - GAP * (cols - 1)) / cols), th = Math.round(tw * 2 / 3) + 8;
-    const rows = Math.ceil(TILES.length / cols), block = 50 + 8 + 22 + rows * (th + GAP + 4);
-    y = Math.max(y + H * 2 + 10, a.y + a.h - 84 - 40 - block);
-    win(ui, x0, y, w, 50, { burn: 3 });
-    drawTextCentered(ui, st.name.toUpperCase(), UW / 2, y + 9, INK, 2, false);
-    drawTextCentered(ui, st.tag.toUpperCase(), UW / 2, y + 32, INK2, 1, false);
-    y += 50 + 8;
-    dots(ui, TILES.length, this.final ? TILES.indexOf(this.final) : this.cur, UW / 2, y);
-    y += 22;
-    TILES.forEach((id, n) => {
-      const x = x0 + (n % cols) * (tw + GAP), ty = y + Math.floor(n / cols) * (th + GAP + 4);
-      const mine = net ? TILES.indexOf(net.lobby.stage) === n : this.cur === n;
-      const theirs = !!rl && TILES.indexOf(rl.stage) === n;
-      const lit = !!(this.final && this.view === id) || (!this.final && mine && showSel());
-      bigButton(ui, `stile:${n}`, id === 'random' ? '' : ' ', x, ty, tw, th, { on: lit });
-      if (id === 'random') {
-        drawTextCentered(ui, '?', x + tw / 2, ty + 10, RED_INK, 4, false);
-        drawTextCentered(ui, 'RANDOM', x + tw / 2, ty + th - 18, INK, 1, false);
-      } else {
-        const tm = thumb(id, tw - 8, th - 12);
-        ui.drawImage(tm, x + 4, ty + 4);
-      }
-      const tag = (label: string, color: string, right: boolean): void => {
-        const lw = label.length * 6 + 5, lx = right ? x + tw - lw - 2 : x + 2;
-        P(ui, color, lx, ty + th - 13, lw, 11);
-        drawText(ui, label, lx + 3, ty + th - 11, '#fcfcfc');
-      };
-      if (net) {
-        if (mine && (showSel() || net.lobby.voted)) tag('YOU', YOU.mark, false);
-        if (theirs) tag('RIVAL', FOE.mark, true);
-      }
-    });
-
-    let status = '';
-    if (this.final && this.t >= ROULETTE) status = tick % 8 < 6 ? 'GET READY!' : '';
-    else if (this.final) status = 'VOTES SPLIT: FLIPPING A COIN...';
-    else if (net && net.lobby.voted) status = rl?.voted ? '' : tick % 16 < 12 ? 'WAITING FOR RIVAL...' : '';
-    else if (net) status = rl?.voted ? 'RIVAL HAS VOTED' : 'VOTE FOR A STAGE';
-    const top = actionBar(ui, { back: net && this.voted ? false : undefined, primary: { id: 'fight', label: net ? 'VOTE' : 'FIGHT!', disabled: this.voted } });
-    if (status) drawTextCentered(ui, status, UW / 2, top - 24, '#f8b800', 2);
-
-    if (net && (net.status === 'error' || net.status === 'left' || net.status === 'lost')) {
-      fillScreen(ui, 'rgba(0,0,0,0.8)', 2);
-      drawTextCentered(ui, net.status === 'left' ? 'YOUR RIVAL LEFT' : net.status === 'lost' ? 'CONNECTION LOST' : net.error || 'CONNECTION ERROR', UW / 2, 140, '#f83800', 2);
-      drawTextCentered(ui, 'TAP: BACK TO TITLE', UW / 2, 170, '#fcfcfc', 2);
-    }
   }
 }

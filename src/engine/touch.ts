@@ -2,7 +2,7 @@
 // button for menus, a text box for typing room codes, and tap-friendly wording for the hints.
 // Menus themselves take taps on the canvas (see the finger handling in input.ts).
 import { virtualKey, releaseVirtual, getKey, keyName, type Bindable } from './input';
-import { view, spread } from './gfx';
+import { view } from './gfx';
 import { getSave, setSave } from './save';
 
 /** What the current screen needs: nothing, a back button, or the fight pad (`fight-ready` lights DRAW). */
@@ -30,7 +30,6 @@ window.addEventListener('keydown', e => {
 
 const CSS = `
 html.svs-touch, html.svs-touch body { touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
-body.svs-portrait { align-items: flex-start; }
 .svs-pad { position: fixed; inset: 0; pointer-events: none; z-index: 10; font: bold 14px ui-monospace, Menlo, Consolas, monospace; color: #fcfcfc; }
 .svs-pad [hidden] { display: none !important; }
 .svs-pad > * { position: absolute; pointer-events: auto; touch-action: none; box-sizing: border-box; }
@@ -232,37 +231,23 @@ export function layout(canvas = canvasEl): void {
   if (!canvas) return;
   const touchSettings = getTouchSettings();
   const full = canvas.getBoundingClientRect();
-  // a full-height phone screen keeps the game in its top part (as tall as the half-screen layout) and the pad below it
-  const screen = spread.tall ? new DOMRect(full.left, full.top, full.width, full.height * spread.halfH / view.h) : full;
-  const oy = spread.tall ? (spread.halfH - 160) / 2 : view.oy;
+  const screen = full, oy = view.oy;
   // the game itself, centered on a screen that may show extra stage around it; buttons keep off it
   const k = screen.width / view.w;
   const r = new DOMRect(screen.left + view.ox * k, screen.top + oy * k, screen.width - 2 * view.ox * k, screen.height - 2 * oy * k);
   const [vw, vh] = viewport();
   let size: number, cy: number, dx: number, ax: number;
-  if (vh > vw) {
-    // portrait: the screen sits on top, the pad underneath like a handheld
-    const below = vh - screen.bottom;
-    size = Math.min(180 * SIZE_K[touchSettings.size], vw * 0.46, below * 0.68);
-    cy = screen.bottom + below * 0.5;
-    dx = 14 + size / 2;
-    ax = vw - 14 - size / 2;
-    place(pause, vw / 2 - 36, screen.bottom + 14, 72, 28, r);
-    place(back, 12, screen.bottom + 10, 92, 32, r);
-    place(draw, ax - size * 0.5, cy - size / 2 - 60, size, 46, r);
-  } else {
-    // landscape: thumbs on either side of the screen
-    size = Math.min(160 * SIZE_K[touchSettings.size], vh * 0.44);
-    cy = Math.min(vh - size / 2 - 14, r.top + r.height * 0.64);
-    const side = (vw - r.width) / 2;
-    dx = Math.max(10 + size / 2, side / 2);
-    ax = vw - dx;
-    place(pause, vw - 82, 8, 74, 28, r);
-    place(back, 8, 8, 92, 32, r);
-    // DRAW over the buttons, kept off the screen when the side has room
-    const w = Math.max(size * 0.8, Math.min(size, side - 12));
-    place(draw, ax - w / 2, cy - size / 2 - 54, w, 42, r);
-  }
+  // landscape: thumbs on either side of the screen
+  size = Math.min(160 * SIZE_K[touchSettings.size], vh * 0.44);
+  cy = Math.min(vh - size / 2 - 14, r.top + r.height * 0.64);
+  const side = (vw - r.width) / 2;
+  dx = Math.max(10 + size / 2, side / 2);
+  ax = vw - dx;
+  place(pause, vw - 82, 8, 74, 28, r);
+  place(back, 8, 8, 92, 32, r);
+  // DRAW over the buttons, kept off the screen when the side has room
+  const w = Math.max(size * 0.8, Math.min(size, side - 12));
+  place(draw, ax - w / 2, cy - size / 2 - 54, w, 42, r);
   // left-handed: the buttons go under the left thumb and the d-pad under the right
   if (touchSettings.left) {
     [dx, ax] = [ax, dx];

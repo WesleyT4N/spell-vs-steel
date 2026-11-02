@@ -5,9 +5,9 @@ import { popScene, hint, zone, hot, isHot, button, showSel, type Scene } from '.
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { teamColor, type ClassId } from '../art/sprites';
-import { P, UW, screenRect, spread, vy, type Ctx } from '../engine/gfx';
+import { P, UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered, textWidth } from '../engine/font';
-import { wasPressed, navPressed, mouse, gesture, k, usingPad } from '../engine/input';
+import { wasPressed, navPressed, mouse, k, usingPad } from '../engine/input';
 import { touchActive, type PadMode } from '../engine/touch';
 import { sfx } from '../engine/audio';
 import { cardsFor, ELEMENT_COLOR, MAX_COPIES, RARITY_COLOR, type CardDef } from '../game/cards';
@@ -24,7 +24,7 @@ import { openDeckPanel, type DeckPanel } from './deckPanel';
 import { NameEntry } from './nameEntry';
 import type { SpellDeck } from '../game/deckCode';
 import { win, selRow, plaque, ink, PAPER, BURN, INK, INK2, RED_INK, GOLD, TRIM } from './skin';
-import { bigButton, actionBar, barTapped, swipeIn, tallArea, tabs, sheet, panel, rowList, Scroller, TAP, GAP, PAD } from './touchUi';
+import { Scroller } from './scroller';
 
 const RARITY_ORDER = { common: 0, uncommon: 1, legendary: 2, mythic: 3 };
 const CLASSES: ClassId[] = PLAYABLE;
@@ -69,7 +69,6 @@ export class DeckBuilderScene implements Scene {
   private naming: { entry: NameEntry; done: (name: string) => void } | null = null;
   /** Phone layout: the list's scroll. */
   private lscroller = new Scroller();
-  private lrect: [number, number, number, number] = [0, 0, 0, 0];
   /** Tile grid scroll in UI pixels (touch). */
   private tscroll = 0;
   /** The tile grid's window this frame, for scrolling and keeping the selection in view. */
@@ -80,17 +79,9 @@ export class DeckBuilderScene implements Scene {
     if (deckId && getCustom(cls, deckId)) this.edit(deckId, false);
     else this.openList();
   }
-
-  tall(): boolean { return true; }
-  pad(): PadMode { return spread.tall ? 'none' : 'back'; }
+  pad(): PadMode { return 'back'; }
   /** Full-height phone layout: the card grid's scroll, its window, and how long a finger has rested on one card. */
   private tscroller = new Scroller();
-  private tgrid: [number, number, number, number] = [0, 0, 0, 0];
-  private holdT = 0;
-  /** The card a resting finger is reading (shown in a sheet from the bottom), or -1. */
-  private reading = -1;
-  /** The start-from choice whose spell list is open in a sheet, or -1. */
-  private peek = -1;
 
   private get decks(): SavedDeck[] { return customDecks(this.cls); }
   /** The deck under the list cursor, or null on NEW. */
@@ -254,7 +245,6 @@ export class DeckBuilderScene implements Scene {
 
   /** Show the start-from picker for a new deck, on the ready-made deck picked for the fight. */
   private openPicker(): void {
-    this.peek = -1;
     this.picks = [...this.presets.map(p => p.id), 'empty', 'import'];
     const m = loadMatch(), picked = m.p1 === this.cls ? m.p1Deck : m.cpu === this.cls ? m.cpuDeck : 'starter';
     this.pickSel = Math.max(0, this.picks.indexOf(picked));
@@ -368,7 +358,7 @@ export class DeckBuilderScene implements Scene {
       return;
     }
     if (this.naming) { this.updateNaming(dt); return; }
-    if (spread.tall) { this.updateTall(dt); return; }
+    
     if (isHot('share') && mouse.click) { this.openShare(); return; }
     if (this.picks || this.listing) {
       if (isHot('done') && mouse.click) { if (this.listing) { sfx('back'); this.back(); } else this.closePicker(); return; }
@@ -433,71 +423,6 @@ export class DeckBuilderScene implements Scene {
     this.back();
   }
 
-  /** The full-height phone layout's input: tabs, the bar, swipes between classes, the card grid and the picker. */
-  private updateTall(dt: number): void {
-    const tab = hot('tab');
-    if (tab >= 0 && mouse.click) { this.switchClass(CLASSES[tab]); return; }
-    // a ready-made deck's list, open in a sheet over the picker: START takes it, any other tap closes it
-    if (this.picks && this.peek >= 0) {
-      if (mouse.click && isHot('t:start')) { this.choosePick(this.picks[this.peek]); this.peek = -1; return; }
-      if (mouse.click || wasPressed('back') || mouse.rclick) { this.peek = -1; sfx('back'); }
-      return;
-    }
-    if (this.listing) { this.updateTallList(); return; }
-    if (barTapped('mid')) { this.openShare(); return; }
-    if (barTapped('back') || barTapped('primary') || wasPressed('back') || mouse.rclick) {
-      if (this.picks) this.closePicker(); else this.exit();
-      return;
-    }
-    // swiping the grid sideways steps through the classes
-    const sw = swipeIn(...this.tgrid);
-    if (sw) { this.switchClass(CLASSES[(CLASSES.indexOf(this.cls) + sw + CLASSES.length) % CLASSES.length]); return; }
-    if (this.picks) {
-      const h = hot('pick'), id = this.picks[h];
-      // a deck with spells in it opens its list first, like hovering one does on wider screens
-      if (h >= 0 && mouse.click) {
-        if (id === 'empty' || id === 'import') this.choosePick(id);
-        else { this.pickSel = this.peek = h; sfx('open'); }
-      }
-      return;
-    }
-    if (isHot('change') && mouse.click) { this.special(); return; }
-    this.tscroller.update(...this.tgrid);
-    // a finger resting on a card reads it; lifting closes the sheet, dragging cancels
-    const t = hot('tile');
-    if (mouse.touched || Math.abs(gesture.dy) > 1 || !mouse.down) this.holdT = 0;
-    else if (t >= 0) this.holdT += dt;
-    this.reading = mouse.down && t >= 0 && this.holdT >= 0.35 ? t : -1;
-    if (this.reading >= 0) this.sel = this.top + this.reading;
-    const minus = hot('tminus');
-    if (minus >= 0 && mouse.click) { this.sel = this.top + minus; this.change(this.cards[minus], -1); return; }
-    if (t >= 0 && mouse.click) { this.sel = this.top + t; this.change(this.cards[t], 1); }
-  }
-
-  /** Phone layout, the list of your decks: tap one for its spells and what to do with it, NEW in the bar. */
-  private updateTallList(): void {
-    if (this.onActs) {
-      // the deck's sheet is open: its buttons, or any other tap closes it
-      const tapped = ACTS.find(a => isHot(`t:${a.toLowerCase()}`));
-      if (mouse.click && tapped) {
-        const id = this.listed?.id;
-        this.act(tapped);
-        // gone, copied or opened: the sheet closes
-        if (tapped !== 'RENAME' && (tapped !== 'DELETE' || !this.decks.some(d => d.id === id))) this.onActs = false;
-        return;
-      }
-      if (mouse.click || wasPressed('back') || mouse.rclick) { this.onActs = false; this.armed = null; sfx('back'); }
-      return;
-    }
-    if (barTapped('back') || wasPressed('back') || mouse.rclick) { sfx('back'); this.back(); return; }
-    if (barTapped('primary')) { this.newDeck(); return; }
-    const sw = swipeIn(...this.lrect);
-    if (sw) { this.switchClass(CLASSES[(CLASSES.indexOf(this.cls) + sw + CLASSES.length) % CLASSES.length]); return; }
-    this.lscroller.update(...this.lrect);
-    const h = hot('dl');
-    if (h >= 0 && mouse.click) { this.listSel = h; this.onActs = true; this.armed = null; sfx('open'); }
-  }
-
   draw(c: Ctx, tick: number, ui: Ctx): void {
     this.drawScreen(c, tick, ui);
     this.naming?.entry.draw(ui);
@@ -507,10 +432,10 @@ export class DeckBuilderScene implements Scene {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.5)';
     c.fillRect(...screenRect());
-    if (spread.tall) { this.drawTall(ui); return; }
+    
 
-    // header: class tabs, counts, done (phone portrait moves it up, and the list rows grow, into the spare height)
-    const hy = vy(4) - 4;
+    // header: class tabs, counts, done
+    const hy = 4 - 4;
     win(ui, 8, 4 + hy, UW - 16, 40, { accent: teamColor(this.cls, loadMatch().p1Skin[this.cls], false), burn: 3 });
     CLASSES.forEach((cl, i) => button(ui, `tab:${i}`, cl.toUpperCase(), 14 + i * 54, 12 + hy, 52, 14, cl === this.cls, cl === this.cls ? RED_INK : INK2));
     // the deck being edited; in the list, the one under the cursor
@@ -527,7 +452,7 @@ export class DeckBuilderScene implements Scene {
     button(ui, 'done', 'DONE', UW - 60, 13 + hy, 46, 24, false, RED_INK);
 
     // list
-    const ly = vy(LY), rh = Math.round(RH * spread.k), off = Math.round((rh - RH) / 2);
+    const ly = LY, rh = RH, off = 0;
     win(ui, LX, ly - 4, LW, VISIBLE * rh + 6);
     if (this.tiles) this.drawTiles(ui, ly, VISIBLE * rh);
     else {
@@ -594,7 +519,7 @@ export class DeckBuilderScene implements Scene {
 
   /** Touch: the start-from button over a scrolling grid of card tiles, inside the list window (top `ly`, height `h`). */
   private drawTiles(ui: Ctx, ly: number, h: number): void {
-    const bh = Math.round(18 * spread.k), on = this.sel === 0 && showSel();
+    const bh = 18, on = this.sel === 0 && showSel();
     button(ui, 'change', '← ALL YOUR SPELL DECKS', LX + 6, ly, LW - 12, bh, on, INK2);
     const top = ly + bh + 4, gh = h - bh - 4;
     this.grid = { top, h: gh };
@@ -637,9 +562,9 @@ export class DeckBuilderScene implements Scene {
     const picks = this.picks!;
     ui.fillStyle = 'rgba(40,20,0,0.55)';
     // phone portrait: placed and sized like the list window, with taller rows
-    const ly = vy(LY), lh = VISIBLE * Math.round(RH * spread.k);
+    const ly = LY, lh = VISIBLE * RH;
     ui.fillRect(0, ly - 6, UW, lh + 30);
-    const x = 24, y = ly - 2, w = UW - 48, hgt = lh + 2, colW = 176, rh = Math.round(22 * spread.k), ro = Math.round((rh - 22) / 2);
+    const x = 24, y = ly - 2, w = UW - 48, hgt = lh + 2, colW = 176, rh = 22, ro = 0;
     win(ui, x, y, w, hgt, { accent: teamColor(this.cls, loadMatch().p1Skin[this.cls], false) });
     drawText(ui, 'START A NEW SPELL DECK FROM', x + 10, y + 8, INK);
     picks.forEach((id, i) => {
@@ -670,11 +595,11 @@ export class DeckBuilderScene implements Scene {
   private drawList(ui: Ctx): void {
     const decks = this.decks, d = showSel() ? this.listed : null;
     ui.fillStyle = 'rgba(40,20,0,0.55)';
-    const ly = vy(LY), lh = VISIBLE * Math.round(RH * spread.k);
+    const ly = LY, lh = VISIBLE * RH;
     ui.fillRect(0, ly - 6, UW, lh + 30);
     // touch gets taller rows, as many as fit
     const x = 24, y = ly - 2, w = UW - 48, hgt = lh + 2, colW = 176;
-    const rh = touchActive() ? Math.min(Math.round(24 * spread.k), Math.floor((hgt - 28) / (decks.length + 1))) : Math.round(16 * spread.k), ro = Math.round((rh - 16) / 2);
+    const rh = touchActive() ? Math.min(24, Math.floor((hgt - 28) / (decks.length + 1))) : 16, ro = Math.round((rh - 16) / 2);
     win(ui, x, y, w, hgt, { accent: teamColor(this.cls, loadMatch().p1Skin[this.cls], false) });
     drawText(ui, `${CLASS_INFO[this.cls].name} SPELL DECKS ${decks.length}/${MAX_CUSTOM_DECKS}`, x + 10, y + 8, INK);
     const m = loadMatch(), fighting = customIdOf(m.p1 === this.cls ? m.p1Deck : '');
@@ -714,141 +639,6 @@ export class DeckBuilderScene implements Scene {
     hint(ui, touchActive() ? 'TAP A SPELL DECK, THEN WHAT TO DO WITH IT'
       : this.onActs ? `${k('left')}/${k('right')}: CHOOSE   ${k('attack')}: DO IT   ${k('cast')}: BACK TO THE LIST`
         : `${ud}: CHOOSE   ${k('attack')}: OPEN   LB/RB: CLASS   ${k('cast')} / RIGHT-CLICK: BACK`);
-  }
-
-  // ---------- full-height phone layout ----------
-
-  /** The phone layout: class tabs, the counts, a scrolling grid of cards and the action bar. */
-  private drawTall(ui: Ctx): void {
-    const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
-    let y = a.y + 10;
-    tabs(ui, 'tab', CLASSES.map(c => c.toUpperCase()), CLASSES.indexOf(this.cls), x0, y, w, 48);
-    y += 58;
-    if (this.listing) { this.drawTallList(ui, x0, y, w); return; }
-    // the deck's name and counts
-    const n = deckSize(this.deck), leg = countRarity(this.deck, 'legendary'), myth = countRarity(this.deck, 'mythic');
-    const ok = validate(this.deck).length === 0;
-    win(ui, x0, y, w, 46, { accent: teamColor(this.cls, loadMatch().p1Skin[this.cls], false), burn: 3 });
-    drawText(ui, this.picks ? 'NEW SPELL DECK' : this.editingName, x0 + 12, y + 10, INK, 2);
-    drawText(ui, ok ? 'READY' : 'NOT READY', x0 + w - 12 - (ok ? 60 : 108), y + 10, ok ? '#007800' : RED_INK, 2);
-    drawText(ui, `SPELLS ${n}/${DECK_SIZE}`, x0 + 12, y + 30, n === DECK_SIZE ? '#007800' : RED_INK);
-    drawText(ui, `LEGENDARY ${leg}/${MAX_LEGENDARIES}`, x0 + 120, y + 30, leg <= MAX_LEGENDARIES ? ink(RARITY_COLOR.legendary) : RED_INK);
-    drawText(ui, `MYTHIC ${myth}/1`, x0 + 246, y + 30, myth === 1 ? ink(RARITY_COLOR.mythic) : RED_INK);
-    y += 56;
-
-    const barTop = a.y + a.h - 84, msgY = barTop - 22;
-    if (this.picks) actionBar(ui, {});
-    else actionBar(ui, { mid: { id: 'share', label: 'SHARE' }, primary: { id: 'done', label: 'DONE' } });
-    const errs = validate(this.deck);
-    const note = this.msgT > 0 ? [this.msg, '#f8b800'] : errs.length ? [errs[0], '#f83800'] : ['SPELL DECK READY. SAVED HERE.', '#58d854'];
-    drawTextCentered(ui, note[0], UW / 2, msgY, note[1], note[0].length * 12 < w ? 2 : 1);
-
-    if (this.picks) { this.drawTallPicker(ui, x0, y, w, msgY - 10 - y); return; }
-    bigButton(ui, 'change', '← ALL SPELL DECKS', x0, y, w, 48);
-    y += 58;
-    // the card grid: four to a row, tap a card to add a copy, - takes one out, rest a finger on a card to read it
-    const gh = msgY - 10 - y, cols = 4, cw = Math.floor((w - GAP * (cols - 1)) / cols), rowH = CARD_H + 56;
-    this.tgrid = [a.x, y, a.w, gh];
-    const sc = this.tscroller;
-    sc.max = Math.max(0, Math.ceil(this.cards.length / cols) * rowH - gh + 8);
-    panel(ui, x0 - 6, y - 6, w + 12, gh + 12);
-    ui.save();
-    ui.beginPath(); ui.rect(x0 - 3, y - 3, w + 6, gh + 6); ui.clip();
-    this.cards.forEach((card, i) => {
-      const cx = x0 + (i % cols) * (cw + GAP), cy = y + 6 + Math.floor(i / cols) * rowH - Math.round(sc.pos);
-      if (cy + rowH < y || cy > y + gh) return;
-      const have = this.deck[card.id] ?? 0, max = MAX_COPIES[card.rarity];
-      const clip = (zy: number, zh: number): [number, number] => { const lo = Math.max(zy, y), hi = Math.min(zy + zh, y + gh); return [lo, hi - lo]; };
-      const fx = cx + Math.round((cw - CARD_W) / 2);
-      const [fy, fh] = clip(cy, CARD_H);
-      if (fh > 0) zone(`tile:${i}`, fx, fy, CARD_W, fh);
-      drawCardFace(ui, card, fx, cy, { lit: this.reading === i, faded: !have });
-      // under the card: a big minus and the count
-      const by = cy + CARD_H + 6, [zy, zh] = clip(by, 44);
-      if (zh > 0) zone(`tminus:${i}`, cx, zy, 48, zh);
-      const mt = plaque(ui, cx, by, 48, 42, mouse.down && isHot(`tminus:${i}`));
-      drawTextCentered(ui, '-', cx + 24, by + 14, mouse.down && isHot(`tminus:${i}`) ? mt : have ? INK : BURN, 2, false);
-      drawText(ui, `${have}/${max}`, cx + 56, by + 14, have ? INK : TRIM, 2);
-    });
-    ui.restore();
-    if (sc.max > 0) {
-      const sh = Math.max(24, Math.round(gh * gh / (gh + sc.max)));
-      P(ui, BURN, a.x + a.w - 6, y, 4, gh);
-      P(ui, INK2, a.x + a.w - 6, y + Math.round((sc.pos / sc.max) * (gh - sh)), 4, sh);
-    }
-    // reading a card: its clip and rules slide up from the bottom
-    const card = this.reading >= 0 ? this.cards[this.reading] : undefined;
-    if (card) {
-      sheet(ui, 360, (sx, sy, sw) => {
-        this.preview.draw(ui, sx, sy, sw, 140);
-        const yy = drawCardDetail(ui, card, sx, sy + 152, sw, 2);
-        drawText(ui, `IN DECK ${this.deck[card.id] ?? 0} / ${MAX_COPIES[card.rarity]}`, sx, yy + 4, INK2, 2);
-      });
-    }
-  }
-
-  /** The phone layout's list of your decks: a scrolling column, NEW in the bar, and a sheet for the tapped deck. */
-  private drawTallList(ui: Ctx, x0: number, y: number, w: number): void {
-    const decks = this.decks, full = decks.length >= MAX_CUSTOM_DECKS;
-    const barTop = actionBar(ui, { primary: { id: 'new', label: '+ NEW DECK', disabled: full } }), msgY = barTop - 22;
-    const note = this.msgT > 0 ? [this.msg, '#f8b800'] : [`${CLASS_INFO[this.cls].name} SPELL DECKS ${decks.length}/${MAX_CUSTOM_DECKS}`, '#fcfcfc'];
-    drawTextCentered(ui, note[0], UW / 2, msgY, note[1], note[0].length * 12 < w ? 2 : 1);
-    const h = msgY - 16 - y, fighting = customIdOf(loadMatch().p1 === this.cls ? loadMatch().p1Deck : '');
-    this.lrect = [x0 - PAD, y, w + PAD * 2, h];
-    rowList(ui, this.lscroller, 'dl', decks.length, this.onActs ? this.listSel : -1, x0, y, w, h, TAP + 14, (i, rx, ry, rw) => {
-      const d = decks[i], ready = !validate(d.cards).length, mythic = this.cards.find(c => d.cards[c.id] && c.rarity === 'mythic');
-      drawText(ui, d.name, rx + 14, ry + 14, INK, 2);
-      drawText(ui, ready ? 'READY' : `NOT READY, ${deckSize(d.cards)}/${DECK_SIZE} SPELLS`, rx + 14, ry + 38, ready ? '#007800' : RED_INK, 1);
-      if (d.id === fighting) drawText(ui, 'PICKED', rx + rw - 14 - textWidth('PICKED', 1), ry + 38, INK2, 1);
-      if (mythic) drawText(ui, mythic.name.toUpperCase(), rx + rw - 14 - textWidth(mythic.name.toUpperCase(), 1), ry + 14, ink(RARITY_COLOR.mythic), 1);
-    });
-    if (!decks.length) drawTextCentered(ui, 'NO SPELL DECKS YET', UW / 2, y + 30, INK2, 2, false);
-    const d = this.onActs ? this.listed : null;
-    if (!d) return;
-    const cards = this.cards.filter(c => d.cards[c.id]), half = Math.ceil(cards.length / 2);
-    sheet(ui, 150 + Math.max(1, half) * 16 + 70 + TAP, (sx, sy, sw, sh) => {
-      drawText(ui, d.name, sx, sy, INK, 2);
-      drawText(ui, `${deckSize(d.cards)} SPELLS`, sx + sw - textWidth(`${deckSize(d.cards)} SPELLS`, 1), sy + 4, TRIM, 1);
-      if (!cards.length) drawText(ui, 'NO SPELLS YET', sx, sy + 34, INK2, 1);
-      const cw = Math.floor(sw / 2), max = Math.floor((cw - 8) / 6);
-      cards.forEach((c, i) => drawText(ui, `${d.cards[c.id]}X ${c.name.toUpperCase()}`.slice(0, max), sx + (i < half ? 0 : cw), sy + 32 + (i % half) * 16,
-        c.rarity === 'common' ? INK2 : ink(RARITY_COLOR[c.rarity]), 1));
-      const by = sy + sh - TAP * 2 - GAP - 8, bw = Math.floor((sw - GAP * 2) / 3), armed = this.armed === d.id;
-      bigButton(ui, 't:rename', 'RENAME', sx, by, bw, TAP);
-      bigButton(ui, 't:clone', 'CLONE', sx + bw + GAP, by, bw, TAP, { disabled: full });
-      bigButton(ui, 't:delete', armed ? 'SURE?' : 'DELETE', sx + (bw + GAP) * 2, by, bw, TAP, { sub: armed ? 'TAP AGAIN' : undefined });
-      bigButton(ui, 't:share', 'SHARE', sx, by + TAP + GAP, bw, TAP);
-      bigButton(ui, 't:edit', 'EDIT', sx + bw + GAP, by + TAP + GAP, sw - bw - GAP, TAP, { primary: true });
-    });
-  }
-
-  /** The start-from picker in the phone layout: a column of big choices. */
-  private drawTallPicker(ui: Ctx, x: number, y: number, w: number, h: number): void {
-    const picks = this.picks!;
-    panel(ui, x - 6, y, w + 12, h);
-    drawTextCentered(ui, 'START A NEW SPELL DECK FROM', UW / 2, y + 14, INK, 2, false);
-    const rh = Math.min(TAP + 16, Math.floor((h - 44) / picks.length) - 6);
-    picks.forEach((id, i) => {
-      const p = this.presets.find(q => q.id === id);
-      const name = id === 'empty' ? 'EMPTY DECK' : id === 'import' ? 'IMPORT A CODE' : p!.name.toUpperCase() + (id === 'starter' ? ' (STARTER)' : '');
-      const sub = id === 'empty' ? 'BUILD FROM SCRATCH' : id === 'import' ? 'PASTE A FRIEND\'S CODE'
-          : `MYTHIC: ${(this.cards.find(c => c.id === p!.mythic)?.name ?? '').toUpperCase()}`;
-      bigButton(ui, `pick:${i}`, name, x + 6, y + 40 + i * (rh + 6), w - 12, rh, { sub, scale: name.length * 12 < w - 30 ? 2 : 1, on: i === this.peek });
-    });
-    // the tapped deck's spells, and START to take it
-    const id = this.peek >= 0 ? picks[this.peek] : undefined;
-    if (!id) return;
-    const p = this.presets.find(q => q.id === id);
-    const list = p?.cards ?? {};
-    const cards = this.cards.filter(c => list[c.id]), half = Math.ceil(cards.length / 2);
-    sheet(ui, 150 + Math.max(1, half) * 16 + 70, (sx, sy, sw, sh) => {
-      drawText(ui, p!.name.toUpperCase(), sx, sy, INK, 2);
-      drawText(ui, `${deckSize(list)} SPELLS`, sx + sw - textWidth(`${deckSize(list)} SPELLS`, 1), sy + 4, TRIM, 1);
-      const cw = Math.floor(sw / 2), max = Math.floor((cw - 8) / 6);
-      cards.forEach((c, i) => drawText(ui, `${list[c.id]}X ${c.name.toUpperCase()}`.slice(0, max), sx + (i < half ? 0 : cw), sy + 32 + (i % half) * 16,
-        c.rarity === 'common' ? INK2 : ink(RARITY_COLOR[c.rarity]), 1));
-      bigButton(ui, 't:start', 'START FROM IT', sx, sy + sh - 66, sw, TAP, { primary: true });
-    });
   }
 }
 

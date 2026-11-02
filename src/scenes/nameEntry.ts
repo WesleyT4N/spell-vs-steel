@@ -2,14 +2,13 @@
 // types into it and phones bring up their own keyboard. Someone on a gamepad gets an on-screen QWERTY keyboard
 // under the box instead.
 import { hint, zone, hot, isHot, button, showSel } from './scene';
-import { P, UW, UH, spread, type Ctx } from '../engine/gfx';
+import { P, UW, UH, type Ctx } from '../engine/gfx';
 import { drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, mouse, k, usingPad } from '../engine/input';
 import { touchActive } from '../engine/touch';
 import { textField, textFieldFocused, focusTextField, blurTextField } from '../engine/textField';
 import { sfx } from '../engine/audio';
 import { win, plaque, GOLD, INK, INK2, RED_INK, FRAME } from './skin';
-import { bigButton, tallArea, TAP, GAP, PAD } from './touchUi';
 
 /** One key of the on-screen keyboard: a character, or one of the editing keys. */
 interface Key { label: string; ch?: string; act?: 'space' | 'del' | 'cancel' | 'ok'; row: number; x: number; w: number }
@@ -112,16 +111,7 @@ export class NameEntry {
     ui.fillStyle = 'rgba(40,20,0,0.6)';
     ui.fillRect(0, 0, UW, UH);
     const typing = textFieldFocused();
-    if (spread.tall) {
-      const a = tallArea(), x = a.x + PAD, w = a.w - PAD * 2, y = a.y + 60, h = 200;
-      win(ui, x, y, w, h, { edge: GOLD });
-      drawTextCentered(ui, this.title, UW / 2, y + 18, INK, 2, false);
-      this.box(ui, x + 16, y + 48, w - 32, TAP, typing);
-      const bw = Math.floor((w - 32 - GAP) / 2);
-      bigButton(ui, 'name:cancel', 'CANCEL', x + 16, y + h - TAP - 16, bw, TAP);
-      bigButton(ui, 'name:ok', 'OK', x + 16 + bw + GAP, y + h - TAP - 16, bw, TAP, { primary: true, disabled: !this.text.trim() });
-      return;
-    }
+    
     const grid = this.grid, gw = COLS * STEP - KGAP, w = gw + 24, h = grid ? 66 + ROWS * (KH + KGAP) : 96;
     const x = Math.round(UW / 2 - w / 2), y = Math.round(UH / 2 - h / 2);
     win(ui, x, y, w, h, { edge: GOLD });

@@ -1,9 +1,8 @@
 import { pushScene, popScene, hint, zone, hot, isHot, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
-import { P, UW, screenRect, vy, vspan, spread, type Ctx } from '../engine/gfx';
+import { P, UW, screenRect, type Ctx } from '../engine/gfx';
 import { getTouchSettings, setTouchSettings, touchActive, type PadMode, type PadSize } from '../engine/touch';
-import { bigButton, actionBar, barTapped, tabs, panel, swipeIn, tallArea, TAP, GAP, PAD } from './touchUi';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, k, mouse } from '../engine/input';
 import { sfx, getAudioSettings, setAudioSettings, isMuted, toggleMute, voiceLine, announce } from '../engine/audio';
@@ -54,7 +53,7 @@ function preview(row: Row): void {
 const PX = 64, PW = UW - 128, Y0 = 56, BAR_X = 236, BLOCK = 14;
 const rowH = (): number => (rows().length > 11 ? 17 : rows().length > 10 ? 18 : 20);
 const rowY = (i: number): number => Y0 + i * rowH() + (i >= rows().findIndex(([r]) => r === 'touch' || r === 'keys') ? 10 : 0);
-// phone portrait spreads the rows into the spare height (vy); `off` centers a row's contents in its taller box
+// `off` centers a row's contents in its box
 
 /** Audio settings and a door to the key mapping screen. Settings save in the browser. */
 export class OptionsScene implements Scene {
@@ -63,42 +62,12 @@ export class OptionsScene implements Scene {
   tab = 0;
   /** The row picked on the wide touch controls page. */
   tsel = 0;
-  private tabRect: [number, number, number, number] = [0, 0, 0, 0];
   constructor(private back: () => void = popScene) {}
-
-  tall(): boolean { return true; }
-  pad(): PadMode { return spread.tall ? 'none' : 'back'; }
-
-  /** Taps on the phone layout; true when it handled this frame. */
-  private tallInput(): boolean {
-    if (barTapped('back')) { sfx('back'); this.back(); return true; }
-    const t = hot('otab');
-    const sw = swipeIn(...this.tabRect);
-    if ((t >= 0 && mouse.click && t !== this.tab) || sw) { this.tab = sw ? (this.tab + 1) % 2 : t; sfx('move'); return true; }
-    if (!mouse.click) return false;
-    const s = getAudioSettings();
-    if (isHot('tog:musicOn') || isHot('tog:sfxOn')) {
-      const row = isHot('tog:musicOn') ? 'musicOn' : 'sfxOn';
-      setAudioSettings({ [row]: !s[row] }); sfx('select'); return true;
-    }
-    if (isHot('tog:mute')) { toggleMute(); sfx('select'); return true; }
-    if (isHot('tog:full')) { void platform.fullscreen.set(!platform.fullscreen.isOn()); sfx('select'); return true; }
-    if (isHot('t:keys')) { sfx('select'); pushScene(new ControlsScene()); return true; }
-    const size = hot('tsize');
-    if (size >= 0) { setTouchSettings({ size: (['S', 'M', 'L'] as PadSize[])[size] }); sfx('select'); return true; }
-    if (isHot('tog:left')) { setTouchSettings({ left: !getTouchSettings().left }); sfx('select'); return true; }
-    if (isHot('tog:buzz')) {
-      const on = !getTouchSettings().buzz;
-      setTouchSettings({ buzz: on });
-      if (on) { try { navigator.vibrate?.(30); } catch { /* not allowed */ } }
-      sfx('select'); return true;
-    }
-    return false;
-  }
+  pad(): PadMode { return 'back'; }
 
   update(dt: number): void {
-    if (spread.tall && this.tallInput()) return;
-    if (this.tab === 1 && !spread.tall) { this.updateTouch(dt); return; }
+    
+    if (this.tab === 1) { this.updateTouch(dt); return; }
     const ROWS = rows();
     this.sel = Math.min(this.sel, ROWS.length - 1);
     if (navPressed('up', dt)) { this.sel = (this.sel + ROWS.length - 1) % ROWS.length; sfx('move'); }
@@ -150,13 +119,13 @@ export class OptionsScene implements Scene {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.35)';
     c.fillRect(...screenRect());
-    if (spread.tall) { this.drawTall(ui); return; }
-    win(ui, PX - 16, vy(18), PW + 32, vspan(18, 262));
+    
+    win(ui, PX - 16, 18, PW + 32, 262);
     if (this.tab === 1) { this.drawTouchWide(ui, tick); return; }
-    drawTextCentered(ui, 'OPTIONS', UW / 2, vy(30), RED_INK, 2, false);
+    drawTextCentered(ui, 'OPTIONS', UW / 2, 30, RED_INK, 2, false);
     const s = getAudioSettings(), RH = rowH();
     rows().forEach(([row, label], i) => {
-      const y = vy(rowY(i)), rh = vspan(rowY(i), RH), off = Math.round((rh - RH) / 2);
+      const y = rowY(i), rh = RH, off = Math.round((rh - RH) / 2);
       const on = i === this.sel && showSel();
       zone(`row:${i}`, PX - 12, y, PW + 24, rh - 2);
       if (on) selRow(ui, PX - 12, y, PW + 24, rh - 2);
@@ -208,10 +177,10 @@ export class OptionsScene implements Scene {
   }
 
   private drawTouchWide(ui: Ctx, tick: number): void {
-    drawTextCentered(ui, 'TOUCH CONTROLS', UW / 2, vy(30), RED_INK, 2, false);
+    drawTextCentered(ui, 'TOUCH CONTROLS', UW / 2, 30, RED_INK, 2, false);
     const t = getTouchSettings();
     TOUCH_ROWS.forEach(([row, label], i) => {
-      const y = vy(Y0 + i * 22 + (row === 'back' ? 8 : 0)), on = i === this.tsel && showSel(), ty = y + 7;
+      const y = Y0 + i * 22 + (row === 'back' ? 8 : 0), on = i === this.tsel && showSel(), ty = y + 7;
       zone(`trow:${i}`, PX - 12, y, PW + 24, 20);
       if (on) selRow(ui, PX - 12, y, PW + 24, 20);
       if (on && tick % 8 < 6) drawText(ui, '→', PX - 4, ty, PAPER);
@@ -224,97 +193,10 @@ export class OptionsScene implements Scene {
       if (row === 'left') drawText(ui, t.left ? 'ON' : 'OFF', BAR_X, ty, t.left ? '#007800' : INK);
       if (row === 'buzz') drawText(ui, t.buzz ? 'ON' : 'OFF', BAR_X, ty, t.buzz ? '#007800' : INK);
     });
-    const py = vy(Y0 + TOUCH_ROWS.length * 22 + 16), ph = vy(272) - py;
+    const py = Y0 + TOUCH_ROWS.length * 22 + 16, ph = 272 - py;
     drawText(ui, 'LEFT-HANDED: BUTTONS ON THE LEFT, D-PAD ON THE RIGHT', PX + 10, py - 4, TRIM);
     if (ph >= 80) this.drawPadPreview(ui, UW / 2 - ph * 0.8, py + 8, ph * 1.6, ph - 8, t);
     hint(ui, `CLICK OR ${k('attack')}: CHANGE   ${k('left')}/${k('right')}: ADJUST   ${k('cast')} / RIGHT-CLICK: BACK`);
-  }
-
-  /** The phone layout: sound and touch settings on two tabs, with finger-sized sliders and switches. */
-  private drawTall(ui: Ctx): void {
-    const a = tallArea(), x0 = a.x + PAD, w = a.w - PAD * 2;
-    let y = a.y + PAD;
-    drawTextCentered(ui, 'OPTIONS', UW / 2, y, PAPER, 3, true);
-    y += 21 + GAP;
-    tabs(ui, 'otab', ['SOUND', 'TOUCH'], this.tab, x0, y, w);
-    // swiping the tabs flips them; not the panel, where fingers drag the volume sliders
-    this.tabRect = [a.x, a.y, a.w, y + 48 - a.y];
-    y += 48 + GAP;
-    const barTop = actionBar(ui, {});
-    panel(ui, x0 - 6, y, w + 12, barTop - GAP - y);
-    y += 16;
-    const room = barTop - GAP - 12 - y;
-    if (this.tab === 0) this.drawSound(ui, x0 + 8, y, w - 16, room);
-    else this.drawTouch(ui, x0 + 8, y, w - 16, room);
-  }
-
-  /** One labelled row: the label in ink on the left, a switch on the right when `toggle` is given. */
-  private toggleRow(ui: Ctx, id: string, label: string, on: boolean, x: number, y: number, w: number, onText = 'ON', offText = 'OFF'): void {
-    drawText(ui, label, x, y + Math.round((TAP - 14) / 2), INK, 2);
-    bigButton(ui, `tog:${id}`, on ? onText : offText, x + w - 110, y, 110, TAP, { primary: on });
-  }
-
-  private drawSound(ui: Ctx, x: number, y: number, w: number, room: number): void {
-    const s = getAudioSettings();
-    // each volume: label (with its switch for music and sfx), then a row of ten tall blocks between - and +
-    const vols: Array<[Vol, string, ('musicOn' | 'sfxOn')?]> = [
-      ['master', 'MASTER'], ['music', 'MUSIC', 'musicOn'], ['sfx', 'SOUND FX', 'sfxOn'],
-      ['voice', 'VOICES'], ['announcer', 'ANNOUNCER'],
-    ];
-    const per = Math.min(136, Math.floor((room - TAP - GAP) / vols.length));
-    const sh = Math.max(40, Math.min(TAP, per - 50));
-    for (const [row, label, sw] of vols) {
-      const i = rows().findIndex(r => r[0] === row);
-      const live = isLive(row, s);
-      if (sw) {
-        drawText(ui, label, x, y + 6, live ? INK : INK2, 2);
-        bigButton(ui, `tog:${sw}`, s[sw] ? 'ON' : 'OFF', x + w - 84, y - 4, 84, 32, { primary: s[sw], scale: 2 });
-      } else drawText(ui, label, x, y + 6, INK, 2);
-      drawText(ui, String(s[row]), x + w - (sw ? 104 : 0) - (s[row] > 9 ? 28 : 14), y + 6, live ? INK : TRIM, 2);
-      const sy = y + 34;
-      bigButton(ui, `step:${i * 2}`, '-', x, sy, sh, sh);
-      bigButton(ui, `step:${i * 2 + 1}`, '+', x + w - sh, sy, sh, sh);
-      const bx = x + sh + 8, bw = (w - sh * 2 - 16) / 10;
-      P(ui, BURN, bx, sy, w - sh * 2 - 16, sh);
-      for (let n = 0; n < 10; n++) {
-        const lx = Math.round(bx + n * bw);
-        zone(`block:${i * 100 + n}`, lx, sy - 8, Math.round(bw), sh + 16);
-        // blocks rise left to right, like a volume wedge
-        const bh = Math.round(sh * (0.45 + 0.55 * (n + 1) / 10));
-        P(ui, n < s[row] ? (live ? RED_INK : TRIM) : PAPER, lx + 2, sy + sh - bh - 2, Math.round(bw) - 4, bh);
-      }
-      y += Math.max(per, sh + 44);
-    }
-    y += 4;
-    this.toggleRow(ui, 'mute', 'MUTE ALL', isMuted(), x, y, w);
-  }
-
-  private drawTouch(ui: Ctx, x: number, y: number, w: number, room: number): void {
-    const t = getTouchSettings(), y0 = y;
-    drawText(ui, 'PAD SIZE', x, y + 2, INK, 2);
-    y += 24;
-    const bw = (w - GAP * 2) / 3;
-    (['S', 'M', 'L'] as PadSize[]).forEach((sz, i) =>
-      bigButton(ui, `tsize:${i}`, ['SMALL', 'MEDIUM', 'LARGE'][i], x + i * (bw + GAP), y, bw, TAP, { primary: t.size === sz }));
-    y += TAP + GAP * 3;
-    this.toggleRow(ui, 'left', 'LEFT-HANDED', t.left, x, y, w);
-    drawText(ui, 'BUTTONS ON THE LEFT, D-PAD ON THE RIGHT', x, y + TAP + 6, INK2, 1);
-    y += TAP + GAP * 3 + 8;
-    this.toggleRow(ui, 'buzz', 'VIBRATION', t.buzz, x, y, w);
-    drawText(ui, 'A SHORT BUZZ ON EACH PAD PRESS', x, y + TAP + 6, INK2, 1);
-    y += TAP + GAP * 3 + 8;
-    if (platform.fullscreen.supported()) {
-      this.toggleRow(ui, 'full', 'FULLSCREEN', platform.fullscreen.isOn(), x, y, w);
-      y += TAP + GAP * 2;
-    }
-    // a keyboard or gamepad on a phone gets the same key mapping screen as everywhere else
-    bigButton(ui, 't:keys', 'KEYS AND GAMEPAD →', x, y, w, TAP);
-    y += TAP + GAP * 2;
-    drawText(ui, 'SWIPE IN FROM THE LEFT EDGE TO GO BACK', x, y, INK2, 1);
-    drawText(ui, 'ON ANY SCREEN.', x, y + 12, INK2, 1);
-    y += 34;
-    const ph = Math.min(300, y0 + room - y);
-    if (ph >= 140) this.drawPadPreview(ui, x, y, w, ph, t);
   }
 
   /** A little phone showing where the fight pad sits with these settings. */

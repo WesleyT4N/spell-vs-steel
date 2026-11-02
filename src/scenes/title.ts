@@ -1,13 +1,13 @@
-import { pushScene, drawMenu, hint, listMouse, showSel, type Scene } from './scene';
+import { pushScene, drawMenu, hint, listMouse, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
 import { drawLogo, LOGO_W } from '../art/logo';
 import { getFrame, drawFighterSprite, defaultSkin, type ClassId } from '../art/sprites';
 import type { FrameId } from '../art/fighterFrames';
 import { FIRE as FIRE_RAMP, STEEL, SHADOW, HOLY } from '../game/fxView';
-import { P, W, UW, UH, view, screenRect, spread, clamp, dith, type Ctx } from '../engine/gfx';
+import { P, W, UW, UH, view, screenRect, clamp, dith, type Ctx } from '../engine/gfx';
 import { PLAYABLE } from '../game/classes';
-import { drawText, drawTextCentered, drawTextOutlined } from '../engine/font';
+import { drawTextCentered, drawTextOutlined } from '../engine/font';
 import { wasPressed, navPressed, anyPressed, k, mouse, page } from '../engine/input';
 import type { PadMode } from '../engine/touch';
 import { playMusic, sfx, isMuted } from '../engine/audio';
@@ -19,7 +19,6 @@ import { ModsScene } from './mods';
 import { ProfileScene } from './profile';
 import { loadMatch } from '../game/match';
 import { DEV_TOOLS } from '../flags';
-import { bigButton, tallArea, panel, TAP, GAP, PAD } from './touchUi';
 import { platform } from '../platform';
 import { flushSave } from '../engine/save';
 
@@ -31,7 +30,6 @@ const MENU_Y = ITEMS.length > 10 ? 146 : ITEMS.length > 9 ? 150 : ITEMS.length >
 const MENU_GAP = ITEMS.length > 10 ? 12 : ITEMS.length > 9 ? 13 : ITEMS.length > 8 ? 14 : ITEMS.length > 7 ? 15 : ITEMS.length > 6 ? 16 : 18;
 /** The logo's size (UI pixels per logo pixel; 2 is full size) and top edge on the UI layer when the menu sits under it. */
 const LOGO_SMALL = 1.5, LOGO_TOP = 14;
-// taller screens (phone portrait) have room under the stage: rows grow into it, with double-size text once they fit
 const MAX_GAP = 36, BIG_GAP = 24;
 
 /** Row gap, text scale, menu width and version-line y for the current screen height. */
@@ -167,7 +165,6 @@ export class TitleScene implements Scene {
   // a screen opened from here (the sandbox, a fight) may have changed the music
   resume(): void { playMusic('menu'); }
   pad(): PadMode { return 'none'; }
-  tall(): boolean { return true; }
 
   /** The side about to be knocked out, and the one knocking it. */
   private get target(): 0 | 1 { return (1 - this.swapSide) as 0 | 1; }
@@ -249,12 +246,7 @@ export class TitleScene implements Scene {
   draw(c: Ctx, tick: number, ui: Ctx): void {
     const intro = this.intro, sx = this.shake > 0 ? Math.round(Math.sin(this.t * 90) * 2) : 0;
     c.save();
-    // the full-height phone layout lifts the duel to the top of the screen; the menu fills the bottom
-    const lift = spread.tall ? tallLift() : 0;
-    c.translate(sx, -lift);
-    // the stage is painted to fill the screen; lifting it bares a strip along the bottom, under the menu
-    if (lift) { const [rx, ry, rw, rh] = screenRect(); P(c, '#2a1a08', rx, ry + rh, rw, lift); }
-    // and the sky above the logo carries on up past the top of the painted stage
+    c.translate(sx, 0);
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.25)';
     c.fillRect(...screenRect());
@@ -308,13 +300,13 @@ export class TitleScene implements Scene {
       onFighterGrid(c, p.x, p.y, () => P(c, r[i], 0, 0, z, z));
     }
 
-    // the logo drops in and lands with a bounce. The phone's full-height layout has room for it at full size, over the duel
+    // the logo drops in and lands with a bounce
     const drop = span(intro, LOGO_DROP);
-    if (drop > 0 && spread.tall) drawLogo(c, W / 2, Math.round(10 - (1 - drop) ** 2 * 110), this.t);
+    
     c.restore();
     // elsewhere the menu sits right under it, so it draws at 3/4 size on the sharper UI layer: each logo pixel is a
     // whole 3x3 block of backing pixels there, so it shrinks without any uneven pixels
-    if (drop > 0 && !spread.tall) {
+    if (drop > 0) {
       ui.save();
       ui.translate(UW / 2 - (LOGO_W / 2) * LOGO_SMALL + sx * 2, LOGO_TOP - Math.round((1 - drop) ** 2 * 220));
       ui.scale(LOGO_SMALL, LOGO_SMALL);
@@ -333,7 +325,7 @@ export class TitleScene implements Scene {
 
     const rise = span(intro, MENU_IN);
     if (rise <= 0) return;
-    if (spread.tall) { this.drawTall(ui, rise); return; }
+    
     const { gap, scale, width, versionY } = menuLayout();
     ui.save();
     ui.translate(0, Math.round((1 - rise) ** 2 * 80) & ~1);
@@ -345,46 +337,4 @@ export class TitleScene implements Scene {
     if (isMuted()) drawTextOutlined(ui, 'MUTED', 8, 22, '#fcfcfc');
     hint(ui, `CLICK OR ${k('up')}/${k('down')} + ${k('attack')} TO SELECT   M: MUTE`);
   }
-
-  /** The full-height phone menu: one big button for the top mode, then the modes two to a row, all in the thumb zone. */
-  private drawTall(ui: Ctx, rise: number): void {
-    const a = tallArea();
-    const rows = tallRows();
-    const w = a.w - PAD * 2, half = (w - GAP) / 2;
-    const y0 = tallMenuTop(), h = a.y + a.h - PAD - y0;
-    ui.save();
-    ui.translate(0, Math.round((1 - rise) ** 2 * 160) & ~1);
-    panel(ui, a.x + PAD - 6, y0, w + 12, h);
-    let y = y0 + 14;
-    for (const r of rows) {
-      r.items.forEach((item, j) => {
-        const i = ITEMS.indexOf(item);
-        const x = a.x + PAD + (r.items.length > 1 ? j * (half + GAP) : 0);
-        bigButton(ui, `menu:${i}`, TALL_LABEL[item] ?? item, x, y, r.items.length > 1 ? half : w, r.h, { primary: item === ITEMS[0], on: i === this.sel && showSel() && item !== ITEMS[0] });
-      });
-      y += r.h + GAP;
-    }
-    ui.restore();
-    drawTextCentered(ui, DEV_TOOLS ? 'PROTOTYPE 0.3  DEV BUILD' : 'PROTOTYPE 0.3', UW / 2, y0 - 16, '#bcbcbc', 1, true);
-    if (isMuted()) drawText(ui, 'MUTED', a.x + 8, a.y + 8, '#7c7c7c');
-  }
-}
-
-/** Shorter names for the two-column phone menu. */
-const TALL_LABEL: Record<string, string> = { 'ARCADE MODE': 'ARCADE', 'VERSUS MODE': 'VERSUS', 'ONLINE MODE': 'ONLINE', 'TRAINING MODE': 'TRAINING', 'SPELL DECK BUILDER': 'DECKS' };
-/** The phone menu's rows: the top mode alone and tall, the rest in pairs. */
-function tallRows(): Array<{ items: string[]; h: number }> {
-  const rest = ITEMS.slice(1);
-  const rows = [{ items: [ITEMS[0]], h: 76 }];
-  for (let i = 0; i < rest.length; i += 2) rows.push({ items: rest.slice(i, i + 2), h: TAP + 8 });
-  return rows;
-}
-/** Top of the phone menu panel on the UI layer: it sits on the bottom of the screen. */
-function tallMenuTop(): number {
-  const a = tallArea();
-  return a.y + a.h - PAD - (tallRows().reduce((n, r) => n + r.h + GAP, 0) - GAP + 28);
-}
-/** How far (world pixels) the full-height layout lifts the duel so the fighters stand just above the menu. */
-function tallLift(): number {
-  return Math.max(0, Math.min(view.oy, FOOT + 4 - (Math.floor(tallMenuTop() / 2) - 18)));
 }

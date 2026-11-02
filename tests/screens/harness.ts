@@ -3,7 +3,6 @@
 // entry at every screen shape.
 import './frameClock';
 import * as game from '../../src/main';
-import { spread } from '../../src/engine/gfx';
 import { screens } from '../../src/dev/screens';
 
 declare global { interface Window { __test: unknown } }
@@ -12,8 +11,6 @@ declare global { interface Window { __test: unknown } }
 const ready = (game as { ready?: Promise<void> }).ready ?? Promise.resolve();
 void ready.then(() => { window.__test = {
   names: Object.keys(screens),
-  /** True when the screen shown uses its full-height phone layout (it fills the whole window, not the top half). */
-  tall: (): boolean => spread.tall,
   show(name: string): void {
     const open = screens[name];
     if (!open) throw new Error(`no screen named ${name}`);

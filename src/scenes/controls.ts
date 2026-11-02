@@ -1,7 +1,7 @@
 import { popScene, hint, zone, hot, listMouse, showSel, type Scene } from './scene';
 import { getArena } from '../game/battleView';
 import { drawStage } from '../art/arena';
-import { UW, screenRect, vy, vspan, type Ctx } from '../engine/gfx';
+import { UW, screenRect, type Ctx } from '../engine/gfx';
 import { drawText, drawTextCentered } from '../engine/font';
 import { wasPressed, navPressed, BINDABLE, getKey, setKey, resetKeys, keyName, k, captureNextKey, RESERVED, mouse, type Bindable,
   LOCAL_ACTS, getP2Key, setP2Key, resetP2Keys, type LocalAct,
@@ -91,18 +91,17 @@ export class ControlsScene implements Scene {
     drawStage(c, getArena(), tick);
     c.fillStyle = 'rgba(40,20,0,0.35)';
     c.fillRect(...screenRect());
-    win(ui, PX - 16, vy(14), PW + 32, vspan(14, 286));
-    drawTextCentered(ui, 'KEY MAPPING', UW / 2, vy(22), RED_INK, 2, false);
+    win(ui, PX - 16, 14, PW + 32, 286);
+    drawTextCentered(ui, 'KEY MAPPING', UW / 2, 22, RED_INK, 2, false);
     TABS.forEach((t, i) => {
       const x = TX0 + i * (TW + TGAP), on = i === this.tab;
-      const ty = vy(TY), th = vspan(TY, 14);
+      const ty = TY, th = 14;
       zone(`tab:${i}`, x, ty, TW, th);
       const text = plaque(ui, x, ty, TW, th, on);
       drawTextCentered(ui, t, x + TW / 2, ty + Math.round((th - 6) / 2), on ? text : i === 1 ? BLUE_INK : RED_INK, 1, false);
     });
     this.rows.forEach((row, i) => {
-      // phone portrait spreads the rows into the spare height
-      const y = vy(this.rowY(i)), rh = vspan(this.rowY(i), RH), ty = y + 5 + Math.round((rh - RH) / 2);
+      const y = this.rowY(i), rh = RH, ty = y + 5 + Math.round((rh - RH) / 2);
       const on = i === this.sel && showSel();
       zone(`row:${i}`, PX - 12, y, PW + 24, rh - 1);
       if (on) selRow(ui, PX - 12, y, PW + 24, rh - 1);
@@ -116,16 +115,16 @@ export class ControlsScene implements Scene {
       drawText(ui, keyName(this.tab === 0 ? getKey(row) : getP2Key(row as LocalAct)), KEY_X, ty, BLUE_INK);
       drawText(ui, padName(this.tab === 0 ? getPadButton(row) : getP2PadButton(row as LocalAct)), PAD_X, ty, BLUE_INK);
     });
-    drawText(ui, 'KEY', KEY_X, vy(Y0 - 8), TRIM);
-    drawText(ui, padCount() ? 'PAD' : 'PAD (NONE)', PAD_X, vy(Y0 - 8), TRIM);
+    drawText(ui, 'KEY', KEY_X, Y0 - 8, TRIM);
+    drawText(ui, padCount() ? 'PAD' : 'PAD (NONE)', PAD_X, Y0 - 8, TRIM);
     if (this.tab === 0) {
-      drawText(ui, `HOLD ${k('attack')}: HEAVY ATTACK    ${k('cast')} + DIRECTION: AIM SPELL`, PX, vy(262), TRIM);
-      drawText(ui, 'ARROWS ALSO MOVE (NOT IN 2P VERSUS)   ESC: PAUSE   M: MUTE', PX, vy(262) + 12, TRIM);
+      drawText(ui, `HOLD ${k('attack')}: HEAVY ATTACK    ${k('cast')} + DIRECTION: AIM SPELL`, PX, 262, TRIM);
+      drawText(ui, 'ARROWS ALSO MOVE (NOT IN 2P VERSUS)   ESC: PAUSE   M: MUTE', PX, 262 + 12, TRIM);
     } else {
-      drawText(ui, 'FOR TWO PLAYERS IN VERSUS: PAD 2 PLAYS PLAYER 2', PX, vy(262), TRIM);
-      drawText(ui, `NUMPAD ALSO WORKS: 8456 MOVE, 1 2 3   ${keyName(getKey('pause'))}/ESC: PAUSE`, PX, vy(262) + 12, TRIM);
+      drawText(ui, 'FOR TWO PLAYERS IN VERSUS: PAD 2 PLAYS PLAYER 2', PX, 262, TRIM);
+      drawText(ui, `NUMPAD ALSO WORKS: 8456 MOVE, 1 2 3   ${keyName(getKey('pause'))}/ESC: PAUSE`, PX, 262 + 12, TRIM);
     }
-    if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, vy(262) + 26, RED_INK, 1, false);
+    if (this.msgT > 0) drawTextCentered(ui, this.msg, UW / 2, 262 + 26, RED_INK, 1, false);
     hint(ui, this.waiting ? 'PRESS A KEY OR PAD BUTTON   ESC / SELECT: CANCEL' : `CLICK A ROW OR ${k('attack')}: REBIND   ←/→: TAB   ${k('cast')} / RIGHT-CLICK: BACK`);
   }
 }
